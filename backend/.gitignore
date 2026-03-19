@@ -1,0 +1,8 @@
+node_modules
+.env
+coverage
+npm-debug.log*
+uploads/photos/*
+uploads/documents/*
+!uploads/photos/.gitkeep
+!uploads/documents/.gitkeep

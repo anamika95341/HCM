@@ -1,0 +1,52 @@
+const fs = require('fs');
+const path = require('path');
+const multer = require('multer');
+const crypto = require('crypto');
+const { fileTypeFromBuffer } = require('file-type');
+const env = require('../config/env');
+
+const ALLOWED = new Set(['image/jpeg', 'image/png', 'application/pdf']);
+
+fs.mkdirSync(path.resolve(process.cwd(), env.uploadDir, 'photos'), { recursive: true });
+fs.mkdirSync(path.resolve(process.cwd(), env.uploadDir, 'documents'), { recursive: true });
+
+const storage = multer.memoryStorage();
+
+function createUploader({ maxSizeBytes, subdir }) {
+  return multer({
+    storage,
+    limits: { fileSize: maxSizeBytes },
+    async fileFilter(req, file, cb) {
+      cb(null, true);
+    },
+  }).single('file');
+}
+
+async function persistPrivateUpload(file, subdir) {
+  const type = await fileTypeFromBuffer(file.buffer);
+  if (!type || !ALLOWED.has(type.mime)) {
+    const error = new Error('Invalid file type');
+    error.status = 400;
+    throw error;
+  }
+
+  const ext = type.ext;
+  const storedName = `${crypto.randomUUID()}.${ext}`;
+  const baseDir = path.resolve(process.cwd(), env.uploadDir, subdir);
+  const storagePath = path.join(baseDir, storedName);
+  fs.writeFileSync(storagePath, file.buffer);
+
+  return {
+    storedName,
+    originalName: file.originalname,
+    mimeType: type.mime,
+    fileSize: file.size,
+    storagePath,
+  };
+}
+
+module.exports = {
+  photoUpload: createUploader({ maxSizeBytes: 2 * 1024 * 1024, subdir: 'photos' }),
+  documentUpload: createUploader({ maxSizeBytes: 10 * 1024 * 1024, subdir: 'documents' }),
+  persistPrivateUpload,
+};
