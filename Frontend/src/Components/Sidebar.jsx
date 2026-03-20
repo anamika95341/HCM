@@ -133,6 +133,26 @@ function Sidebar({ collapsed, onToggle }) {
                                 collapsed={collapsed}
                             />
                         </div>
+
+                        <div onClick={handlePreventRedirect}>
+                            <SidebarItem
+                                type="NavLink"
+                                to="/CalendarEvent"
+                                icon={BsFillGearFill}
+                                label="DEO Calendar "
+                                collapsed={collapsed}
+                            />
+                        </div>
+
+                        <div onClick={handlePreventRedirect}>
+                            <SidebarItem
+                                type="NavLink"
+                                to="/ministerdashboard"
+                                icon={BsFillGearFill}
+                                label="Minister Dashboard"
+                                collapsed={collapsed}
+                            />
+                        </div>
                     </ul>
                 </div>
                 <div className="border-t border-gray-300 px-3 py-2">

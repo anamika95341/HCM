@@ -12,6 +12,8 @@ import AdminAllCases from './Components/Admin/AdminAllCases'
 import AdminCases from './Components/Admin/AdminCases'
 import AdminCaseDetail from './Components/Admin/AdminCaseDetail'
 import AdminMeeting from './Components/Admin/AdminMeeting'
+import MinisterDashboard from './Components/Minister/MinisterDashboard'
+import DeoCalendarEvent from './Components/DEO/DeoCalendarEvent'
 function App() {
 
   return (
@@ -30,6 +32,8 @@ function App() {
           <Route path='/admincases' element={<AdminCases />} />
           <Route path='/admincasedetail' element={<AdminCaseDetail />} />
           <Route path='/Meetings' element={<AdminMeeting />} />
+          <Route path='/ministerdashboard' element={<MinisterDashboard />} />
+          <Route path='//CalendarEvent' element={<DeoCalendarEvent />} />
         
         </Route>
       </Routes>
