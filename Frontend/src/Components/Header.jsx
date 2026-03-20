@@ -7,6 +7,7 @@ import {
     FiSettings,
     FiLogOut,
     FiMinimize,
+    FiCalendar,
 } from "react-icons/fi";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 
@@ -77,6 +78,11 @@ const Header = () => {
         if (e) e.preventDefault();
     };
 
+    // 🟢 NEW: Handle calendar navigation
+    const handleCalendarClick = () => {
+        navigate("/calendar");
+    };
+
     return (
         <header className="h-12 bg-white shadow flex items-center justify-between px-6">
             <div className="">
@@ -85,24 +91,37 @@ const Header = () => {
                 )}
             </div>
             <div className="flex items-center gap-4 relative" ref={ref}>
-                <HeaderIcon icon={isFullscreen ? FiMinimize : FiMaximize} onClick={toggleFullscreen} />
+                <HeaderIcon icon={isFullscreen ? FiMinimize : FiMaximize} onClick={toggleFullscreen} title="Toggle Fullscreen" />
+
+                {/* 🟢 NEW: Calendar Icon */}
+                <HeaderIcon 
+                    icon={FiCalendar} 
+                    onClick={handleCalendarClick}
+                    title="Open Calendar"
+                    className="text-indigo-600 hover:text-indigo-700"
+                />
 
                 {/* 🟢 Notifications modal remove kar diya gaya hai */}
-                <HeaderIcon icon={FiBell} dot={hasUnread} onClick={(e) => {
-                    handlePreventRedirect(e);
-                    setOpen(false);
-                }} />
+                <HeaderIcon 
+                    icon={FiBell} 
+                    dot={hasUnread} 
+                    onClick={(e) => {
+                        handlePreventRedirect(e);
+                        setOpen(false);
+                    }}
+                    title="Notifications"
+                />
 
                 {/* Avatar Button */}
-                <button onClick={(e) => { handlePreventRedirect(e); setOpen((v) => !v); }} className="focus:outline-none">
+                <button onClick={(e) => { handlePreventRedirect(e); setOpen((v) => !v); }} className="focus:outline-none" title="User Menu">
                     {user?.avatar ? (
                         <img
                             src={user.avatar}
                             alt="User Avatar"
-                            className="w-8 h-8 rounded-full object-cover border border-gray-300 cursor-pointer shadow-sm"
+                            className="w-8 h-8 rounded-full object-cover border border-gray-300 cursor-pointer shadow-sm hover:shadow-md transition-shadow"
                         />
                     ) : (
-                        <div className="w-8 h-8 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center font-bold text-sm border border-gray-300 cursor-pointer shadow-sm">
+                        <div className="w-8 h-8 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center font-bold text-sm border border-gray-300 cursor-pointer shadow-sm hover:shadow-md transition-shadow">
                             {userInitial}
                         </div>
                     )}
@@ -110,7 +129,7 @@ const Header = () => {
 
                 {/* Profile Dropdown */}
                 {open && (
-                    <div className="absolute right-0 top-11 w-64 bg-white rounded-xl shadow-lg border border-gray-200 z-50 overflow-hidden">
+                    <div className="absolute right-0 top-11 w-64 bg-white rounded-xl shadow-lg border border-gray-200 z-50 overflow-hidden animate-in fade-in zoom-in-95 duration-200">
                         {/* User info */}
                         <div className="flex items-center gap-3 px-4 py-3 border-b border-gray-100 bg-gray-50/50">
                             {/* Dropdown Avatar */}
@@ -150,6 +169,15 @@ const Header = () => {
                                 handlePreventRedirect(e);
                                 setOpen(false);
                             }} />
+                            <MenuItem 
+                                icon={FiCalendar} 
+                                label="Calendar" 
+                                onClick={(e) => {
+                                    handlePreventRedirect(e);
+                                    setOpen(false);
+                                    navigate("/calendar");
+                                }} 
+                            />
                             <MenuItem icon={FiLogOut} label="Logout" danger onClick={(e) => {
                                 handlePreventRedirect(e);
                                 // localStorage.removeItem("loggedInUser");
@@ -166,8 +194,12 @@ const Header = () => {
     );
 };
 
-const HeaderIcon = ({ icon: Icon, badge, dot, onClick }) => (
-    <button className="relative text-gray-500 hover:text-gray-700 cursor-pointer" onClick={onClick}>
+const HeaderIcon = ({ icon: Icon, badge, dot, onClick, title, className }) => (
+    <button 
+        className={`relative text-gray-500 hover:text-gray-700 cursor-pointer transition-colors ${className || ""}`} 
+        onClick={onClick}
+        title={title}
+    >
         <Icon size={18} />
 
         {badge && badge > 0 && (
@@ -183,10 +215,12 @@ const HeaderIcon = ({ icon: Icon, badge, dot, onClick }) => (
 );
 
 const MenuItem = ({ icon: Icon, label, danger, onClick }) => (
-    <li className={`flex items-center gap-3 px-4 py-2.5 cursor-pointer transition-colors
-        ${danger ? "text-red-600 hover:bg-red-50" : "text-gray-700 hover:bg-gray-100"}
+    <li 
+        className={`flex items-center gap-3 px-4 py-2.5 cursor-pointer transition-colors
+            ${danger ? "text-red-600 hover:bg-red-50" : "text-gray-700 hover:bg-gray-100"}
         `}
-        onClick={onClick} >
+        onClick={onClick}
+    >
         <Icon size={16} />
         {label}
     </li>

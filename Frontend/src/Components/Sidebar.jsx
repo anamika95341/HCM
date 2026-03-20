@@ -107,9 +107,9 @@ function Sidebar({ collapsed, onToggle }) {
                         <div onClick={handlePreventRedirect}>
                             <SidebarItem
                                 type="NavLink"
-                                to="/admincases"
+                                to="/adminallcases"
                                 icon={BsFillGearFill}
-                                label="Work Queue"
+                                label="Work Pool"
                                 collapsed={collapsed}
                             />
                         </div>
@@ -117,9 +117,9 @@ function Sidebar({ collapsed, onToggle }) {
                         <div onClick={handlePreventRedirect}>
                             <SidebarItem
                                 type="NavLink"
-                                to="/calender"
+                                to="/admincases"
                                 icon={BsFillGearFill}
-                                label="Calendar"
+                                label="My Cases" //Admin Cases
                                 collapsed={collapsed}
                             />
                         </div>

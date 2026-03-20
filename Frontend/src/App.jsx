@@ -7,6 +7,11 @@ import MyCases from './Components/Citizen/MyCases'
 import Meeting from './Components/Citizen/Meeting'
 import CaseDetail from './Components/Citizen/CaseDetail'
 import Setting from './Pages/Setting'
+import Calendar from './Components/Admin/Calendar'
+import AdminAllCases from './Components/Admin/AdminAllCases'
+import AdminCases from './Components/Admin/AdminCases'
+import AdminCaseDetail from './Components/Admin/AdminCaseDetail'
+import AdminMeeting from './Components/Admin/AdminMeeting'
 function App() {
 
   return (
@@ -20,6 +25,12 @@ function App() {
           <Route path='/meeting' element={<Meeting />} />
           <Route path='/case/:id' element={<CaseDetail />} />
           <Route path='/setting' element={<Setting />} />
+          <Route path='/calendar' element={<Calendar />} />
+          <Route path='/adminallcases' element={<AdminAllCases />} />
+          <Route path='/admincases' element={<AdminCases />} />
+          <Route path='/admincasedetail' element={<AdminCaseDetail />} />
+          <Route path='/Meetings' element={<AdminMeeting />} />
+        
         </Route>
       </Routes>
     </>
