@@ -220,8 +220,8 @@ export default function CaseDetailsPage() {
   const statusColor = statusBadgeClass(caseData.status);
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-900 dark:to-slate-950 p-6">
-      <div className="max-w-[1200px] mx-auto">
+    <div className="portal-page min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-900 dark:to-slate-950">
+      <div className="portal-page-wrap max-w-[1200px] mx-auto">
         {/* Back Button */}
         <button
           onClick={() => navigate(-1)}
@@ -231,7 +231,7 @@ export default function CaseDetailsPage() {
         </button>
 
         {/* Header Card */}
-        <div className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 p-6 mb-6 shadow-sm">
+        <div className="portal-hero bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 p-6 mb-6 shadow-sm">
           <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-4">
             <div className="flex-1">
               <div className="flex items-center gap-3 mb-3">

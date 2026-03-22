@@ -103,17 +103,17 @@ export default function AdminAllCases() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-white via-blue-50 to-blue-100 p-6">
-      <div className="max-w-7xl mx-auto">
+    <div className="portal-page min-h-screen bg-gradient-to-br from-white via-blue-50 to-blue-100">
+      <div className="portal-page-wrap max-w-7xl mx-auto">
         
         {/* Header */}
-        <div className="mb-8">
+        <div className="portal-page-header">
           <h1 className="text-4xl font-bold text-gray-900 mb-2">Cases Management</h1>
           <p className="text-gray-600">Manage complaints and meeting requests</p>
         </div>
 
         {/* Tabs */}
-        <div className="flex gap-2 mb-6 bg-white rounded-lg p-1 border border-gray-200 shadow-sm w-fit">
+        <div className="portal-panel flex gap-2 mb-6 bg-white rounded-lg p-1 border border-gray-200 shadow-sm w-fit">
           {[
             ["complaints", `Complaints (${tabCounts.complaints})`],
             ["meetings", `Meet the Minister (${tabCounts.meetings})`],
@@ -135,7 +135,7 @@ export default function AdminAllCases() {
         </div>
 
         {/* Filter Section */}
-        <div className="bg-white rounded-lg border border-gray-200 shadow-sm p-4 mb-6">
+        <div className="portal-panel bg-white rounded-lg border border-gray-200 shadow-sm p-4 mb-6">
           <div className="grid md:grid-cols-3 gap-4">
             <input
               value={filters.q}
@@ -159,15 +159,15 @@ export default function AdminAllCases() {
 
         {/* Table */}
         {loading ? (
-          <div className="bg-white rounded-lg border border-gray-200 p-12 text-center">
+          <div className="portal-panel bg-white rounded-lg border border-gray-200 p-12 text-center">
             <p className="text-gray-600 font-medium">Loading...</p>
           </div>
         ) : rows.length === 0 ? (
-          <div className="bg-white rounded-lg border border-gray-200 p-12 text-center">
+          <div className="portal-panel bg-white rounded-lg border border-gray-200 p-12 text-center">
             <p className="text-gray-600 font-medium">No items found</p>
           </div>
         ) : (
-          <div className="bg-white rounded-lg border border-gray-200 shadow-sm overflow-hidden flex flex-col">
+          <div className="portal-panel bg-white rounded-lg border border-gray-200 shadow-sm overflow-hidden flex flex-col">
             
             {/* Table */}
             <div className="overflow-x-auto">

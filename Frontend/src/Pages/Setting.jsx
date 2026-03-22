@@ -1,76 +1,7 @@
-import React, { useState, createContext, useContext, useEffect, useLayoutEffect } from "react";
+import React, { useState } from "react";
+import { usePortalTheme } from "../theme/portalTheme";
 
-const FONT_URL = "https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap";
-
-const THEMES = {
-  dark: {
-    bg: '#0a0a0a',
-    bgElevated: '#111111',
-    card: '#161616',
-    cardHover: '#1a1a1a',
-    border: '#262626',
-    borderLight: '#1f1f1f',
-    purple: '#a855f7',
-    purpleDim: 'rgba(168,85,247,0.15)',
-    mint: '#34d399',
-    mintDim: 'rgba(52,211,153,0.15)',
-    t1: '#ffffff',
-    t2: '#a3a3a3',
-    t3: '#737373',
-    inp: '#1a1a1a',
-    danger: '#ef4444',
-    warn: '#f59e0b',
-    success: '#34d399',
-    scrollbar: '#2e2e2e',
-    scrollbarHover: '#404040',
-    navHover: 'rgba(255,255,255,0.04)',
-  },
-  light: {
-    bg: '#f5f5f5',
-    bgElevated: '#ffffff',
-    card: '#ffffff',
-    cardHover: '#fafafa',
-    border: '#e5e5e5',
-    borderLight: '#ebebeb',
-    purple: '#7c3aed',
-    purpleDim: 'rgba(124,58,237,0.12)',
-    mint: '#059669',
-    mintDim: 'rgba(5,150,105,0.12)',
-    t1: '#171717',
-    t2: '#525252',
-    t3: '#737373',
-    inp: '#fafafa',
-    danger: '#dc2626',
-    warn: '#d97706',
-    success: '#059669',
-    scrollbar: '#d4d4d4',
-    scrollbarHover: '#a3a3a3',
-    navHover: 'rgba(0,0,0,0.04)',
-  },
-};
-
-const ThemeContext = createContext({ theme: 'dark', rawTheme: 'dark', setTheme: () => { }, C: THEMES.dark });
-const useTheme = () => useContext(ThemeContext);
-
-const getGlobalStyles = (theme) => {
-  const C = THEMES[theme];
-  return `
-  @import url('${FONT_URL}');
-  .settings-portal, .settings-portal *, .settings-portal *::before, .settings-portal *::after { box-sizing: border-box; margin: 0; padding: 0; }
-  .settings-portal { font-family: 'Inter', system-ui, -apple-system, sans-serif; }
-  .settings-portal input, .settings-portal select, .settings-portal button, .settings-portal textarea { font-family: 'Inter', system-ui, sans-serif; }
-  .settings-portal input:focus, .settings-portal select:focus { border-color: ${C.purple} !important; box-shadow: 0 0 0 3px ${C.purpleDim} !important; outline: none; }
-  .settings-portal input[type=color] { padding: 0; cursor: pointer; }
-  .settings-portal::-webkit-scrollbar, .settings-portal *::-webkit-scrollbar { width: 6px; }
-  .settings-portal::-webkit-scrollbar-track, .settings-portal *::-webkit-scrollbar-track { background: transparent; }
-  .settings-portal::-webkit-scrollbar-thumb, .settings-portal *::-webkit-scrollbar-thumb { background: ${C.scrollbar}; border-radius: 10px; }
-  .settings-portal::-webkit-scrollbar-thumb:hover, .settings-portal *::-webkit-scrollbar-thumb:hover { background: ${C.scrollbarHover}; }
-  .settings-portal button { transition: opacity 0.2s ease, transform 0.2s ease; }
-  .settings-portal button:hover { opacity: 0.9; }
-  .settings-portal button:active { transform: scale(0.98); }
-  @keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
-`;
-};
+const useTheme = usePortalTheme;
 
 // ── ICONS (thin line style) ──
 function Ico({ n, s = 18, c = 'currentColor', w = 1.5, style }) {
@@ -856,35 +787,5 @@ function SettingsPortalContent() {
 }
 
 export default function Setting() {
-  const [theme, setTheme] = useState(() => {
-    try { return localStorage.getItem('eparinam-theme') || 'dark'; } catch { return 'dark'; }
-  });
-  const [resolvedTheme, setResolvedTheme] = useState('dark');
-
-  useEffect(() => {
-    try { localStorage.setItem('eparinam-theme', theme); } catch { }
-  }, [theme]);
-
-  useLayoutEffect(() => {
-    const resolve = () => {
-      if (theme === 'system') {
-        setResolvedTheme(typeof window !== 'undefined' && window.matchMedia?.('(prefers-color-scheme: light)').matches ? 'light' : 'dark');
-      } else {
-        setResolvedTheme(theme);
-      }
-    };
-    resolve();
-    if (theme === 'system' && typeof window !== 'undefined') {
-      const mq = window.matchMedia('(prefers-color-scheme: light)');
-      mq.addEventListener('change', resolve);
-      return () => mq.removeEventListener('change', resolve);
-    }
-  }, [theme]);
-
-  return (
-    <ThemeContext.Provider value={{ theme: resolvedTheme, rawTheme: theme, setTheme, C: THEMES[resolvedTheme] }}>
-      <style dangerouslySetInnerHTML={{ __html: getGlobalStyles(resolvedTheme) }} />
-      <SettingsPortalContent />
-    </ThemeContext.Provider>
-  );
+  return <SettingsPortalContent />;
 }

@@ -1,6 +1,17 @@
-import React, { useState, useEffect } from "react";
-import { Mail, Lock, Eye, EyeOff, AlertCircle, CheckCircle, ArrowRight, Shield, Zap } from "lucide-react";
+import React, { useEffect, useState } from "react";
+import { AlertCircle, ArrowRight, CheckCircle, Eye, EyeOff, Lock, Mail, Shield } from "lucide-react";
 import { useNavigate } from "react-router-dom";
+import { usePortalTheme } from "../theme/portalTheme";
+
+const fieldStyle = (C, hasIcon = true, hasRightAction = false) => ({
+    width: "100%",
+    padding: hasIcon ? `12px ${hasRightAction ? "42px" : "14px"} 12px 40px` : "12px 14px",
+    borderRadius: 10,
+    border: `1px solid ${C.border}`,
+    background: C.inp,
+    color: C.t1,
+    fontSize: 13,
+});
 
 const Login = () => {
     const [email, setEmail] = useState("");
@@ -15,6 +26,7 @@ const Login = () => {
     const [resetSuccess, setResetSuccess] = useState(false);
     const [redirecting, setRedirecting] = useState(false);
     const navigate = useNavigate();
+    const { C } = usePortalTheme();
 
     useEffect(() => {
         if (success && !loading) {
@@ -28,32 +40,27 @@ const Login = () => {
         }
     }, [success, loading, navigate]);
 
-    const handleLogin = (e) => {
-        e.preventDefault();
+    const handleLogin = (event) => {
+        event.preventDefault();
         setLoading(true);
         setError("");
         setSuccess("");
 
-        console.log("Login Attempt with:", { email, password });
-
-        // Simulate API call
         setTimeout(() => {
             if (email && password) {
-                setSuccess("✓ Authentication successful! Redirecting...");
+                setSuccess("Authentication successful. Redirecting to the workspace.");
                 setLoading(false);
             } else {
-                setError("Please fill in all mandatory fields");
+                setError("Please fill in all mandatory fields.");
                 setLoading(false);
             }
         }, 1200);
     };
 
-    const handleForgotPassword = (e) => {
-        e.preventDefault();
+    const handleForgotPassword = (event) => {
+        event.preventDefault();
         setResetLoading(true);
         setError("");
-
-        console.log("Password Reset for:", resetEmail);
 
         setTimeout(() => {
             setResetSuccess(true);
@@ -67,273 +74,283 @@ const Login = () => {
         }, 1200);
     };
 
+    const cardStyle = {
+        width: "100%",
+        maxWidth: 460,
+        background: C.card,
+        border: `1px solid ${C.border}`,
+        borderRadius: 18,
+        boxShadow: "var(--portal-shadow)",
+        overflow: "hidden",
+    };
+
     return (
-        <div className="min-h-screen bg-slate-50 flex items-center justify-center px-4 py-2 relative overflow-hidden font-sans">
-            {/* Subtle, Formal Background Effects */}
-            <div className="absolute top-[-10%] right-[-5%] w-[500px] h-[500px] bg-orange-500/10 rounded-full blur-3xl opacity-60"></div>
-            <div className="absolute bottom-[-10%] left-[-5%] w-[500px] h-[500px] bg-green-600/10 rounded-full blur-3xl opacity-60"></div>
-            <div className="absolute inset-0 bg-[radial-gradient(#e5e7eb_1px,transparent_1px)] [background-size:16px_16px] opacity-40"></div>
-
-            {/* Main Container */}
-            <div className="w-full max-w-md relative z-10">
-
-                {/* Loading Redirect Overlay */}
-                {redirecting && (
-                    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm">
-                        <div className="bg-white rounded-2xl p-8 text-center shadow-2xl border-t-4 border-orange-500">
-                            <div className="mb-4 flex justify-center">
-                                <div className="relative w-16 h-16 bg-slate-100 rounded-full flex items-center justify-center">
-                                    <Shield className="text-slate-800" size={32} />
-                                </div>
-                            </div>
-                            <p className="text-slate-800 font-bold text-lg">Securing Session...</p>
-                            <p className="text-slate-500 text-sm mt-1">Routing to dashboard</p>
-                            <div className="mt-4 flex gap-1 justify-center">
-                                <div className="w-2 h-2 bg-orange-500 rounded-full animate-bounce"></div>
-                                <div className="w-2 h-2 bg-orange-500 rounded-full animate-bounce" style={{ animationDelay: '0.1s' }}></div>
-                                <div className="w-2 h-2 bg-orange-500 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
-                            </div>
+        <div
+            className="portal-content"
+            style={{
+                minHeight: "100vh",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                padding: "24px 16px",
+                background: C.bg,
+            }}
+        >
+            {redirecting && (
+                <div
+                    className="fixed inset-0 z-50 flex items-center justify-center"
+                    style={{ background: "rgba(0,0,0,0.55)", backdropFilter: "blur(10px)" }}
+                >
+                    <div style={{ ...cardStyle, maxWidth: 360, padding: 32, textAlign: "center" }}>
+                        <div
+                            style={{
+                                width: 68,
+                                height: 68,
+                                borderRadius: 16,
+                                background: C.purpleDim,
+                                color: C.purple,
+                                display: "flex",
+                                alignItems: "center",
+                                justifyContent: "center",
+                                margin: "0 auto 18px",
+                            }}
+                        >
+                            <Shield size={34} />
                         </div>
+                        <div style={{ fontSize: 20, fontWeight: 700, color: C.t1 }}>Securing session</div>
+                        <div style={{ fontSize: 12, color: C.t3, marginTop: 6 }}>Routing to the dashboard workspace.</div>
                     </div>
-                )}
+                </div>
+            )}
 
-                {/* Login Card */}
+            <div style={cardStyle}>
+                <div style={{ padding: "32px 32px 28px", background: C.bgElevated, borderBottom: `1px solid ${C.border}` }}>
+                    <div
+                        style={{
+                            width: 56,
+                            height: 56,
+                            borderRadius: 14,
+                            background: C.purpleDim,
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            marginBottom: 18,
+                        }}
+                    >
+                        <Shield size={28} color={C.purple} />
+                    </div>
+                    <div style={{ fontSize: 11, fontWeight: 700, color: C.t3, textTransform: "uppercase", letterSpacing: ".18em" }}>
+                        Government Workspace
+                    </div>
+                    <h1 style={{ margin: "10px 0 6px", fontSize: 28, lineHeight: 1.1, color: C.t1 }}>Ministry of Culture</h1>
+                    <p style={{ margin: 0, color: C.t3, fontSize: 13, lineHeight: 1.6 }}>
+                        Sign in to the unified portal with the same visual workspace used across settings, cases, meetings, and dashboards.
+                    </p>
+                </div>
+
                 {!isForgotPassword ? (
-                    <div className="bg-white rounded-2xl shadow-[0_8px_30px_rgb(0,0,0,0.08)] overflow-hidden border border-slate-200 transform transition-all">
-                        
-                        {/* Official Header */}
-                        <div className="relative px-8 py-10 bg-[#0f172a] text-center overflow-hidden">
-                            {/* Tricolor Top Bar */}
-                            <div className="absolute top-0 left-0 right-0 h-1.5 flex">
-                                <div className="flex-1 bg-[#FF9933]"></div>
-                                <div className="flex-1 bg-white"></div>
-                                <div className="flex-1 bg-[#138808]"></div>
-                            </div>
+                    <div style={{ padding: 32 }}>
+                        {success && (
+                            <MessageBox color={C.mint} bg={C.mintDim} icon={<CheckCircle size={18} />} message={success} />
+                        )}
+                        {error && (
+                            <MessageBox color={C.danger} bg={`${C.danger}20`} icon={<AlertCircle size={18} />} message={error} />
+                        )}
 
-                            {/* subtle background pattern in header */}
-                            <div className="absolute inset-0 opacity-10 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')]"></div>
+                        <form onSubmit={handleLogin} style={{ display: "grid", gap: 18 }}>
+                            <Field label="Official Email ID" icon={<Mail size={16} color={C.t3} />}>
+                                <input
+                                    type="email"
+                                    value={email}
+                                    onChange={(event) => setEmail(event.target.value)}
+                                    required
+                                    placeholder="officer@gov.in"
+                                    style={fieldStyle(C)}
+                                />
+                            </Field>
 
-                            {/* Government Logo Space */}
-                            <div className="relative z-10 mb-5 flex justify-center">
-                                <div className="h-20 w-20 bg-white rounded-full flex items-center justify-center shadow-lg p-2 border-2 border-slate-700">
-                                    <img 
-                                        src="/images-removebg-preview.png" 
-                                        alt="Emblem" 
-                                        className="w-full h-full object-contain"
-                                    />
-                                </div>
-                            </div>
-
-                            {/* Header Text */}
-                            <div className="relative z-10">
-                                <p className="text-[#FF9933] text-xs font-bold tracking-[0.2em] uppercase mb-1">
-                                    Government of India
-                                </p>
-                                <h1 className="text-2xl font-black text-white uppercase tracking-wide">
-                                    Ministry of Culture
-                                </h1>
-                                <div className="mt-3 inline-block px-4 py-1 bg-slate-800/80 rounded-full border border-slate-700">
-                                    <p className="text-slate-300 text-xs font-medium tracking-wide">
-                                        Ministerial Request & Referral Portal
-                                    </p>
-                                </div>
-                            </div>
-                        </div>
-
-                        {/* Form Content */}
-                        <div className="px-8 py-8">
-                            {/* Success Message */}
-                            {success && (
-                                <div className="mb-6 p-4 bg-green-50 border border-green-200 rounded-xl flex items-start gap-3 animate-slideIn">
-                                    <CheckCircle size={20} className="text-green-600 mt-0.5 flex-shrink-0" />
-                                    <p className="text-sm font-medium text-green-800">{success}</p>
-                                </div>
-                            )}
-
-                            {/* Error Message */}
-                            {error && (
-                                <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-xl flex items-start gap-3 animate-slideIn">
-                                    <AlertCircle size={20} className="text-red-600 mt-0.5 flex-shrink-0" />
-                                    <p className="text-sm font-medium text-red-800">{error}</p>
-                                </div>
-                            )}
-
-                            <form onSubmit={handleLogin} className="space-y-5">
-                                {/* Email Field */}
-                                <div>
-                                    <label className="block text-sm font-semibold text-slate-700 mb-2">
-                                        Official Email ID
-                                    </label>
-                                    <div className="relative group">
-                                        <div className="relative flex items-center">
-                                            <Mail size={18} className="absolute left-4 text-slate-400 group-focus-within:text-[#FF9933] transition-colors" />
-                                            <input
-                                                type="email"
-                                                value={email}
-                                                onChange={(e) => setEmail(e.target.value)}
-                                                required
-                                                placeholder="officer@gov.in"
-                                                className="w-full pl-11 pr-4 py-2.5 border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#FF9933]/50 focus:border-[#FF9933] transition-all bg-white hover:border-slate-400 text-slate-800 placeholder-slate-400 text-sm"
-                                            />
-                                        </div>
-                                    </div>
-                                </div>
-
-                                {/* Password Field */}
-                                <div>
-                                    <label className="block text-sm font-semibold text-slate-700 mb-2">
-                                        Password
-                                    </label>
-                                    <div className="relative group">
-                                        <div className="relative flex items-center">
-                                            <Lock size={18} className="absolute left-4 text-slate-400 group-focus-within:text-[#FF9933] transition-colors" />
-                                            <input
-                                                type={showPassword ? "text" : "password"}
-                                                value={password}
-                                                onChange={(e) => setPassword(e.target.value)}
-                                                required
-                                                placeholder="••••••••"
-                                                className="w-full pl-11 pr-11 py-2.5 border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#FF9933]/50 focus:border-[#FF9933] transition-all bg-white hover:border-slate-400 text-slate-800 placeholder-slate-400 text-sm"
-                                            />
-                                            <button
-                                                type="button"
-                                                onClick={() => setShowPassword(!showPassword)}
-                                                className="absolute right-4 text-slate-400 hover:text-slate-600 transition-colors"
-                                            >
-                                                {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
-                                            </button>
-                                        </div>
-                                    </div>
-                                </div>
-
-                                {/* Remember & Forgot */}
-                                <div className="flex items-center justify-between pt-1">
-                                    <label className="flex items-center gap-2 cursor-pointer group">
-                                        <input
-                                            type="checkbox"
-                                            className="w-4 h-4 rounded border-slate-300 text-[#FF9933] focus:ring-[#FF9933]"
-                                        />
-                                        <span className="text-sm text-slate-600 group-hover:text-slate-900 transition-colors">Remember me</span>
-                                    </label>
-                                    <button
-                                        type="button"
-                                        onClick={() => setIsForgotPassword(true)}
-                                        className="text-sm font-semibold text-slate-700 hover:text-[#FF9933] transition-colors"
-                                    >
-                                        Forgot Password?
-                                    </button>
-                                </div>
-
-                                {/* Login Button */}
+                            <Field label="Password" icon={<Lock size={16} color={C.t3} />}>
+                                <input
+                                    type={showPassword ? "text" : "password"}
+                                    value={password}
+                                    onChange={(event) => setPassword(event.target.value)}
+                                    required
+                                    placeholder="••••••••"
+                                    style={fieldStyle(C, true, true)}
+                                />
                                 <button
-                                    type="submit"
-                                    disabled={loading || !email || !password}
-                                    className="w-full mt-2 px-6 py-3 bg-[#0f172a] hover:bg-slate-800 disabled:bg-slate-300 text-white font-bold rounded-xl transition-all duration-300 flex items-center justify-center gap-2 shadow-md hover:shadow-lg disabled:cursor-not-allowed group"
+                                    type="button"
+                                    onClick={() => setShowPassword((value) => !value)}
+                                    style={{
+                                        position: "absolute",
+                                        right: 12,
+                                        top: "50%",
+                                        transform: "translateY(-50%)",
+                                        background: "transparent",
+                                        border: "none",
+                                        color: C.t3,
+                                        cursor: "pointer",
+                                        padding: 0,
+                                    }}
                                 >
-                                    {loading ? (
-                                        <>
-                                            <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
-                                            <span>Authenticating...</span>
-                                        </>
-                                    ) : (
-                                        <>
-                                            <span>Secure Login</span>
-                                            <ArrowRight size={18} className="group-hover:translate-x-1 transition-transform" />
-                                        </>
-                                    )}
+                                    {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
                                 </button>
-                            </form>
-                        </div>
+                            </Field>
+
+                            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12 }}>
+                                <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12, color: C.t2 }}>
+                                    <input type="checkbox" style={{ accentColor: C.purple }} />
+                                    Remember me
+                                </label>
+                                <button
+                                    type="button"
+                                    onClick={() => setIsForgotPassword(true)}
+                                    style={{ background: "transparent", border: "none", color: C.purple, fontSize: 12, fontWeight: 600, cursor: "pointer" }}
+                                >
+                                    Forgot password?
+                                </button>
+                            </div>
+
+                            <button
+                                type="submit"
+                                disabled={loading}
+                                style={{
+                                    marginTop: 6,
+                                    width: "100%",
+                                    padding: "12px 16px",
+                                    borderRadius: 10,
+                                    border: "none",
+                                    background: C.purple,
+                                    color: "#fff",
+                                    fontSize: 13,
+                                    fontWeight: 700,
+                                    display: "inline-flex",
+                                    alignItems: "center",
+                                    justifyContent: "center",
+                                    gap: 8,
+                                    cursor: loading ? "wait" : "pointer",
+                                }}
+                            >
+                                {loading ? "Authenticating..." : "Sign In"}
+                                {!loading && <ArrowRight size={15} />}
+                            </button>
+                        </form>
                     </div>
                 ) : (
-                    /* Forgot Password Card */
-                    <div className="bg-white rounded-2xl shadow-[0_8px_30px_rgb(0,0,0,0.08)] overflow-hidden border border-slate-200">
-                        {/* Header */}
-                        <div className="relative px-8 py-10 bg-[#0f172a] text-center overflow-hidden">
-                            <div className="absolute top-0 left-0 right-0 h-1.5 flex">
-                                <div className="flex-1 bg-[#FF9933]"></div>
-                                <div className="flex-1 bg-white"></div>
-                                <div className="flex-1 bg-[#138808]"></div>
-                            </div>
-
-                            <div className="relative z-10 mb-5 flex justify-center">
-                                <div className="h-16 w-16 bg-slate-800 rounded-full flex items-center justify-center shadow-lg border border-slate-700">
-                                    <Lock className="text-slate-300" size={28} />
-                                </div>
-                            </div>
-
-                            <div className="relative z-10">
-                                <h1 className="text-xl font-bold text-white mb-2">Account Recovery</h1>
-                                <p className="text-slate-400 text-sm px-4">Enter your official ID to receive a secure reset link.</p>
-                            </div>
-                        </div>
-
-                        {/* Form Content */}
-                        <div className="px-8 py-8">
-                            {resetSuccess && (
-                                <div className="mb-6 p-4 bg-green-50 border border-green-200 rounded-xl flex items-start gap-3 animate-slideIn">
-                                    <CheckCircle size={20} className="text-green-600 mt-0.5 flex-shrink-0" />
-                                    <p className="text-sm font-medium text-green-800">
-                                        Recovery instructions have been dispatched to your official email.
+                    <div style={{ padding: 32 }}>
+                        {resetSuccess ? (
+                            <MessageBox
+                                color={C.mint}
+                                bg={C.mintDim}
+                                icon={<CheckCircle size={18} />}
+                                message="Reset instructions have been sent to your official email."
+                            />
+                        ) : (
+                            <>
+                                <div style={{ marginBottom: 18 }}>
+                                    <div style={{ fontSize: 20, fontWeight: 700, color: C.t1 }}>Reset password</div>
+                                    <p style={{ margin: "6px 0 0", fontSize: 13, color: C.t3, lineHeight: 1.6 }}>
+                                        Enter your official email ID to receive password reset instructions.
                                     </p>
                                 </div>
-                            )}
 
-                            <form onSubmit={handleForgotPassword} className="space-y-5">
-                                <div>
-                                    <label className="block text-sm font-semibold text-slate-700 mb-2">
-                                        Official Email ID
-                                    </label>
-                                    <div className="relative group">
-                                        <Mail size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-[#FF9933] transition-colors" />
+                                <form onSubmit={handleForgotPassword} style={{ display: "grid", gap: 18 }}>
+                                    <Field label="Official Email ID" icon={<Mail size={16} color={C.t3} />}>
                                         <input
                                             type="email"
                                             value={resetEmail}
-                                            onChange={(e) => setResetEmail(e.target.value)}
+                                            onChange={(event) => setResetEmail(event.target.value)}
                                             required
                                             placeholder="officer@gov.in"
-                                            className="w-full pl-11 pr-4 py-2.5 border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#FF9933]/50 focus:border-[#FF9933] transition-all bg-white text-sm text-slate-800"
+                                            style={fieldStyle(C)}
                                         />
-                                    </div>
-                                </div>
+                                    </Field>
 
-                                <button
-                                    type="submit"
-                                    disabled={resetLoading || !resetEmail}
-                                    className="w-full px-6 py-3 bg-[#FF9933] hover:bg-[#e68a2e] disabled:bg-slate-300 text-white font-bold rounded-xl transition-all duration-300 flex items-center justify-center gap-2 shadow-md"
-                                >
-                                    {resetLoading ? (
-                                        <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
-                                    ) : (
-                                        <span>Dispatch Reset Link</span>
-                                    )}
-                                </button>
+                                    <button
+                                        type="submit"
+                                        disabled={resetLoading}
+                                        style={{
+                                            width: "100%",
+                                            padding: "12px 16px",
+                                            borderRadius: 10,
+                                            border: "none",
+                                            background: C.purple,
+                                            color: "#fff",
+                                            fontSize: 13,
+                                            fontWeight: 700,
+                                            cursor: resetLoading ? "wait" : "pointer",
+                                        }}
+                                    >
+                                        {resetLoading ? "Sending..." : "Send Reset Link"}
+                                    </button>
+                                </form>
+                            </>
+                        )}
 
-                                <button
-                                    type="button"
-                                    onClick={() => {
-                                        setIsForgotPassword(false);
-                                        setError("");
-                                    }}
-                                    className="w-full px-6 py-3 border border-slate-300 text-slate-600 font-semibold rounded-xl hover:bg-slate-50 transition-colors text-sm"
-                                >
-                                    Return to Secure Login
-                                </button>
-                            </form>
-                        </div>
+                        <button
+                            type="button"
+                            onClick={() => {
+                                setIsForgotPassword(false);
+                                setResetSuccess(false);
+                            }}
+                            style={{
+                                marginTop: 18,
+                                background: "transparent",
+                                border: `1px solid ${C.border}`,
+                                color: C.t2,
+                                padding: "10px 14px",
+                                borderRadius: 10,
+                                cursor: "pointer",
+                                width: "100%",
+                                fontWeight: 600,
+                            }}
+                        >
+                            Back to sign in
+                        </button>
                     </div>
                 )}
             </div>
-
-            <style>{`
-                @keyframes slideIn {
-                    from { opacity: 0; transform: translateY(-5px); }
-                    to { opacity: 1; transform: translateY(0); }
-                }
-                .animate-slideIn { animation: slideIn 0.3s ease-out forwards; }
-            `}</style>
         </div>
     );
 };
+
+function Field({ label, icon, children }) {
+    const { C } = usePortalTheme();
+
+    return (
+        <label style={{ display: "grid", gap: 8 }}>
+            <span style={{ fontSize: 12, fontWeight: 600, color: C.t2 }}>{label}</span>
+            <div style={{ position: "relative" }}>
+                <div style={{ position: "absolute", left: 14, top: "50%", transform: "translateY(-50%)", pointerEvents: "none" }}>
+                    {icon}
+                </div>
+                {children}
+            </div>
+        </label>
+    );
+}
+
+function MessageBox({ color, bg, icon, message }) {
+    return (
+        <div
+            style={{
+                marginBottom: 18,
+                padding: "12px 14px",
+                borderRadius: 10,
+                border: `1px solid ${color}33`,
+                background: bg,
+                color,
+                display: "flex",
+                alignItems: "flex-start",
+                gap: 10,
+                fontSize: 12,
+                lineHeight: 1.6,
+            }}
+        >
+            <div style={{ flexShrink: 0, marginTop: 1 }}>{icon}</div>
+            <div>{message}</div>
+        </div>
+    );
+}
 
 export default Login;

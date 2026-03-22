@@ -213,17 +213,17 @@ export default function AdminCases() {
   }, [complaints]);
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-white via-blue-50 to-blue-100 p-6">
-      <div className="max-w-7xl mx-auto">
+    <div className="portal-page min-h-screen bg-gradient-to-br from-white via-blue-50 to-blue-100">
+      <div className="portal-page-wrap max-w-7xl mx-auto">
         
         {/* Header */}
-        <div className="mb-8">
+        <div className="portal-page-header">
           <h1 className="text-4xl font-bold text-gray-900 mb-2">My Assigned Complaints</h1>
           <p className="text-gray-600">Manage and track complaints assigned to you</p>
         </div>
 
         {/* Filter Section */}
-        <div className="bg-white rounded-lg border border-gray-200 shadow-sm p-4 mb-6">
+        <div className="portal-panel bg-white rounded-lg border border-gray-200 shadow-sm p-4 mb-6">
           <div className="grid md:grid-cols-3 gap-4">
             <input
               value={filters.q}
@@ -248,15 +248,15 @@ export default function AdminCases() {
 
         {/* Table */}
         {loading ? (
-          <div className="bg-white rounded-lg border border-gray-200 p-12 text-center">
+          <div className="portal-panel bg-white rounded-lg border border-gray-200 p-12 text-center">
             <p className="text-gray-600 font-medium">Loading...</p>
           </div>
         ) : rows.length === 0 ? (
-          <div className="bg-white rounded-lg border border-gray-200 p-12 text-center">
+          <div className="portal-panel bg-white rounded-lg border border-gray-200 p-12 text-center">
             <p className="text-gray-600 font-medium">No complaints found</p>
           </div>
         ) : (
-          <div className="bg-white rounded-lg border border-gray-200 shadow-sm overflow-hidden flex flex-col">
+          <div className="portal-panel bg-white rounded-lg border border-gray-200 shadow-sm overflow-hidden flex flex-col">
             
             {/* Table */}
             <div className="overflow-x-auto">

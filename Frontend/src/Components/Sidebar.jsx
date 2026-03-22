@@ -1,69 +1,71 @@
 import { FiLogOut } from "react-icons/fi";
-import { NavLink, useNavigate } from "react-router-dom";
-import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import {
     FiBarChart2,
-    FiPlus,
     FiMenu,
 } from "react-icons/fi";
-import { LuBuilding } from "react-icons/lu";
 import { BsFillGearFill } from "react-icons/bs";
-import { FaRegEye, FaUsers } from "react-icons/fa";
 import { RiTeamLine } from "react-icons/ri";
 import SidebarItem from "./SidebarItem";
 import { LuBox } from "react-icons/lu";
+import { usePortalTheme } from "../theme/portalTheme";
 
 function Sidebar({ collapsed, onToggle }) {
-    const [teams, setTeams] = useState([]);
-    const [projects, setProjects] = useState([]);
-    const navigate = useNavigate();
+    const { C } = usePortalTheme();
 
-    const loggedInUser = JSON.parse(localStorage.getItem("loggedInUser")) || {};
-    const employees = JSON.parse(localStorage.getItem("employees")) || [];
-
-    const currentEmployee = employees.find(
-        (e) => e.employeeId === loggedInUser?.employeeId
-    );
-
-    // 🟢 API logic removed, kept simple state updates
-    useEffect(() => {
-        const savedTeams = JSON.parse(localStorage.getItem("teams")) || [];
-        setTeams(savedTeams);
-        // You can fetch or set projects from local storage or static data here if needed
-    }, []);
-
-    // 🟢 Prevent Redirect Function
     const handlePreventRedirect = (e) => {
         e.preventDefault();
     };
 
     const handleLogout = (e) => {
-        e.preventDefault(); // Logout pe bhi redirection rok diya currently
-        // localStorage.removeItem("loggedInUser");
-        // localStorage.removeItem("token");
-        // navigate("/");
+        e.preventDefault();
     };
 
     return (
         <>
-            <div className="h-full flex flex-col bg-white border-r border-gray-200">
-                <div className="flex items-center justify-between px-3 py-2 shadow">
+            <div className="h-full flex flex-col" style={{ background: C.bgElevated }}>
+                <div
+                    className="flex items-center justify-between px-4 py-4"
+                    style={{ borderBottom: `1px solid ${C.border}` }}
+                >
                     {!collapsed && (
-                        <span className="font-semibold text-gray-800 dark:text-gray-100">
+                        <span className="font-semibold" style={{ color: C.t1 }}>
                             <Link to="/" onClick={handlePreventRedirect}>Multiverse</Link>
                         </span>
                     )}
                     <SidebarItem type="" collapsed={collapsed} label="Expand Navigation Menu">
-                        <button onClick={onToggle} className="p-2 rounded hover:bg-gray-200 dark:hover:bg-gray-800 text-gray-500 cursor-pointer">
+                        <button
+                            onClick={onToggle}
+                            className="p-2 cursor-pointer"
+                            style={{
+                                borderRadius: 10,
+                                background: C.card,
+                                color: C.t2,
+                                border: `1px solid ${C.border}`,
+                            }}
+                        >
                             <FiMenu className="text-[16px] min-w-4 h-4" />
                         </button>
                     </SidebarItem>
                 </div>
-                <div className="h-full px-3 py-2 overflow-y-auto hide-scroll">
+                <div className="h-full px-3 py-4 overflow-y-auto hide-scroll">
+                    {!collapsed && (
+                        <div
+                            className="mb-4 rounded-xl p-4"
+                            style={{ background: C.card, border: `1px solid ${C.border}` }}
+                        >
+                            <div className="text-[11px] uppercase tracking-[0.18em] font-bold" style={{ color: C.t3 }}>
+                                Front Office
+                            </div>
+                            <div className="mt-2 text-sm font-semibold" style={{ color: C.t1 }}>
+                                Ministerial portal
+                            </div>
+                            <div className="mt-1 text-xs leading-5" style={{ color: C.t3 }}>
+                                Shared navigation aligned with the settings workspace.
+                            </div>
+                        </div>
+                    )}
                     <ul className="w-full space-y-1">
-
-                        {/* 🟢 NavLinks par onClick laga kar redirect roka gaya hai */}
                         <div onClick={handlePreventRedirect}>
                             <SidebarItem
                                 type="NavLink"
@@ -82,8 +84,6 @@ function Sidebar({ collapsed, onToggle }) {
                                 collapsed={collapsed}
                             />
                         </div>
-
-                        {/* 🟢 Role base checks removed, ab sabko show hoga */}
                         <div onClick={handlePreventRedirect}>
                             <SidebarItem
                                 type="NavLink"
@@ -155,9 +155,19 @@ function Sidebar({ collapsed, onToggle }) {
                         </div>
                     </ul>
                 </div>
-                <div className="border-t border-gray-300 px-3 py-2">
+                <div className="px-3 py-3" style={{ borderTop: `1px solid ${C.border}` }}>
                     <SidebarItem type="" collapsed={collapsed} label="Logout">
-                        <button onClick={handleLogout} className="flex items-center gap-2 w-full p-2 text-red-600 hover:bg-red-100 rounded cursor-pointer">
+                        <button
+                            onClick={handleLogout}
+                            className="flex items-center gap-2 w-full p-3 cursor-pointer"
+                            style={{
+                                color: C.danger,
+                                background: "transparent",
+                                borderRadius: 10,
+                                border: `1px solid ${C.border}`,
+                                justifyContent: collapsed ? "center" : "flex-start",
+                            }}
+                        >
                             <FiLogOut className="text-[16px] min-w-4 h-4" />
                             <div className={`whitespace-nowrap transition-all duration-300 text-sm leading-4 h-4 ${collapsed ? "w-0 opacity-0 hidden" : "max-w-fit opacity-100"} `}>
                                 Logout
@@ -166,8 +176,6 @@ function Sidebar({ collapsed, onToggle }) {
                     </SidebarItem>
                 </div>
             </div>
-
-            {/* 🟢 Saare modals theek yahan se hata diye gaye hain */}
         </>
     );
 }

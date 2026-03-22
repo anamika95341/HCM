@@ -349,10 +349,10 @@ export default function AdminMeeting() {
 
   if (selectedMeeting) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-white via-blue-50 to-blue-100">
+      <div className="portal-page min-h-screen bg-gradient-to-br from-white via-blue-50 to-blue-100">
         {/* Header */}
-        <div className="bg-gradient-to-r from-blue-600 to-indigo-600 text-white">
-          <div className="max-w-6xl mx-auto px-6 py-8">
+        <div className="portal-hero bg-gradient-to-r from-blue-600 to-indigo-600 text-white">
+          <div className="portal-page-wrap max-w-6xl mx-auto px-6 py-2">
             <button
               type="button"
               onClick={() => navigate("/meetings")}
@@ -362,15 +362,15 @@ export default function AdminMeeting() {
               <span className="font-semibold">Back to Meetings</span>
             </button>
             <div>
-              <div className="text-sm font-semibold text-blue-100 uppercase">{selectedMeeting.requestId}</div>
+              <div className="text-sm font-semibold uppercase" style={{ color: "var(--portal-text-muted)" }}>{selectedMeeting.requestId}</div>
               <h1 className="text-4xl font-bold mt-2">{selectedMeeting.purpose}</h1>
-              <p className="text-blue-100 mt-2">Meeting details and status information</p>
+              <p className="portal-hero-subtitle mt-2">Meeting details and status information</p>
             </div>
           </div>
         </div>
 
         {/* Content */}
-        <div className="max-w-6xl mx-auto px-6 py-8">
+        <div className="portal-page-wrap max-w-6xl mx-auto px-6 py-2">
           {/* Status Cards */}
           <div className="grid md:grid-cols-3 gap-6 mb-8">
             <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-6">

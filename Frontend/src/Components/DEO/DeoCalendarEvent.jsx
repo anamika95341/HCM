@@ -307,7 +307,7 @@ export default function DeoCalendarEvent() {
   const attendedCount = events.filter(e => e.attendanceStatus === "attended").length;
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-white via-blue-50 to-blue-100">
+    <div className="portal-page min-h-screen bg-gradient-to-br from-white via-blue-50 to-blue-100">
       <SuccessModal
         open={eventSuccess.open}
         title={eventSuccess.title}
@@ -316,17 +316,17 @@ export default function DeoCalendarEvent() {
       />
 
       {/* Header */}
-      <div className="bg-gradient-to-r from-blue-600 to-indigo-600 text-white">
-        <div className="max-w-7xl mx-auto px-6 py-8">
+      <div className="portal-hero bg-gradient-to-r from-blue-600 to-indigo-600 text-white">
+        <div className="portal-page-wrap max-w-7xl mx-auto px-6 py-2">
           <h1 className="text-4xl font-bold">DEO Calendar & Engagement</h1>
-          <p className="text-blue-100 mt-2 max-w-2xl">
+          <p className="portal-hero-subtitle mt-2 max-w-2xl">
             Create and manage government events, meetings, and cultural initiatives. Track attendance and productivity metrics.
           </p>
         </div>
       </div>
 
       {/* Main Content */}
-      <div className="max-w-7xl mx-auto px-6 py-8">
+      <div className="portal-page-wrap max-w-7xl mx-auto px-6 py-2">
         {/* Stats */}
         <div className="grid md:grid-cols-3 gap-6 mb-8">
           <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-6">

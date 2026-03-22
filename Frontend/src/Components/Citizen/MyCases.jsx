@@ -247,13 +247,13 @@ export default function MyCases() {
 
     return (
         // Replaced min-h-screen with h-screen and overflow-hidden to prevent whole page scrolling
-        <div className="h-screen bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-900 dark:to-slate-950 p-6 flex flex-col overflow-hidden">
-            <div className="max-w-[1320px] mx-auto w-full h-full flex flex-col">
+        <div className="portal-page h-screen bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-900 dark:to-slate-950 flex flex-col overflow-hidden">
+            <div className="portal-page-wrap max-w-[1320px] mx-auto w-full h-full flex flex-col">
 
                 {/* --- FIXED TOP SECTION --- */}
                 <div className="flex-shrink-0 space-y-5 pb-4">
                     {/* Header */}
-                    <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-4">
+                    <div className="portal-hero flex flex-col md:flex-row md:items-end md:justify-between gap-4">
                         <div>
                             <h1 className="text-3xl font-bold text-slate-900 dark:text-slate-100 mb-2 flex items-center gap-2">
                                 <FileText className="text-blue-600" size={32} />
@@ -263,7 +263,7 @@ export default function MyCases() {
                                 Track your complaints, meeting escalations, resolution updates, and linked references in one place.
                             </p>
                         </div>
-                        <div className="bg-white dark:bg-slate-800 rounded-xl px-4 py-2 border border-slate-200 dark:border-slate-700 shadow-sm">
+                        <div className="portal-panel bg-white dark:bg-slate-800 rounded-xl px-4 py-2 border border-slate-200 dark:border-slate-700 shadow-sm">
                             <p className="text-xs text-slate-500 dark:text-slate-400">
                                 Total requests:
                             </p>
@@ -272,7 +272,7 @@ export default function MyCases() {
                     </div>
 
                     {/* Tabs */}
-                    <div className="flex gap-2 flex-wrap">
+                    <div className="portal-panel flex gap-2 flex-wrap p-1 w-fit">
                         {[
                             ["all", `All (${totalItems})`],
                             ["complaint", `Complaints (${data.complaints.length})`],
@@ -293,7 +293,7 @@ export default function MyCases() {
                     </div>
 
                     {/* Filters */}
-                    <div className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 p-4 shadow-sm">
+                    <div className="portal-panel bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 p-4 shadow-sm">
                         <div className="grid md:grid-cols-3 gap-3">
                             <div className="relative">
                                 <Search className="absolute left-3 top-3 text-slate-400" size={18} />

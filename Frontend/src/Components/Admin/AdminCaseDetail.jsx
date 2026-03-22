@@ -307,12 +307,12 @@ export default function AdminCaseDetail() {
     };
 
     return (
-        <div className="min-h-screen bg-gradient-to-br from-white via-blue-50 to-blue-100">
+        <div className="portal-page min-h-screen bg-gradient-to-br from-white via-blue-50 to-blue-100">
             <SuccessModal open={!!successMessage} message={successMessage} onClose={() => setSuccessMessage("")} />
 
             {/* Header */}
-            <div className="bg-gradient-to-r from-blue-600 to-indigo-600 text-white">
-                <div className="max-w-6xl mx-auto px-6 py-8">
+            <div className="portal-hero bg-gradient-to-r from-blue-600 to-indigo-600 text-white">
+                <div className="portal-page-wrap max-w-6xl mx-auto px-6 py-2">
                     <div className="flex items-center justify-between mb-6">
                         <button
                             type="button"
@@ -357,13 +357,13 @@ export default function AdminCaseDetail() {
                                 <span className="px-3 py-1 bg-red-500 text-white rounded-full text-sm font-bold">VIP</span>
                             )}
                         </div>
-                        <p className="text-blue-100 text-lg">{item.title}</p>
+                        <p className="portal-hero-subtitle text-lg">{item.title}</p>
                     </div>
                 </div>
             </div>
 
             {/* Main Content */}
-            <div className="max-w-6xl mx-auto px-6 py-8">
+            <div className="portal-page-wrap max-w-6xl mx-auto px-6 py-2">
                 {/* Citizen & Status Info */}
                 <div className="grid md:grid-cols-3 gap-6 mb-8">
                     <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-6">

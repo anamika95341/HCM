@@ -364,14 +364,14 @@ export default function MinisterDashboard() {
   }
 
   return (
-    <div className="minister-dashboard" style={{ background: TOKENS.bgApp, minHeight: "100%", color: TOKENS.textPrimary, padding: "1.5rem" }}>
-      <div style={{ marginBottom: "1.2rem", borderRadius: 16, padding: "1.3rem 1.4rem", background: "linear-gradient(135deg, #5B4FE9, #756BFF)", color: "#fff", display: "flex", alignItems: "center", justifyContent: "space-between", gap: "1rem", flexWrap: "wrap" }}>
+    <div className="minister-dashboard portal-page" style={{ background: TOKENS.bgApp, minHeight: "100%", color: TOKENS.textPrimary }}>
+      <div className="portal-hero" style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "1rem", flexWrap: "wrap" }}>
         <div>
-          <div style={{ fontSize: "0.85rem", opacity: 0.82, fontWeight: 700 }}>Executive Snapshot</div>
-          <div style={{ fontSize: "1.4rem", fontWeight: 800, marginTop: "0.3rem" }}>This month&apos;s governance pulse is ready for review.</div>
-          <div style={{ fontSize: "0.88rem", opacity: 0.88, marginTop: "0.35rem" }}>Track meetings, complaints, events, and productivity from one consolidated view.</div>
+          <div style={{ fontSize: "0.75rem", color: "var(--portal-text-muted)", fontWeight: 700, textTransform: "uppercase", letterSpacing: ".18em" }}>Executive Snapshot</div>
+          <div style={{ fontSize: "1.4rem", fontWeight: 800, marginTop: "0.3rem", color: "var(--portal-text-strong)" }}>This month&apos;s governance pulse is ready for review.</div>
+          <div style={{ fontSize: "0.88rem", color: "var(--portal-text-muted)", marginTop: "0.35rem" }}>Track meetings, complaints, events, and productivity from one consolidated view.</div>
         </div>
-        <button type="button" onClick={handleDownloadExecutiveBrief} style={{ border: "none", borderRadius: 999, padding: "0.75rem 1.2rem", fontWeight: 700, background: "#FFFFFF", color: ACCENT, cursor: "pointer", whiteSpace: "nowrap" }}>
+        <button type="button" onClick={handleDownloadExecutiveBrief} style={{ border: "none", borderRadius: 999, padding: "0.75rem 1.2rem", fontWeight: 700, background: ACCENT, color: "#fff", cursor: "pointer", whiteSpace: "nowrap" }}>
           View Executive Brief
         </button>
       </div>

@@ -393,17 +393,17 @@ export default function Calendar() {
   };
 
   return (
-    <div className="min-h-screen p-6">
-      <div className="max-w-7xl mx-auto">
+    <div className="portal-page min-h-screen">
+      <div className="portal-page-wrap max-w-7xl mx-auto">
         
-        <div className="mb-8">
+        <div className="portal-page-header">
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-6 mb-8">
             <div>
               <div className="flex items-center gap-3 mb-2">
               </div>
             </div>
 
-            <div className="flex flex-wrap items-center gap-3 bg-white rounded-lg p-1 border border-gray-200 shadow-sm">
+            <div className="portal-panel flex flex-wrap items-center gap-3 bg-white rounded-lg p-1 border border-gray-200 shadow-sm">
               <button
                 type="button"
                 onClick={() => shiftCursor(-1)}
@@ -466,7 +466,7 @@ export default function Calendar() {
         )}
 
         {loading ? (
-          <div className="bg-white rounded-2xl border border-gray-200 p-12 text-center">
+          <div className="portal-panel bg-white rounded-2xl border border-gray-200 p-12 text-center">
             <div className="inline-flex h-12 w-12 animate-spin rounded-full border-4 border-gray-300 border-t-blue-600 mb-4"></div>
             <p className="text-gray-600 font-medium">Loading calendar…</p>
           </div>
