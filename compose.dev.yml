@@ -13,6 +13,7 @@ services:
       - "5173:5173"
     volumes:
       - ./Frontend:/app
+      - frontend-node-modules:/app/node_modules
 
   backend:
     build:
@@ -29,3 +30,8 @@ services:
       - "3000:3000"
     volumes:
       - ./backend:/app
+      - backend-node-modules:/app/node_modules
+
+volumes:
+  frontend-node-modules:
+  backend-node-modules:
