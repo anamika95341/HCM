@@ -18,7 +18,7 @@ services:
     cpus: 0.3
     mem_limit: 64m
     networks:
-      - citizen-portal-net
+      - frontend-backend-net
 
   api:
     build:
@@ -64,7 +64,8 @@ services:
       timeout: 5s
       retries: 3
     networks:
-      - citizen-portal-net
+      - frontend-backend-net
+      - backend-data-net
 
   worker:
     build:
@@ -88,7 +89,7 @@ services:
     cpus: 0.5
     mem_limit: 128m
     networks:
-      - citizen-portal-net
+      - backend-data-net
 
   postgres:
     image: postgres:16-alpine
@@ -108,7 +109,7 @@ services:
     cpus: 0.5
     mem_limit: 220m
     networks:
-      - citizen-portal-net
+      - backend-data-net
 
   redis:
     image: redis:7-alpine
@@ -123,7 +124,7 @@ services:
     cpus: 0.2
     mem_limit: 80m
     networks:
-      - citizen-portal-net
+      - backend-data-net
 
   monitor:
     build:
@@ -158,11 +159,16 @@ services:
     cpus: 0.1
     mem_limit: 64m
     networks:
-      - citizen-portal-net
+      - backend-data-net
 
 networks:
-  citizen-portal-net:
+  frontend-backend-net:
     driver: bridge
+    name: citizen-portal-frontend-backend
+  backend-data-net:
+    driver: bridge
+    internal: true
+    name: citizen-portal-backend-data
 
 volumes:
   postgres-data:

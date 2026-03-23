@@ -37,6 +37,15 @@ async function getCitizenMeetingDetail(req, res, next) {
   }
 }
 
+async function getAdminMeetingDetail(req, res, next) {
+  try {
+    const detail = await meetingsService.getAdminMeetingDetail(req.params.meetingId);
+    res.json(detail);
+  } catch (error) {
+    next(error);
+  }
+}
+
 async function acceptMeeting(req, res, next) {
   try {
     const meeting = await meetingsService.acceptMeeting(req.params.meetingId, req.user.sub, reqMeta(req));
@@ -89,13 +98,34 @@ async function scheduleMeeting(req, res, next) {
   }
 }
 
+async function completeMeeting(req, res, next) {
+  try {
+    const meeting = await meetingsService.completeMeeting(req.params.meetingId, req.user.sub, req.body.reason, reqMeta(req));
+    res.json({ meeting });
+  } catch (error) {
+    next(error);
+  }
+}
+
+async function cancelMeeting(req, res, next) {
+  try {
+    const meeting = await meetingsService.cancelMeeting(req.params.meetingId, req.user.sub, req.body.reason, reqMeta(req));
+    res.json({ meeting });
+  } catch (error) {
+    next(error);
+  }
+}
+
 module.exports = {
   submitMeetingRequest,
   getCitizenMeetings,
   getCitizenMeetingDetail,
+  getAdminMeetingDetail,
   acceptMeeting,
   rejectMeeting,
   assignVerification,
   submitVerification,
   scheduleMeeting,
+  completeMeeting,
+  cancelMeeting,
 };

@@ -1,5 +1,4 @@
 const { z } = require('zod');
-const { isValidAadhaar } = require('../utils/aadhaar');
 
 const passwordSchema = z.string().min(12).max(128)
   .regex(/[A-Z]/, 'Must include an uppercase letter')
@@ -17,7 +16,7 @@ const citizenRegistrationSchema = z.object({
   middleName: z.string().max(100).optional().or(z.literal('')),
   lastName: z.string().max(100).optional().or(z.literal('')),
   email: z.string().email().optional().or(z.literal('')),
-  aadhaarNumber: z.string().regex(/^\d{12}$/).refine(isValidAadhaar, 'Invalid Aadhaar number'),
+  aadhaarNumber: z.string().regex(/^\d{12}$/, 'Aadhaar must be exactly 12 digits'),
   age: z.number().int().min(1).max(120),
   sex: z.enum(['male', 'female', 'other']),
   mobileNumber: z.string().regex(/^\d{10}$/),
@@ -26,7 +25,7 @@ const citizenRegistrationSchema = z.object({
   state: z.string().min(1).max(120),
   password: passwordSchema,
   confirmPassword: z.string(),
-  preferredVerificationChannel: z.enum(['email', 'sms']).default('sms'),
+  preferredVerificationChannel: z.enum(['email', 'sms']).default('email'),
 }).refine((data) => data.password === data.confirmPassword, {
   message: 'Passwords do not match',
   path: ['confirmPassword'],
@@ -38,7 +37,7 @@ const citizenLoginSchema = z.object({
 });
 
 const citizenForgotPasswordSchema = z.object({
-  aadhaarNumber: z.string().regex(/^\d{12}$/).refine(isValidAadhaar, 'Invalid Aadhaar number'),
+  aadhaarNumber: z.string().regex(/^\d{12}$/, 'Aadhaar must be exactly 12 digits'),
   email: z.string().email().optional().or(z.literal('')),
   captchaToken: z.string().min(10),
 });
@@ -56,6 +55,8 @@ const citizenResetPasswordSchema = z.object({
 const complaintSchema = z.object({
   subject: z.string().min(5).max(255),
   description: z.string().min(10).max(5000),
+  complaintLocation: z.string().max(500).optional().or(z.literal('')),
+  complaintType: z.string().max(120).optional().or(z.literal('')),
 });
 
 const meetingRequestSchema = z.object({

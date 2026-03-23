@@ -5,6 +5,7 @@ const { sanitizeText } = require('../../utils/sanitize');
 const { persistPrivateUpload } = require('../../middleware/uploadHandler');
 const { writeAuditLog } = require('../../utils/audit');
 const { publishMeetingStatusUpdate } = require('../../realtime/wsPublisher');
+const { generateCaseCode } = require('../../utils/generateCaseCode');
 
 async function enforceIdempotency(idempotencyKey, payload) {
   if (!idempotencyKey) {
@@ -77,6 +78,15 @@ async function getCitizenMeetingDetail(meetingId, citizenId) {
   return { meeting, history };
 }
 
+async function getAdminMeetingDetail(meetingId) {
+  const meeting = await meetingsRepository.getAdminMeetingById(meetingId);
+  if (!meeting) {
+    throw createHttpError(404, 'Meeting not found');
+  }
+  const history = await meetingsRepository.getMeetingHistory(meetingId);
+  return { meeting, history };
+}
+
 async function changeMeetingStatus({ meetingId, actorRole, actorId, status, note, patch = {} }) {
   const meeting = await meetingsRepository.getMeetingById(meetingId);
   if (!meeting) {
@@ -104,13 +114,17 @@ async function changeMeetingStatus({ meetingId, actorRole, actorId, status, note
 }
 
 async function rejectMeeting(meetingId, actorId, reason, reqMeta) {
+  const cleanReason = sanitizeText(reason);
   const updated = await changeMeetingStatus({
     meetingId,
     actorRole: 'admin',
     actorId,
     status: 'rejected',
-    note: sanitizeText(reason),
-    patch: { rejection_reason: sanitizeText(reason) },
+    note: cleanReason,
+    patch: {
+      assigned_admin_id: actorId,
+      rejection_reason: cleanReason,
+    },
   });
 
   await writeAuditLog({
@@ -121,7 +135,7 @@ async function rejectMeeting(meetingId, actorId, reason, reqMeta) {
     action: 'meeting_rejected',
     ipAddress: reqMeta.ip,
     userAgent: reqMeta.userAgent,
-    metadata: { reason: sanitizeText(reason) },
+    metadata: { reason: cleanReason },
   });
 
   return updated;
@@ -134,6 +148,7 @@ async function acceptMeeting(meetingId, actorId, reqMeta) {
     actorId,
     status: 'accepted',
     note: 'Meeting request accepted',
+    patch: { assigned_admin_id: actorId },
   });
 
   await writeAuditLog({
@@ -155,7 +170,7 @@ async function assignVerification(meetingId, actorId, deoId, reqMeta) {
     actorId,
     status: 'verification_pending',
     note: `Sent to DEO ${deoId} for verification`,
-    patch: { assigned_deo_id: deoId },
+    patch: { assigned_admin_id: actorId, assigned_deo_id: deoId },
   });
   await writeAuditLog({
     actorRole: 'admin',
@@ -201,7 +216,7 @@ async function scheduleMeeting(meetingId, adminId, body, reqMeta) {
     throw createHttpError(404, 'Meeting not found');
   }
 
-  const event = await meetingsRepository.createCalendarEvent({
+  const payload = {
     ministerId: body.ministerId,
     meetingId,
     title: meeting.title,
@@ -211,20 +226,32 @@ async function scheduleMeeting(meetingId, adminId, body, reqMeta) {
     isVip: body.isVip,
     comments: sanitizeText(body.comments || ''),
     createdByAdminId: adminId,
-  });
+  };
+
+  const existingEvent = meeting.status === 'scheduled'
+    ? await meetingsRepository.updateCalendarEventByMeetingId(meetingId, payload)
+    : null;
+
+  const event = existingEvent || await meetingsRepository.createCalendarEvent(payload);
 
   const updated = await changeMeetingStatus({
     meetingId,
     actorRole: 'admin',
     actorId: adminId,
     status: 'scheduled',
-    note: 'Meeting scheduled',
+    note: meeting.status === 'scheduled' ? 'Meeting rescheduled' : 'Meeting scheduled',
     patch: {
+      assigned_admin_id: adminId,
       minister_id: body.ministerId,
       scheduled_at: body.startsAt,
+      scheduled_end_at: body.endsAt,
       scheduled_location: sanitizeText(body.location),
       is_vip: body.isVip,
       admin_comments: sanitizeText(body.comments || ''),
+      visitor_id: meeting.visitorId || generateCaseCode('VIS'),
+      meeting_docket: meeting.meetingDocket || generateCaseCode('DOC'),
+      cancellation_reason: null,
+      cancelled_at: null,
     },
   });
 
@@ -233,7 +260,7 @@ async function scheduleMeeting(meetingId, adminId, body, reqMeta) {
     actorId: adminId,
     entityType: 'meeting',
     entityId: meetingId,
-    action: 'meeting_scheduled',
+    action: meeting.status === 'scheduled' ? 'meeting_rescheduled' : 'meeting_scheduled',
     ipAddress: reqMeta.ip,
     userAgent: reqMeta.userAgent,
     metadata: { eventId: event.id, ministerId: body.ministerId },
@@ -241,13 +268,72 @@ async function scheduleMeeting(meetingId, adminId, body, reqMeta) {
   return updated;
 }
 
+async function completeMeeting(meetingId, adminId, reason, reqMeta) {
+  const cleanReason = sanitizeText(reason);
+  const updated = await changeMeetingStatus({
+    meetingId,
+    actorRole: 'admin',
+    actorId: adminId,
+    status: 'completed',
+    note: cleanReason,
+    patch: {
+      assigned_admin_id: adminId,
+      completion_note: cleanReason,
+      completed_at: new Date().toISOString(),
+    },
+  });
+
+  await writeAuditLog({
+    actorRole: 'admin',
+    actorId: adminId,
+    entityType: 'meeting',
+    entityId: meetingId,
+    action: 'meeting_completed',
+    ipAddress: reqMeta.ip,
+    userAgent: reqMeta.userAgent,
+  });
+
+  return updated;
+}
+
+async function cancelMeeting(meetingId, adminId, reason, reqMeta) {
+  const cleanReason = sanitizeText(reason);
+  const updated = await changeMeetingStatus({
+    meetingId,
+    actorRole: 'admin',
+    actorId: adminId,
+    status: 'cancelled',
+    note: cleanReason,
+    patch: {
+      assigned_admin_id: adminId,
+      cancellation_reason: cleanReason,
+      cancelled_at: new Date().toISOString(),
+    },
+  });
+
+  await writeAuditLog({
+    actorRole: 'admin',
+    actorId: adminId,
+    entityType: 'meeting',
+    entityId: meetingId,
+    action: 'meeting_cancelled',
+    ipAddress: reqMeta.ip,
+    userAgent: reqMeta.userAgent,
+  });
+
+  return updated;
+}
+
 module.exports = {
   submitMeetingRequest,
   getCitizenMeetings,
   getCitizenMeetingDetail,
+  getAdminMeetingDetail,
   rejectMeeting,
   acceptMeeting,
   assignVerification,
   submitVerification,
   scheduleMeeting,
+  completeMeeting,
+  cancelMeeting,
 };

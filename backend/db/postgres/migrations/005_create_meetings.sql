@@ -35,9 +35,17 @@ CREATE TABLE IF NOT EXISTS meetings (
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
-ALTER TABLE minister_calendar_events
-  ADD CONSTRAINT minister_calendar_events_meeting_fk
-  FOREIGN KEY (meeting_id) REFERENCES meetings(id) ON DELETE SET NULL;
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_constraint
+    WHERE conname = 'minister_calendar_events_meeting_fk'
+  ) THEN
+    ALTER TABLE minister_calendar_events
+      ADD CONSTRAINT minister_calendar_events_meeting_fk
+      FOREIGN KEY (meeting_id) REFERENCES meetings(id) ON DELETE SET NULL;
+  END IF;
+END $$;
 
 CREATE TABLE IF NOT EXISTS meeting_additional_attendees (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),

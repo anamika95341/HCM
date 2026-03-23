@@ -1,6 +1,7 @@
 const fs = require('fs');
 const path = require('path');
 const dotenv = require('dotenv');
+const { getDevSecretOrEnv } = require('./devSecrets');
 
 const envPath = path.join(process.cwd(), '.env');
 if (fs.existsSync(envPath)) {
@@ -35,7 +36,7 @@ module.exports = {
   accessTokenTtl: process.env.ACCESS_TOKEN_TTL || '15m',
   refreshTokenTtlDays: Number(process.env.REFRESH_TOKEN_TTL_DAYS || 30),
   adminRsaPublicKey: process.env.ADMIN_RSA_PUBLIC_KEY,
-  aadhaarEncryptionKey: process.env.AADHAAR_ENC_KEY,
+  aadhaarEncryptionKey: getDevSecretOrEnv(process.env.AADHAAR_ENC_KEY, 'aadhaarEncryptionKey'),
   recaptchaSecret: process.env.RECAPTCHA_SECRET,
   smtp: {
     host: process.env.SMTP_HOST,

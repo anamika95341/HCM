@@ -1,0 +1,93 @@
+services:
+  frontend:
+    build:
+      context: ./Frontend
+      dockerfile: Dockerfile
+      target: prod
+      args:
+        VITE_API_BASE_URL: ${VITE_API_BASE_URL:-http://localhost:3000/api/v1}
+    depends_on:
+      backend:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8080 || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+    networks:
+      - frontend-backend-net
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+      target: runner
+    env_file:
+      - ./backend/.env.localhost
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+      FRONTEND_ORIGINS: ${FRONTEND_ORIGINS:-http://localhost:8080}
+      DATABASE_URL: postgresql://app_user:${DB_PASSWORD:-change_me}@postgres:5432/citizen_portal
+      REDIS_URL: redis://:${REDIS_PASSWORD:-change_me}@redis:6379
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://localhost:3000/health').then((res)=>process.exit(res.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+    networks:
+      - frontend-backend-net
+      - backend-data-net
+
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: citizen_portal
+      POSTGRES_USER: app_user
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-change_me}
+    command: ["postgres", "-c", "max_connections=50", "-c", "shared_buffers=64MB", "-c", "effective_cache_size=128MB", "-c", "work_mem=4MB", "-c", "shared_preload_libraries=pg_stat_statements"]
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      - ./backend/db/postgres/migrations:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U app_user -d citizen_portal"]
+      interval: 20s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+    networks:
+      - backend-data-net
+
+  redis:
+    image: redis:7-alpine
+    command: ["redis-server", "--appendonly", "yes", "--requirepass", "${REDIS_PASSWORD:-change_me}", "--maxmemory", "64mb", "--maxmemory-policy", "allkeys-lru", "--bind", "0.0.0.0"]
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD-SHELL", "redis-cli -a ${REDIS_PASSWORD:-change_me} ping"]
+      interval: 20s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+    networks:
+      - backend-data-net
+
+networks:
+  frontend-backend-net:
+    driver: bridge
+    name: hcm-frontend-backend
+  backend-data-net:
+    driver: bridge
+    internal: true
+    name: hcm-backend-data
+
+volumes:
+  postgres-data:
+  redis-data:

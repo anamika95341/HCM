@@ -23,9 +23,14 @@ const meetingScheduleSchema = z.object({
   comments: z.string().max(2000).optional().or(z.literal('')),
 });
 
+const meetingActionNoteSchema = z.object({
+  reason: z.string().min(3).max(2000),
+});
+
 module.exports = {
   assignVerificationSchema,
   meetingRejectSchema,
   meetingVerificationSchema,
   meetingScheduleSchema,
+  meetingActionNoteSchema,
 };

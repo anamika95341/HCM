@@ -29,9 +29,9 @@ async function createAdmin(payload) {
 
 async function getDashboard() {
   const [meetingQueue, complaintQueue, escalated, scheduled] = await Promise.all([
-    pool.query(`SELECT COUNT(*) FROM meetings WHERE status IN ('pending', 'accepted', 'verification_pending', 'verified')`),
-    pool.query(`SELECT COUNT(*) FROM complaints WHERE status IN ('submitted', 'in_review')`),
-    pool.query(`SELECT COUNT(*) FROM complaints WHERE status = 'escalated'`),
+    pool.query(`SELECT COUNT(*) FROM meetings WHERE status IN ('pending', 'accepted', 'verification_pending', 'verified', 'not_verified', 'scheduled')`),
+    pool.query(`SELECT COUNT(*) FROM complaints WHERE status IN ('submitted', 'assigned', 'in_review', 'department_contact_identified', 'call_scheduled', 'followup_in_progress')`),
+    pool.query(`SELECT COUNT(*) FROM complaints WHERE status = 'escalated_to_meeting'`),
     pool.query(`SELECT COUNT(*) FROM meetings WHERE status = 'scheduled'`),
   ]);
 
@@ -43,4 +43,36 @@ async function getDashboard() {
   };
 }
 
-module.exports = { createAdmin, getDashboard };
+async function listActiveAdminsForCitizenDirectory() {
+  const result = await pool.query(
+    `SELECT id, first_name, last_name, designation
+     FROM admins
+     WHERE status = 'active'
+     ORDER BY first_name ASC, last_name ASC`
+  );
+  return result.rows;
+}
+
+async function listWorkflowDirectory() {
+  const [deos, ministers] = await Promise.all([
+    pool.query(
+      `SELECT id, first_name, last_name, designation
+       FROM deos
+       WHERE status = 'active'
+       ORDER BY first_name ASC, last_name ASC`
+    ),
+    pool.query(
+      `SELECT id, first_name, last_name
+       FROM ministers
+       WHERE status = 'active'
+       ORDER BY first_name ASC, last_name ASC`
+    ),
+  ]);
+
+  return {
+    deos: deos.rows,
+    ministers: ministers.rows,
+  };
+}
+
+module.exports = { createAdmin, getDashboard, listActiveAdminsForCitizenDirectory, listWorkflowDirectory };

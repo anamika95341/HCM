@@ -1,0 +1,105 @@
+import { Navigate, Route, Routes } from "react-router-dom";
+import { Suspense, lazy } from "react";
+import AppLayout from "../layouts/AppLayout.jsx";
+import { PATHS } from "./paths.js";
+import ProtectedRoute from "../shared/auth/ProtectedRoute.jsx";
+import AdminCases from "../modules/admin/components/AdminCases.jsx";
+import AdminCaseDetail from "../modules/admin/components/AdminCaseDetail.jsx";
+import AdminMeeting from "../modules/admin/components/AdminMeeting.jsx";
+
+const LoginPage = lazy(() => import("../modules/auth/LoginPage.jsx"));
+const NewCasePage = lazy(() => import("../modules/citizen/pages/NewCasePage.jsx"));
+const MyCases = lazy(() => import("../modules/citizen/components/MyCases.jsx"));
+const MeetingList = lazy(() => import("../modules/citizen/components/MeetingList.jsx"));
+const CaseDetailPage = lazy(() => import("../modules/citizen/components/CaseDetailPage.jsx"));
+const SettingsPage = lazy(() => import("../modules/settings/SettingsPage.jsx"));
+const Calendar = lazy(() => import("../modules/admin/components/Calendar.jsx"));
+const MinisterDashboard = lazy(() => import("../modules/minister/MinisterDashboard.jsx"));
+const MinisterCalendar = lazy(() => import("../modules/minister/MinisterCalendar.jsx"));
+const DeoCalendarEvent = lazy(() => import("../modules/deo/DeoCalendarEvent.jsx"));
+
+function LoadingScreen() {
+  return (
+    <div
+      style={{
+        minHeight: "100vh",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        background: "var(--portal-bg)",
+        color: "var(--portal-text)",
+        fontSize: 13,
+      }}
+    >
+      Loading workspace...
+    </div>
+  );
+}
+
+export default function AppRoutes() {
+  return (
+    <Suspense fallback={<LoadingScreen />}>
+      <Routes>
+        <Route path={PATHS.login} element={<LoginPage defaultRole="citizen" />} />
+        <Route path={PATHS.adminLogin} element={<LoginPage defaultRole="admin" />} />
+        <Route path={PATHS.adminRegister} element={<LoginPage defaultRole="admin" initialAdminMode="verify-token" />} />
+        <Route path={PATHS.ministerLogin} element={<LoginPage defaultRole="minister" />} />
+        <Route path={PATHS.deoLogin} element={<LoginPage defaultRole="deo" />} />
+
+        <Route element={<ProtectedRoute allowedRoles={["citizen"]} />}>
+          <Route element={<AppLayout />}>
+            <Route path={PATHS.citizen.home} element={<Navigate to={PATHS.citizen.newCase} replace />} />
+            <Route path={PATHS.citizen.newCase} element={<NewCasePage />} />
+            <Route path={PATHS.citizen.legacyNewCase} element={<NewCasePage />} />
+            <Route path={PATHS.citizen.cases} element={<MyCases />} />
+            <Route path={PATHS.citizen.legacyCases} element={<MyCases />} />
+            <Route path={PATHS.citizen.meetings} element={<MeetingList />} />
+            <Route path={PATHS.citizen.legacyMeetings} element={<MeetingList />} />
+            <Route path={PATHS.citizen.caseDetail} element={<CaseDetailPage />} />
+            <Route path={PATHS.citizen.legacyCaseDetail} element={<CaseDetailPage />} />
+          </Route>
+        </Route>
+
+        <Route element={<ProtectedRoute allowedRoles={["admin"]} />}>
+          <Route element={<AppLayout />}>
+            <Route path={PATHS.admin.workQueue} element={<AdminCases />} />
+            <Route path={PATHS.admin.calendar} element={<Calendar />} />
+            <Route path={PATHS.admin.legacyCalendar} element={<Calendar />} />
+            <Route path={PATHS.admin.pool} element={<AdminCases />} />
+            <Route path={PATHS.admin.legacyPool} element={<AdminCases />} />
+            <Route path={PATHS.admin.cases} element={<AdminCases />} />
+            <Route path={PATHS.admin.legacyCases} element={<AdminCases />} />
+            <Route path={PATHS.admin.caseDetail} element={<AdminCaseDetail />} />
+            <Route path={PATHS.admin.legacyCaseDetail} element={<AdminCaseDetail />} />
+            <Route path={PATHS.admin.meetings} element={<AdminMeeting />} />
+            <Route path={PATHS.admin.meetingDetail} element={<AdminMeeting />} />
+            <Route path={PATHS.admin.legacyMeetings} element={<AdminMeeting />} />
+          </Route>
+        </Route>
+
+        <Route element={<ProtectedRoute allowedRoles={["minister"]} />}>
+          <Route element={<AppLayout />}>
+            <Route path={PATHS.minister.dashboard} element={<MinisterDashboard />} />
+            <Route path={PATHS.minister.calendar} element={<MinisterCalendar />} />
+            <Route path={PATHS.minister.legacyDashboard} element={<MinisterDashboard />} />
+          </Route>
+        </Route>
+
+        <Route element={<ProtectedRoute allowedRoles={["deo"]} />}>
+          <Route element={<AppLayout />}>
+            <Route path={PATHS.deo.calendarEvents} element={<DeoCalendarEvent />} />
+            <Route path={PATHS.deo.legacyCalendarEvents} element={<DeoCalendarEvent />} />
+          </Route>
+        </Route>
+
+        <Route element={<ProtectedRoute allowedRoles={["citizen", "admin", "deo", "minister"]} />}>
+          <Route element={<AppLayout />}>
+            <Route path={PATHS.settings} element={<SettingsPage />} />
+          </Route>
+        </Route>
+
+        <Route path="*" element={<Navigate to={PATHS.login} replace />} />
+      </Routes>
+    </Suspense>
+  );
+}

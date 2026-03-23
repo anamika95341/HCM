@@ -14,4 +14,8 @@ async function getWorkQueue() {
   return { meetings, complaints };
 }
 
-module.exports = { getDashboard, getWorkQueue };
+async function getWorkflowDirectory() {
+  return adminRepository.listWorkflowDirectory();
+}
+
+module.exports = { getDashboard, getWorkQueue, getWorkflowDirectory };

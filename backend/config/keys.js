@@ -1,5 +1,6 @@
 const env = require('./env');
+const { getDevSecretOrEnv } = require('./devSecrets');
 
 module.exports = {
-  adminRegistrationPublicKey: env.adminRsaPublicKey ? env.adminRsaPublicKey.replace(/\\n/g, '\n') : undefined,
+  adminRegistrationPublicKey: getDevSecretOrEnv(env.adminRsaPublicKey, 'adminPublicKey')?.replace(/\\n/g, '\n'),
 };

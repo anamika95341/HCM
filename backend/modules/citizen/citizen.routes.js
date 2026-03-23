@@ -10,5 +10,8 @@ router.use(authorize('citizen'));
 
 router.get('/me', citizenController.getProfile);
 router.get('/dashboard', citizenController.getDashboard);
+router.get('/admin-directory', citizenController.getAdminDirectory);
+router.get('/my-cases', citizenController.getMyCases);
+router.get('/cases/:caseId', citizenController.getCaseDetail);
 
 module.exports = router;

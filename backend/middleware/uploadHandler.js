@@ -2,7 +2,6 @@ const fs = require('fs');
 const path = require('path');
 const multer = require('multer');
 const crypto = require('crypto');
-const { fileTypeFromBuffer } = require('file-type');
 const env = require('../config/env');
 
 const ALLOWED = new Set(['image/jpeg', 'image/png', 'application/pdf']);
@@ -23,6 +22,7 @@ function createUploader({ maxSizeBytes, subdir }) {
 }
 
 async function persistPrivateUpload(file, subdir) {
+  const { fileTypeFromBuffer } = await import('file-type');
   const type = await fileTypeFromBuffer(file.buffer);
   if (!type || !ALLOWED.has(type.mime)) {
     const error = new Error('Invalid file type');

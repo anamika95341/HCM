@@ -27,7 +27,7 @@ async function seedData() {
 
   await pool.query(
     `INSERT INTO citizens
-      (citizen_id, first_name, email, aadhaar_ciphertext, aadhaar_iv, aadhaar_tag, age, sex, mobile_number, pincode, city, state, local_mp, password_hash, status, is_verified)
+      (citizen_id, first_name, email, aadhaar_hash, aadhaar_ciphertext, aadhaar_iv, aadhaar_tag, age, sex, mobile_number, pincode, city, state, local_mp, password_hash, status, is_verified)
      VALUES
       ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,'active',true)
      ON CONFLICT (citizen_id) DO NOTHING`,
@@ -36,7 +36,7 @@ async function seedData() {
 
   await pool.query(
     `INSERT INTO admins
-      (username, first_name, age, sex, designation, email, aadhaar_ciphertext, aadhaar_iv, aadhaar_tag, phone_number, password_hash)
+      (username, first_name, age, sex, designation, email, aadhaar_hash, aadhaar_ciphertext, aadhaar_iv, aadhaar_tag, phone_number, password_hash)
      VALUES
       ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)
      ON CONFLICT (username) DO NOTHING`,

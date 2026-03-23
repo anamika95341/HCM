@@ -37,13 +37,31 @@ async function getCitizenComplaintDetail(req, res, next) {
   }
 }
 
-async function updateComplaintStatus(req, res, next) {
+async function getAdminComplaintDetail(req, res, next) {
   try {
-    const complaint = await complaintsService.updateComplaintStatus(
+    const detail = await complaintsService.getAdminComplaintDetail(req.params.complaintId);
+    res.json(detail);
+  } catch (error) {
+    next(error);
+  }
+}
+
+async function assignComplaintToSelf(req, res, next) {
+  try {
+    const complaint = await complaintsService.assignComplaintToSelf(req.params.complaintId, req.user.sub, reqMeta(req));
+    res.json({ complaint });
+  } catch (error) {
+    next(error);
+  }
+}
+
+async function reassignComplaint(req, res, next) {
+  try {
+    const complaint = await complaintsService.reassignComplaint(
       req.params.complaintId,
       req.user.sub,
-      req.body.status,
-      req.body.note,
+      req.body.adminId,
+      req.body.reason,
       reqMeta(req)
     );
     res.json({ complaint });
@@ -52,4 +70,81 @@ async function updateComplaintStatus(req, res, next) {
   }
 }
 
-module.exports = { submitComplaint, getCitizenComplaints, getCitizenComplaintDetail, updateComplaintStatus };
+async function updateComplaintDepartment(req, res, next) {
+  try {
+    const complaint = await complaintsService.updateComplaintDepartment(req.params.complaintId, req.user.sub, req.body, reqMeta(req));
+    res.json({ complaint });
+  } catch (error) {
+    next(error);
+  }
+}
+
+async function scheduleComplaintCall(req, res, next) {
+  try {
+    const complaint = await complaintsService.scheduleComplaintCall(req.params.complaintId, req.user.sub, req.body.callScheduledAt, reqMeta(req));
+    res.json({ complaint });
+  } catch (error) {
+    next(error);
+  }
+}
+
+async function logComplaintCallOutcome(req, res, next) {
+  try {
+    const complaint = await complaintsService.logComplaintCallOutcome(req.params.complaintId, req.user.sub, req.body.callOutcome, reqMeta(req));
+    res.json({ complaint });
+  } catch (error) {
+    next(error);
+  }
+}
+
+async function resolveComplaint(req, res, next) {
+  try {
+    const complaint = await complaintsService.resolveComplaint(req.params.complaintId, req.user.sub, req.body, reqMeta(req));
+    res.json({ complaint });
+  } catch (error) {
+    next(error);
+  }
+}
+
+async function escalateComplaintToMeeting(req, res, next) {
+  try {
+    const result = await complaintsService.escalateComplaintToMeeting(req.params.complaintId, req.user.sub, req.body, reqMeta(req));
+    res.json(result);
+  } catch (error) {
+    next(error);
+  }
+}
+
+async function reopenComplaint(req, res, next) {
+  try {
+    const complaint = await complaintsService.reopenComplaint(req.params.complaintId, req.user.sub, req.body.reason, reqMeta(req));
+    res.json({ complaint });
+  } catch (error) {
+    next(error);
+  }
+}
+
+async function closeComplaint(req, res, next) {
+  try {
+    const complaint = await complaintsService.closeComplaint(req.params.complaintId, req.user.sub, req.body.note, reqMeta(req));
+    res.json({ complaint });
+  } catch (error) {
+    next(error);
+  }
+}
+
+module.exports = {
+  submitComplaint,
+  getCitizenComplaints,
+  getCitizenComplaintDetail,
+  getAdminComplaintDetail,
+  assignComplaintToSelf,
+  reassignComplaint,
+  updateComplaintDepartment,
+  scheduleComplaintCall,
+  logComplaintCallOutcome,
+  resolveComplaint,
+  escalateComplaintToMeeting,
+  reopenComplaint,
+  closeComplaint,
+};

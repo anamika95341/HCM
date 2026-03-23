@@ -1,5 +1,4 @@
 const { z } = require('zod');
-const { isValidAadhaar } = require('../utils/aadhaar');
 
 const passwordSchema = z.string().min(12).max(128)
   .regex(/[A-Z]/)
@@ -16,7 +15,7 @@ const adminRegistrationSchema = z.object({
   age: z.number().int().min(1).max(120),
   sex: z.enum(['male', 'female', 'other']),
   designation: z.string().min(2).max(150),
-  aadhaarNumber: z.string().regex(/^\d{12}$/).refine(isValidAadhaar, 'Invalid Aadhaar number'),
+  aadhaarNumber: z.string().regex(/^\d{12}$/, 'Aadhaar must be exactly 12 digits'),
   phoneNumber: z.string().regex(/^\d{10}$/),
   email: z.string().email(),
   password: passwordSchema,

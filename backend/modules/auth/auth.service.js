@@ -108,13 +108,29 @@ async function issueSession(role, user) {
 
 async function registerCitizen(payload, reqMeta) {
   const passwordHash = await bcrypt.hash(payload.password, 12);
-  const citizen = await citizenRepository.createCitizen({
+  const registrationPayload = {
     ...payload,
     aadhaarHash: sha256(payload.aadhaarNumber),
     aadhaar: encryptAadhaar(payload.aadhaarNumber),
     passwordHash,
     localMp: lookupMp({ state: payload.state }),
+  };
+
+  const existingCitizen = await citizenRepository.findCitizenByRegistrationConflict({
+    email: payload.email,
+    aadhaarHash: registrationPayload.aadhaarHash,
+    mobileNumber: payload.mobileNumber,
   });
+
+  let citizen;
+  if (existingCitizen) {
+    if (existingCitizen.is_verified || existingCitizen.status === 'active' || existingCitizen.citizen_id) {
+      throw createHttpError(409, 'Citizen account already exists. Use login or forgot password.');
+    }
+    citizen = await citizenRepository.updatePendingCitizen(existingCitizen.id, registrationPayload);
+  } else {
+    citizen = await citizenRepository.createCitizen(registrationPayload);
+  }
 
   const destination = payload.preferredVerificationChannel === 'email' ? payload.email : payload.mobileNumber;
   const otp = await generateOtp({
@@ -270,7 +286,7 @@ async function startTwoFactorLogin(role, identifier, password, reqMeta) {
     throw genericError;
   }
 
-  if (role === 'minister') {
+  if (role === 'minister' || role === 'admin') {
     await clearLoginFailures({ role, userId: user.id, ip: reqMeta.ip });
     return issueSession(role, user);
   }

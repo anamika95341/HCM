@@ -20,7 +20,7 @@ BEGIN
     CREATE TYPE otp_purpose_type AS ENUM ('registration_verification', 'login_2fa', 'password_reset');
   END IF;
   IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'complaint_status_type') THEN
-    CREATE TYPE complaint_status_type AS ENUM ('submitted', 'in_review', 'resolved', 'rejected', 'escalated');
+    CREATE TYPE complaint_status_type AS ENUM ('submitted', 'assigned', 'in_review', 'department_contact_identified', 'call_scheduled', 'followup_in_progress', 'resolved', 'rejected', 'completed', 'escalated_to_meeting');
   END IF;
   IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'meeting_status_type') THEN
     CREATE TYPE meeting_status_type AS ENUM ('pending', 'accepted', 'rejected', 'verification_pending', 'verified', 'not_verified', 'scheduled', 'completed', 'cancelled');
@@ -180,10 +180,12 @@ CREATE TABLE IF NOT EXISTS uploaded_files (
 
 CREATE TABLE IF NOT EXISTS meetings (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  request_id VARCHAR(32) UNIQUE NOT NULL,
   citizen_id UUID NOT NULL REFERENCES citizens(id) ON DELETE CASCADE,
   assigned_admin_id UUID REFERENCES admins(id) ON DELETE SET NULL,
   assigned_deo_id UUID REFERENCES deos(id) ON DELETE SET NULL,
   minister_id UUID REFERENCES ministers(id) ON DELETE SET NULL,
+  linked_complaint_id UUID,
   title VARCHAR(255) NOT NULL,
   purpose TEXT NOT NULL,
   preferred_time TIMESTAMPTZ,
@@ -194,9 +196,16 @@ CREATE TABLE IF NOT EXISTS meetings (
   verification_reason TEXT,
   verification_notes TEXT,
   scheduled_at TIMESTAMPTZ,
+  scheduled_end_at TIMESTAMPTZ,
   scheduled_location TEXT,
   is_vip BOOLEAN NOT NULL DEFAULT FALSE,
+  visitor_id VARCHAR(32),
+  meeting_docket VARCHAR(32),
   admin_comments TEXT,
+  completion_note TEXT,
+  cancellation_reason TEXT,
+  completed_at TIMESTAMPTZ,
+  cancelled_at TIMESTAMPTZ,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
@@ -226,19 +235,36 @@ CREATE TABLE IF NOT EXISTS meeting_status_history (
 
 CREATE INDEX IF NOT EXISTS idx_meetings_citizen_id ON meetings (citizen_id, created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_meetings_admin_queue ON meetings (status, assigned_admin_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_meetings_request_id ON meetings (request_id);
+CREATE INDEX IF NOT EXISTS idx_meetings_linked_complaint ON meetings (linked_complaint_id);
 
 
 -- 006_create_complaints.sql
 
 CREATE TABLE IF NOT EXISTS complaints (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  complaint_id VARCHAR(32) UNIQUE NOT NULL,
   citizen_id UUID NOT NULL REFERENCES citizens(id) ON DELETE CASCADE,
   assigned_admin_id UUID REFERENCES admins(id) ON DELETE SET NULL,
   subject VARCHAR(255) NOT NULL,
   description TEXT NOT NULL,
+  complaint_location TEXT,
+  complaint_type VARCHAR(120),
+  department VARCHAR(150),
+  officer_name VARCHAR(150),
+  officer_contact VARCHAR(255),
+  manual_contact VARCHAR(255),
+  call_scheduled_at TIMESTAMPTZ,
+  call_outcome TEXT,
   document_file_id UUID REFERENCES uploaded_files(id) ON DELETE SET NULL,
   status complaint_status_type NOT NULL DEFAULT 'submitted',
   resolution_note TEXT,
+  resolution_summary TEXT,
+  resolution_document_names JSONB NOT NULL DEFAULT '[]'::jsonb,
+  status_reason TEXT,
+  reopened_count INTEGER NOT NULL DEFAULT 0,
+  related_meeting_id UUID REFERENCES meetings(id) ON DELETE SET NULL,
+  closed_at TIMESTAMPTZ,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
@@ -256,6 +282,12 @@ CREATE TABLE IF NOT EXISTS complaint_status_history (
 
 CREATE INDEX IF NOT EXISTS idx_complaints_citizen_id ON complaints (citizen_id, created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_complaints_status ON complaints (status, assigned_admin_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_complaints_complaint_id ON complaints (complaint_id);
+CREATE INDEX IF NOT EXISTS idx_complaints_related_meeting ON complaints (related_meeting_id);
+
+ALTER TABLE meetings
+  ADD CONSTRAINT meetings_linked_complaint_fk
+  FOREIGN KEY (linked_complaint_id) REFERENCES complaints(id) ON DELETE SET NULL;
 
 
 -- 007_create_otp_records.sql

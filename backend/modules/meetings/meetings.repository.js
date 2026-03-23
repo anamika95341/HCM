@@ -1,4 +1,103 @@
 const pool = require('../../config/database');
+const { generateCaseCode } = require('../../utils/generateCaseCode');
+
+const meetingSelect = `
+  SELECT
+    m.id,
+    m.request_id,
+    m.citizen_id,
+    m.assigned_admin_id,
+    m.assigned_deo_id,
+    m.minister_id,
+    m.linked_complaint_id,
+    m.title,
+    m.purpose,
+    m.preferred_time,
+    m.admin_referral,
+    m.status,
+    m.rejection_reason,
+    m.verification_reason,
+    m.verification_notes,
+    m.scheduled_at,
+    m.scheduled_end_at,
+    m.scheduled_location,
+    m.is_vip,
+    m.admin_comments,
+    m.visitor_id,
+    m.meeting_docket,
+    m.completion_note,
+    m.cancellation_reason,
+    m.created_at,
+    m.updated_at,
+    citizen.first_name,
+    citizen.last_name,
+    citizen.citizen_id AS citizen_code,
+    citizen.mobile_number,
+    citizen.email,
+    admin.first_name AS admin_first_name,
+    admin.last_name AS admin_last_name,
+    deo.first_name AS deo_first_name,
+    deo.last_name AS deo_last_name,
+    complaint.complaint_id AS linked_complaint_code,
+    complaint.subject AS linked_complaint_subject
+  FROM meetings m
+  JOIN citizens citizen ON citizen.id = m.citizen_id
+  LEFT JOIN admins admin ON admin.id = m.assigned_admin_id
+  LEFT JOIN deos deo ON deo.id = m.assigned_deo_id
+  LEFT JOIN complaints complaint ON complaint.id = m.linked_complaint_id
+`;
+
+function mapMeeting(row) {
+  return {
+    id: row.id,
+    _id: row.id,
+    requestId: row.request_id,
+    citizen_id: row.citizen_id,
+    assignedAdminUserId: row.assigned_admin_id,
+    assignedDeoId: row.assigned_deo_id,
+    ministerId: row.minister_id,
+    title: row.title,
+    purpose: row.purpose,
+    preferred_time: row.preferred_time,
+    admin_referral: row.admin_referral,
+    status: row.status,
+    rejection_reason: row.rejection_reason,
+    verification_reason: row.verification_reason,
+    verification_notes: row.verification_notes,
+    scheduled_at: row.scheduled_at,
+    scheduled_end_at: row.scheduled_end_at,
+    scheduled_location: row.scheduled_location,
+    is_vip: row.is_vip,
+    admin_comments: row.admin_comments,
+    visitorId: row.visitor_id,
+    meetingDocket: row.meeting_docket,
+    completionNote: row.completion_note,
+    cancellationReason: row.cancellation_reason,
+    createdAt: row.created_at,
+    created_at: row.created_at,
+    updatedAt: row.updated_at,
+    updated_at: row.updated_at,
+    first_name: row.first_name,
+    last_name: row.last_name,
+    citizen_code: row.citizen_code,
+    mobile_number: row.mobile_number,
+    email: row.email,
+    assignedAdminName: [row.admin_first_name, row.admin_last_name].filter(Boolean).join(' ') || '',
+    assignedDeoName: [row.deo_first_name, row.deo_last_name].filter(Boolean).join(' ') || '',
+    currentOwner: [row.deo_first_name, row.deo_last_name].filter(Boolean).join(' ')
+      || [row.admin_first_name, row.admin_last_name].filter(Boolean).join(' ')
+      || 'Admin Queue',
+    citizenSnapshot: {
+      name: [row.first_name, row.last_name].filter(Boolean).join(' '),
+      citizenId: row.citizen_code,
+      phoneNumbers: row.mobile_number ? [row.mobile_number] : [],
+      email: row.email || '',
+    },
+    relatedComplaint: row.linked_complaint_id
+      ? { id: row.linked_complaint_id, complaintId: row.linked_complaint_code, title: row.linked_complaint_subject }
+      : null,
+  };
+}
 
 async function createUploadedFile(file, context) {
   const result = await pool.query(
@@ -21,16 +120,26 @@ async function createUploadedFile(file, context) {
   return result.rows[0];
 }
 
-async function createMeeting({ citizenId, title, purpose, preferredTime, adminReferral, documentFileId, additionalAttendees }) {
+async function createMeeting({
+  citizenId,
+  title,
+  purpose,
+  preferredTime,
+  adminReferral,
+  documentFileId,
+  additionalAttendees,
+  linkedComplaintId = null,
+}) {
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
+    const requestId = generateCaseCode('MREQ');
     const meetingResult = await client.query(
       `INSERT INTO meetings
-        (citizen_id, title, purpose, preferred_time, admin_referral, document_file_id)
-       VALUES ($1,$2,$3,$4,$5,$6)
+        (request_id, citizen_id, title, purpose, preferred_time, admin_referral, document_file_id, linked_complaint_id)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8)
        RETURNING *`,
-      [citizenId, title, purpose, preferredTime || null, adminReferral || null, documentFileId || null]
+      [requestId, citizenId, title, purpose, preferredTime || null, adminReferral || null, documentFileId || null, linkedComplaintId]
     );
     const meeting = meetingResult.rows[0];
 
@@ -60,38 +169,48 @@ async function createMeeting({ citizenId, title, purpose, preferredTime, adminRe
 
 async function getCitizenMeetings(citizenId) {
   const result = await pool.query(
-    `SELECT id, title, purpose, preferred_time, admin_referral, status, rejection_reason, verification_reason, scheduled_at, scheduled_location, is_vip, admin_comments, created_at
-     FROM meetings
-     WHERE citizen_id = $1
-     ORDER BY created_at DESC`,
+    `${meetingSelect}
+     WHERE m.citizen_id = $1
+     ORDER BY m.updated_at DESC, m.created_at DESC`,
     [citizenId]
   );
-  return result.rows;
+  return result.rows.map(mapMeeting);
 }
 
 async function getMeetingById(meetingId) {
-  const result = await pool.query('SELECT * FROM meetings WHERE id = $1', [meetingId]);
-  return result.rows[0] || null;
+  const result = await pool.query(
+    `${meetingSelect}
+     WHERE m.id = $1`,
+    [meetingId]
+  );
+  return result.rows[0] ? mapMeeting(result.rows[0]) : null;
 }
 
 async function getCitizenMeetingById(meetingId, citizenId) {
   const result = await pool.query(
-    `SELECT id, citizen_id, title, purpose, preferred_time, admin_referral, status, rejection_reason, verification_reason, scheduled_at, scheduled_location, is_vip, admin_comments, created_at
-     FROM meetings WHERE id = $1 AND citizen_id = $2`,
+    `${meetingSelect}
+     WHERE m.id = $1 AND m.citizen_id = $2`,
     [meetingId, citizenId]
   );
-  return result.rows[0] || null;
+  return result.rows[0] ? mapMeeting(result.rows[0]) : null;
 }
 
 async function getMeetingQueue() {
   const result = await pool.query(
-    `SELECT m.id, m.title, m.purpose, m.preferred_time, m.status, m.created_at, c.first_name, c.last_name, c.citizen_id
-     FROM meetings m
-     JOIN citizens c ON c.id = m.citizen_id
-     WHERE m.status IN ('pending', 'accepted', 'verification_pending', 'verified')
-     ORDER BY m.created_at ASC`
+    `${meetingSelect}
+     WHERE m.status NOT IN ('completed', 'cancelled')
+     ORDER BY m.updated_at DESC, m.created_at DESC`
   );
-  return result.rows;
+  return result.rows.map(mapMeeting);
+}
+
+async function getAdminMeetingById(meetingId) {
+  const result = await pool.query(
+    `${meetingSelect}
+     WHERE m.id = $1`,
+    [meetingId]
+  );
+  return result.rows[0] ? mapMeeting(result.rows[0]) : null;
 }
 
 async function updateMeetingStatus({ meetingId, status, previousStatus, actorRole, actorId, note, patch = {} }) {
@@ -135,9 +254,35 @@ async function createCalendarEvent({ ministerId, meetingId, title, startsAt, end
   return result.rows[0];
 }
 
+async function updateCalendarEventByMeetingId(meetingId, payload) {
+  const result = await pool.query(
+    `UPDATE minister_calendar_events
+     SET minister_id = $2,
+         title = $3,
+         starts_at = $4,
+         ends_at = $5,
+         location = $6,
+         is_vip = $7,
+         comments = $8
+     WHERE meeting_id = $1
+     RETURNING *`,
+    [
+      meetingId,
+      payload.ministerId,
+      payload.title,
+      payload.startsAt,
+      payload.endsAt,
+      payload.location,
+      payload.isVip,
+      payload.comments || null,
+    ]
+  );
+  return result.rows[0] || null;
+}
+
 async function getMeetingHistory(meetingId) {
   const result = await pool.query(
-    `SELECT previous_status, new_status, actor_role, note, created_at
+    `SELECT id, previous_status, new_status, actor_role, note, created_at
      FROM meeting_status_history
      WHERE meeting_id = $1
      ORDER BY created_at ASC`,
@@ -153,7 +298,9 @@ module.exports = {
   getMeetingById,
   getCitizenMeetingById,
   getMeetingQueue,
+  getAdminMeetingById,
   updateMeetingStatus,
   createCalendarEvent,
+  updateCalendarEventByMeetingId,
   getMeetingHistory,
 };

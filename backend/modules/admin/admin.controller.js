@@ -18,4 +18,13 @@ async function getWorkQueue(req, res, next) {
   }
 }
 
-module.exports = { getDashboard, getWorkQueue };
+async function getWorkflowDirectory(req, res, next) {
+  try {
+    const directory = await adminService.getWorkflowDirectory();
+    res.json(directory);
+  } catch (error) {
+    next(error);
+  }
+}
+
+module.exports = { getDashboard, getWorkQueue, getWorkflowDirectory };

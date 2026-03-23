@@ -1,0 +1,31 @@
+services:
+  frontend:
+    build:
+      target: dev
+    environment:
+      VITE_API_BASE_URL: http://localhost:3000/api/v1
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://localhost:5173').then((res)=>process.exit(res.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+    ports:
+      - "5173:5173"
+    volumes:
+      - ./Frontend:/app
+
+  backend:
+    build:
+      target: dev
+    env_file:
+      - ./backend/.env
+    environment:
+      NODE_ENV: development
+      FRONTEND_ORIGINS: http://localhost:5173
+      DATABASE_URL: postgresql://app_user:${DB_PASSWORD:-change_me}@postgres:5432/citizen_portal
+      REDIS_URL: redis://:${REDIS_PASSWORD:-change_me}@redis:6379
+    command: ["npm", "run", "dev"]
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./backend:/app
