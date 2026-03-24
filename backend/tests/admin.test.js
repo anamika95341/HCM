@@ -12,7 +12,7 @@ describe('admin validation', () => {
       phoneNumber: '9876543211',
       email: 'admin@example.com',
       password: 'StrongPass123!',
-      confirmPassword: 'StrongPass123',
+      confirmPassword: 'PasswordMismatch001',
     });
 
     expect(result.success).toBe(false);
