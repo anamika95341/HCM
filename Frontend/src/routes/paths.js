@@ -1,7 +1,8 @@
 export const PATHS = {
   login: "/",
   adminLogin: "/admin",
-  adminRegister: "/admin/register",
+  adminVerify: "/admin/verify",
+  masteradminLogin: "/masteradmin",
   ministerLogin: "/Minister",
   deoLogin: "/DEO",
   settings: "/settings",
@@ -31,6 +32,14 @@ export const PATHS = {
     meetingDetail: "/admin/meetings/:meetingId",
     legacyMeetings: "/meetings",
   },
+  masteradmin: {
+    home: "/masteradmin/dashboard",
+    dashboard: "/masteradmin/dashboard",
+    createAdmin: "/masteradmin/create-admin",
+    createDeo: "/masteradmin/create-deo",
+    manageAdmins: "/masteradmin/manage-admins",
+    manageDeos: "/masteradmin/manage-deos",
+  },
   minister: {
     home: "/Minister/dashboard",
     dashboard: "/Minister/dashboard",
@@ -39,12 +48,14 @@ export const PATHS = {
   },
   deo: {
     home: "/DEO/calendar-events",
+    verify: "/DEO/verify",
     calendarEvents: "/DEO/calendar-events",
     legacyCalendarEvents: "/CalendarEvent",
   },
 };
 
 export function getLoginPathForRole(role) {
+  if (role === "masteradmin") return PATHS.masteradminLogin;
   if (role === "admin") return PATHS.adminLogin;
   if (role === "minister") return PATHS.ministerLogin;
   if (role === "deo") return PATHS.deoLogin;
@@ -52,6 +63,7 @@ export function getLoginPathForRole(role) {
 }
 
 export function getHomePathForRole(role) {
+  if (role === "masteradmin") return PATHS.masteradmin.dashboard;
   if (role === "admin") return PATHS.admin.workQueue;
   if (role === "minister") return PATHS.minister.dashboard;
   if (role === "deo") return PATHS.deo.calendarEvents;

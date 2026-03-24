@@ -3,6 +3,7 @@ const pool = require('../../config/database');
 const roleTables = {
   citizen: { table: 'citizens', phoneField: 'mobile_number', loginField: 'citizen_id' },
   admin: { table: 'admins', phoneField: 'phone_number', loginField: 'username' },
+  masteradmin: { table: 'master_admins', phoneField: 'phone_number', loginField: 'username' },
   deo: { table: 'deos', phoneField: 'phone_number', loginField: 'username' },
   minister: { table: 'ministers', phoneField: 'phone_number', loginField: 'username' },
 };
@@ -41,7 +42,15 @@ async function findCitizenByForgotPassword(aadhaarHash, email) {
 
 async function findAdminByUsernameOrEmail(identifier) {
   const result = await pool.query(
-    'SELECT * FROM admins WHERE username = $1 OR email = $1',
+    'SELECT * FROM admins WHERE removed_at IS NULL AND (username = $1 OR email = $1)',
+    [identifier]
+  );
+  return result.rows[0] || null;
+}
+
+async function findMasterAdminByUsernameOrEmail(identifier) {
+  const result = await pool.query(
+    'SELECT * FROM master_admins WHERE username = $1 OR email = $1',
     [identifier]
   );
   return result.rows[0] || null;
@@ -49,7 +58,7 @@ async function findAdminByUsernameOrEmail(identifier) {
 
 async function findDeoByUsernameOrEmail(identifier) {
   const result = await pool.query(
-    'SELECT * FROM deos WHERE username = $1 OR email = $1',
+    'SELECT * FROM deos WHERE removed_at IS NULL AND (username = $1 OR email = $1)',
     [identifier]
   );
   return result.rows[0] || null;
@@ -68,6 +77,29 @@ async function insertVerificationRecord({ userRole, userId, purpose, channel, de
     `INSERT INTO verification_records (user_role, user_id, purpose, channel, destination, expires_at)
      VALUES ($1,$2,$3,$4,$5,$6)`,
     [userRole, userId, purpose, channel, destination, expiresAt]
+  );
+}
+
+async function markVerificationRecordVerified({ userRole, userId, purpose }) {
+  await pool.query(
+    `UPDATE verification_records
+        SET verified_at = NOW()
+      WHERE user_role = $1
+        AND user_id = $2
+        AND purpose = $3
+        AND verified_at IS NULL`,
+    [userRole, userId, purpose]
+  );
+}
+
+async function clearVerificationRecords({ userRole, userId, purpose }) {
+  await pool.query(
+    `DELETE FROM verification_records
+      WHERE user_role = $1
+        AND user_id = $2
+        AND purpose = $3
+        AND verified_at IS NULL`,
+    [userRole, userId, purpose]
   );
 }
 
@@ -115,24 +147,21 @@ async function updateCitizenVerification(userId, citizenId) {
   );
 }
 
-async function findAdminTokenRecordByJti(jti) {
-  const result = await pool.query('SELECT * FROM admin_token_records WHERE jti = $1', [jti]);
-  return result.rows[0] || null;
-}
-
-async function createAdminTokenRecord({ jti, subjectEmail, designation, expiresAt }) {
+async function updateDeoVerification(userId) {
   await pool.query(
-    `INSERT INTO admin_token_records (jti, subject_email, designation, expires_at)
-     VALUES ($1,$2,$3,$4)
-     ON CONFLICT (jti) DO NOTHING`,
-    [jti, subjectEmail || null, designation || null, expiresAt]
+    `UPDATE deos
+     SET is_verified = TRUE, status = 'active', updated_at = NOW()
+     WHERE id = $1`,
+    [userId]
   );
 }
 
-async function markAdminTokenUsed(jti, adminId) {
+async function updateAdminVerification(userId) {
   await pool.query(
-    'UPDATE admin_token_records SET used_at = NOW(), used_by_admin_id = $2 WHERE jti = $1 AND used_at IS NULL',
-    [jti, adminId]
+    `UPDATE admins
+     SET is_verified = TRUE, status = 'active', updated_at = NOW()
+     WHERE id = $1`,
+    [userId]
   );
 }
 
@@ -141,15 +170,17 @@ module.exports = {
   findCitizenByCitizenId,
   findCitizenByForgotPassword,
   findAdminByUsernameOrEmail,
+  findMasterAdminByUsernameOrEmail,
   findDeoByUsernameOrEmail,
   findMinisterByUsernameOrEmail,
   insertVerificationRecord,
+  markVerificationRecordVerified,
+  clearVerificationRecords,
   storeRefreshToken,
   findActiveRefreshToken,
   revokeRefreshToken,
   updatePassword,
   updateCitizenVerification,
-  findAdminTokenRecordByJti,
-  createAdminTokenRecord,
-  markAdminTokenUsed,
+  updateAdminVerification,
+  updateDeoVerification,
 };

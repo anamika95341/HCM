@@ -4,6 +4,7 @@ import { apiClient, setUnauthorizedHandler } from "../api/client.js";
 const AuthContext = createContext(null);
 
 function mapRoleToLogoutPath(role) {
+  if (role === "masteradmin") return "/auth/masteradmin/logout";
   if (role === "admin") return "/auth/admin/logout";
   if (role === "deo") return "/auth/deo/logout";
   if (role === "minister") return "/auth/minister/logout";
@@ -12,12 +13,10 @@ function mapRoleToLogoutPath(role) {
 
 export function AuthProvider({ children }) {
   const [session, setSession] = useState(null);
-  const [pendingChallenge, setPendingChallenge] = useState(null);
 
   useEffect(() => {
     setUnauthorizedHandler(() => {
       setSession(null);
-      setPendingChallenge(null);
     });
 
     return () => {
@@ -32,7 +31,6 @@ export function AuthProvider({ children }) {
         password,
       });
       setSession({ ...data, role: "citizen" });
-      setPendingChallenge(null);
       return { requiresOtp: false };
     }
 
@@ -42,7 +40,15 @@ export function AuthProvider({ children }) {
         password,
       });
       setSession({ ...data, role: "minister" });
-      setPendingChallenge(null);
+      return { requiresOtp: false };
+    }
+
+    if (role === "masteradmin") {
+      const { data } = await apiClient.post("/auth/masteradmin/login", {
+        usernameOrEmail: identifier,
+        password,
+      });
+      setSession({ ...data, role: "masteradmin" });
       return { requiresOtp: false };
     }
 
@@ -52,27 +58,8 @@ export function AuthProvider({ children }) {
       password,
     });
 
-    if (data?.accessToken) {
-      setSession({ ...data, role });
-      setPendingChallenge(null);
-      return { requiresOtp: false };
-    }
-
-    setPendingChallenge({ role, loginToken: data.loginToken });
-    return { requiresOtp: true };
-  }
-
-  async function verifyOtp(otp) {
-    if (!pendingChallenge) {
-      throw new Error("No pending OTP challenge");
-    }
-    const endpoint = pendingChallenge.role === "admin" ? "/auth/admin/verify-otp" : "/auth/deo/verify-otp";
-    const { data } = await apiClient.post(endpoint, {
-      loginToken: pendingChallenge.loginToken,
-      otp,
-    });
-    setSession({ ...data, role: pendingChallenge.role });
-    setPendingChallenge(null);
+    setSession({ ...data, role });
+    return { requiresOtp: false };
   }
 
   async function logout() {
@@ -92,17 +79,14 @@ export function AuthProvider({ children }) {
       }
     }
     setSession(null);
-    setPendingChallenge(null);
   }
 
   const value = useMemo(() => ({
     session,
-    pendingChallenge,
     login,
-    verifyOtp,
     logout,
     isAuthenticated: Boolean(session?.accessToken),
-  }), [pendingChallenge, session]);
+  }), [session]);
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }

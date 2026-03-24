@@ -17,6 +17,10 @@ const Calendar = lazy(() => import("../modules/admin/components/Calendar.jsx"));
 const MinisterDashboard = lazy(() => import("../modules/minister/MinisterDashboard.jsx"));
 const MinisterCalendar = lazy(() => import("../modules/minister/MinisterCalendar.jsx"));
 const DeoCalendarEvent = lazy(() => import("../modules/deo/DeoCalendarEvent.jsx"));
+const DeoVerifyPage = lazy(() => import("../modules/deo/DeoVerifyPage.jsx"));
+const AdminVerifyPage = lazy(() => import("../modules/admin/AdminVerifyPage.jsx"));
+const MasterAdminDashboard = lazy(() => import("../modules/masteradmin/MasterAdminDashboard.jsx"));
+const MasterAdminAccessPage = lazy(() => import("../modules/masteradmin/MasterAdminAccessPage.jsx"));
 
 function LoadingScreen() {
   return (
@@ -42,9 +46,11 @@ export default function AppRoutes() {
       <Routes>
         <Route path={PATHS.login} element={<LoginPage defaultRole="citizen" />} />
         <Route path={PATHS.adminLogin} element={<LoginPage defaultRole="admin" />} />
-        <Route path={PATHS.adminRegister} element={<LoginPage defaultRole="admin" initialAdminMode="verify-token" />} />
+        <Route path={PATHS.adminVerify} element={<AdminVerifyPage />} />
+        <Route path={PATHS.masteradminLogin} element={<LoginPage defaultRole="masteradmin" />} />
         <Route path={PATHS.ministerLogin} element={<LoginPage defaultRole="minister" />} />
         <Route path={PATHS.deoLogin} element={<LoginPage defaultRole="deo" />} />
+        <Route path={PATHS.deo.verify} element={<DeoVerifyPage />} />
 
         <Route element={<ProtectedRoute allowedRoles={["citizen"]} />}>
           <Route element={<AppLayout />}>
@@ -57,6 +63,16 @@ export default function AppRoutes() {
             <Route path={PATHS.citizen.legacyMeetings} element={<MeetingList />} />
             <Route path={PATHS.citizen.caseDetail} element={<CaseDetailPage />} />
             <Route path={PATHS.citizen.legacyCaseDetail} element={<CaseDetailPage />} />
+          </Route>
+        </Route>
+
+        <Route element={<ProtectedRoute allowedRoles={["masteradmin"]} />}>
+          <Route element={<AppLayout />}>
+            <Route path={PATHS.masteradmin.dashboard} element={<MasterAdminDashboard />} />
+            <Route path={PATHS.masteradmin.createAdmin} element={<MasterAdminAccessPage mode="create-admin" />} />
+            <Route path={PATHS.masteradmin.createDeo} element={<MasterAdminAccessPage mode="create-deo" />} />
+            <Route path={PATHS.masteradmin.manageAdmins} element={<MasterAdminAccessPage mode="manage-admins" />} />
+            <Route path={PATHS.masteradmin.manageDeos} element={<MasterAdminAccessPage mode="manage-deos" />} />
           </Route>
         </Route>
 
@@ -92,7 +108,7 @@ export default function AppRoutes() {
           </Route>
         </Route>
 
-        <Route element={<ProtectedRoute allowedRoles={["citizen", "admin", "deo", "minister"]} />}>
+        <Route element={<ProtectedRoute allowedRoles={["citizen", "admin", "masteradmin", "deo", "minister"]} />}>
           <Route element={<AppLayout />}>
             <Route path={PATHS.settings} element={<SettingsPage />} />
           </Route>

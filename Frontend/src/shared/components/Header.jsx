@@ -8,6 +8,7 @@ import { useAuth } from "../auth/AuthContext.jsx";
 
 const WORKSPACE_TITLES = [
   { match: "/citizen/", title: "Citizen Module" },
+  { match: "/masteradmin/", title: "Master Admin Module" },
   { match: "/admin/", title: "Admin Module" },
   { match: "/Minister/", title: "Minister Module" },
   { match: "/DEO/", title: "DEO Module" },

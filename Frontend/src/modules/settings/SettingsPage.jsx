@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import { usePortalTheme } from "../../shared/theme/portalTheme.jsx";
+import { useAuth } from "../../shared/auth/AuthContext.jsx";
 
 const useTheme = usePortalTheme;
 
@@ -702,6 +703,7 @@ const DataSection = () => {
 // ═══════════════════════════════════════════
 function SettingsPortalContent() {
   const { C } = useTheme();
+  const { session } = useAuth();
   const [activeTab, setActiveTab] = useState('profile');
   const [search, setSearch] = useState('');
 

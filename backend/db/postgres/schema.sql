@@ -64,6 +64,30 @@ CREATE INDEX IF NOT EXISTS idx_citizens_status ON citizens (status);
 CREATE INDEX IF NOT EXISTS idx_citizens_aadhaar_hash ON citizens (aadhaar_hash);
 
 
+-- 011_create_master_admins.sql
+
+CREATE TABLE IF NOT EXISTS master_admins (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  username VARCHAR(100) NOT NULL UNIQUE,
+  first_name VARCHAR(100) NOT NULL,
+  middle_name VARCHAR(100),
+  last_name VARCHAR(100),
+  age SMALLINT NOT NULL CHECK (age BETWEEN 1 AND 120),
+  sex sex_type NOT NULL,
+  designation VARCHAR(150) NOT NULL,
+  email VARCHAR(255) NOT NULL UNIQUE,
+  phone_number VARCHAR(15) NOT NULL UNIQUE,
+  password_hash TEXT NOT NULL,
+  status user_status_type NOT NULL DEFAULT 'active',
+  password_changed_at TIMESTAMPTZ,
+  failed_login_count INTEGER NOT NULL DEFAULT 0,
+  locked_until TIMESTAMPTZ,
+  manual_unlock_required BOOLEAN NOT NULL DEFAULT FALSE,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+
 -- 002_create_admins.sql
 
 CREATE TABLE IF NOT EXISTS admins (
@@ -83,6 +107,10 @@ CREATE TABLE IF NOT EXISTS admins (
   phone_number VARCHAR(15) NOT NULL UNIQUE,
   password_hash TEXT NOT NULL,
   status user_status_type NOT NULL DEFAULT 'active',
+  is_verified BOOLEAN NOT NULL DEFAULT FALSE,
+  created_by_master_admin_id UUID REFERENCES master_admins(id) ON DELETE SET NULL,
+  removed_at TIMESTAMPTZ,
+  removed_by_master_admin_id UUID REFERENCES master_admins(id) ON DELETE SET NULL,
   password_changed_at TIMESTAMPTZ,
   failed_login_count INTEGER NOT NULL DEFAULT 0,
   locked_until TIMESTAMPTZ,
@@ -91,18 +119,11 @@ CREATE TABLE IF NOT EXISTS admins (
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
-CREATE TABLE IF NOT EXISTS admin_token_records (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  jti VARCHAR(128) NOT NULL UNIQUE,
-  subject_email VARCHAR(255),
-  designation VARCHAR(150),
-  expires_at TIMESTAMPTZ NOT NULL,
-  used_at TIMESTAMPTZ,
-  used_by_admin_id UUID REFERENCES admins(id) ON DELETE SET NULL,
-  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-);
+CREATE INDEX IF NOT EXISTS idx_admins_master_admin_created
+  ON admins (created_by_master_admin_id, created_at DESC);
 
-CREATE INDEX IF NOT EXISTS idx_admin_token_records_unused ON admin_token_records (jti, used_at);
+CREATE INDEX IF NOT EXISTS idx_admins_status_verified
+  ON admins (status, is_verified, created_at DESC);
 
 
 -- 003_create_ministers.sql
@@ -150,16 +171,39 @@ CREATE TABLE IF NOT EXISTS deos (
   age SMALLINT NOT NULL CHECK (age BETWEEN 1 AND 120),
   sex sex_type NOT NULL,
   email VARCHAR(255) NOT NULL UNIQUE,
+  aadhaar_hash VARCHAR(64),
+  aadhaar_ciphertext TEXT,
+  aadhaar_iv VARCHAR(64),
+  aadhaar_tag VARCHAR(64),
   phone_number VARCHAR(15) NOT NULL UNIQUE,
   designation VARCHAR(150) NOT NULL,
   password_hash TEXT NOT NULL,
   status user_status_type NOT NULL DEFAULT 'active',
+  created_by_admin_id UUID REFERENCES admins(id) ON DELETE SET NULL,
+  created_by_master_admin_id UUID REFERENCES master_admins(id) ON DELETE SET NULL,
+  removed_at TIMESTAMPTZ,
+  removed_by_master_admin_id UUID REFERENCES master_admins(id) ON DELETE SET NULL,
+  is_verified BOOLEAN NOT NULL DEFAULT FALSE,
+  password_changed_at TIMESTAMPTZ,
   failed_login_count INTEGER NOT NULL DEFAULT 0,
   locked_until TIMESTAMPTZ,
   manual_unlock_required BOOLEAN NOT NULL DEFAULT FALSE,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+
+CREATE UNIQUE INDEX IF NOT EXISTS idx_deos_aadhaar_hash_unique
+  ON deos (aadhaar_hash)
+  WHERE aadhaar_hash IS NOT NULL;
+
+CREATE INDEX IF NOT EXISTS idx_deos_created_by_admin
+  ON deos (created_by_admin_id, created_at DESC);
+
+CREATE INDEX IF NOT EXISTS idx_deos_status_verified
+  ON deos (status, is_verified, created_at DESC);
+
+CREATE INDEX IF NOT EXISTS idx_deos_master_admin_created
+  ON deos (created_by_master_admin_id, created_at DESC);
 
 
 -- 005_create_meetings.sql

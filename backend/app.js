@@ -10,6 +10,7 @@ const errorHandler = require('./middleware/errorHandler');
 const authRoutes = require('./modules/auth/auth.routes');
 const citizenRoutes = require('./modules/citizen/citizen.routes');
 const adminRoutes = require('./modules/admin/admin.routes');
+const masteradminRoutes = require('./modules/masteradmin/masteradmin.routes');
 const ministerRoutes = require('./modules/minister/minister.routes');
 const deoRoutes = require('./modules/deo/deo.routes');
 const meetingRoutes = require('./modules/meetings/meetings.routes');
@@ -57,6 +58,7 @@ function createApp() {
   app.use('/api/v1/auth', authRoutes);
   app.use('/api/v1/citizen', citizenRoutes);
   app.use('/api/v1/admin', adminRoutes);
+  app.use('/api/v1/masteradmin', masteradminRoutes);
   app.use('/api/v1/minister', ministerRoutes);
   app.use('/api/v1/deo', deoRoutes);
   app.use('/api/v1/meetings', meetingRoutes);

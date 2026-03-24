@@ -34,6 +34,14 @@ function Sidebar({ collapsed, onToggle }) {
             { to: PATHS.admin.calendar, icon: FiCalendar, label: "Calendar" },
             { to: PATHS.settings, icon: BsFillGearFill, label: "Settings" },
         ],
+        masteradmin: [
+            { to: PATHS.masteradmin.dashboard, icon: FiHome, label: "Dashboard" },
+            { to: PATHS.masteradmin.createAdmin, icon: RiTeamLine, label: "Create Admin" },
+            { to: PATHS.masteradmin.createDeo, icon: RiTeamLine, label: "Create DEO" },
+            { to: PATHS.masteradmin.manageAdmins, icon: FiClipboard, label: "Manage Admins" },
+            { to: PATHS.masteradmin.manageDeos, icon: FiClipboard, label: "Manage DEOs" },
+            { to: PATHS.settings, icon: BsFillGearFill, label: "Settings" },
+        ],
         deo: [
             { to: PATHS.deo.calendarEvents, icon: RiTeamLine, label: "Verification Queue" },
             { to: PATHS.settings, icon: BsFillGearFill, label: "Settings" },

@@ -27,4 +27,17 @@ async function getWorkflowDirectory(req, res, next) {
   }
 }
 
-module.exports = { getDashboard, getWorkQueue, getWorkflowDirectory };
+async function listDeos(req, res, next) {
+  try {
+    const result = await adminService.listDeos();
+    res.json(result);
+  } catch (error) {
+    next(error);
+  }
+}
+
+function reqMeta(req) {
+  return { ip: req.ip, userAgent: req.get('user-agent') };
+}
+
+module.exports = { getDashboard, getWorkQueue, getWorkflowDirectory, listDeos };

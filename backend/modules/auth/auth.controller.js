@@ -26,6 +26,42 @@ async function citizenVerify(req, res, next) {
   }
 }
 
+async function deoVerify(req, res, next) {
+  try {
+    const result = await authService.verifyDeoRegistration(req.body, reqMeta(req));
+    res.json(result);
+  } catch (error) {
+    next(error);
+  }
+}
+
+async function adminVerify(req, res, next) {
+  try {
+    const result = await authService.verifyAdminRegistration(req.body, reqMeta(req));
+    res.json(result);
+  } catch (error) {
+    next(error);
+  }
+}
+
+async function adminResendVerification(req, res, next) {
+  try {
+    const result = await authService.resendAdminVerificationCode(req.body, reqMeta(req));
+    res.json(result);
+  } catch (error) {
+    next(error);
+  }
+}
+
+async function deoResendVerification(req, res, next) {
+  try {
+    const result = await authService.resendDeoVerificationCode(req.body, reqMeta(req));
+    res.json(result);
+  } catch (error) {
+    next(error);
+  }
+}
+
 async function citizenLogin(req, res, next) {
   try {
     const session = await authService.loginCitizen(req.body, reqMeta(req));
@@ -35,27 +71,18 @@ async function citizenLogin(req, res, next) {
   }
 }
 
-async function adminVerifyRegistrationToken(req, res, next) {
-  try {
-    const payload = await authService.verifyAdminRegistrationGate(req.body.registrationToken);
-    res.json({ valid: true, token: payload });
-  } catch (error) {
-    next(error);
-  }
-}
-
-async function adminRegister(req, res, next) {
-  try {
-    const admin = await authService.registerAdmin(req.body, reqMeta(req));
-    res.status(201).json({ admin });
-  } catch (error) {
-    next(error);
-  }
-}
-
 async function adminLogin(req, res, next) {
   try {
     const result = await authService.startTwoFactorLogin('admin', req.body.usernameOrEmail, req.body.password, reqMeta(req));
+    res.json(result);
+  } catch (error) {
+    next(error);
+  }
+}
+
+async function masteradminLogin(req, res, next) {
+  try {
+    const result = await authService.startTwoFactorLogin('masteradmin', req.body.usernameOrEmail, req.body.password, reqMeta(req));
     res.json(result);
   } catch (error) {
     next(error);
@@ -75,15 +102,6 @@ async function ministerLogin(req, res, next) {
   try {
     const result = await authService.startTwoFactorLogin('minister', req.body.usernameOrEmail, req.body.password, reqMeta(req));
     res.json(result);
-  } catch (error) {
-    next(error);
-  }
-}
-
-async function verifyOtp(req, res, next) {
-  try {
-    const session = await authService.verifyTwoFactorLogin(req.body, reqMeta(req));
-    res.json(session);
   } catch (error) {
     next(error);
   }
@@ -128,13 +146,15 @@ async function logout(req, res, next) {
 module.exports = {
   citizenRegister,
   citizenVerify,
+  adminVerify,
+  deoVerify,
+  adminResendVerification,
+  deoResendVerification,
   citizenLogin,
-  adminVerifyRegistrationToken,
-  adminRegister,
   adminLogin,
+  masteradminLogin,
   deoLogin,
   ministerLogin,
-  verifyOtp,
   forgotCitizenPassword,
   resetCitizenPassword,
   refresh,

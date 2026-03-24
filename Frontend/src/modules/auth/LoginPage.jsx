@@ -17,13 +17,19 @@ const ROLE_COPY = {
   },
   admin: {
     title: "Admin Portal",
-    subtitle: "Sign in with your username or email to access the admin workspace.",
+    subtitle: "Sign in with your username or email. Newly created admins must verify their account with the emailed code first.",
     identifierLabel: "Username or Email",
     identifierPlaceholder: "admin.user or admin@gov.in",
   },
+  masteradmin: {
+    title: "Master Admin Portal",
+    subtitle: "Sign in with your username or email to manage admin and DEO access securely.",
+    identifierLabel: "Username or Email",
+    identifierPlaceholder: "masteradmin.user or masteradmin@gov.in",
+  },
   deo: {
     title: "DEO Portal",
-    subtitle: "Sign in with your username or email. OTP verification is mandatory.",
+    subtitle: "Sign in with your username or email. OTP is required only once for initial account verification.",
     identifierLabel: "Username or Email",
     identifierPlaceholder: "deo.user or deo@gov.in",
   },
@@ -45,14 +51,15 @@ const fieldStyle = (C, hasIcon = true, hasRightAction = false) => ({
   fontSize: 13,
 });
 
-export default function LoginPage({ defaultRole = "citizen", initialAdminMode = "login" }) {
+export default function LoginPage({ defaultRole = "citizen" }) {
   const navigate = useNavigate();
   const location = useLocation();
   const { C } = usePortalTheme();
-  const { session, login, verifyOtp, pendingChallenge, isAuthenticated } = useAuth();
+  const { session, login, isAuthenticated } = useAuth();
 
   const role = useMemo(() => {
-    if (location.pathname === PATHS.adminLogin || location.pathname === PATHS.adminRegister) return "admin";
+    if (location.pathname === PATHS.masteradminLogin) return "masteradmin";
+    if (location.pathname === PATHS.adminLogin) return "admin";
     if (location.pathname === PATHS.deoLogin) return "deo";
     if (location.pathname === PATHS.ministerLogin) return "minister";
     return defaultRole;
@@ -61,16 +68,11 @@ export default function LoginPage({ defaultRole = "citizen", initialAdminMode = 
   const roleCopy = ROLE_COPY[role];
   const [identifier, setIdentifier] = useState("");
   const [password, setPassword] = useState("");
-  const [otp, setOtp] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
-  const [adminRegistrationResult, setAdminRegistrationResult] = useState(null);
   const [citizenMode, setCitizenMode] = useState("login");
-  const [adminMode, setAdminMode] = useState(initialAdminMode);
-  const [adminRegistrationToken, setAdminRegistrationToken] = useState("");
-  const [verifiedAdminGate, setVerifiedAdminGate] = useState(null);
   const [pendingCitizenUserId, setPendingCitizenUserId] = useState("");
   const [pendingResetCitizenId, setPendingResetCitizenId] = useState("");
   const [registerForm, setRegisterForm] = useState({
@@ -99,21 +101,6 @@ export default function LoginPage({ defaultRole = "citizen", initialAdminMode = 
     password: "",
     confirmPassword: "",
   });
-  const [adminRegisterForm, setAdminRegisterForm] = useState({
-    username: "",
-    firstName: "",
-    middleName: "",
-    lastName: "",
-    age: "",
-    sex: "male",
-    designation: "",
-    aadhaarNumber: "",
-    phoneNumber: "",
-    email: "",
-    password: "",
-    confirmPassword: "",
-  });
-
   useEffect(() => {
     if (isAuthenticated && session?.role) {
       navigate(getHomePathForRole(session.role), { replace: true });
@@ -123,15 +110,10 @@ export default function LoginPage({ defaultRole = "citizen", initialAdminMode = 
   useEffect(() => {
     setIdentifier("");
     setPassword("");
-    setOtp("");
     setError("");
     setSuccess("");
     setCitizenMode("login");
-    setAdminMode(role === "admin" ? initialAdminMode : "login");
-    setAdminRegistrationToken("");
-    setVerifiedAdminGate(null);
-    setAdminRegistrationResult(null);
-  }, [initialAdminMode, role]);
+  }, [role]);
 
   async function handlePrimaryLogin(event) {
     event.preventDefault();
@@ -140,29 +122,10 @@ export default function LoginPage({ defaultRole = "citizen", initialAdminMode = 
     setSuccess("");
 
     try {
-      const result = await login({ role, identifier, password });
-      if (result.requiresOtp) {
-        setSuccess("OTP sent. Complete the second step to continue.");
-      } else {
-        setSuccess("Authentication successful. Redirecting to the workspace.");
-      }
+      await login({ role, identifier, password });
+      setSuccess("Authentication successful. Redirecting to the workspace.");
     } catch (authError) {
       setError(toSafeUserMessage(authError, "Authentication failed"));
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  async function handleOtpVerification(event) {
-    event.preventDefault();
-    setLoading(true);
-    setError("");
-
-    try {
-      await verifyOtp(otp);
-      setSuccess("OTP verified. Redirecting to the workspace.");
-    } catch (authError) {
-      setError(toSafeUserMessage(authError, "OTP verification failed"));
     } finally {
       setLoading(false);
     }
@@ -267,64 +230,6 @@ export default function LoginPage({ defaultRole = "citizen", initialAdminMode = 
     }
   }
 
-  async function handleAdminTokenVerification(event) {
-    event.preventDefault();
-    setLoading(true);
-    setError("");
-    setSuccess("");
-
-    try {
-      const { data } = await apiClient.post("/auth/admin/verify-registration-token", {
-        registrationToken: adminRegistrationToken,
-      });
-      const gate = data.token || {};
-      setVerifiedAdminGate(gate);
-      setAdminRegisterForm((current) => ({
-        ...current,
-        email: typeof gate.sub === "string" ? gate.sub : current.email,
-        designation: typeof gate.designation === "string" ? gate.designation : current.designation,
-      }));
-      setAdminMode("register");
-      setSuccess("Registration token verified. Complete admin registration.");
-    } catch (requestError) {
-      setError(extractErrorMessage(requestError, "Unable to verify registration token"));
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  async function handleAdminRegister(event) {
-    event.preventDefault();
-    setLoading(true);
-    setError("");
-    setSuccess("");
-
-    try {
-      if (!adminRegistrationToken) {
-        throw new Error("Registration token is required");
-      }
-      if (!isTwelveDigitAadhaar(adminRegisterForm.aadhaarNumber)) {
-        throw new Error("Enter a valid 12-digit Aadhaar number");
-      }
-      const passwordError = validatePassword(adminRegisterForm.password, adminRegisterForm.confirmPassword);
-      if (passwordError) {
-        throw new Error(passwordError);
-      }
-
-      const { data } = await apiClient.post("/auth/admin/register", {
-        ...adminRegisterForm,
-        registrationToken: adminRegistrationToken,
-        age: Number(adminRegisterForm.age),
-      });
-      setAdminRegistrationResult(data.admin);
-      setSuccess("");
-    } catch (requestError) {
-      setError(extractErrorMessage(requestError, "Unable to register admin"));
-    } finally {
-      setLoading(false);
-    }
-  }
-
   const cardStyle = {
     width: "100%",
     maxWidth: 460,
@@ -335,9 +240,8 @@ export default function LoginPage({ defaultRole = "citizen", initialAdminMode = 
     overflow: "hidden",
   };
 
-  const otpRequired = pendingChallenge?.role === role;
-  const showCitizenActions = role === "citizen" && !otpRequired;
-  const showAdminActions = role === "admin" && !otpRequired;
+  const showCitizenActions = role === "citizen";
+  const showAdminActions = role === "admin";
 
   return (
     <div
@@ -351,16 +255,6 @@ export default function LoginPage({ defaultRole = "citizen", initialAdminMode = 
         background: C.bg,
       }}
     >
-      <AdminRegistrationSuccessModal
-        admin={adminRegistrationResult}
-        onClose={() => {
-          const nextIdentifier = adminRegistrationResult?.username || adminRegistrationResult?.email || "";
-          setAdminRegistrationResult(null);
-          setAdminMode("login");
-          setIdentifier(nextIdentifier);
-          navigate(PATHS.adminLogin, { replace: true });
-        }}
-      />
       <div style={cardStyle}>
         <div style={{ padding: "32px 32px 28px", background: C.bgElevated, borderBottom: `1px solid ${C.border}` }}>
           <div
@@ -388,9 +282,10 @@ export default function LoginPage({ defaultRole = "citizen", initialAdminMode = 
           {success && <MessageBox color={C.mint} bg={C.mintDim} icon={<CheckCircle size={18} />} message={success} />}
           {error && <MessageBox color={C.danger} bg={`${C.danger}20`} icon={<AlertCircle size={18} />} message={error} />}
 
-          {!otpRequired && (
+          {(
             (role === "citizen" && citizenMode === "login") ||
-            (role === "admin" && adminMode === "login") ||
+            role === "admin" ||
+            role === "deo" ||
             (!showCitizenActions && !showAdminActions)
           ) ? (
             <form onSubmit={handlePrimaryLogin} style={{ display: "grid", gap: 18 }}>
@@ -507,18 +402,43 @@ export default function LoginPage({ defaultRole = "citizen", initialAdminMode = 
                   <button
                     type="button"
                     onClick={() => {
-                      navigate(PATHS.adminRegister);
+                      navigate(PATHS.adminVerify);
                       setError("");
                       setSuccess("");
                     }}
                     style={footerLinkStyle(C)}
                   >
-                    Register New Admin
+                    Verify Admin
+                  </button>
+                </div>
+              )}
+
+              {role === "deo" && (
+                <div
+                  style={{
+                    marginTop: 10,
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                    gap: 12,
+                    flexWrap: "wrap",
+                  }}
+                >
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setError("");
+                      setSuccess("");
+                      navigate(PATHS.deo.verify);
+                    }}
+                    style={footerLinkStyle(C)}
+                  >
+                    Verify DEO
                   </button>
                 </div>
               )}
             </form>
-          ) : !otpRequired && role === "citizen" && citizenMode === "register" ? (
+          ) : role === "citizen" && citizenMode === "register" ? (
             <form onSubmit={handleCitizenRegister} style={{ display: "grid", gap: 14 }}>
               <Field label="First Name" icon={<Mail size={16} color={C.t3} />}>
                 <input value={registerForm.firstName} onChange={(event) => setRegisterForm((current) => ({ ...current, firstName: event.target.value }))} required style={fieldStyle(C)} />
@@ -573,7 +493,7 @@ export default function LoginPage({ defaultRole = "citizen", initialAdminMode = 
                 Back to Login
               </button>
             </form>
-          ) : !otpRequired && role === "citizen" && citizenMode === "verify" ? (
+          ) : role === "citizen" && citizenMode === "verify" ? (
             <form onSubmit={handleCitizenVerification} style={{ display: "grid", gap: 18 }}>
               <Field label="Email OTP" icon={<Shield size={16} color={C.t3} />}>
                 <input value={verificationOtp} onChange={(event) => setVerificationOtp(event.target.value.replace(/\D/g, "").slice(0, 6))} required placeholder="Enter 6-digit OTP" style={fieldStyle(C)} />
@@ -585,7 +505,7 @@ export default function LoginPage({ defaultRole = "citizen", initialAdminMode = 
                 Back to Login
               </button>
             </form>
-          ) : !otpRequired && role === "citizen" && citizenMode === "forgot" ? (
+          ) : role === "citizen" && citizenMode === "forgot" ? (
             <form onSubmit={handleCitizenForgotPassword} style={{ display: "grid", gap: 18 }}>
               <Field label="Aadhaar Number" icon={<Shield size={16} color={C.t3} />}>
                 <input value={forgotForm.aadhaarNumber} onChange={(event) => setForgotForm((current) => ({ ...current, aadhaarNumber: event.target.value.replace(/\D/g, "").slice(0, 12) }))} required style={fieldStyle(C)} />
@@ -603,7 +523,7 @@ export default function LoginPage({ defaultRole = "citizen", initialAdminMode = 
                 Back to Login
               </button>
             </form>
-          ) : !otpRequired && role === "citizen" && citizenMode === "reset" ? (
+          ) : role === "citizen" && citizenMode === "reset" ? (
             <form onSubmit={handleCitizenResetPassword} style={{ display: "grid", gap: 18 }}>
               <Field label="Citizen ID" icon={<Mail size={16} color={C.t3} />}>
                 <input value={resetForm.citizenId} onChange={(event) => setResetForm((current) => ({ ...current, citizenId: event.target.value }))} required placeholder={pendingResetCitizenId || "CTZ-2026-00000001"} style={fieldStyle(C)} />
@@ -624,119 +544,7 @@ export default function LoginPage({ defaultRole = "citizen", initialAdminMode = 
                 Back to Login
               </button>
             </form>
-          ) : !otpRequired && role === "admin" && adminMode === "verify-token" ? (
-            <form onSubmit={handleAdminTokenVerification} style={{ display: "grid", gap: 18 }}>
-              <Field label="Admin Registration Token" icon={<Shield size={16} color={C.t3} />}>
-                <input
-                  type="text"
-                  value={adminRegistrationToken}
-                  onChange={(event) => setAdminRegistrationToken(normalizeInputText(event.target.value, { maxLength: 4000 }))}
-                  required
-                  placeholder="Paste signed registration token"
-                  style={fieldStyle(C)}
-                />
-              </Field>
-              <button type="submit" disabled={loading} style={primaryButtonStyle(C)}>
-                {loading ? "Verifying..." : "Verify Token"}
-              </button>
-              <button type="button" onClick={() => setAdminMode("login")} style={secondaryButtonStyle(C)}>
-                Back to Login
-              </button>
-            </form>
-          ) : !otpRequired && role === "admin" && adminMode === "register" ? (
-            <form onSubmit={handleAdminRegister} style={{ display: "grid", gap: 14 }}>
-              <Field label="Username" icon={<Mail size={16} color={C.t3} />}>
-                <input value={adminRegisterForm.username} onChange={(event) => setAdminRegisterForm((current) => ({ ...current, username: event.target.value }))} required style={fieldStyle(C)} />
-              </Field>
-              <Field label="First Name" icon={<Mail size={16} color={C.t3} />}>
-                <input value={adminRegisterForm.firstName} onChange={(event) => setAdminRegisterForm((current) => ({ ...current, firstName: event.target.value }))} required style={fieldStyle(C)} />
-              </Field>
-              <Field label="Middle Name" icon={<Mail size={16} color={C.t3} />}>
-                <input value={adminRegisterForm.middleName} onChange={(event) => setAdminRegisterForm((current) => ({ ...current, middleName: event.target.value }))} style={fieldStyle(C)} />
-              </Field>
-              <Field label="Last Name" icon={<Mail size={16} color={C.t3} />}>
-                <input value={adminRegisterForm.lastName} onChange={(event) => setAdminRegisterForm((current) => ({ ...current, lastName: event.target.value }))} style={fieldStyle(C)} />
-              </Field>
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
-                <Field label="Age" icon={<Mail size={16} color={C.t3} />}>
-                  <input type="number" min="1" max="120" value={adminRegisterForm.age} onChange={(event) => setAdminRegisterForm((current) => ({ ...current, age: event.target.value }))} required style={fieldStyle(C)} />
-                </Field>
-                <label style={{ display: "grid", gap: 8 }}>
-                  <span style={{ fontSize: 12, fontWeight: 600, color: C.t2 }}>Sex</span>
-                  <select value={adminRegisterForm.sex} onChange={(event) => setAdminRegisterForm((current) => ({ ...current, sex: event.target.value }))} style={fieldStyle(C, false)}>
-                    <option value="male">Male</option>
-                    <option value="female">Female</option>
-                    <option value="other">Other</option>
-                  </select>
-                </label>
-              </div>
-              <Field label="Designation" icon={<Mail size={16} color={C.t3} />}>
-                <input value={adminRegisterForm.designation} onChange={(event) => setAdminRegisterForm((current) => ({ ...current, designation: event.target.value }))} required style={fieldStyle(C)} />
-              </Field>
-              <Field label="Aadhaar Number" icon={<Shield size={16} color={C.t3} />}>
-                <input value={adminRegisterForm.aadhaarNumber} onChange={(event) => setAdminRegisterForm((current) => ({ ...current, aadhaarNumber: event.target.value.replace(/\D/g, "").slice(0, 12) }))} required style={fieldStyle(C)} />
-              </Field>
-              <Field label="Phone Number" icon={<Mail size={16} color={C.t3} />}>
-                <input value={adminRegisterForm.phoneNumber} onChange={(event) => setAdminRegisterForm((current) => ({ ...current, phoneNumber: event.target.value.replace(/\D/g, "").slice(0, 10) }))} required style={fieldStyle(C)} />
-              </Field>
-              <Field label="Email" icon={<Mail size={16} color={C.t3} />}>
-                <input
-                  type="email"
-                  value={adminRegisterForm.email}
-                  onChange={(event) => setAdminRegisterForm((current) => ({ ...current, email: normalizeInputText(event.target.value, { maxLength: 160 }) }))}
-                  required
-                  readOnly={Boolean(verifiedAdminGate?.sub)}
-                  style={fieldStyle(C)}
-                />
-              </Field>
-              <Field label="Password" icon={<Lock size={16} color={C.t3} />}>
-                <input type="password" value={adminRegisterForm.password} onChange={(event) => setAdminRegisterForm((current) => ({ ...current, password: event.target.value }))} required style={fieldStyle(C)} />
-              </Field>
-              <Field label="Confirm Password" icon={<Lock size={16} color={C.t3} />}>
-                <input type="password" value={adminRegisterForm.confirmPassword} onChange={(event) => setAdminRegisterForm((current) => ({ ...current, confirmPassword: event.target.value }))} required style={fieldStyle(C)} />
-              </Field>
-              <button type="submit" disabled={loading} style={primaryButtonStyle(C)}>
-                {loading ? "Registering..." : "Create Admin Account"}
-              </button>
-              <button type="button" onClick={() => setAdminMode("verify-token")} style={secondaryTextButtonStyle(C)}>
-                Change Token
-              </button>
-              <button type="button" onClick={() => setAdminMode("login")} style={secondaryButtonStyle(C)}>
-                Back to Login
-              </button>
-            </form>
-          ) : (
-            <form onSubmit={handleOtpVerification} style={{ display: "grid", gap: 18 }}>
-              <Field label="One-Time Password" icon={<Shield size={16} color={C.t3} />}>
-                <input
-                  type="text"
-                  value={otp}
-                  onChange={(event) => setOtp(event.target.value.replace(/\D/g, "").slice(0, 6))}
-                  required
-                  placeholder="Enter 6-digit OTP"
-                  style={fieldStyle(C)}
-                />
-              </Field>
-
-              <button
-                type="submit"
-                disabled={loading}
-                style={{
-                  width: "100%",
-                  padding: "12px 16px",
-                  borderRadius: 10,
-                  border: "none",
-                  background: C.purple,
-                  color: "#fff",
-                  fontSize: 13,
-                  fontWeight: 700,
-                  cursor: loading ? "wait" : "pointer",
-                }}
-              >
-                {loading ? "Verifying..." : "Verify OTP"}
-              </button>
-            </form>
-          )}
+          ) : null}
         </div>
       </div>
     </div>
@@ -781,96 +589,6 @@ function MessageBox({ color, bg, icon, message }) {
     </div>
   );
 }
-
-function AdminRegistrationSuccessModal({ admin, onClose }) {
-  const { C } = usePortalTheme();
-  const [copied, setCopied] = useState(false);
-
-  if (!admin) {
-    return null;
-  }
-
-  async function handleCopy() {
-    try {
-      await navigator.clipboard.writeText(admin.id);
-      setCopied(true);
-    } catch {
-      setCopied(false);
-    }
-  }
-
-  return (
-    <div
-      style={{
-        position: "fixed",
-        inset: 0,
-        background: "rgba(15, 23, 42, 0.45)",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        padding: 16,
-        zIndex: 1000,
-      }}
-    >
-      <div
-        style={{
-          width: "100%",
-          maxWidth: 480,
-          background: C.card,
-          border: `1px solid ${C.border}`,
-          borderRadius: 18,
-          boxShadow: "var(--portal-shadow)",
-          padding: 24,
-          display: "grid",
-          gap: 16,
-        }}
-      >
-        <div style={{ display: "grid", gap: 6 }}>
-          <div style={{ fontSize: 20, fontWeight: 800, color: C.t1 }}>Admin Registered</div>
-          <div style={{ fontSize: 13, color: C.t3 }}>Use the created credentials to sign in.</div>
-        </div>
-
-        <div style={{ display: "grid", gap: 12 }}>
-          <InfoRow label="Admin ID" value={admin.id} />
-          <InfoRow label="Username" value={admin.username || "Not available"} />
-          <InfoRow label="Email" value={admin.email || "Not available"} />
-        </div>
-
-        <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
-          <button type="button" onClick={handleCopy} style={secondaryButtonStyle(C)}>
-            {copied ? "Copied Admin ID" : "Copy Admin ID"}
-          </button>
-          <button type="button" onClick={onClose} style={primaryButtonStyle(C)}>
-            Continue to Login
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function InfoRow({ label, value }) {
-  const { C } = usePortalTheme();
-
-  return (
-    <div
-      style={{
-        display: "grid",
-        gap: 6,
-        padding: "12px 14px",
-        borderRadius: 12,
-        border: `1px solid ${C.border}`,
-        background: C.bgElevated,
-      }}
-    >
-      <div style={{ fontSize: 11, fontWeight: 700, color: C.t3, textTransform: "uppercase", letterSpacing: ".08em" }}>
-        {label}
-      </div>
-      <div style={{ fontSize: 13, color: C.t1, wordBreak: "break-all" }}>{value}</div>
-    </div>
-  );
-}
-
 function primaryButtonStyle(C) {
   return {
     width: "100%",

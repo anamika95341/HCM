@@ -8,7 +8,6 @@
     "start": "NODE_ENV=production node server.js",
     "migrate": "node db/postgres/seeds/seed.js migrate",
     "seed": "node db/postgres/seeds/seed.js seed",
-    "generate:admin-token": "node scripts/generateAdminRegistrationToken.js",
     "test": "jest --runInBand",
     "lint:security": "npm audit --audit-level=high"
   },

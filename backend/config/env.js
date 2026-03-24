@@ -14,7 +14,6 @@ const requiredInProduction = [
   'DATABASE_URL',
   'REDIS_URL',
   'AADHAAR_ENC_KEY',
-  'ADMIN_RSA_PUBLIC_KEY',
 ];
 
 if (process.env.NODE_ENV === 'production') {
@@ -35,7 +34,6 @@ module.exports = {
   jwtIssuer: process.env.JWT_ISSUER || 'citizen-portal',
   accessTokenTtl: process.env.ACCESS_TOKEN_TTL || '15m',
   refreshTokenTtlDays: Number(process.env.REFRESH_TOKEN_TTL_DAYS || 30),
-  adminRsaPublicKey: process.env.ADMIN_RSA_PUBLIC_KEY,
   aadhaarEncryptionKey: getDevSecretOrEnv(process.env.AADHAAR_ENC_KEY, 'aadhaarEncryptionKey'),
   recaptchaSecret: process.env.RECAPTCHA_SECRET,
   smtp: {

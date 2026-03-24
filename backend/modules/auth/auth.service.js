@@ -10,11 +10,9 @@ const { sendMail } = require('../../utils/mailer');
 const { sendSms } = require('../../utils/smsService');
 const { generateOtp, verifyOtp } = require('../../utils/otpService');
 const { verifyCaptcha } = require('../../utils/captchaVerify');
-const { verifyAdminRegistrationToken } = require('../../utils/tokenVerify');
 const { writeAuditLog } = require('../../utils/audit');
 const authRepository = require('./auth.repository');
 const citizenRepository = require('../citizen/citizen.repository');
-const adminRepository = require('../admin/admin.repository');
 const { lookupMp } = require('../../utils/mpLookup');
 
 function publicUser(user, role) {
@@ -31,6 +29,19 @@ function publicUser(user, role) {
       localMp: user.local_mp,
       status: user.status,
       isVerified: user.is_verified,
+    };
+  }
+
+  if (role === 'masteradmin') {
+    return {
+      id: user.id,
+      username: user.username,
+      firstName: user.first_name,
+      lastName: user.last_name,
+      email: user.email,
+      phoneNumber: user.phone_number,
+      designation: user.designation,
+      status: user.status,
     };
   }
 
@@ -205,6 +216,196 @@ async function verifyCitizenRegistration({ userId, otp, ip }, reqMeta) {
   return { citizenId, user: publicUser(user, 'citizen') };
 }
 
+async function verifyDeoRegistration({ usernameOrEmail, otp }, reqMeta) {
+  const user = await authRepository.findDeoByUsernameOrEmail(usernameOrEmail);
+  if (!user) {
+    throw createHttpError(400, 'Invalid or expired OTP');
+  }
+
+  const validOtp = await verifyOtp({
+    role: 'deo',
+    userId: user.id,
+    purpose: 'registration_verification',
+    scope: 'email_verification',
+    otp,
+  });
+
+  if (!validOtp) {
+    await recordLoginFailure({ role: 'deo', userId: user.id, ip: reqMeta.ip });
+    throw createHttpError(401, 'Invalid credentials');
+  }
+
+  await clearLoginFailures({ role: 'deo', userId: user.id, ip: reqMeta.ip });
+  await authRepository.updateDeoVerification(user.id);
+  await authRepository.markVerificationRecordVerified({
+    userRole: 'deo',
+    userId: user.id,
+    purpose: 'registration_verification',
+  });
+
+  await writeAuditLog({
+    actorRole: 'deo',
+    actorId: user.id,
+    entityType: 'deo',
+    entityId: user.id,
+    action: 'deo_verified',
+    ipAddress: reqMeta.ip,
+    userAgent: reqMeta.userAgent,
+  });
+
+  return { message: 'DEO account verified successfully. You can now log in.' };
+}
+
+async function verifyAdminRegistration({ usernameOrEmail, otp }, reqMeta) {
+  const user = await authRepository.findAdminByUsernameOrEmail(usernameOrEmail);
+  if (!user) {
+    throw createHttpError(400, 'Invalid or expired OTP');
+  }
+
+  const validOtp = await verifyOtp({
+    role: 'admin',
+    userId: user.id,
+    purpose: 'registration_verification',
+    scope: 'email_verification',
+    otp,
+  });
+
+  if (!validOtp) {
+    await recordLoginFailure({ role: 'admin', userId: user.id, ip: reqMeta.ip });
+    throw createHttpError(401, 'Invalid credentials');
+  }
+
+  await clearLoginFailures({ role: 'admin', userId: user.id, ip: reqMeta.ip });
+  await authRepository.updateAdminVerification(user.id);
+  await authRepository.markVerificationRecordVerified({
+    userRole: 'admin',
+    userId: user.id,
+    purpose: 'registration_verification',
+  });
+
+  await writeAuditLog({
+    actorRole: 'admin',
+    actorId: user.id,
+    entityType: 'admin',
+    entityId: user.id,
+    action: 'admin_verified',
+    ipAddress: reqMeta.ip,
+    userAgent: reqMeta.userAgent,
+  });
+
+  return { message: 'Admin account verified successfully. You can now log in.' };
+}
+
+async function resendAdminVerificationCode({ usernameOrEmail }, reqMeta) {
+  const user = await authRepository.findAdminByUsernameOrEmail(usernameOrEmail);
+  if (!user) {
+    return { message: 'If that admin account exists, a verification code was sent.' };
+  }
+
+  if (user.is_verified) {
+    return { message: 'Admin account is already verified.' };
+  }
+
+  if (!['pending_verification', 'active'].includes(user.status)) {
+    throw createHttpError(403, 'Account not active');
+  }
+
+  const otp = await generateOtp({
+    role: 'admin',
+    userId: user.id,
+    purpose: 'registration_verification',
+    scope: 'email_verification',
+  });
+
+  await authRepository.clearVerificationRecords({
+    userRole: 'admin',
+    userId: user.id,
+    purpose: 'registration_verification',
+  });
+
+  await authRepository.insertVerificationRecord({
+    userRole: 'admin',
+    userId: user.id,
+    purpose: 'registration_verification',
+    channel: 'email',
+    destination: user.email,
+    expiresAt: new Date(Date.now() + 5 * 60 * 1000),
+  });
+
+  await sendMail({
+    to: user.email,
+    subject: 'Your admin verification code',
+    text: `Your admin verification code is ${otp}. It expires in 5 minutes.`,
+  });
+
+  await writeAuditLog({
+    actorRole: 'admin',
+    actorId: user.id,
+    entityType: 'admin',
+    entityId: user.id,
+    action: 'admin_verification_code_resent',
+    ipAddress: reqMeta.ip,
+    userAgent: reqMeta.userAgent,
+  });
+
+  return { message: 'If that admin account exists, a verification code was sent.' };
+}
+
+async function resendDeoVerificationCode({ usernameOrEmail }, reqMeta) {
+  const user = await authRepository.findDeoByUsernameOrEmail(usernameOrEmail);
+  if (!user) {
+    return { message: 'If that DEO account exists, a verification code was sent.' };
+  }
+
+  if (user.is_verified) {
+    return { message: 'DEO account is already verified.' };
+  }
+
+  if (!['pending_verification', 'active'].includes(user.status)) {
+    throw createHttpError(403, 'Account not active');
+  }
+
+  const otp = await generateOtp({
+    role: 'deo',
+    userId: user.id,
+    purpose: 'registration_verification',
+    scope: 'email_verification',
+  });
+
+  await authRepository.clearVerificationRecords({
+    userRole: 'deo',
+    userId: user.id,
+    purpose: 'registration_verification',
+  });
+
+  await authRepository.insertVerificationRecord({
+    userRole: 'deo',
+    userId: user.id,
+    purpose: 'registration_verification',
+    channel: 'email',
+    destination: user.email,
+    expiresAt: new Date(Date.now() + 5 * 60 * 1000),
+  });
+
+  await sendMail({
+    to: user.email,
+    subject: 'Your DEO verification code',
+    text: `Your DEO verification code is ${otp}. It expires in 5 minutes.`,
+  });
+
+  await writeAuditLog({
+    actorRole: 'deo',
+    actorId: user.id,
+    entityType: 'deo',
+    entityId: user.id,
+    action: 'deo_verification_code_resent',
+    ipAddress: reqMeta.ip,
+    userAgent: reqMeta.userAgent,
+  });
+
+  return { message: 'If that DEO account exists, a verification code was sent.' };
+}
+
 async function checkLockout({ role, userId, ip, email }) {
   const userKey = `login:fail:${role}:${userId}`;
   const ipKey = `login:fail:ip:${role}:${ip}`;
@@ -271,6 +472,7 @@ async function startTwoFactorLogin(role, identifier, password, reqMeta) {
   const genericError = createHttpError(401, 'Invalid credentials');
   const finder = {
     admin: authRepository.findAdminByUsernameOrEmail,
+    masteradmin: authRepository.findMasterAdminByUsernameOrEmail,
     deo: authRepository.findDeoByUsernameOrEmail,
     minister: authRepository.findMinisterByUsernameOrEmail,
   }[role];
@@ -286,121 +488,19 @@ async function startTwoFactorLogin(role, identifier, password, reqMeta) {
     throw genericError;
   }
 
-  if (role === 'minister' || role === 'admin') {
+  if ((role === 'admin' || role === 'deo') && !user.is_verified) {
+    throw createHttpError(403, 'Account verification required');
+  }
+
+  if (user.status !== 'active') {
+    throw createHttpError(403, 'Account not active');
+  }
+
+  if (role === 'minister' || role === 'admin' || role === 'masteradmin' || role === 'deo') {
     await clearLoginFailures({ role, userId: user.id, ip: reqMeta.ip });
     return issueSession(role, user);
   }
-
-  const otp = await generateOtp({
-    role,
-    userId: user.id,
-    purpose: 'login_2fa',
-    ip: reqMeta.ip,
-  });
-
-  await authRepository.insertVerificationRecord({
-    userRole: role,
-    userId: user.id,
-    purpose: 'login_2fa',
-    channel: user.email ? 'email' : 'sms',
-    destination: user.email || user.phone_number,
-    expiresAt: new Date(Date.now() + 5 * 60 * 1000),
-  });
-
-  if (user.email) {
-    await sendMail({
-      to: user.email,
-      subject: 'Your 2FA OTP',
-      text: `Your OTP is ${otp}. It expires in 5 minutes.`,
-    });
-  } else {
-    await sendSms({
-      to: user.phone_number,
-      message: `Your OTP is ${otp}. It expires in 5 minutes.`,
-    });
-  }
-
-  const config = getRoleConfig(role);
-  const loginToken = jwt.sign(
-    { sub: user.id, role, type: 'login_challenge', ip: reqMeta.ip },
-    config.privateKey,
-    {
-      algorithm: 'RS256',
-      expiresIn: '5m',
-      audience: role,
-      issuer: config.issuer,
-    }
-  );
-
-  return { loginToken };
-}
-
-async function verifyTwoFactorLogin({ loginToken, otp }, reqMeta) {
-  let payload;
-  let user;
-  for (const role of ['admin', 'deo']) {
-    try {
-      payload = verifyJwtByRole(role, loginToken);
-      if (payload.type === 'login_challenge') {
-        user = await authRepository.findUserById(role, payload.sub);
-        if (user) {
-          const validOtp = await verifyOtp({
-            role,
-            userId: payload.sub,
-            purpose: 'login_2fa',
-            ip: reqMeta.ip,
-            otp,
-          });
-          if (!validOtp) {
-            await recordLoginFailure({ role, userId: payload.sub, ip: reqMeta.ip });
-            throw createHttpError(401, 'Invalid credentials');
-          }
-          await clearLoginFailures({ role, userId: payload.sub, ip: reqMeta.ip });
-          return issueSession(role, user);
-        }
-      }
-    } catch (error) {
-      continue;
-    }
-  }
-  throw createHttpError(401, 'Invalid credentials');
-}
-
-async function verifyAdminRegistrationGate(token) {
-  const payload = verifyAdminRegistrationToken(token);
-  const existing = await authRepository.findAdminTokenRecordByJti(payload.jti);
-  if (existing?.used_at) {
-    throw createHttpError(400, 'Registration token already used');
-  }
-  await authRepository.createAdminTokenRecord({
-    jti: payload.jti,
-    subjectEmail: payload.sub,
-    designation: payload.designation,
-    expiresAt: new Date(payload.exp * 1000),
-  });
-  return payload;
-}
-
-async function registerAdmin(payload, reqMeta) {
-  const gate = await verifyAdminRegistrationGate(payload.registrationToken);
-  const passwordHash = await bcrypt.hash(payload.password, 12);
-  const admin = await adminRepository.createAdmin({
-    ...payload,
-    aadhaarHash: sha256(payload.aadhaarNumber),
-    aadhaar: encryptAadhaar(payload.aadhaarNumber),
-    passwordHash,
-  });
-  await authRepository.markAdminTokenUsed(gate.jti, admin.id);
-  await writeAuditLog({
-    actorRole: 'admin',
-    actorId: admin.id,
-    entityType: 'admin',
-    entityId: admin.id,
-    action: 'admin_registered',
-    ipAddress: reqMeta.ip,
-    userAgent: reqMeta.userAgent,
-  });
-  return admin;
+  throw createHttpError(500, 'Unsupported login flow');
 }
 
 async function forgotCitizenPassword({ aadhaarNumber, email, captchaToken }, reqMeta) {
@@ -463,7 +563,7 @@ async function resetCitizenPassword({ citizenId, otp, password }, reqMeta) {
 async function refreshSession(refreshToken) {
   let payload;
   let role;
-  for (const candidate of ['citizen', 'admin', 'deo', 'minister']) {
+  for (const candidate of ['citizen', 'admin', 'masteradmin', 'deo', 'minister']) {
     try {
       payload = verifyJwtByRole(candidate, refreshToken);
       if (payload.type === 'refresh') {
@@ -515,11 +615,12 @@ async function logout(role, token, refreshToken) {
 module.exports = {
   registerCitizen,
   verifyCitizenRegistration,
+  verifyAdminRegistration,
+  verifyDeoRegistration,
+  resendAdminVerificationCode,
+  resendDeoVerificationCode,
   loginCitizen,
   startTwoFactorLogin,
-  verifyTwoFactorLogin,
-  verifyAdminRegistrationGate,
-  registerAdmin,
   forgotCitizenPassword,
   resetCitizenPassword,
   refreshSession,

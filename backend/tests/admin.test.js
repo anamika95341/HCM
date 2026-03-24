@@ -1,20 +1,14 @@
-const { adminRegistrationSchema } = require('../validators/admin.validator');
-const { generateVerhoeffDigit } = require('../utils/aadhaar');
-
-function buildValidAadhaar(prefix = '23412341235') {
-  return `${prefix}${generateVerhoeffDigit(prefix)}`;
-}
+const { adminCreationSchema, deoCreationSchema } = require('../validators/admin.validator');
 
 describe('admin validation', () => {
   test('rejects mismatched passwords', () => {
-    const result = adminRegistrationSchema.safeParse({
-      registrationToken: 'x'.repeat(32),
+    const result = adminCreationSchema.safeParse({
       username: 'admin.user',
       firstName: 'Admin',
       age: 40,
       sex: 'female',
       designation: 'Officer',
-      aadhaarNumber: buildValidAadhaar(),
+      aadhaarNumber: '123456789012',
       phoneNumber: '9876543211',
       email: 'admin@example.com',
       password: 'StrongPass123!',
@@ -22,5 +16,23 @@ describe('admin validation', () => {
     });
 
     expect(result.success).toBe(false);
+  });
+
+  test('accepts a valid DEO creation payload', () => {
+    const result = deoCreationSchema.safeParse({
+      firstName: 'Deo',
+      middleName: '',
+      lastName: 'Officer',
+      age: 31,
+      sex: 'male',
+      designation: 'Verification Officer',
+      aadhaarNumber: '123456789013',
+      phoneNumber: '9876543214',
+      email: 'deo@example.com',
+      password: 'StrongPass123!',
+      confirmPassword: 'StrongPass123!',
+    });
+
+    expect(result.success).toBe(true);
   });
 });
