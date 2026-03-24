@@ -11,6 +11,7 @@ const { sendSms } = require('../../utils/smsService');
 const { generateOtp, verifyOtp } = require('../../utils/otpService');
 const { verifyCaptcha } = require('../../utils/captchaVerify');
 const { writeAuditLog } = require('../../utils/audit');
+const logger = require('../../utils/logger');
 const authRepository = require('./auth.repository');
 const citizenRepository = require('../citizen/citizen.repository');
 const { lookupMp } = require('../../utils/mpLookup');
@@ -118,6 +119,7 @@ async function issueSession(role, user) {
 }
 
 async function registerCitizen(payload, reqMeta) {
+  let stage = 'start';
   const passwordHash = await bcrypt.hash(payload.password, 12);
   const registrationPayload = {
     ...payload,
@@ -127,83 +129,111 @@ async function registerCitizen(payload, reqMeta) {
     localMp: lookupMp({ state: payload.state }),
   };
 
-  const existingCitizen = await citizenRepository.findCitizenByRegistrationConflict({
-    email: payload.email,
-    aadhaarHash: registrationPayload.aadhaarHash,
-    mobileNumber: payload.mobileNumber,
-  });
-
-  let citizen;
-  let createdNewCitizen = false;
-  if (existingCitizen) {
-    if (existingCitizen.is_verified || existingCitizen.status === 'active' || existingCitizen.citizen_id) {
-      throw createHttpError(409, 'Citizen account already exists. Use login or forgot password.');
-    }
-    citizen = await citizenRepository.updatePendingCitizen(existingCitizen.id, registrationPayload);
-  } else {
-    citizen = await citizenRepository.createCitizen(registrationPayload);
-    createdNewCitizen = true;
-  }
-
-  const destination = payload.preferredVerificationChannel === 'email' ? payload.email : payload.mobileNumber;
   try {
-    const otp = await generateOtp({
-      role: 'citizen',
-      userId: citizen.id,
-      purpose: 'registration_verification',
-      ip: reqMeta.ip,
+    stage = 'check-existing-citizen';
+    const existingCitizen = await citizenRepository.findCitizenByRegistrationConflict({
+      email: payload.email,
+      aadhaarHash: registrationPayload.aadhaarHash,
+      mobileNumber: payload.mobileNumber,
     });
 
-    await authRepository.clearVerificationRecords({
-      userRole: 'citizen',
-      userId: citizen.id,
-      purpose: 'registration_verification',
-    });
-
-    await authRepository.insertVerificationRecord({
-      userRole: 'citizen',
-      userId: citizen.id,
-      purpose: 'registration_verification',
-      channel: payload.preferredVerificationChannel,
-      destination,
-      expiresAt: new Date(Date.now() + 5 * 60 * 1000),
-    });
-
-    if (payload.preferredVerificationChannel === 'email') {
-      await sendMail({
-        to: payload.email,
-        subject: 'Verify your Citizen Portal account',
-        text: `Your OTP is ${otp}. It expires in 5 minutes.`,
-      });
+    let citizen;
+    let createdNewCitizen = false;
+    if (existingCitizen) {
+      if (existingCitizen.is_verified || existingCitizen.status === 'active' || existingCitizen.citizen_id) {
+        throw createHttpError(409, 'Citizen account already exists. Use login or forgot password.');
+      }
+      stage = 'update-pending-citizen';
+      citizen = await citizenRepository.updatePendingCitizen(existingCitizen.id, registrationPayload);
     } else {
-      await sendSms({
-        to: payload.mobileNumber,
-        message: `Your OTP is ${otp}. It expires in 5 minutes.`,
+      stage = 'create-citizen';
+      citizen = await citizenRepository.createCitizen(registrationPayload);
+      createdNewCitizen = true;
+    }
+    const destination = payload.preferredVerificationChannel === 'email' ? payload.email : payload.mobileNumber;
+    try {
+      stage = 'generate-otp';
+      const otp = await generateOtp({
+        role: 'citizen',
+        userId: citizen.id,
+        purpose: 'registration_verification',
+        ip: reqMeta.ip,
       });
+
+      stage = 'clear-old-verification-records';
+      await authRepository.clearVerificationRecords({
+        userRole: 'citizen',
+        userId: citizen.id,
+        purpose: 'registration_verification',
+      });
+
+      stage = 'insert-verification-record';
+      await authRepository.insertVerificationRecord({
+        userRole: 'citizen',
+        userId: citizen.id,
+        purpose: 'registration_verification',
+        channel: payload.preferredVerificationChannel,
+        destination,
+        expiresAt: new Date(Date.now() + 5 * 60 * 1000),
+      });
+
+      if (payload.preferredVerificationChannel === 'email') {
+        stage = 'send-email';
+        await sendMail({
+          to: payload.email,
+          subject: 'Verify your Citizen Portal account',
+          text: `Your OTP is ${otp}. It expires in 5 minutes.`,
+        });
+      } else {
+        stage = 'send-sms';
+        await sendSms({
+          to: payload.mobileNumber,
+          message: `Your OTP is ${otp}. It expires in 5 minutes.`,
+        });
+      }
+    } catch (error) {
+      stage = `${stage}-rollback`;
+      await authRepository.clearVerificationRecords({
+        userRole: 'citizen',
+        userId: citizen.id,
+        purpose: 'registration_verification',
+      });
+      if (createdNewCitizen) {
+        await citizenRepository.deletePendingCitizenById(citizen.id);
+      }
+      logger.error('Citizen registration verification dispatch failed', {
+        stage,
+        email: payload.email,
+        mobileNumber: payload.mobileNumber,
+        preferredVerificationChannel: payload.preferredVerificationChannel,
+        citizenId: citizen.id,
+        error,
+      });
+      throw createHttpError(502, 'Unable to send citizen verification code');
     }
-  } catch (error) {
-    await authRepository.clearVerificationRecords({
-      userRole: 'citizen',
-      userId: citizen.id,
-      purpose: 'registration_verification',
+
+    stage = 'write-audit-log';
+    await writeAuditLog({
+      actorRole: 'citizen',
+      actorId: citizen.id,
+      entityType: 'citizen',
+      entityId: citizen.id,
+      action: 'citizen_registered',
+      ipAddress: reqMeta.ip,
+      userAgent: reqMeta.userAgent,
     });
-    if (createdNewCitizen) {
-      await citizenRepository.deletePendingCitizenById(citizen.id);
-    }
-    throw createHttpError(502, 'Unable to send citizen verification code');
+
+    return citizen;
+  } catch (error) {
+    logger.error('Citizen registration failed', {
+      stage,
+      email: payload.email,
+      mobileNumber: payload.mobileNumber,
+      preferredVerificationChannel: payload.preferredVerificationChannel,
+      error,
+    });
+    throw error;
   }
-
-  await writeAuditLog({
-    actorRole: 'citizen',
-    actorId: citizen.id,
-    entityType: 'citizen',
-    entityId: citizen.id,
-    action: 'citizen_registered',
-    ipAddress: reqMeta.ip,
-    userAgent: reqMeta.userAgent,
-  });
-
-  return citizen;
 }
 
 async function verifyCitizenRegistration({ userId, otp, ip }, reqMeta) {
