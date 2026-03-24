@@ -134,6 +134,7 @@ async function registerCitizen(payload, reqMeta) {
   });
 
   let citizen;
+  let createdNewCitizen = false;
   if (existingCitizen) {
     if (existingCitizen.is_verified || existingCitizen.status === 'active' || existingCitizen.citizen_id) {
       throw createHttpError(409, 'Citizen account already exists. Use login or forgot password.');
@@ -141,36 +142,55 @@ async function registerCitizen(payload, reqMeta) {
     citizen = await citizenRepository.updatePendingCitizen(existingCitizen.id, registrationPayload);
   } else {
     citizen = await citizenRepository.createCitizen(registrationPayload);
+    createdNewCitizen = true;
   }
 
   const destination = payload.preferredVerificationChannel === 'email' ? payload.email : payload.mobileNumber;
-  const otp = await generateOtp({
-    role: 'citizen',
-    userId: citizen.id,
-    purpose: 'registration_verification',
-    ip: reqMeta.ip,
-  });
-
-  await authRepository.insertVerificationRecord({
-    userRole: 'citizen',
-    userId: citizen.id,
-    purpose: 'registration_verification',
-    channel: payload.preferredVerificationChannel,
-    destination,
-    expiresAt: new Date(Date.now() + 5 * 60 * 1000),
-  });
-
-  if (payload.preferredVerificationChannel === 'email') {
-    await sendMail({
-      to: payload.email,
-      subject: 'Verify your Citizen Portal account',
-      text: `Your OTP is ${otp}. It expires in 5 minutes.`,
+  try {
+    const otp = await generateOtp({
+      role: 'citizen',
+      userId: citizen.id,
+      purpose: 'registration_verification',
+      ip: reqMeta.ip,
     });
-  } else {
-    await sendSms({
-      to: payload.mobileNumber,
-      message: `Your OTP is ${otp}. It expires in 5 minutes.`,
+
+    await authRepository.clearVerificationRecords({
+      userRole: 'citizen',
+      userId: citizen.id,
+      purpose: 'registration_verification',
     });
+
+    await authRepository.insertVerificationRecord({
+      userRole: 'citizen',
+      userId: citizen.id,
+      purpose: 'registration_verification',
+      channel: payload.preferredVerificationChannel,
+      destination,
+      expiresAt: new Date(Date.now() + 5 * 60 * 1000),
+    });
+
+    if (payload.preferredVerificationChannel === 'email') {
+      await sendMail({
+        to: payload.email,
+        subject: 'Verify your Citizen Portal account',
+        text: `Your OTP is ${otp}. It expires in 5 minutes.`,
+      });
+    } else {
+      await sendSms({
+        to: payload.mobileNumber,
+        message: `Your OTP is ${otp}. It expires in 5 minutes.`,
+      });
+    }
+  } catch (error) {
+    await authRepository.clearVerificationRecords({
+      userRole: 'citizen',
+      userId: citizen.id,
+      purpose: 'registration_verification',
+    });
+    if (createdNewCitizen) {
+      await citizenRepository.deletePendingCitizenById(citizen.id);
+    }
+    throw createHttpError(502, 'Unable to send citizen verification code');
   }
 
   await writeAuditLog({

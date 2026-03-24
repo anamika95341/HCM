@@ -29,6 +29,14 @@ const citizenRegistrationSchema = z.object({
 }).refine((data) => data.password === data.confirmPassword, {
   message: 'Passwords do not match',
   path: ['confirmPassword'],
+}).superRefine((data, ctx) => {
+  if (data.preferredVerificationChannel === 'email' && !data.email) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ['email'],
+      message: 'Email is required for email verification',
+    });
+  }
 });
 
 const citizenLoginSchema = z.object({

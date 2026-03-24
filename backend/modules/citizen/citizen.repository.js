@@ -103,4 +103,21 @@ async function findCitizenById(id) {
   return result.rows[0] || null;
 }
 
-module.exports = { createCitizen, findCitizenByRegistrationConflict, updatePendingCitizen, findCitizenById };
+async function deletePendingCitizenById(id) {
+  await pool.query(
+    `DELETE FROM citizens
+      WHERE id = $1
+        AND is_verified = FALSE
+        AND status = 'pending_verification'
+        AND citizen_id IS NULL`,
+    [id]
+  );
+}
+
+module.exports = {
+  createCitizen,
+  findCitizenByRegistrationConflict,
+  updatePendingCitizen,
+  findCitizenById,
+  deletePendingCitizenById,
+};
