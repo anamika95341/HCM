@@ -36,7 +36,10 @@ function createApp() {
 
   app.use(cors({
     origin(origin, callback) {
-      if (!origin || env.frontendOrigins.length === 0 || env.frontendOrigins.includes(origin)) {
+      if (env.nodeEnv === 'production' && env.frontendOrigins.length === 0) {
+        return callback(new Error('CORS is not configured'));
+      }
+      if (!origin || env.frontendOrigins.includes(origin)) {
         return callback(null, true);
       }
       return callback(new Error('Origin not allowed by CORS'));

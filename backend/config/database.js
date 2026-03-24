@@ -8,7 +8,7 @@ const pool = new Pool({
   min: 2,
   connectionTimeoutMillis: 3000,
   keepAlive: true,
-  ssl: env.databaseSsl ? { rejectUnauthorized: false } : false,
+  ssl: env.databaseSsl ? { rejectUnauthorized: env.databaseSslRejectUnauthorized } : false,
 });
 
 pool.on('error', (error) => {

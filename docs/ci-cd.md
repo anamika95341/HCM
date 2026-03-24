@@ -43,5 +43,5 @@ The production deploy workflow:
 - Host-level nginx on the EC2 instance should proxy:
   - `/` to `http://127.0.0.1:5173`
   - `/api/` and `/ws` to `http://127.0.0.1:3000`
-- Restrict EC2 security groups so ports `5173` and `3000` are not publicly reachable except as needed for your host nginx setup
+- Restrict EC2 security groups according to your environment. For a public dev server, keep the intended ports open only as needed.
 - A ready-to-use EC2 nginx config is in [`deploy/nginx/hcm-ec2.conf`](/mnt/d/hcmproject/HCM/deploy/nginx/hcm-ec2.conf)

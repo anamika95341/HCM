@@ -29,6 +29,7 @@ module.exports = {
   port: Number(process.env.PORT || 3000),
   databaseUrl: process.env.DATABASE_URL,
   databaseSsl: process.env.DATABASE_SSL === 'true',
+  databaseSslRejectUnauthorized: process.env.DATABASE_SSL_REJECT_UNAUTHORIZED !== 'false',
   redisUrl: process.env.REDIS_URL,
   frontendOrigins: (process.env.FRONTEND_ORIGINS || '').split(',').map((value) => value.trim()).filter(Boolean),
   jwtIssuer: process.env.JWT_ISSUER || 'citizen-portal',
