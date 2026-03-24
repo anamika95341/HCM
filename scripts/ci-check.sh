@@ -1,0 +1,19 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+
+pushd "${ROOT_DIR}/backend" >/dev/null
+npm ci
+npm test -- --runInBand
+popd >/dev/null
+
+pushd "${ROOT_DIR}/Frontend" >/dev/null
+npm ci
+npm run build
+popd >/dev/null
+
+pushd "${ROOT_DIR}" >/dev/null
+docker compose --env-file backend/.env.example -f compose.yml config >/dev/null
+docker compose --env-file backend/.env.example -f compose.yml -f compose.dev.yml config >/dev/null
+popd >/dev/null

@@ -5,12 +5,14 @@ services:
       dockerfile: Dockerfile
       target: prod
       args:
-        VITE_API_BASE_URL: ${VITE_API_BASE_URL:-http://localhost:3000/api/v1}
+        VITE_API_BASE_URL: ${VITE_API_BASE_URL:-/api/v1}
     depends_on:
       backend:
         condition: service_healthy
+    ports:
+      - "${FRONTEND_PORT:-5173}:5173"
     healthcheck:
-      test: ["CMD-SHELL", "wget -qO- http://localhost:8080 || exit 1"]
+      test: ["CMD", "node", "-e", "fetch('http://localhost:5173').then((res)=>process.exit(res.ok?0:1)).catch(()=>process.exit(1))"]
       interval: 30s
       timeout: 5s
       retries: 5
@@ -24,13 +26,15 @@ services:
       dockerfile: Dockerfile
       target: runner
     env_file:
-      - ./backend/.env.localhost
+      - ./backend/.env
     environment:
       NODE_ENV: production
       PORT: 3000
-      FRONTEND_ORIGINS: ${FRONTEND_ORIGINS:-http://localhost:8080}
+      FRONTEND_ORIGINS: ${FRONTEND_ORIGINS:-http://localhost:5173}
       DATABASE_URL: postgresql://app_user:${DB_PASSWORD:-change_me}@postgres:5432/citizen_portal
       REDIS_URL: redis://:${REDIS_PASSWORD:-change_me}@redis:6379
+    ports:
+      - "${BACKEND_PORT:-3000}:3000"
     depends_on:
       postgres:
         condition: service_healthy

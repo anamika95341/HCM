@@ -1,0 +1,40 @@
+name: Deploy Prod
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up SSH
+        uses: webfactory/ssh-agent@v0.9.0
+        with:
+          ssh-private-key: ${{ secrets.PROD_SSH_PRIVATE_KEY }}
+
+      - name: Add host key
+        run: |
+          mkdir -p ~/.ssh
+          ssh-keyscan -p "${{ secrets.PROD_SSH_PORT }}" -H "${{ secrets.PROD_SSH_HOST }}" >> ~/.ssh/known_hosts
+
+      - name: Sync repository
+        run: |
+          rsync -az --delete \
+            --exclude '.git' \
+            --exclude 'backend/node_modules' \
+            --exclude 'Frontend/node_modules' \
+            --exclude 'backend/.env' \
+            ./ "${{ secrets.PROD_SSH_USER }}@${{ secrets.PROD_SSH_HOST }}:${{ secrets.PROD_DEPLOY_PATH }}/"
+
+      - name: Deploy production stack
+        run: |
+          ssh -p "${{ secrets.PROD_SSH_PORT }}" "${{ secrets.PROD_SSH_USER }}@${{ secrets.PROD_SSH_HOST }}" "cd '${{ secrets.PROD_DEPLOY_PATH }}' && chmod +x scripts/deploy-prod.sh && ./scripts/deploy-prod.sh '${{ secrets.PROD_DEPLOY_PATH }}'"
