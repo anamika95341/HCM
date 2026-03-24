@@ -17,6 +17,17 @@ function redact(value, key) {
     return value;
   }
 
+  if (value instanceof Error) {
+    return {
+      name: value.name,
+      message: value.message,
+      stack: value.stack,
+      code: value.code,
+      status: value.status,
+      statusCode: value.statusCode,
+    };
+  }
+
   if (typeof key === 'string' && REDACT_KEYS.has(key)) {
     return '[REDACTED]';
   }

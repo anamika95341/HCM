@@ -3,6 +3,11 @@ const logger = require('../utils/logger');
 module.exports = function errorHandler(err, req, res, next) {
   logger.error('Unhandled request error', {
     error: err,
+    errorName: err?.name,
+    errorMessage: err?.message,
+    errorCode: err?.code,
+    errorStatus: err?.statusCode || err?.status,
+    errorStack: err?.stack,
     path: req.path,
     method: req.method,
     ip: req.ip,
