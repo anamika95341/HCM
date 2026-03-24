@@ -652,7 +652,7 @@ export default function HCMNewCasePage() {
                   <option value="">-- Select an admin desk --</option>
                   {admins.map((admin) => (
                     <option key={admin.id} value={admin.id}>
-                      {admin.name} · {admin.department}
+                      {admin.name ? `${admin.name} (${admin.username})` : admin.username} · {admin.department}
                     </option>
                   ))}
                 </WorkspaceSelect>

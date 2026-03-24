@@ -16,9 +16,26 @@ async function withIdempotency(idempotencyKey, producer) {
   if (existing) {
     return JSON.parse(existing);
   }
-  const result = await producer();
-  await redis.set(key, JSON.stringify(result), 'EX', 600);
-  return result;
+  const claimed = await redis.set(key, JSON.stringify({ pending: true }), 'EX', 600, 'NX');
+  if (!claimed) {
+    const current = await redis.get(key);
+    if (current) {
+      const parsed = JSON.parse(current);
+      if (parsed.pending) {
+        throw createHttpError(409, 'Request is already being processed');
+      }
+      return parsed;
+    }
+    throw createHttpError(409, 'Duplicate request detected');
+  }
+  try {
+    const result = await producer();
+    await redis.set(key, JSON.stringify(result), 'EX', 600);
+    return result;
+  } catch (error) {
+    await redis.del(key);
+    throw error;
+  }
 }
 
 function sanitizeOptional(input) {
@@ -105,10 +122,32 @@ async function getAdminComplaintDetail(complaintId) {
   };
 }
 
-async function applyComplaintTransition({ complaintId, actorId, actorRole, nextStatus, note, patch = {} }) {
+function assertAllowedComplaintTransition(currentStatus, allowedStatuses, actionLabel) {
+  if (!allowedStatuses.includes(currentStatus)) {
+    throw createHttpError(409, `Cannot ${actionLabel} when complaint status is ${currentStatus}`);
+  }
+}
+
+async function applyComplaintTransition({
+  complaintId,
+  actorId,
+  actorRole,
+  nextStatus,
+  note,
+  patch = {},
+  allowedPreviousStatuses,
+  actionLabel,
+}) {
   const complaint = await complaintsRepository.getComplaintById(complaintId);
   if (!complaint) {
     throw createHttpError(404, 'Complaint not found');
+  }
+  if (allowedPreviousStatuses?.length) {
+    assertAllowedComplaintTransition(
+      complaint.status,
+      allowedPreviousStatuses,
+      actionLabel || nextStatus,
+    );
   }
 
   await complaintsRepository.updateComplaintStatus({
@@ -130,6 +169,8 @@ async function assignComplaintToSelf(complaintId, adminId, reqMeta) {
     actorId: adminId,
     actorRole: 'admin',
     nextStatus: 'assigned',
+    allowedPreviousStatuses: ['submitted', 'assigned'],
+    actionLabel: 'assign this complaint',
     note: 'Complaint assigned to admin',
     patch: { assigned_admin_id: adminId },
   });
@@ -153,6 +194,15 @@ async function reassignComplaint(complaintId, actorId, adminId, reason, reqMeta)
     actorId,
     actorRole: 'admin',
     nextStatus: 'assigned',
+    allowedPreviousStatuses: [
+      'submitted',
+      'assigned',
+      'in_review',
+      'department_contact_identified',
+      'call_scheduled',
+      'followup_in_progress',
+    ],
+    actionLabel: 'reassign this complaint',
     note: sanitizeText(reason),
     patch: {
       assigned_admin_id: adminId,
@@ -180,6 +230,14 @@ async function updateComplaintDepartment(complaintId, actorId, body, reqMeta) {
     actorId,
     actorRole: 'admin',
     nextStatus: 'department_contact_identified',
+    allowedPreviousStatuses: [
+      'assigned',
+      'in_review',
+      'department_contact_identified',
+      'call_scheduled',
+      'followup_in_progress',
+    ],
+    actionLabel: 'update department handling for this complaint',
     note: 'Department flow updated',
     patch: {
       department: sanitizeText(body.department),
@@ -209,6 +267,14 @@ async function scheduleComplaintCall(complaintId, actorId, callScheduledAt, reqM
     actorId,
     actorRole: 'admin',
     nextStatus: 'call_scheduled',
+    allowedPreviousStatuses: [
+      'assigned',
+      'in_review',
+      'department_contact_identified',
+      'call_scheduled',
+      'followup_in_progress',
+    ],
+    actionLabel: 'schedule a call for this complaint',
     note: 'Follow-up call scheduled',
     patch: {
       call_scheduled_at: callScheduledAt,
@@ -235,6 +301,8 @@ async function logComplaintCallOutcome(complaintId, actorId, callOutcome, reqMet
     actorId,
     actorRole: 'admin',
     nextStatus: 'followup_in_progress',
+    allowedPreviousStatuses: ['call_scheduled', 'followup_in_progress'],
+    actionLabel: 'log a call outcome for this complaint',
     note: sanitizeText(callOutcome),
     patch: {
       call_outcome: sanitizeText(callOutcome),
@@ -262,6 +330,15 @@ async function resolveComplaint(complaintId, actorId, body, reqMeta) {
     actorId,
     actorRole: 'admin',
     nextStatus: 'resolved',
+    allowedPreviousStatuses: [
+      'submitted',
+      'assigned',
+      'in_review',
+      'department_contact_identified',
+      'call_scheduled',
+      'followup_in_progress',
+    ],
+    actionLabel: 'resolve this complaint',
     note: sanitizeText(body.resolutionSummary),
     patch: {
       resolution_summary: sanitizeText(body.resolutionSummary),
@@ -289,6 +366,11 @@ async function escalateComplaintToMeeting(complaintId, actorId, body, reqMeta) {
   if (!complaint) {
     throw createHttpError(404, 'Complaint not found');
   }
+  assertAllowedComplaintTransition(
+    complaint.status,
+    ['assigned', 'in_review', 'department_contact_identified', 'call_scheduled', 'followup_in_progress'],
+    'escalate this complaint to a meeting',
+  );
 
   const meeting = await meetingsRepository.createMeeting({
     citizenId: complaint.citizen_id,
@@ -336,6 +418,8 @@ async function reopenComplaint(complaintId, actorId, reason, reqMeta) {
     actorId,
     actorRole: 'admin',
     nextStatus: 'assigned',
+    allowedPreviousStatuses: ['resolved', 'completed', 'rejected', 'escalated_to_meeting'],
+    actionLabel: 'reopen this complaint',
     note: sanitizeText(reason),
     patch: {
       reopened_count: reopenedCount,
@@ -363,6 +447,8 @@ async function closeComplaint(complaintId, actorId, note, reqMeta) {
     actorId,
     actorRole: 'admin',
     nextStatus: 'completed',
+    allowedPreviousStatuses: ['resolved'],
+    actionLabel: 'close this complaint',
     note: sanitizeText(note),
     patch: {
       closed_at: new Date().toISOString(),

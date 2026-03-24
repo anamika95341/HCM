@@ -27,6 +27,7 @@ async function getAdminDirectory() {
   const admins = await adminRepository.listActiveAdminsForCitizenDirectory();
   return admins.map((admin) => ({
     id: admin.id,
+    username: admin.username,
     name: [admin.first_name, admin.last_name].filter(Boolean).join(' '),
     department: admin.designation,
   }));

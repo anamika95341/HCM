@@ -16,12 +16,35 @@ async function enforceIdempotency(idempotencyKey, payload) {
   if (existing) {
     return JSON.parse(existing);
   }
-  await redis.set(key, JSON.stringify({ pending: true, payload }), 'EX', 600, 'NX');
-  return null;
+  const pending = JSON.stringify({ pending: true, payload });
+  const claimed = await redis.set(key, pending, 'EX', 600, 'NX');
+  if (claimed) {
+    return null;
+  }
+  const current = await redis.get(key);
+  if (current) {
+    const parsed = JSON.parse(current);
+    if (parsed.pending) {
+      throw createHttpError(409, 'Request is already being processed');
+    }
+    return parsed;
+  }
+  throw createHttpError(409, 'Duplicate request detected');
 }
 
 async function saveIdempotencyResult(idempotencyKey, result) {
   await redis.set(`idempotency:${idempotencyKey}`, JSON.stringify(result), 'EX', 600);
+}
+
+async function clearIdempotency(idempotencyKey) {
+  if (!idempotencyKey) return;
+  await redis.del(`idempotency:${idempotencyKey}`);
+}
+
+function assertAllowedTransition(currentStatus, allowedStatuses, actionLabel) {
+  if (!allowedStatuses.includes(currentStatus)) {
+    throw createHttpError(409, `Cannot ${actionLabel} when meeting status is ${currentStatus}`);
+  }
 }
 
 async function submitMeetingRequest({ citizenId, body, file, reqMeta, idempotencyKey }) {
@@ -30,39 +53,44 @@ async function submitMeetingRequest({ citizenId, body, file, reqMeta, idempotenc
     return existing;
   }
 
-  let document = null;
-  if (file) {
-    const storedFile = await persistPrivateUpload(file, 'documents');
-    document = await meetingsRepository.createUploadedFile(storedFile, {
-      entityType: 'meeting_document',
-      uploadedByRole: 'citizen',
-      uploadedById: citizenId,
+  try {
+    let document = null;
+    if (file) {
+      const storedFile = await persistPrivateUpload(file, 'documents');
+      document = await meetingsRepository.createUploadedFile(storedFile, {
+        entityType: 'meeting_document',
+        uploadedByRole: 'citizen',
+        uploadedById: citizenId,
+      });
+    }
+
+    const meeting = await meetingsRepository.createMeeting({
+      citizenId,
+      title: sanitizeText(body.title),
+      purpose: sanitizeText(body.purpose),
+      preferredTime: body.preferredTime || null,
+      adminReferral: sanitizeText(body.adminReferral || ''),
+      documentFileId: document?.id,
+      additionalAttendees: body.additionalAttendees || [],
     });
+
+    await writeAuditLog({
+      actorRole: 'citizen',
+      actorId: citizenId,
+      entityType: 'meeting',
+      entityId: meeting.id,
+      action: 'meeting_submitted',
+      ipAddress: reqMeta.ip,
+      userAgent: reqMeta.userAgent,
+    });
+
+    const result = { meeting };
+    await saveIdempotencyResult(idempotencyKey, result);
+    return result;
+  } catch (error) {
+    await clearIdempotency(idempotencyKey);
+    throw error;
   }
-
-  const meeting = await meetingsRepository.createMeeting({
-    citizenId,
-    title: sanitizeText(body.title),
-    purpose: sanitizeText(body.purpose),
-    preferredTime: body.preferredTime || null,
-    adminReferral: sanitizeText(body.adminReferral || ''),
-    documentFileId: document?.id,
-    additionalAttendees: body.additionalAttendees || [],
-  });
-
-  await writeAuditLog({
-    actorRole: 'citizen',
-    actorId: citizenId,
-    entityType: 'meeting',
-    entityId: meeting.id,
-    action: 'meeting_submitted',
-    ipAddress: reqMeta.ip,
-    userAgent: reqMeta.userAgent,
-  });
-
-  const result = { meeting };
-  await saveIdempotencyResult(idempotencyKey, result);
-  return result;
 }
 
 async function getCitizenMeetings(citizenId) {
@@ -87,10 +115,22 @@ async function getAdminMeetingDetail(meetingId) {
   return { meeting, history };
 }
 
-async function changeMeetingStatus({ meetingId, actorRole, actorId, status, note, patch = {} }) {
+async function changeMeetingStatus({
+  meetingId,
+  actorRole,
+  actorId,
+  status,
+  note,
+  patch = {},
+  allowedPreviousStatuses,
+  actionLabel,
+}) {
   const meeting = await meetingsRepository.getMeetingById(meetingId);
   if (!meeting) {
     throw createHttpError(404, 'Meeting not found');
+  }
+  if (allowedPreviousStatuses?.length) {
+    assertAllowedTransition(meeting.status, allowedPreviousStatuses, actionLabel || status);
   }
 
   await meetingsRepository.updateMeetingStatus({
@@ -120,6 +160,8 @@ async function rejectMeeting(meetingId, actorId, reason, reqMeta) {
     actorRole: 'admin',
     actorId,
     status: 'rejected',
+    allowedPreviousStatuses: ['pending', 'accepted', 'verification_pending', 'verified', 'not_verified'],
+    actionLabel: 'reject this meeting',
     note: cleanReason,
     patch: {
       assigned_admin_id: actorId,
@@ -147,6 +189,8 @@ async function acceptMeeting(meetingId, actorId, reqMeta) {
     actorRole: 'admin',
     actorId,
     status: 'accepted',
+    allowedPreviousStatuses: ['pending', 'not_verified'],
+    actionLabel: 'accept this meeting',
     note: 'Meeting request accepted',
     patch: { assigned_admin_id: actorId },
   });
@@ -169,6 +213,8 @@ async function assignVerification(meetingId, actorId, deoId, reqMeta) {
     actorRole: 'admin',
     actorId,
     status: 'verification_pending',
+    allowedPreviousStatuses: ['accepted', 'not_verified'],
+    actionLabel: 'send this meeting for verification',
     note: `Sent to DEO ${deoId} for verification`,
     patch: { assigned_admin_id: actorId, assigned_deo_id: deoId },
   });
@@ -192,6 +238,8 @@ async function submitVerification(meetingId, deoId, verified, reason, notes, req
     actorRole: 'deo',
     actorId: deoId,
     status,
+    allowedPreviousStatuses: ['verification_pending'],
+    actionLabel: verified ? 'verify this meeting' : 'mark this meeting as not verified',
     note: sanitizeText(reason),
     patch: {
       verification_reason: sanitizeText(reason),
@@ -239,6 +287,8 @@ async function scheduleMeeting(meetingId, adminId, body, reqMeta) {
     actorRole: 'admin',
     actorId: adminId,
     status: 'scheduled',
+    allowedPreviousStatuses: ['accepted', 'verified', 'scheduled'],
+    actionLabel: meeting.status === 'scheduled' ? 'reschedule this meeting' : 'schedule this meeting',
     note: meeting.status === 'scheduled' ? 'Meeting rescheduled' : 'Meeting scheduled',
     patch: {
       assigned_admin_id: adminId,
@@ -275,6 +325,8 @@ async function completeMeeting(meetingId, adminId, reason, reqMeta) {
     actorRole: 'admin',
     actorId: adminId,
     status: 'completed',
+    allowedPreviousStatuses: ['scheduled'],
+    actionLabel: 'complete this meeting',
     note: cleanReason,
     patch: {
       assigned_admin_id: adminId,
@@ -303,6 +355,8 @@ async function cancelMeeting(meetingId, adminId, reason, reqMeta) {
     actorRole: 'admin',
     actorId: adminId,
     status: 'cancelled',
+    allowedPreviousStatuses: ['pending', 'accepted', 'verification_pending', 'verified', 'not_verified', 'scheduled'],
+    actionLabel: 'cancel this meeting',
     note: cleanReason,
     patch: {
       assigned_admin_id: adminId,

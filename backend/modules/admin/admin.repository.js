@@ -48,7 +48,7 @@ async function getDashboard() {
 
 async function listActiveAdminsForCitizenDirectory() {
   const result = await pool.query(
-    `SELECT id, first_name, last_name, designation
+    `SELECT id, username, first_name, last_name, designation
      FROM admins
      WHERE status = 'active'
      ORDER BY first_name ASC, last_name ASC`
@@ -171,6 +171,16 @@ async function deleteDeoById(deoId, masterAdminId = null) {
   await pool.query('DELETE FROM deos WHERE id = $1 AND is_verified = FALSE', [deoId]);
 }
 
+async function purgePendingDeoById(deoId) {
+  await pool.query(
+    `DELETE FROM deos
+      WHERE id = $1
+        AND is_verified = FALSE
+        AND status = 'pending_verification'`,
+    [deoId]
+  );
+}
+
 module.exports = {
   createAdmin,
   createDeo,
@@ -180,4 +190,5 @@ module.exports = {
   listActiveAdminsForCitizenDirectory,
   listWorkflowDirectory,
   listDeosWithCreators,
+  purgePendingDeoById,
 };

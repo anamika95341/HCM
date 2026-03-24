@@ -13,29 +13,11 @@ import {
   WorkspaceSectionHeader,
   WorkspaceSelect,
   WorkspaceStatGrid,
-  WorkspaceTabs,
 } from "../../../shared/components/WorkspaceUI.jsx";
 import { usePortalTheme } from "../../../shared/theme/portalTheme.jsx";
 
-function statusBadgeClass(status) {
-  if (status === "scheduled") return "bg-emerald-100 text-emerald-700";
-  if (status === "accepted" || status === "verified" || status === "resolved" || status === "completed") return "bg-sky-100 text-sky-700";
-  if (["verification_pending", "pending", "assigned", "in_review", "department_contact_identified", "call_scheduled", "followup_in_progress", "escalated_to_meeting"].includes(status)) return "bg-amber-100 text-amber-700";
-  if (["rejected", "not_verified", "cancelled"].includes(status)) return "bg-rose-100 text-rose-700";
-  return "bg-slate-100 text-slate-700";
-}
-
-function getStatusIcon(status) {
-  if (["resolved", "completed"].includes(status)) return <CheckCircle2 size={16} className="text-emerald-600" />;
-  if (["rejected", "cancelled", "not_verified"].includes(status)) return <AlertCircle size={16} className="text-rose-600" />;
-  return <Clock size={16} className="text-amber-600" />;
-}
-
 function citizenStatus(item) {
-  if (item.itemType === "meeting" && ["verification_pending", "accepted", "verified", "not_verified", "pending"].includes(item.status)) {
-    return { value: "under_review", label: "Under Review" };
-  }
-  if (item.itemType === "complaint" && ["assigned", "department_contact_identified", "call_scheduled", "followup_in_progress", "escalated_to_meeting"].includes(item.status)) {
+  if (["assigned", "department_contact_identified", "call_scheduled", "followup_in_progress", "escalated_to_meeting"].includes(item.status)) {
     return { value: "under_review", label: "Under Review" };
   }
   const label = String(item.status || "")
@@ -50,11 +32,10 @@ export default function MyCases() {
   const { C } = usePortalTheme();
   const navigate = useNavigate();
   const { session } = useAuth();
-  const [data, setData] = useState({ meetings: [], complaints: [] });
+  const [complaints, setComplaints] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-  const [tab, setTab] = useState("all");
-  const [filters, setFilters] = useState({ q: "", status: "all", type: "all" });
+  const [filters, setFilters] = useState({ q: "", status: "all" });
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 10;
 
@@ -65,14 +46,11 @@ export default function MyCases() {
       try {
         const { data: response } = await apiClient.get("/citizen/my-cases", authorizedConfig(session.accessToken));
         if (mounted) {
-          setData({
-            meetings: response.meetings || [],
-            complaints: response.complaints || [],
-          });
+          setComplaints(response.complaints || []);
         }
       } catch (loadError) {
         if (mounted) {
-          setError(loadError?.response?.data?.error || "Unable to load your cases");
+          setError(loadError?.response?.data?.error || "Unable to load your complaints");
         }
       } finally {
         if (mounted) {
@@ -90,34 +68,15 @@ export default function MyCases() {
     };
   }, [session?.accessToken]);
 
-  useEffect(() => {
-    setFilters((current) => ({
-      ...current,
-      status: "all",
-      type: tab === "all" ? "all" : tab,
-    }));
-    setCurrentPage(1);
-  }, [tab]);
-
   const items = useMemo(() => {
-    const combined = [
-      ...data.meetings.map((item) => ({
-        ...item,
-        itemType: "meeting",
-        primaryTitle: item.title || item.purpose,
-        primaryId: item.requestId,
-      })),
-      ...data.complaints.map((item) => ({
-        ...item,
-        itemType: "complaint",
-        primaryTitle: item.title || item.subject,
-        primaryId: item.complaintId,
-      })),
-    ].sort((a, b) => new Date(b.updatedAt || b.updated_at || b.createdAt || b.created_at || 0) - new Date(a.updatedAt || a.updated_at || a.createdAt || a.created_at || 0));
+    const complaintItems = complaints.map((item) => ({
+      ...item,
+      itemType: "complaint",
+      primaryTitle: item.title || item.subject,
+      primaryId: item.complaintId,
+    })).sort((a, b) => new Date(b.updatedAt || b.updated_at || b.createdAt || b.created_at || 0) - new Date(a.updatedAt || a.updated_at || a.createdAt || a.created_at || 0));
 
-    return combined.filter((item) => {
-      const tabOk = tab === "all" || item.itemType === tab;
-      const typeOk = filters.type === "all" || item.itemType === filters.type;
+    return complaintItems.filter((item) => {
       const status = citizenStatus(item);
       const statusOk = filters.status === "all" || status.value === filters.status;
       const q = filters.q.trim().toLowerCase();
@@ -128,17 +87,12 @@ export default function MyCases() {
         item.currentOwner,
         item.department,
         item.relatedMeeting?.requestId,
-        item.relatedComplaint?.complaintId,
-        item.scheduled_location,
-        item.scheduleLocation,
         item.statusReason,
         item.resolutionSummary,
-        item.visitorId,
-        item.meetingDocket,
       ].filter(Boolean).join(" ").toLowerCase();
-      return tabOk && typeOk && statusOk && (!q || searchText.includes(q));
+      return statusOk && (!q || searchText.includes(q));
     });
-  }, [data.complaints, data.meetings, filters, tab]);
+  }, [complaints, filters]);
 
   const totalPages = Math.ceil(items.length / itemsPerPage) || 1;
   const paginatedItems = items.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
@@ -147,14 +101,14 @@ export default function MyCases() {
     return Array.from(new Set(items.map((item) => citizenStatus(item).value))).filter(Boolean).sort();
   }, [items]);
 
-  const totalItems = data.meetings.length + data.complaints.length;
+  const totalItems = complaints.length;
 
   return (
     <WorkspacePage width={1320}>
       <WorkspaceSectionHeader
         eyebrow="Citizen Workspace"
-        title="My Cases & Complaints"
-        subtitle="Track your complaints, meeting escalations, resolution updates, and linked references in one place."
+        title="My Complaints"
+        subtitle="Track only your complaint requests, status updates, and resolution progress."
         icon={<FileText size={20} />}
       />
 
@@ -163,20 +117,8 @@ export default function MyCases() {
       </div>
 
       <div style={{ marginBottom: 20 }}>
-        <WorkspaceTabs
-          items={[
-            { id: "all", label: "All", count: totalItems },
-            { id: "complaint", label: "Complaints", count: data.complaints.length },
-            { id: "meeting", label: "Meeting Escalations", count: data.meetings.length },
-          ]}
-          value={tab}
-          onChange={setTab}
-        />
-      </div>
-
-      <div style={{ marginBottom: 20 }}>
         <WorkspaceCard>
-          <div className="grid md:grid-cols-3 gap-3">
+          <div className="grid md:grid-cols-2 gap-3">
             <div className="relative">
               <Search className="absolute left-3 top-3" size={18} style={{ color: C.t3 }} />
               <WorkspaceInput
@@ -207,24 +149,13 @@ export default function MyCases() {
                 ))}
               </WorkspaceSelect>
             </div>
-            <WorkspaceSelect
-              value={filters.type}
-              onChange={(event) => {
-                setFilters((current) => ({ ...current, type: event.target.value }));
-                setCurrentPage(1);
-              }}
-            >
-              <option value="all">All record types</option>
-              <option value="meeting">Meetings</option>
-              <option value="complaint">Complaints</option>
-            </WorkspaceSelect>
           </div>
         </WorkspaceCard>
       </div>
 
         <div className="flex-1 overflow-y-auto min-h-0 custom-scrollbar rounded-xl">
           {loading && (
-            <WorkspaceEmptyState title="Loading your cases..." />
+            <WorkspaceEmptyState title="Loading your complaints..." />
           )}
 
           {error && <WorkspaceCard style={{ color: C.danger }}>{error}</WorkspaceCard>}
@@ -232,7 +163,7 @@ export default function MyCases() {
           {!loading && !error && (
             <>
               {items.length === 0 ? (
-                <WorkspaceEmptyState title="No cases found" subtitle="Try adjusting your filters." />
+                <WorkspaceEmptyState title="No complaints found" subtitle="Try adjusting your filters." />
               ) : (
                 <>
                   <WorkspaceCard style={{ padding: 0, overflow: "hidden" }}>
@@ -251,16 +182,9 @@ export default function MyCases() {
                       <tbody className="divide-y divide-slate-200">
                         {paginatedItems.map((item) => {
                           const status = citizenStatus(item);
-                          const isMeeting = item.itemType === "meeting";
-                          const secondaryLine = isMeeting
-                            ? (item.scheduled_location || item.admin_comments || "Awaiting admin update")
-                            : (item.callOutcome || item.resolutionSummary || item.statusReason || "Complaint under process");
-                          const departmentLabel = isMeeting
-                            ? (item.admin_referral || item.assignedAdminName || "General Admin Pool")
-                            : (item.department || "Complaint Desk");
-                          const referenceLabel = isMeeting
-                            ? (item.relatedComplaint?.complaintId || item.meetingDocket || "No linked record")
-                            : (item.relatedMeeting?.requestId || "No linked record");
+                          const secondaryLine = item.callOutcome || item.resolutionSummary || item.statusReason || "Complaint under process";
+                          const departmentLabel = item.department || "Complaint Desk";
+                          const referenceLabel = item.relatedMeeting?.requestId || "No linked record";
 
                           return (
                             <tr key={`${item.itemType}-${item._id}`} style={{ borderBottom: `1px solid ${C.borderLight}` }}>
@@ -298,13 +222,8 @@ export default function MyCases() {
                   <div className="lg:hidden space-y-3 pb-2">
                     {paginatedItems.map((item) => {
                       const status = citizenStatus(item);
-                      const isMeeting = item.itemType === "meeting";
-                      const departmentLabel = isMeeting
-                        ? (item.admin_referral || item.assignedAdminName || "General Admin Pool")
-                        : (item.department || "Complaint Desk");
-                      const referenceLabel = isMeeting
-                        ? (item.relatedComplaint?.complaintId || item.meetingDocket || "No linked record")
-                        : (item.relatedMeeting?.requestId || "No linked record");
+                      const departmentLabel = item.department || "Complaint Desk";
+                      const referenceLabel = item.relatedMeeting?.requestId || "No linked record";
 
                       return (
                         <WorkspaceCard key={`${item.itemType}-${item._id}`} style={{ padding: 16 }}>

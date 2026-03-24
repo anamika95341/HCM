@@ -46,8 +46,7 @@ async function findAdminByIdentityConflict({ username, email, phoneNumber, aadha
   const result = await db.query(
     `SELECT id, username, email, phone_number, aadhaar_hash
        FROM admins
-      WHERE removed_at IS NULL
-        AND (username = $1 OR email = $2 OR phone_number = $3 OR aadhaar_hash = $4)`,
+      WHERE username = $1 OR email = $2 OR phone_number = $3 OR aadhaar_hash = $4`,
     [username, email, phoneNumber, aadhaarHash]
   );
   return result.rows[0] || null;
@@ -68,6 +67,16 @@ async function deactivateAdmin(adminId, masterAdminId) {
   return result.rows[0] || null;
 }
 
+async function deletePendingAdminById(adminId) {
+  await pool.query(
+    `DELETE FROM admins
+      WHERE id = $1
+        AND is_verified = FALSE
+        AND status = 'pending_verification'`,
+    [adminId]
+  );
+}
+
 async function deactivateDeo(deoId, masterAdminId) {
   const result = await pool.query(
     `UPDATE deos
@@ -85,6 +94,7 @@ async function deactivateDeo(deoId, masterAdminId) {
 
 module.exports = {
   deactivateAdmin,
+  deletePendingAdminById,
   deactivateDeo,
   findAdminByIdentityConflict,
   getDashboard,

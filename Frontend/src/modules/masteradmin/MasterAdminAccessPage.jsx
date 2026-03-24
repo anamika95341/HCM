@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { apiClient, authorizedConfig } from "../../shared/api/client.js";
 import { useAuth } from "../../shared/auth/AuthContext.jsx";
 import { usePortalTheme } from "../../shared/theme/portalTheme.jsx";
-import { toSafeUserMessage } from "../../shared/security/text.js";
+import { normalizeInputText, toSafeUserMessage } from "../../shared/security/text.js";
 
 const emptyAdminForm = {
   username: "",
@@ -51,6 +51,22 @@ export default function MasterAdminAccessPage({ mode }) {
   const isManageAdmins = mode === "manage-admins";
   const isManageDeos = mode === "manage-deos";
 
+  function setAdminField(field, value) {
+    setAdminForm((current) => ({ ...current, [field]: value }));
+  }
+
+  function setDeoField(field, value) {
+    setDeoForm((current) => ({ ...current, [field]: value }));
+  }
+
+  function sanitizeDigits(value, maxLength) {
+    return String(value || "").replace(/\D/g, "").slice(0, maxLength);
+  }
+
+  function sanitizeText(value, maxLength = 150) {
+    return normalizeInputText(value, { maxLength, trim: false });
+  }
+
   useEffect(() => {
     if (!session?.accessToken) return;
     if (isManageAdmins) {
@@ -93,8 +109,20 @@ export default function MasterAdminAccessPage({ mode }) {
     setError("");
     setSuccess("");
     try {
-      const { data } = await apiClient.post("/masteradmin/admins", { ...adminForm, age: Number(adminForm.age) }, config);
-      setSuccess(`Admin created. Verification code sent to ${data.admin.email}. Username: ${data.admin.username}`);
+      const payload = {
+        ...adminForm,
+        username: sanitizeText(adminForm.username, 100).trim(),
+        firstName: sanitizeText(adminForm.firstName, 100).trim(),
+        middleName: sanitizeText(adminForm.middleName, 100).trim(),
+        lastName: sanitizeText(adminForm.lastName, 100).trim(),
+        designation: sanitizeText(adminForm.designation, 150).trim(),
+        aadhaarNumber: sanitizeDigits(adminForm.aadhaarNumber, 12),
+        phoneNumber: sanitizeDigits(adminForm.phoneNumber, 10),
+        email: sanitizeText(adminForm.email, 255).trim(),
+        age: Number(adminForm.age),
+      };
+      const { data } = await apiClient.post("/masteradmin/admins", payload, config);
+      setSuccess(`Admin created. Verification code sent to ${data.admin.email}. Username: ${data.admin.username}. Verify the account on /admin/verify before first login.`);
       setAdminForm(emptyAdminForm);
     } catch (requestError) {
       setError(toSafeUserMessage(requestError, "Unable to create admin"));
@@ -108,8 +136,19 @@ export default function MasterAdminAccessPage({ mode }) {
     setError("");
     setSuccess("");
     try {
-      const { data } = await apiClient.post("/masteradmin/deos", { ...deoForm, age: Number(deoForm.age) }, config);
-      setSuccess(`DEO created. Verification code sent to ${data.deo.email}. Login username: ${data.deo.username}`);
+      const payload = {
+        ...deoForm,
+        firstName: sanitizeText(deoForm.firstName, 100).trim(),
+        middleName: sanitizeText(deoForm.middleName, 100).trim(),
+        lastName: sanitizeText(deoForm.lastName, 100).trim(),
+        designation: sanitizeText(deoForm.designation, 150).trim(),
+        aadhaarNumber: sanitizeDigits(deoForm.aadhaarNumber, 12),
+        phoneNumber: sanitizeDigits(deoForm.phoneNumber, 10),
+        email: sanitizeText(deoForm.email, 255).trim(),
+        age: Number(deoForm.age),
+      };
+      const { data } = await apiClient.post("/masteradmin/deos", payload, config);
+      setSuccess(`DEO created. Verification code sent to ${data.deo.email}. Login username: ${data.deo.username}. Verify the account on /DEO/verify before first login.`);
       setDeoForm(emptyDeoForm);
     } catch (requestError) {
       setError(toSafeUserMessage(requestError, "Unable to create DEO"));
@@ -166,18 +205,18 @@ export default function MasterAdminAccessPage({ mode }) {
         <Card C={C}>
           <SectionHeader C={C} title="Admin Onboarding" subtitle="Masteradmin-controlled onboarding for admins." />
           <TwoColumnGrid>
-            <Field C={C} label="Username"><Input C={C} value={adminForm.username} onChange={(value) => setAdminForm((current) => ({ ...current, username: value }))} /></Field>
-            <Field C={C} label="First Name"><Input C={C} value={adminForm.firstName} onChange={(value) => setAdminForm((current) => ({ ...current, firstName: value }))} /></Field>
-            <Field C={C} label="Middle Name"><Input C={C} value={adminForm.middleName} onChange={(value) => setAdminForm((current) => ({ ...current, middleName: value }))} /></Field>
-            <Field C={C} label="Last Name"><Input C={C} value={adminForm.lastName} onChange={(value) => setAdminForm((current) => ({ ...current, lastName: value }))} /></Field>
-            <Field C={C} label="Age"><Input C={C} type="number" value={adminForm.age} onChange={(value) => setAdminForm((current) => ({ ...current, age: value }))} /></Field>
-            <Field C={C} label="Sex"><Select C={C} value={adminForm.sex} onChange={(value) => setAdminForm((current) => ({ ...current, sex: value }))} /></Field>
-            <Field C={C} label="Designation"><Input C={C} value={adminForm.designation} onChange={(value) => setAdminForm((current) => ({ ...current, designation: value }))} /></Field>
-            <Field C={C} label="Aadhaar Number"><Input C={C} value={adminForm.aadhaarNumber} onChange={(value) => setAdminForm((current) => ({ ...current, aadhaarNumber: value }))} /></Field>
-            <Field C={C} label="Phone Number"><Input C={C} value={adminForm.phoneNumber} onChange={(value) => setAdminForm((current) => ({ ...current, phoneNumber: value }))} /></Field>
-            <Field C={C} label="Email Address"><Input C={C} type="email" value={adminForm.email} onChange={(value) => setAdminForm((current) => ({ ...current, email: value }))} /></Field>
-            <Field C={C} label="Password"><Input C={C} type="password" value={adminForm.password} onChange={(value) => setAdminForm((current) => ({ ...current, password: value }))} /></Field>
-            <Field C={C} label="Confirm Password"><Input C={C} type="password" value={adminForm.confirmPassword} onChange={(value) => setAdminForm((current) => ({ ...current, confirmPassword: value }))} /></Field>
+            <Field C={C} label="Username"><Input C={C} value={adminForm.username} onChange={(value) => setAdminField("username", sanitizeText(value, 100))} /></Field>
+            <Field C={C} label="First Name"><Input C={C} value={adminForm.firstName} onChange={(value) => setAdminField("firstName", sanitizeText(value, 100))} /></Field>
+            <Field C={C} label="Middle Name"><Input C={C} value={adminForm.middleName} onChange={(value) => setAdminField("middleName", sanitizeText(value, 100))} /></Field>
+            <Field C={C} label="Last Name"><Input C={C} value={adminForm.lastName} onChange={(value) => setAdminField("lastName", sanitizeText(value, 100))} /></Field>
+            <Field C={C} label="Age"><Input C={C} type="number" value={adminForm.age} onChange={(value) => setAdminField("age", sanitizeDigits(value, 3))} /></Field>
+            <Field C={C} label="Sex"><Select C={C} value={adminForm.sex} onChange={(value) => setAdminField("sex", value)} /></Field>
+            <Field C={C} label="Designation"><Input C={C} value={adminForm.designation} onChange={(value) => setAdminField("designation", sanitizeText(value, 150))} /></Field>
+            <Field C={C} label="Aadhaar Number"><Input C={C} value={adminForm.aadhaarNumber} onChange={(value) => setAdminField("aadhaarNumber", sanitizeDigits(value, 12))} inputMode="numeric" maxLength={12} /></Field>
+            <Field C={C} label="Phone Number"><Input C={C} value={adminForm.phoneNumber} onChange={(value) => setAdminField("phoneNumber", sanitizeDigits(value, 10))} inputMode="numeric" maxLength={10} /></Field>
+            <Field C={C} label="Email Address"><Input C={C} type="email" value={adminForm.email} onChange={(value) => setAdminField("email", sanitizeText(value, 255))} /></Field>
+            <Field C={C} label="Password"><Input C={C} type="password" value={adminForm.password} onChange={(value) => setAdminField("password", value)} /></Field>
+            <Field C={C} label="Confirm Password"><Input C={C} type="password" value={adminForm.confirmPassword} onChange={(value) => setAdminField("confirmPassword", value)} /></Field>
           </TwoColumnGrid>
           <ActionsRow><PrimaryButton C={C} disabled={submitting} onClick={handleCreateAdmin}>{submitting ? "Creating Admin..." : "Create Admin"}</PrimaryButton></ActionsRow>
         </Card>
@@ -187,17 +226,17 @@ export default function MasterAdminAccessPage({ mode }) {
         <Card C={C}>
           <SectionHeader C={C} title="DEO Onboarding" subtitle="Masteradmin-controlled onboarding for Data Entry Operators." />
           <TwoColumnGrid>
-            <Field C={C} label="First Name"><Input C={C} value={deoForm.firstName} onChange={(value) => setDeoForm((current) => ({ ...current, firstName: value }))} /></Field>
-            <Field C={C} label="Middle Name"><Input C={C} value={deoForm.middleName} onChange={(value) => setDeoForm((current) => ({ ...current, middleName: value }))} /></Field>
-            <Field C={C} label="Last Name"><Input C={C} value={deoForm.lastName} onChange={(value) => setDeoForm((current) => ({ ...current, lastName: value }))} /></Field>
-            <Field C={C} label="Age"><Input C={C} type="number" value={deoForm.age} onChange={(value) => setDeoForm((current) => ({ ...current, age: value }))} /></Field>
-            <Field C={C} label="Sex"><Select C={C} value={deoForm.sex} onChange={(value) => setDeoForm((current) => ({ ...current, sex: value }))} /></Field>
-            <Field C={C} label="Designation"><Input C={C} value={deoForm.designation} onChange={(value) => setDeoForm((current) => ({ ...current, designation: value }))} /></Field>
-            <Field C={C} label="Aadhaar Number"><Input C={C} value={deoForm.aadhaarNumber} onChange={(value) => setDeoForm((current) => ({ ...current, aadhaarNumber: value }))} /></Field>
-            <Field C={C} label="Phone Number"><Input C={C} value={deoForm.phoneNumber} onChange={(value) => setDeoForm((current) => ({ ...current, phoneNumber: value }))} /></Field>
-            <Field C={C} label="Email Address"><Input C={C} type="email" value={deoForm.email} onChange={(value) => setDeoForm((current) => ({ ...current, email: value }))} /></Field>
-            <Field C={C} label="Password"><Input C={C} type="password" value={deoForm.password} onChange={(value) => setDeoForm((current) => ({ ...current, password: value }))} /></Field>
-            <Field C={C} label="Confirm Password"><Input C={C} type="password" value={deoForm.confirmPassword} onChange={(value) => setDeoForm((current) => ({ ...current, confirmPassword: value }))} /></Field>
+            <Field C={C} label="First Name"><Input C={C} value={deoForm.firstName} onChange={(value) => setDeoField("firstName", sanitizeText(value, 100))} /></Field>
+            <Field C={C} label="Middle Name"><Input C={C} value={deoForm.middleName} onChange={(value) => setDeoField("middleName", sanitizeText(value, 100))} /></Field>
+            <Field C={C} label="Last Name"><Input C={C} value={deoForm.lastName} onChange={(value) => setDeoField("lastName", sanitizeText(value, 100))} /></Field>
+            <Field C={C} label="Age"><Input C={C} type="number" value={deoForm.age} onChange={(value) => setDeoField("age", sanitizeDigits(value, 3))} /></Field>
+            <Field C={C} label="Sex"><Select C={C} value={deoForm.sex} onChange={(value) => setDeoField("sex", value)} /></Field>
+            <Field C={C} label="Designation"><Input C={C} value={deoForm.designation} onChange={(value) => setDeoField("designation", sanitizeText(value, 150))} /></Field>
+            <Field C={C} label="Aadhaar Number"><Input C={C} value={deoForm.aadhaarNumber} onChange={(value) => setDeoField("aadhaarNumber", sanitizeDigits(value, 12))} inputMode="numeric" maxLength={12} /></Field>
+            <Field C={C} label="Phone Number"><Input C={C} value={deoForm.phoneNumber} onChange={(value) => setDeoField("phoneNumber", sanitizeDigits(value, 10))} inputMode="numeric" maxLength={10} /></Field>
+            <Field C={C} label="Email Address"><Input C={C} type="email" value={deoForm.email} onChange={(value) => setDeoField("email", sanitizeText(value, 255))} /></Field>
+            <Field C={C} label="Password"><Input C={C} type="password" value={deoForm.password} onChange={(value) => setDeoField("password", value)} /></Field>
+            <Field C={C} label="Confirm Password"><Input C={C} type="password" value={deoForm.confirmPassword} onChange={(value) => setDeoField("confirmPassword", value)} /></Field>
           </TwoColumnGrid>
           <ActionsRow><PrimaryButton C={C} disabled={submitting} onClick={handleCreateDeo}>{submitting ? "Creating DEO..." : "Create DEO"}</PrimaryButton></ActionsRow>
         </Card>
@@ -254,8 +293,8 @@ function Field({ C, label, children }) {
   );
 }
 
-function Input({ C, value, onChange, type = "text" }) {
-  return <input type={type} value={value} onChange={(event) => onChange(event.target.value)} style={{ width: "100%", padding: "10px 12px", borderRadius: 10, border: `1px solid ${C.border}`, background: C.inp, color: C.t1, fontSize: 13 }} />;
+function Input({ C, value, onChange, type = "text", ...props }) {
+  return <input {...props} type={type} value={value} onChange={(event) => onChange(event.target.value)} style={{ width: "100%", padding: "10px 12px", borderRadius: 10, border: `1px solid ${C.border}`, background: C.inp, color: C.t1, fontSize: 13 }} />;
 }
 
 function Select({ C, value, onChange }) {

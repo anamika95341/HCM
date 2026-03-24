@@ -34,7 +34,11 @@ export default function DeoVerifyPage() {
     setSuccess("");
 
     try {
-      const { data } = await apiClient.post("/auth/deo/verify-account", form);
+      const payload = {
+        usernameOrEmail: normalizeInputText(form.usernameOrEmail, { maxLength: 160, trim: true }),
+        otp: form.otp,
+      };
+      const { data } = await apiClient.post("/auth/deo/verify-account", payload);
       setSuccess(data?.message || "DEO account verified. You can now log in.");
       setTimeout(() => {
         navigate(PATHS.deoLogin, { replace: true });
@@ -53,7 +57,7 @@ export default function DeoVerifyPage() {
 
     try {
       const { data } = await apiClient.post("/auth/deo/resend-verification-code", {
-        usernameOrEmail: form.usernameOrEmail,
+        usernameOrEmail: normalizeInputText(form.usernameOrEmail, { maxLength: 160, trim: true }),
       });
       setSuccess(data?.message || "If that DEO account exists, a verification code was sent.");
     } catch (requestError) {

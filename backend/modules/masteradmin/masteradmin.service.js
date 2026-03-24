@@ -72,7 +72,7 @@ async function createAdmin(masterAdminId, payload, reqMeta) {
   try {
     await sendVerificationCode({ role: 'admin', userId: admin.id, email: payload.email });
   } catch (error) {
-    await masteradminRepository.deactivateAdmin(admin.id, masterAdminId);
+    await masteradminRepository.deletePendingAdminById(admin.id);
     throw createHttpError(502, 'Unable to send admin verification code');
   }
 
@@ -116,7 +116,7 @@ async function createDeo(masterAdminId, payload, reqMeta) {
   try {
     await sendVerificationCode({ role: 'deo', userId: deo.id, email: payload.email });
   } catch (error) {
-    await adminRepository.deleteDeoById(deo.id, masterAdminId);
+    await adminRepository.purgePendingDeoById(deo.id);
     throw createHttpError(502, 'Unable to send DEO verification code');
   }
 

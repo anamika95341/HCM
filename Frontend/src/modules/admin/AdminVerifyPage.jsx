@@ -31,7 +31,11 @@ export default function AdminVerifyPage() {
     setSuccess("");
 
     try {
-      const { data } = await apiClient.post("/auth/admin/verify-account", form);
+      const payload = {
+        usernameOrEmail: normalizeInputText(form.usernameOrEmail, { maxLength: 160, trim: true }),
+        otp: form.otp,
+      };
+      const { data } = await apiClient.post("/auth/admin/verify-account", payload);
       setSuccess(data?.message || "Admin account verified. You can now log in.");
       setTimeout(() => navigate(PATHS.adminLogin, { replace: true }), 900);
     } catch (requestError) {
@@ -48,7 +52,7 @@ export default function AdminVerifyPage() {
 
     try {
       const { data } = await apiClient.post("/auth/admin/resend-verification-code", {
-        usernameOrEmail: form.usernameOrEmail,
+        usernameOrEmail: normalizeInputText(form.usernameOrEmail, { maxLength: 160, trim: true }),
       });
       setSuccess(data?.message || "If that admin account exists, a verification code was sent.");
     } catch (requestError) {

@@ -232,7 +232,7 @@ async function verifyDeoRegistration({ usernameOrEmail, otp }, reqMeta) {
 
   if (!validOtp) {
     await recordLoginFailure({ role: 'deo', userId: user.id, ip: reqMeta.ip });
-    throw createHttpError(401, 'Invalid credentials');
+    throw createHttpError(400, 'Invalid or expired verification code');
   }
 
   await clearLoginFailures({ role: 'deo', userId: user.id, ip: reqMeta.ip });
@@ -272,7 +272,7 @@ async function verifyAdminRegistration({ usernameOrEmail, otp }, reqMeta) {
 
   if (!validOtp) {
     await recordLoginFailure({ role: 'admin', userId: user.id, ip: reqMeta.ip });
-    throw createHttpError(401, 'Invalid credentials');
+    throw createHttpError(400, 'Invalid or expired verification code');
   }
 
   await clearLoginFailures({ role: 'admin', userId: user.id, ip: reqMeta.ip });
