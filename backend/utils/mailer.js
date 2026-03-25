@@ -9,11 +9,14 @@ function getTransporter() {
     transporter = nodemailer.createTransport({
       host: env.smtp.host,
       port: env.smtp.port,
-      secure: false,
+      secure: env.smtp.port === 465,
       auth: env.smtp.user ? {
         user: env.smtp.user,
         pass: env.smtp.password,
       } : undefined,
+      connectionTimeout: 10000,
+      greetingTimeout: 10000,
+      socketTimeout: 10000,
     });
   }
 
