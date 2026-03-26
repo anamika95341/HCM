@@ -1,5 +1,6 @@
 services:
   frontend:
+    image: ${FRONTEND_IMAGE:-hcm-frontend:latest}
     build:
       context: ./Frontend
       dockerfile: Dockerfile
@@ -21,6 +22,7 @@ services:
       - frontend-backend-net
 
   backend:
+    image: ${BACKEND_IMAGE:-hcm-backend:latest}
     build:
       context: ./backend
       dockerfile: Dockerfile
