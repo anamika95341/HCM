@@ -120,7 +120,7 @@ export default function MeetingList() {
                       <h2 style={{ fontSize: 18, fontWeight: 600, color: C.t1 }}>{meeting.title}</h2>
                       <p style={{ fontSize: 13, color: C.t3, marginTop: 6 }}>{meeting.purpose}</p>
                     </div>
-                    <WorkspaceBadge>{labelForStatus(meeting.status)}</WorkspaceBadge>
+                    <WorkspaceBadge status={meeting.status}>{labelForStatus(meeting.status)}</WorkspaceBadge>
                   </div>
 
                   <div className="grid md:grid-cols-3 gap-4 mt-5" style={{ fontSize: 13, color: C.t2 }}>

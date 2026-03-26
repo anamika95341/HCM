@@ -7,6 +7,7 @@ import {
   WorkspaceButton,
   WorkspaceCard,
   WorkspaceCardHeader,
+  WorkspaceEmptyState,
   WorkspaceInput,
   WorkspacePage,
   WorkspaceSectionHeader,
@@ -62,13 +63,37 @@ function SuccessModal({ open, message, onClose }) {
   if (!open) return null;
   return (
     <div className="fixed inset-0 z-[120] flex items-center justify-center px-4 bg-black/40 backdrop-blur-sm">
-      <div className="w-full max-w-md rounded-2xl bg-white border border-gray-200 shadow-2xl p-8 text-center">
+      <div
+        className="w-full max-w-md p-8 text-center"
+        style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 18, boxShadow: "0 24px 80px rgba(15,23,42,0.18)" }}
+      >
         <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full text-white text-3xl" style={{ background: C.mint }}>✓</div>
-        <h3 className="text-2xl font-bold text-gray-900">Success!</h3>
-        <p className="mt-2 text-sm text-gray-600">{message}</p>
+        <h3 style={{ fontSize: 24, fontWeight: 700, color: C.t1 }}>Success</h3>
+        <p className="mt-2 text-sm" style={{ color: C.t3 }}>{message}</p>
         <WorkspaceButton type="button" onClick={onClose} style={{ width: "100%", marginTop: 24 }}>Continue</WorkspaceButton>
       </div>
     </div>
+  );
+}
+
+function WorkspaceTextArea(props) {
+  const { C } = usePortalTheme();
+  return (
+    <textarea
+      {...props}
+      style={{
+        width: "100%",
+        padding: "10px 14px",
+        borderRadius: 10,
+        border: `1px solid ${C.border}`,
+        background: C.inp,
+        color: C.t1,
+        fontSize: 13,
+        outline: "none",
+        resize: "vertical",
+        ...(props.style || {}),
+      }}
+    />
   );
 }
 
@@ -186,7 +211,9 @@ export default function AdminCaseDetail() {
 
   if (!item) {
     return (
-      <WorkspacePage width={1200}><WorkspaceCard>{error || "Loading case details..."}</WorkspaceCard></WorkspacePage>
+      <WorkspacePage width={1200}>
+        {error ? <WorkspaceCard style={{ color: C.danger }}>{error}</WorkspaceCard> : <WorkspaceEmptyState title="Loading case details..." />}
+      </WorkspacePage>
     );
   }
 
@@ -226,7 +253,7 @@ export default function AdminCaseDetail() {
                 <option value="">Select admin</option>
                 {matchingAdminOptions.map((admin) => <option key={admin.id} value={admin.id}>{admin.name} · {admin.department}</option>)}
               </WorkspaceSelect>
-              <textarea value={complaintForm.reassignReason} onChange={(event) => setComplaintForm((current) => ({ ...current, reassignReason: event.target.value }))} rows={3} placeholder="Reason for reassignment" style={{ width: "100%", padding: "10px 14px", borderRadius: 10, border: `1px solid ${C.border}`, background: C.inp, color: C.t1, fontSize: 13, outline: "none" }} />
+              <WorkspaceTextArea value={complaintForm.reassignReason} onChange={(event) => setComplaintForm((current) => ({ ...current, reassignReason: event.target.value }))} rows={3} placeholder="Reason for reassignment" />
               <WorkspaceButton type="button" disabled={actionLoading || !complaintForm.reassignTo || !complaintForm.reassignReason} onClick={() => runAction("reassign", () => apiClient.patch(`/complaints/${id}/reassign`, { adminId: complaintForm.reassignTo, reason: complaintForm.reassignReason }, authorizedConfig(session.accessToken)))}>
                 Reassign Complaint
               </WorkspaceButton>
@@ -269,7 +296,7 @@ export default function AdminCaseDetail() {
 
           {activeAction === "logCall" && (
             <div className="space-y-3">
-              <textarea value={complaintForm.callOutcome} onChange={(event) => setComplaintForm((current) => ({ ...current, callOutcome: event.target.value }))} rows={3} placeholder="Log call outcome" style={{ width: "100%", padding: "10px 14px", borderRadius: 10, border: `1px solid ${C.border}`, background: C.inp, color: C.t1, fontSize: 13, outline: "none" }} />
+              <WorkspaceTextArea value={complaintForm.callOutcome} onChange={(event) => setComplaintForm((current) => ({ ...current, callOutcome: event.target.value }))} rows={3} placeholder="Log call outcome" />
               <WorkspaceButton type="button" disabled={actionLoading || !complaintForm.callOutcome} onClick={() => runAction("logCall", () => apiClient.patch(`/complaints/${id}/log-call`, { callOutcome: complaintForm.callOutcome }, authorizedConfig(session.accessToken)))}>
                 Log Outcome
               </WorkspaceButton>
@@ -278,7 +305,7 @@ export default function AdminCaseDetail() {
 
           {activeAction === "resolve" && (
             <div className="space-y-3">
-              <textarea value={complaintForm.resolutionSummary} onChange={(event) => setComplaintForm((current) => ({ ...current, resolutionSummary: event.target.value }))} rows={3} placeholder="Resolution summary" style={{ width: "100%", padding: "10px 14px", borderRadius: 10, border: `1px solid ${C.border}`, background: C.inp, color: C.t1, fontSize: 13, outline: "none" }} />
+              <WorkspaceTextArea value={complaintForm.resolutionSummary} onChange={(event) => setComplaintForm((current) => ({ ...current, resolutionSummary: event.target.value }))} rows={3} placeholder="Resolution summary" />
               <WorkspaceButton type="button" disabled={actionLoading || !complaintForm.resolutionSummary} onClick={() => runAction("resolve", () => apiClient.patch(`/complaints/${id}/resolve`, { resolutionSummary: complaintForm.resolutionSummary, resolutionDocs: [] }, authorizedConfig(session.accessToken)))}>
                 Resolve Complaint
               </WorkspaceButton>
@@ -287,7 +314,7 @@ export default function AdminCaseDetail() {
 
           {activeAction === "escalate" && (
             <div className="space-y-3">
-              <textarea value={complaintForm.escalationPurpose} onChange={(event) => setComplaintForm((current) => ({ ...current, escalationPurpose: event.target.value }))} rows={3} placeholder="Escalation purpose" style={{ width: "100%", padding: "10px 14px", borderRadius: 10, border: `1px solid ${C.border}`, background: C.inp, color: C.t1, fontSize: 13, outline: "none" }} />
+              <WorkspaceTextArea value={complaintForm.escalationPurpose} onChange={(event) => setComplaintForm((current) => ({ ...current, escalationPurpose: event.target.value }))} rows={3} placeholder="Escalation purpose" />
               <WorkspaceButton type="button" disabled={actionLoading || !complaintForm.escalationPurpose} onClick={() => runAction("escalate", () => apiClient.patch(`/complaints/${id}/escalate`, { purpose: complaintForm.escalationPurpose }, authorizedConfig(session.accessToken)))}>
                 Create Linked Meeting
               </WorkspaceButton>
@@ -296,7 +323,7 @@ export default function AdminCaseDetail() {
 
           {activeAction === "reopen" && (
             <div className="space-y-3">
-              <textarea value={complaintForm.reopenReason} onChange={(event) => setComplaintForm((current) => ({ ...current, reopenReason: event.target.value }))} rows={3} placeholder="Reason to reopen" style={{ width: "100%", padding: "10px 14px", borderRadius: 10, border: `1px solid ${C.border}`, background: C.inp, color: C.t1, fontSize: 13, outline: "none" }} />
+              <WorkspaceTextArea value={complaintForm.reopenReason} onChange={(event) => setComplaintForm((current) => ({ ...current, reopenReason: event.target.value }))} rows={3} placeholder="Reason to reopen" />
               <WorkspaceButton type="button" disabled={actionLoading || !complaintForm.reopenReason} onClick={() => runAction("reopen", () => apiClient.patch(`/complaints/${id}/reopen`, { reason: complaintForm.reopenReason }, authorizedConfig(session.accessToken)))}>
                 Reopen Complaint
               </WorkspaceButton>
@@ -305,7 +332,7 @@ export default function AdminCaseDetail() {
 
           {activeAction === "close" && (
             <div className="space-y-3">
-              <textarea value={complaintForm.closeNote} onChange={(event) => setComplaintForm((current) => ({ ...current, closeNote: event.target.value }))} rows={3} placeholder="Closure note" style={{ width: "100%", padding: "10px 14px", borderRadius: 10, border: `1px solid ${C.border}`, background: C.inp, color: C.t1, fontSize: 13, outline: "none" }} />
+              <WorkspaceTextArea value={complaintForm.closeNote} onChange={(event) => setComplaintForm((current) => ({ ...current, closeNote: event.target.value }))} rows={3} placeholder="Closure note" />
               <WorkspaceButton type="button" disabled={actionLoading || !complaintForm.closeNote} onClick={() => runAction("close", () => apiClient.patch(`/complaints/${id}/close`, { note: complaintForm.closeNote }, authorizedConfig(session.accessToken)))}>
                 Close Complaint
               </WorkspaceButton>

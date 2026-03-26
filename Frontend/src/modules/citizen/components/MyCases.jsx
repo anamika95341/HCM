@@ -197,7 +197,7 @@ export default function MyCases() {
                               </td>
                               <td className="px-4 py-4 text-sm" style={{ color: C.t2 }}>{departmentLabel}</td>
                               <td className="px-4 py-4">
-                                <WorkspaceBadge>{status.label}</WorkspaceBadge>
+                                <WorkspaceBadge status={status.value}>{status.label}</WorkspaceBadge>
                               </td>
                               <td className="px-4 py-4 text-sm" style={{ color: C.t2 }}>{item.currentOwner || "Pending"}</td>
                               <td className="px-4 py-4 text-sm" style={{ color: C.t2 }}>{referenceLabel}</td>
@@ -233,7 +233,7 @@ export default function MyCases() {
                               <h3 style={{ fontWeight: 700, color: C.t1 }}>{item.primaryTitle}</h3>
                             </div>
                             <div className="flex items-center gap-2">
-                              <WorkspaceBadge>{status.label}</WorkspaceBadge>
+                              <WorkspaceBadge status={status.value}>{status.label}</WorkspaceBadge>
                             </div>
                           </div>
 

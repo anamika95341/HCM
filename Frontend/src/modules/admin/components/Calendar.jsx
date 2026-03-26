@@ -3,7 +3,7 @@ import { ChevronLeft, ChevronRight, X, Calendar as CalendarIcon } from "lucide-r
 import { apiClient, authorizedConfig } from "../../../shared/api/client.js";
 import { useAuth } from "../../../shared/auth/AuthContext.jsx";
 import { usePortalTheme } from "../../../shared/theme/portalTheme.jsx";
-import { WorkspaceButton, WorkspaceCard, WorkspaceInput, WorkspacePage, WorkspaceSectionHeader, WorkspaceSelect } from "../../../shared/components/WorkspaceUI.jsx";
+import { WorkspaceButton, WorkspaceCard, WorkspaceCardHeader, WorkspaceEmptyState, WorkspaceInput, WorkspacePage, WorkspaceSectionHeader, WorkspaceTabs } from "../../../shared/components/WorkspaceUI.jsx";
 
 const VIEW_OPTIONS = ["month", "week", "day"];
 const DAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
@@ -127,7 +127,8 @@ function Modal({ item, mode, editForm, setEditForm, onClose, onSave, onModeChang
       {/* Modal */}
       <div className="fixed inset-0 z-50 flex  sm:items-center justify-center overflow-y-auto">
         <div 
-          className="w-full max-w-2xl bg-white rounded-t-3xl sm:rounded-2xl shadow-2xl border border-gray-200 overflow-hidden animate-in slide-in-from-bottom-5 sm:zoom-in-95 fade-in duration-300"
+          className="w-full max-w-2xl rounded-t-3xl sm:rounded-2xl overflow-hidden animate-in slide-in-from-bottom-5 sm:zoom-in-95 fade-in duration-300"
+          style={{ background: C.card, border: `1px solid ${C.border}`, boxShadow: "0 24px 80px rgba(15,23,42,0.18)" }}
           onClick={(e) => e.stopPropagation()}
         >
           
@@ -158,23 +159,15 @@ function Modal({ item, mode, editForm, setEditForm, onClose, onSave, onModeChang
           </div>
 
           {/* Tabs */}
-          <div className="flex border-b sticky top-0 z-10" style={{ borderColor: C.border, background: C.card }}>
-            <button
-              type="button"
-              onClick={() => onModeChange("details")}
-              className="flex-1 px-4 sm:px-6 py-3 sm:py-4 font-semibold text-sm border-b-2 transition-all duration-200"
-              style={mode === "details" ? { borderColor: C.purple, color: C.purple, background: C.bgElevated } : { borderColor: "transparent", color: C.t2, background: "transparent" }}
-            >
-              Details
-            </button>
-            <button
-              type="button"
-              onClick={() => onModeChange("edit")}
-              className="flex-1 px-4 sm:px-6 py-3 sm:py-4 font-semibold text-sm border-b-2 transition-all duration-200"
-              style={mode === "edit" ? { borderColor: C.purple, color: C.purple, background: C.bgElevated } : { borderColor: "transparent", color: C.t2, background: "transparent" }}
-            >
-              Edit
-            </button>
+          <div style={{ padding: "14px 20px", borderBottom: `1px solid ${C.border}`, background: C.card }}>
+            <WorkspaceTabs
+              items={[
+                { id: "details", label: "Details" },
+                { id: "edit", label: "Edit" },
+              ]}
+              value={mode}
+              onChange={onModeChange}
+            />
           </div>
 
           {/* Content */}
@@ -183,17 +176,17 @@ function Modal({ item, mode, editForm, setEditForm, onClose, onSave, onModeChang
               <div className="space-y-8 animate-in fade-in duration-200">
                 <div className="grid sm:grid-cols-2 gap-6 sm:gap-8">
                   <div>
-                    <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">Location</p>
-                    <p className="text-base sm:text-lg text-gray-900 font-medium break-words">{item.location || "Location pending"}</p>
+                    <p style={{ fontSize: 11, fontWeight: 700, color: C.t3, textTransform: "uppercase", letterSpacing: ".1em", marginBottom: 12 }}>Location</p>
+                    <p style={{ fontSize: 16, color: C.t1, fontWeight: 600 }} className="break-words">{item.location || "Location pending"}</p>
                   </div>
                   <div>
-                    <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">Source</p>
-                    <p className="text-base sm:text-lg text-gray-900 font-medium">{item.source}</p>
+                    <p style={{ fontSize: 11, fontWeight: 700, color: C.t3, textTransform: "uppercase", letterSpacing: ".1em", marginBottom: 12 }}>Source</p>
+                    <p style={{ fontSize: 16, color: C.t1, fontWeight: 600 }}>{item.source}</p>
                   </div>
                 </div>
                 <div>
-                  <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">Description</p>
-                  <p className="text-gray-700 leading-relaxed text-sm sm:text-base">{item.details}</p>
+                  <p style={{ fontSize: 11, fontWeight: 700, color: C.t3, textTransform: "uppercase", letterSpacing: ".1em", marginBottom: 12 }}>Description</p>
+                  <p style={{ color: C.t2, lineHeight: 1.75, fontSize: 14 }}>{item.details}</p>
                 </div>
               </div>
             )}
@@ -207,7 +200,7 @@ function Modal({ item, mode, editForm, setEditForm, onClose, onSave, onModeChang
                 className="space-y-5 sm:space-y-6 animate-in fade-in duration-200"
               >
                 <div>
-                  <label className="block text-xs sm:text-sm font-semibold text-gray-900 mb-2 sm:mb-3">Title</label>
+                  <label style={{ display: "block", fontSize: 12, fontWeight: 700, color: C.t2, marginBottom: 10 }}>Title</label>
                   <input
                     value={editForm.title}
                     onChange={(event) => setEditForm((current) => ({ ...current, title: event.target.value }))}
@@ -217,7 +210,7 @@ function Modal({ item, mode, editForm, setEditForm, onClose, onSave, onModeChang
                 </div>
 
                 <div>
-                  <label className="block text-xs sm:text-sm font-semibold text-gray-900 mb-2 sm:mb-3">Description</label>
+                  <label style={{ display: "block", fontSize: 12, fontWeight: 700, color: C.t2, marginBottom: 10 }}>Description</label>
                   <textarea
                     value={editForm.details}
                     onChange={(event) => setEditForm((current) => ({ ...current, details: event.target.value }))}
@@ -229,7 +222,7 @@ function Modal({ item, mode, editForm, setEditForm, onClose, onSave, onModeChang
 
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
                   <div>
-                    <label className="block text-xs sm:text-sm font-semibold text-gray-900 mb-2 sm:mb-3">Date</label>
+                    <label style={{ display: "block", fontSize: 12, fontWeight: 700, color: C.t2, marginBottom: 10 }}>Date</label>
                     <input
                       type="date"
                       value={editForm.meetingDate}
@@ -238,7 +231,7 @@ function Modal({ item, mode, editForm, setEditForm, onClose, onSave, onModeChang
                     />
                   </div>
                   <div>
-                    <label className="block text-xs sm:text-sm font-semibold text-gray-900 mb-2 sm:mb-3">Start Time</label>
+                    <label style={{ display: "block", fontSize: 12, fontWeight: 700, color: C.t2, marginBottom: 10 }}>Start Time</label>
                     <input
                       type="time"
                       value={editForm.startTime}
@@ -247,7 +240,7 @@ function Modal({ item, mode, editForm, setEditForm, onClose, onSave, onModeChang
                     />
                   </div>
                   <div>
-                    <label className="block text-xs sm:text-sm font-semibold text-gray-900 mb-2 sm:mb-3">End Time</label>
+                    <label style={{ display: "block", fontSize: 12, fontWeight: 700, color: C.t2, marginBottom: 10 }}>End Time</label>
                     <input
                       type="time"
                       value={editForm.endTime}
@@ -258,7 +251,7 @@ function Modal({ item, mode, editForm, setEditForm, onClose, onSave, onModeChang
                 </div>
 
                 <div>
-                  <label className="block text-xs sm:text-sm font-semibold text-gray-900 mb-2 sm:mb-3">Location</label>
+                  <label style={{ display: "block", fontSize: 12, fontWeight: 700, color: C.t2, marginBottom: 10 }}>Location</label>
                   <input
                     value={editForm.location}
                     onChange={(event) => setEditForm((current) => ({ ...current, location: event.target.value }))}
@@ -268,22 +261,12 @@ function Modal({ item, mode, editForm, setEditForm, onClose, onSave, onModeChang
                 </div>
 
                 <div className="pt-4 flex gap-3">
-                  <button
-                    type="button"
-                    onClick={onClose}
-                    className="flex-1 px-4 sm:px-6 py-2 sm:py-3 font-semibold rounded-lg transition-colors text-sm sm:text-base"
-                    style={{ border: `1px solid ${C.border}`, color: C.t2, background: "transparent" }}
-                  >
+                  <WorkspaceButton type="button" variant="ghost" onClick={onClose} style={{ flex: 1 }}>
                     Cancel
-                  </button>
-                  <button
-                    type="submit"
-                    disabled={saving}
-                    className="flex-1 px-4 sm:px-6 py-2 sm:py-3 text-white font-semibold rounded-lg transition-colors text-sm sm:text-base"
-                    style={{ background: saving ? C.t3 : C.purple }}
-                  >
+                  </WorkspaceButton>
+                  <WorkspaceButton type="submit" disabled={saving} style={{ flex: 1 }}>
                     {saving ? "Saving..." : "Save Changes"}
-                  </button>
+                  </WorkspaceButton>
                 </div>
               </form>
             )}
@@ -434,38 +417,34 @@ export default function Calendar() {
   return (
     <WorkspacePage width={1280}>
       <WorkspaceSectionHeader eyebrow="Admin Workspace" title="Calendar" subtitle="Scheduled and VIP meetings aligned to the admin workflow." />
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-6 mb-8">
-        <div style={{ fontSize: 24, fontWeight: 700, color: C.t1 }}>
-          {view === "month"
-            ? `${MONTHS[cursorDate.getMonth()]} ${cursorDate.getFullYear()}`
-            : view === "week"
-            ? `Week of ${startOfWeek(cursorDate).toLocaleDateString()}`
-            : cursorDate.toLocaleDateString(undefined, { weekday: "long", month: "long", day: "numeric", year: "numeric" })}
-        </div>
 
-        <div className="portal-panel flex flex-wrap items-center gap-3 p-1" style={{ background: C.card, borderColor: C.border }}>
-          <WorkspaceButton type="button" variant="ghost" onClick={() => shiftCursor(-1)} style={{ padding: 8 }} aria-label="Previous">
-            <ChevronLeft size={20} />
-          </WorkspaceButton>
-          <div className="w-px h-6" style={{ background: C.border }}></div>
-          <WorkspaceButton type="button" variant="ghost" onClick={() => setCursorDate(startOfDay(new Date()))}>Today</WorkspaceButton>
-          <div className="w-px h-6" style={{ background: C.border }}></div>
-          <WorkspaceSelect
-            value={view}
-            onChange={(e) => setView(e.target.value)}
-            style={{ width: "auto", padding: "8px 12px", border: "none", background: "transparent" }}
-          >
-                {VIEW_OPTIONS.map((option) => (
-                  <option key={option} value={option}>
-                    {option.charAt(0).toUpperCase() + option.slice(1)}
-                  </option>
-                ))}
-          </WorkspaceSelect>
-          <div className="w-px h-6" style={{ background: C.border }}></div>
-          <WorkspaceButton type="button" variant="ghost" onClick={() => shiftCursor(1)} style={{ padding: 8 }} aria-label="Next">
-            <ChevronRight size={20} />
-          </WorkspaceButton>
-        </div>
+      <div style={{ marginBottom: 20 }}>
+        <WorkspaceCard>
+          <WorkspaceCardHeader
+            title={view === "month"
+              ? `${MONTHS[cursorDate.getMonth()]} ${cursorDate.getFullYear()}`
+              : view === "week"
+              ? `Week of ${startOfWeek(cursorDate).toLocaleDateString()}`
+              : cursorDate.toLocaleDateString(undefined, { weekday: "long", month: "long", day: "numeric", year: "numeric" })}
+            subtitle="Navigate the calendar and switch between month, week, and day views."
+            action={
+              <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 10 }}>
+                <WorkspaceTabs
+                  items={VIEW_OPTIONS.map((option) => ({ id: option, label: option.charAt(0).toUpperCase() + option.slice(1) }))}
+                  value={view}
+                  onChange={setView}
+                />
+                <WorkspaceButton type="button" variant="ghost" onClick={() => shiftCursor(-1)} aria-label="Previous">
+                  <ChevronLeft size={16} />
+                </WorkspaceButton>
+                <WorkspaceButton type="button" variant="ghost" onClick={() => setCursorDate(startOfDay(new Date()))}>Today</WorkspaceButton>
+                <WorkspaceButton type="button" variant="ghost" onClick={() => shiftCursor(1)} aria-label="Next">
+                  <ChevronRight size={16} />
+                </WorkspaceButton>
+              </div>
+            }
+          />
+        </WorkspaceCard>
       </div>
 
         {error && (
@@ -475,9 +454,7 @@ export default function Calendar() {
         )}
 
         {loading ? (
-          <WorkspaceCard style={{ textAlign: "center" }}>
-            <p style={{ color: C.t2, fontWeight: 500 }}>Loading calendar…</p>
-          </WorkspaceCard>
+          <WorkspaceEmptyState title="Loading calendar..." />
         ) : (
           <div className="grid grid-cols-1 xl:grid-cols-[1fr_320px] gap-6">
             

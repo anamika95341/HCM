@@ -27,24 +27,23 @@ function SuccessModal({ open, title, message, onClose }) {
   if (!open) return null;
   return (
     <div className="fixed inset-0 z-[120] flex items-center justify-center px-4 bg-black/40 backdrop-blur-sm">
-      <div className="w-full max-w-md bg-white rounded-2xl shadow-2xl border border-gray-200 overflow-hidden animate-in fade-in zoom-in-95 duration-300">
+      <div
+        className="w-full max-w-md rounded-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-300"
+        style={{ background: C.card, border: `1px solid ${C.border}`, boxShadow: "0 24px 80px rgba(15,23,42,0.18)" }}
+      >
         <div className="px-6 py-6 border-b" style={{ background: C.bgElevated, borderColor: C.border }}>
           <div className="flex items-center justify-center mb-4">
             <div className="h-16 w-16 rounded-full flex items-center justify-center" style={{ background: `${C.mint}20` }}>
               <CheckCircle size={32} style={{ color: C.mint }} />
             </div>
           </div>
-          <h3 className="text-lg font-bold text-gray-900 text-center">{title}</h3>
+          <h3 className="text-lg font-bold text-center" style={{ color: C.t1 }}>{title}</h3>
         </div>
         <div className="px-6 py-6">
-          <p className="text-sm text-gray-600 text-center leading-6">{message}</p>
-          <button
-            onClick={onClose}
-            className="w-full mt-6 px-6 py-3 text-white font-semibold rounded-lg transition-colors"
-            style={{ background: C.purple }}
-          >
+          <p className="text-sm text-center leading-6" style={{ color: C.t3 }}>{message}</p>
+          <WorkspaceButton onClick={onClose} style={{ width: "100%", marginTop: 24 }}>
             Continue
-          </button>
+          </WorkspaceButton>
         </div>
       </div>
     </div>

@@ -262,7 +262,7 @@ export default function AdminCases() {
                       <td className="px-6 py-4 text-sm" style={{ color: C.t3, borderBottom: `1px solid ${C.borderLight}` }}>{item.reference}</td>
                       <td className="px-6 py-4 text-sm" style={{ color: C.t3, borderBottom: `1px solid ${C.borderLight}` }}>{item.createdAt ? new Date(item.createdAt).toLocaleDateString("en-IN") : "-"}</td>
                       <td className="px-6 py-4 text-center" style={{ borderBottom: `1px solid ${C.borderLight}` }}>
-                        <WorkspaceBadge>{item.statusLabel}</WorkspaceBadge>
+                        <WorkspaceBadge status={item.status}>{item.statusLabel}</WorkspaceBadge>
                       </td>
                       <td className="px-6 py-4 text-center" style={{ borderBottom: `1px solid ${C.borderLight}` }}>
                         <button

@@ -128,7 +128,7 @@ export default function DeoCalendarEvent() {
                     <p style={{ fontSize: 13, color: C.t3 }}>{meeting.mobile_number || meeting.email || "No contact available"}</p>
                     {meeting.admin_comments && <p style={{ fontSize: 12, color: C.t3, marginTop: 10 }}>{meeting.admin_comments}</p>}
                   </div>
-                  <WorkspaceBadge>Verification Pending</WorkspaceBadge>
+                  <WorkspaceBadge status="verification_pending">Verification Pending</WorkspaceBadge>
                 </div>
 
                 <div className="mt-5 flex flex-wrap gap-3">

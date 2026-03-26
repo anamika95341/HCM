@@ -1,10 +1,20 @@
 import { usePortalTheme } from "../theme/portalTheme.jsx";
 
+// Derive a semantic color from a status string
+function statusColor(status, C) {
+  if (!status) return C.purple;
+  const s = status.toLowerCase().replace(/[_\s-]/g, "");
+  if (/^(verified|resolved|completed|scheduled|active|accepted|approved)$/.test(s)) return C.mint;
+  if (/^(rejected|cancelled|notverified|locked|failed)$/.test(s)) return C.danger;
+  if (/^(pending|submitted|inreview|assigned|verificationpending|deptcontactidentified|callscheduled|followup|escalatedtomeeting|escalated)$/.test(s)) return C.warn;
+  return C.purple;
+}
+
 export function WorkspacePage({ children, width = 1240 }) {
   const { C } = usePortalTheme();
   return (
     <div style={{ minHeight: "100%", background: C.bg }}>
-      <div style={{ maxWidth: width, margin: "0 auto", padding: "24px" }}>
+      <div style={{ maxWidth: width, margin: "0 auto", padding: "28px 24px" }}>
         {children}
       </div>
     </div>
@@ -14,25 +24,31 @@ export function WorkspacePage({ children, width = 1240 }) {
 export function WorkspaceSectionHeader({ eyebrow, title, subtitle, action, icon }) {
   const { C } = usePortalTheme();
   return (
-    <div style={{ marginBottom: 24 }}>
+    <div style={{ marginBottom: 28 }}>
       {eyebrow && (
         <div style={{ fontSize: 11, fontWeight: 700, color: C.t3, textTransform: "uppercase", letterSpacing: ".18em", marginBottom: 10 }}>
           {eyebrow}
         </div>
       )}
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 16, flexWrap: "wrap" }}>
-        <div style={{ display: "flex", alignItems: "flex-start", gap: 14 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
           {icon ? (
-            <div style={{ width: 44, height: 44, borderRadius: 12, background: C.purpleDim, display: "flex", alignItems: "center", justifyContent: "center", color: C.purple, flexShrink: 0 }}>
+            <div style={{
+              width: 46, height: 46, borderRadius: 13,
+              background: C.purpleDim,
+              display: "flex", alignItems: "center", justifyContent: "center",
+              color: C.purple, flexShrink: 0,
+              border: `1px solid ${C.purple}22`,
+            }}>
               {icon}
             </div>
           ) : null}
           <div>
-            <h1 style={{ margin: 0, fontSize: 28, lineHeight: 1.15, fontWeight: 600, color: C.t1 }}>{title}</h1>
-            {subtitle && <p style={{ margin: "6px 0 0", fontSize: 12, lineHeight: 1.7, color: C.t3 }}>{subtitle}</p>}
+            <h1 style={{ margin: 0, fontSize: 22, lineHeight: 1.2, fontWeight: 700, color: C.t1, letterSpacing: "-0.02em" }}>{title}</h1>
+            {subtitle && <p style={{ margin: "5px 0 0", fontSize: 13, lineHeight: 1.6, color: C.t3 }}>{subtitle}</p>}
           </div>
         </div>
-        {action}
+        {action && <div style={{ flexShrink: 0 }}>{action}</div>}
       </div>
     </div>
   );
@@ -44,9 +60,11 @@ export function WorkspaceCard({ children, style }) {
     <div
       style={{
         background: C.card,
-        borderRadius: 12,
+        borderRadius: 14,
         border: `1px solid ${C.border}`,
         padding: 24,
+        boxShadow: "0 1px 4px rgba(0,0,0,0.05), 0 1px 2px rgba(0,0,0,0.04)",
+        transition: "border-color 0.15s ease, box-shadow 0.15s ease",
         ...style,
       }}
     >
@@ -58,10 +76,14 @@ export function WorkspaceCard({ children, style }) {
 export function WorkspaceCardHeader({ title, subtitle, action }) {
   const { C } = usePortalTheme();
   return (
-    <div style={{ display: "flex", justifyContent: "space-between", alignItems: subtitle ? "flex-start" : "center", gap: 12, paddingBottom: 16, marginBottom: 18, borderBottom: `1px solid ${C.border}` }}>
+    <div style={{
+      display: "flex", justifyContent: "space-between", alignItems: subtitle ? "flex-start" : "center",
+      gap: 12, paddingBottom: 16, marginBottom: 20,
+      borderBottom: `1px solid ${C.borderLight}`,
+    }}>
       <div>
-        <div style={{ fontSize: 14, fontWeight: 600, color: C.t1 }}>{title}</div>
-        {subtitle && <div style={{ fontSize: 12, color: C.t3, marginTop: 4 }}>{subtitle}</div>}
+        <div style={{ fontSize: 14, fontWeight: 700, color: C.t1, letterSpacing: "-0.01em" }}>{title}</div>
+        {subtitle && <div style={{ fontSize: 12, color: C.t3, marginTop: 3 }}>{subtitle}</div>}
       </div>
       {action}
     </div>
@@ -71,7 +93,13 @@ export function WorkspaceCardHeader({ title, subtitle, action }) {
 export function WorkspaceTabs({ items, value, onChange }) {
   const { C } = usePortalTheme();
   return (
-    <div style={{ display: "inline-flex", gap: 2, padding: 4, borderRadius: 999, background: C.bgElevated, boxShadow: "inset 0 1px 3px rgba(0,0,0,0.08)", flexWrap: "wrap" }}>
+    <div style={{
+      display: "inline-flex", gap: 2, padding: "4px",
+      borderRadius: 12, background: C.bgElevated,
+      border: `1px solid ${C.border}`,
+      boxShadow: "inset 0 1px 3px rgba(0,0,0,0.06)",
+      flexWrap: "wrap",
+    }}>
       {items.map((item) => {
         const active = item.id === value;
         return (
@@ -81,19 +109,33 @@ export function WorkspaceTabs({ items, value, onChange }) {
             onClick={() => onChange(item.id)}
             style={{
               border: "none",
-              borderRadius: 999,
-              padding: "8px 12px",
+              borderRadius: 9,
+              padding: "7px 13px",
               cursor: "pointer",
               background: active ? C.card : "transparent",
-              color: active ? C.t1 : C.t3,
+              color: active ? C.purple : C.t3,
               fontSize: 12,
-              fontWeight: 600,
-              boxShadow: active ? "0 1px 4px rgba(0,0,0,0.08)" : "none",
-              transition: "all 0.2s ease",
+              fontWeight: active ? 700 : 500,
+              boxShadow: active ? "0 1px 4px rgba(0,0,0,0.1)" : "none",
+              transition: "all 0.18s ease",
+              display: "flex",
+              alignItems: "center",
+              gap: 6,
             }}
           >
             {item.label}
-            {typeof item.count === "number" ? ` (${item.count})` : ""}
+            {typeof item.count === "number" && (
+              <span style={{
+                display: "inline-flex", alignItems: "center", justifyContent: "center",
+                minWidth: 18, height: 18, padding: "0 5px",
+                borderRadius: 999, fontSize: 10, fontWeight: 700,
+                background: active ? C.purpleDim : `${C.t3}20`,
+                color: active ? C.purple : C.t3,
+                transition: "all 0.18s ease",
+              }}>
+                {item.count}
+              </span>
+            )}
           </button>
         );
       })}
@@ -103,7 +145,7 @@ export function WorkspaceTabs({ items, value, onChange }) {
 
 export function WorkspaceStatGrid({ items }) {
   return (
-    <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 16 }}>
+    <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 14 }}>
       {items.map((item) => (
         <WorkspaceStatCard key={item.label} {...item} />
       ))}
@@ -111,14 +153,36 @@ export function WorkspaceStatGrid({ items }) {
   );
 }
 
-export function WorkspaceStatCard({ label, value, accent }) {
+export function WorkspaceStatCard({ label, value, accent, icon }) {
   const { C } = usePortalTheme();
   const color = accent || C.purple;
   return (
-    <WorkspaceCard style={{ padding: 18 }}>
-      <div style={{ fontSize: 11, fontWeight: 700, color: C.t3, textTransform: "uppercase", letterSpacing: ".08em" }}>{label}</div>
-      <div style={{ marginTop: 8, fontSize: 28, fontWeight: 700, color }}>{value}</div>
-    </WorkspaceCard>
+    <div style={{
+      background: C.card,
+      borderRadius: 14,
+      border: `1px solid ${C.border}`,
+      padding: "18px 20px",
+      borderLeft: `3px solid ${color}`,
+      boxShadow: "0 1px 4px rgba(0,0,0,0.05)",
+      display: "flex",
+      flexDirection: "column",
+      gap: 10,
+    }}>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+        <div style={{ fontSize: 11, fontWeight: 700, color: C.t3, textTransform: "uppercase", letterSpacing: ".08em" }}>{label}</div>
+        {icon && (
+          <div style={{
+            width: 30, height: 30, borderRadius: 8,
+            background: `${color}15`,
+            display: "flex", alignItems: "center", justifyContent: "center",
+            color,
+          }}>
+            {icon}
+          </div>
+        )}
+      </div>
+      <div style={{ fontSize: 30, fontWeight: 800, color, lineHeight: 1, letterSpacing: "-0.03em" }}>{value}</div>
+    </div>
   );
 }
 
@@ -129,13 +193,14 @@ export function WorkspaceInput(props) {
       {...props}
       style={{
         width: "100%",
-        padding: "10px 14px",
+        padding: "9px 13px",
         borderRadius: 10,
         border: `1px solid ${C.border}`,
         background: C.inp,
         color: C.t1,
         fontSize: 13,
         outline: "none",
+        transition: "border-color 0.15s ease",
         ...(props.style || {}),
       }}
     />
@@ -149,13 +214,14 @@ export function WorkspaceSelect(props) {
       {...props}
       style={{
         width: "100%",
-        padding: "10px 14px",
+        padding: "9px 13px",
         borderRadius: 10,
         border: `1px solid ${C.border}`,
         background: C.inp,
         color: C.t1,
         fontSize: 13,
         outline: "none",
+        transition: "border-color 0.15s ease",
         ...(props.style || {}),
       }}
     />
@@ -165,12 +231,18 @@ export function WorkspaceSelect(props) {
 export function WorkspaceButton({ variant = "primary", children, style, ...props }) {
   const { C } = usePortalTheme();
   const variants = {
-    primary: { background: C.purple, color: "#fff", border: "none" },
-    ghost: { background: C.bgElevated, color: C.t2, border: `1px solid ${C.border}` },
-    outline: { background: "transparent", color: C.purple, border: `1px solid ${C.purple}` },
-    danger: { background: "transparent", color: C.danger, border: `1px solid ${C.danger}` },
+    primary: {
+      background: C.purple, color: "#fff", border: "none",
+      boxShadow: `0 1px 3px ${C.purple}40, 0 1px 2px ${C.purple}20`,
+    },
+    ghost: {
+      background: C.bgElevated, color: C.t2, border: `1px solid ${C.border}`,
+      boxShadow: "0 1px 2px rgba(0,0,0,0.04)",
+    },
+    outline: { background: "transparent", color: C.purple, border: `1px solid ${C.purple}`, boxShadow: "none" },
+    danger: { background: "transparent", color: C.danger, border: `1px solid ${C.danger}`, boxShadow: "none" },
   };
-  const current = variants[variant];
+  const current = variants[variant] || variants.primary;
   return (
     <button
       {...props}
@@ -178,13 +250,15 @@ export function WorkspaceButton({ variant = "primary", children, style, ...props
         display: "inline-flex",
         alignItems: "center",
         justifyContent: "center",
-        gap: 8,
-        padding: "10px 16px",
+        gap: 7,
+        padding: "9px 16px",
         borderRadius: 10,
         fontSize: 13,
         fontWeight: 600,
         cursor: props.disabled ? "not-allowed" : "pointer",
-        opacity: props.disabled ? 0.6 : 1,
+        opacity: props.disabled ? 0.55 : 1,
+        transition: "opacity 0.15s ease, box-shadow 0.15s ease, background 0.15s ease",
+        letterSpacing: "-0.01em",
         ...current,
         ...style,
       }}
@@ -194,22 +268,61 @@ export function WorkspaceButton({ variant = "primary", children, style, ...props
   );
 }
 
-export function WorkspaceBadge({ children, color }) {
+export function WorkspaceBadge({ children, color, status }) {
   const { C } = usePortalTheme();
-  const tone = color || C.purple;
+  // Auto-color from status string if no explicit color given
+  const tone = color || (status ? statusColor(status, C) : C.purple);
   return (
-    <span style={{ display: "inline-block", padding: "4px 10px", borderRadius: 999, fontSize: 11, fontWeight: 700, background: `${tone}20`, color: tone }}>
+    <span style={{
+      display: "inline-flex", alignItems: "center",
+      padding: "3px 10px", borderRadius: 999,
+      fontSize: 11, fontWeight: 700,
+      background: `${tone}18`,
+      color: tone,
+      border: `1px solid ${tone}28`,
+      letterSpacing: "0.01em",
+      whiteSpace: "nowrap",
+    }}>
       {children}
     </span>
   );
 }
 
-export function WorkspaceEmptyState({ title, subtitle }) {
+export function WorkspaceEmptyState({ title, subtitle, icon }) {
   const { C } = usePortalTheme();
   return (
-    <WorkspaceCard style={{ textAlign: "center" }}>
-      <div style={{ fontSize: 16, fontWeight: 600, color: C.t1 }}>{title}</div>
-      {subtitle && <div style={{ fontSize: 12, color: C.t3, marginTop: 8 }}>{subtitle}</div>}
-    </WorkspaceCard>
+    <div style={{
+      textAlign: "center",
+      padding: "48px 24px",
+      background: C.card,
+      borderRadius: 14,
+      border: `1.5px dashed ${C.border}`,
+      boxShadow: "0 1px 3px rgba(0,0,0,0.04)",
+    }}>
+      {icon && (
+        <div style={{
+          width: 48, height: 48, borderRadius: 14,
+          background: C.purpleDim, color: C.purple,
+          display: "flex", alignItems: "center", justifyContent: "center",
+          margin: "0 auto 16px",
+          border: `1px solid ${C.purple}20`,
+        }}>
+          {icon}
+        </div>
+      )}
+      {!icon && (
+        <div style={{
+          width: 48, height: 48, borderRadius: 14,
+          background: C.bgElevated, border: `1px solid ${C.border}`,
+          display: "flex", alignItems: "center", justifyContent: "center",
+          margin: "0 auto 16px",
+          color: C.t3, fontSize: 20,
+        }}>
+          ○
+        </div>
+      )}
+      <div style={{ fontSize: 14, fontWeight: 700, color: C.t1, letterSpacing: "-0.01em" }}>{title}</div>
+      {subtitle && <div style={{ fontSize: 12, color: C.t3, marginTop: 6, lineHeight: 1.6, maxWidth: 280, margin: "6px auto 0" }}>{subtitle}</div>}
+    </div>
   );
 }

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { CalendarLtrRegular, CheckmarkCircleRegular, ClipboardTaskRegular, StarRegular } from "@fluentui/react-icons";
+import { CalendarDays, Star, ClipboardList, CheckCircle2 } from "lucide-react";
 import { apiClient, authorizedConfig } from "../../shared/api/client.js";
 import { useAuth } from "../../shared/auth/AuthContext.jsx";
 import {
@@ -76,6 +76,7 @@ export default function MinisterDashboard() {
         eyebrow="Minister Workspace"
         title={`${session?.user?.firstName || "Minister"} Dashboard`}
         subtitle="Operational overview of scheduled meetings and VIP visibility from the minister backend module."
+        icon={<CalendarDays size={18} />}
         action={<WorkspaceButton onClick={() => navigate(PATHS.minister.calendar)}>Open Calendar</WorkspaceButton>}
       />
 
@@ -87,10 +88,10 @@ export default function MinisterDashboard() {
           <>
             <div style={{ marginBottom: 20 }}>
               <WorkspaceStatGrid items={[
-                { label: "Total Events", value: summary.total },
-                { label: "Upcoming", value: summary.upcoming },
-                { label: "Completed", value: summary.completed, accent: C.mint },
-                { label: "VIP Meetings", value: summary.vip, accent: C.warn },
+                { label: "Total Events", value: summary.total, icon: <ClipboardList size={16} /> },
+                { label: "Upcoming", value: summary.upcoming, icon: <CalendarDays size={16} /> },
+                { label: "Completed", value: summary.completed, accent: C.mint, icon: <CheckCircle2 size={16} /> },
+                { label: "VIP Meetings", value: summary.vip, accent: C.warn, icon: <Star size={16} /> },
               ]} />
             </div>
 

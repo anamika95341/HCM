@@ -384,7 +384,7 @@ export default function AdminMeeting() {
                     <h3 style={{ fontSize: 14, fontWeight: 700, color: C.t1, marginTop: 6 }}>{meeting.title}</h3>
                     <p style={{ fontSize: 13, color: C.t2, marginTop: 8 }}>{meeting.purpose}</p>
                   </div>
-                  <WorkspaceBadge>{statusLabel(meeting.status)}</WorkspaceBadge>
+                  <WorkspaceBadge status={meeting.status}>{statusLabel(meeting.status)}</WorkspaceBadge>
                 </div>
 
                 <div className="space-y-2" style={{ fontSize: 13, color: C.t2 }}>

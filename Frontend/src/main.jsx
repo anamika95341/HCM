@@ -1,4 +1,3 @@
-import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import './index.css'
 import App from './app/App.jsx'
@@ -7,16 +6,14 @@ import { PortalGlobalStyles, PortalThemeProvider } from './shared/theme/portalTh
 import { AuthProvider } from './shared/auth/AuthContext.jsx'
 import AppErrorBoundary from './shared/errors/AppErrorBoundary.jsx'
 createRoot(document.getElementById('root')).render(
-  <StrictMode>
-    <PortalThemeProvider>
-      <PortalGlobalStyles />
-      <AuthProvider>
-        <BrowserRouter>
-          <AppErrorBoundary>
-            <App />
-          </AppErrorBoundary>
-        </BrowserRouter>
-      </AuthProvider>
-    </PortalThemeProvider>
-  </StrictMode>,
+  <PortalThemeProvider>
+    <PortalGlobalStyles />
+    <AuthProvider>
+      <BrowserRouter>
+        <AppErrorBoundary>
+          <App />
+        </AppErrorBoundary>
+      </BrowserRouter>
+    </AuthProvider>
+  </PortalThemeProvider>,
 )

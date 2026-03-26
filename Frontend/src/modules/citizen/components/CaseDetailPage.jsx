@@ -107,7 +107,7 @@ export default function CaseDetailsPage() {
       />
 
       <div style={{ marginBottom: 24 }}>
-        <WorkspaceBadge>{citizenFacingStatus(caseData, itemType)}</WorkspaceBadge>
+        <WorkspaceBadge status={caseData?.status}>{citizenFacingStatus(caseData, itemType)}</WorkspaceBadge>
       </div>
 
         <div className="grid md:grid-cols-3 gap-6">

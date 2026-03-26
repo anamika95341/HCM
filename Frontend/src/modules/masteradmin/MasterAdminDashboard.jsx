@@ -1,11 +1,18 @@
 import { useEffect, useState } from "react";
-import { Shield, Users, UserCog, UserX } from "lucide-react";
+import { Shield, Users, UserCog, UserX, ArrowRight } from "lucide-react";
 import { Link } from "react-router-dom";
 import { apiClient, authorizedConfig } from "../../shared/api/client.js";
 import { useAuth } from "../../shared/auth/AuthContext.jsx";
 import { usePortalTheme } from "../../shared/theme/portalTheme.jsx";
 import { toSafeUserMessage } from "../../shared/security/text.js";
 import { PATHS } from "../../routes/paths.js";
+import {
+  WorkspacePage,
+  WorkspaceSectionHeader,
+  WorkspaceStatGrid,
+  WorkspaceCard,
+  WorkspaceCardHeader,
+} from "../../shared/components/WorkspaceUI.jsx";
 
 export default function MasterAdminDashboard() {
   const { C } = usePortalTheme();
@@ -28,62 +35,75 @@ export default function MasterAdminDashboard() {
     }
   }, [session?.accessToken]);
 
-  const cards = [
-    { label: "Active Admins", value: data?.activeAdmins ?? "-", icon: <UserCog size={18} color={C.purple} /> },
-    { label: "Pending Admins", value: data?.pendingAdmins ?? "-", icon: <Shield size={18} color={C.warn} /> },
-    { label: "Active DEOs", value: data?.activeDeos ?? "-", icon: <Users size={18} color={C.purple} /> },
-    { label: "Pending DEOs", value: data?.pendingDeos ?? "-", icon: <UserX size={18} color={C.warn} /> },
+  const statItems = [
+    { label: "Active Admins", value: data?.activeAdmins ?? "—", accent: C.purple, icon: <UserCog size={16} /> },
+    { label: "Pending Admins", value: data?.pendingAdmins ?? "—", accent: C.warn, icon: <Shield size={16} /> },
+    { label: "Active DEOs", value: data?.activeDeos ?? "—", accent: C.mint, icon: <Users size={16} /> },
+    { label: "Pending DEOs", value: data?.pendingDeos ?? "—", accent: C.warn, icon: <UserX size={16} /> },
+  ];
+
+  const quickLinks = [
+    { to: PATHS.masteradmin.createAdmin, label: "Create Admin", description: "Provision a new admin account" },
+    { to: PATHS.masteradmin.createDeo, label: "Create DEO", description: "Provision a new DEO account" },
+    { to: PATHS.masteradmin.manageAdmins, label: "Manage Admins", description: "Review and verify admin accounts" },
+    { to: PATHS.masteradmin.manageDeos, label: "Manage DEOs", description: "Review and verify DEO accounts" },
   ];
 
   return (
-    <div className="portal-page" style={{ padding: 24, display: "grid", gap: 18 }}>
-      <div>
-        <div style={{ fontSize: 11, fontWeight: 700, color: C.t3, textTransform: "uppercase", letterSpacing: ".18em" }}>Master Admin Workspace</div>
-        <h1 style={{ marginTop: 10, fontSize: 28, color: C.t1 }}>Access Control Dashboard</h1>
-        <p style={{ marginTop: 6, color: C.t3, fontSize: 13 }}>Provision admins and DEOs directly from the masteradmin sidebar and monitor pending verifications here.</p>
-        <div style={{ marginTop: 14, display: "flex", gap: 10, flexWrap: "wrap" }}>
-          <QuickLink C={C} to={PATHS.masteradmin.createAdmin}>Create Admin</QuickLink>
-          <QuickLink C={C} to={PATHS.masteradmin.createDeo}>Create DEO</QuickLink>
-          <QuickLink C={C} to={PATHS.masteradmin.manageAdmins}>Manage Admins</QuickLink>
-          <QuickLink C={C} to={PATHS.masteradmin.manageDeos}>Manage DEOs</QuickLink>
+    <WorkspacePage>
+      <WorkspaceSectionHeader
+        eyebrow="Master Admin Workspace"
+        title="Access Control Dashboard"
+        subtitle="Provision admins and DEOs, monitor pending verifications, and manage workspace access."
+        icon={<Shield size={20} />}
+      />
+
+      {error && (
+        <div style={{
+          marginBottom: 20, padding: "12px 16px",
+          borderRadius: 10, border: `1px solid ${C.danger}30`,
+          background: `${C.danger}08`, color: C.danger, fontSize: 13,
+        }}>
+          {error}
         </div>
+      )}
+
+      <div style={{ marginBottom: 24 }}>
+        <WorkspaceStatGrid items={statItems} />
       </div>
 
-      {error ? (
-        <div style={{ padding: 12, borderRadius: 10, border: `1px solid ${C.danger}33`, background: `${C.danger}12`, color: C.danger, fontSize: 12 }}>{error}</div>
-      ) : null}
-
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(4, minmax(0, 1fr))", gap: 16 }}>
-        {cards.map((card) => (
-          <div key={card.label} style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 16, padding: 18, boxShadow: "var(--portal-shadow)" }}>
-            <div style={{ width: 40, height: 40, borderRadius: 12, background: C.purpleDim, display: "flex", alignItems: "center", justifyContent: "center", marginBottom: 14 }}>
-              {card.icon}
-            </div>
-            <div style={{ fontSize: 24, fontWeight: 800, color: C.t1 }}>{card.value}</div>
-            <div style={{ marginTop: 6, fontSize: 12, color: C.t3 }}>{card.label}</div>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-function QuickLink({ C, to, children }) {
-  return (
-    <Link
-      to={to}
-      style={{
-        padding: "10px 14px",
-        borderRadius: 10,
-        border: `1px solid ${C.border}`,
-        background: C.card,
-        color: C.t1,
-        fontSize: 12,
-        fontWeight: 700,
-        textDecoration: "none",
-      }}
-    >
-      {children}
-    </Link>
+      <WorkspaceCard>
+        <WorkspaceCardHeader
+          title="Quick Actions"
+          subtitle="Manage access provisioning and user accounts"
+        />
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 12 }}>
+          {quickLinks.map((link) => (
+            <Link
+              key={link.to}
+              to={link.to}
+              style={{
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+                padding: "14px 16px",
+                borderRadius: 11,
+                border: `1px solid ${C.border}`,
+                background: C.bg,
+                textDecoration: "none",
+                transition: "border-color 0.15s ease, box-shadow 0.15s ease",
+                gap: 10,
+              }}
+            >
+              <div>
+                <div style={{ fontSize: 13, fontWeight: 700, color: C.t1, letterSpacing: "-0.01em" }}>{link.label}</div>
+                <div style={{ fontSize: 11, color: C.t3, marginTop: 3 }}>{link.description}</div>
+              </div>
+              <ArrowRight size={15} style={{ color: C.purple, flexShrink: 0 }} />
+            </Link>
+          ))}
+        </div>
+      </WorkspaceCard>
+    </WorkspacePage>
   );
 }
