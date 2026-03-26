@@ -10,11 +10,11 @@ body {
 
 .portal-page-wrap {
   width: 100%;
-  padding: 24px;
+  padding: 28px 24px 36px;
 }
 
 .portal-page-header {
-  margin-bottom: 24px;
+  margin-bottom: 28px;
 }
 
 .portal-page-header h1 {
@@ -35,9 +35,10 @@ body {
 .portal-hero {
   margin-bottom: 24px;
   padding: 24px;
-  background: var(--portal-card);
+  background: linear-gradient(180deg, var(--portal-card) 0%, var(--portal-bg-elevated) 100%);
   border: 1px solid var(--portal-border);
-  border-radius: 12px;
+  border-radius: 16px;
+  box-shadow: var(--portal-shadow-sm);
 }
 
 .portal-hero-subtitle {
@@ -48,7 +49,23 @@ body {
 }
 
 .portal-panel {
-  background: var(--portal-card);
+  background: linear-gradient(180deg, var(--portal-card) 0%, var(--portal-bg-elevated) 100%);
   border: 1px solid var(--portal-border);
-  border-radius: 12px;
+  border-radius: 16px;
+  box-shadow: var(--portal-shadow-sm);
+}
+
+.portal-soft-divider {
+  height: 1px;
+  background: linear-gradient(90deg, transparent 0%, var(--portal-border) 20%, var(--portal-border) 80%, transparent 100%);
+}
+
+@media (max-width: 768px) {
+  .portal-page-wrap {
+    padding: 20px 16px 28px;
+  }
+
+  .portal-page-header h1 {
+    font-size: 24px;
+  }
 }

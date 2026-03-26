@@ -14,7 +14,7 @@ export function WorkspacePage({ children, width = 1240 }) {
   const { C } = usePortalTheme();
   return (
     <div style={{ minHeight: "100%", background: C.bg }}>
-      <div style={{ maxWidth: width, margin: "0 auto", padding: "28px 24px" }}>
+      <div style={{ maxWidth: width, margin: "0 auto", padding: "32px 28px 40px" }}>
         {children}
       </div>
     </div>
@@ -24,7 +24,7 @@ export function WorkspacePage({ children, width = 1240 }) {
 export function WorkspaceSectionHeader({ eyebrow, title, subtitle, action, icon }) {
   const { C } = usePortalTheme();
   return (
-    <div style={{ marginBottom: 28 }}>
+    <div style={{ marginBottom: 30 }}>
       {eyebrow && (
         <div style={{ fontSize: 11, fontWeight: 700, color: C.t3, textTransform: "uppercase", letterSpacing: ".18em", marginBottom: 10 }}>
           {eyebrow}
@@ -59,12 +59,12 @@ export function WorkspaceCard({ children, style }) {
   return (
     <div
       style={{
-        background: C.card,
-        borderRadius: 14,
+        background: `linear-gradient(180deg, ${C.card} 0%, ${C.bgElevated} 100%)`,
+        borderRadius: 16,
         border: `1px solid ${C.border}`,
         padding: 24,
-        boxShadow: "0 1px 4px rgba(0,0,0,0.05), 0 1px 2px rgba(0,0,0,0.04)",
-        transition: "border-color 0.15s ease, box-shadow 0.15s ease",
+        boxShadow: "0 10px 30px rgba(15,23,42,0.05), 0 2px 8px rgba(15,23,42,0.03)",
+        transition: "border-color 0.15s ease, box-shadow 0.15s ease, transform 0.15s ease",
         ...style,
       }}
     >
@@ -97,7 +97,7 @@ export function WorkspaceTabs({ items, value, onChange }) {
       display: "inline-flex", gap: 2, padding: "4px",
       borderRadius: 12, background: C.bgElevated,
       border: `1px solid ${C.border}`,
-      boxShadow: "inset 0 1px 3px rgba(0,0,0,0.06)",
+      boxShadow: "inset 0 1px 3px rgba(0,0,0,0.05), 0 1px 2px rgba(255,255,255,0.65)",
       flexWrap: "wrap",
     }}>
       {items.map((item) => {
@@ -116,7 +116,7 @@ export function WorkspaceTabs({ items, value, onChange }) {
               color: active ? C.purple : C.t3,
               fontSize: 12,
               fontWeight: active ? 700 : 500,
-              boxShadow: active ? "0 1px 4px rgba(0,0,0,0.1)" : "none",
+              boxShadow: active ? "0 4px 12px rgba(15,23,42,0.08)" : "none",
               transition: "all 0.18s ease",
               display: "flex",
               alignItems: "center",
@@ -145,7 +145,7 @@ export function WorkspaceTabs({ items, value, onChange }) {
 
 export function WorkspaceStatGrid({ items }) {
   return (
-    <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 14 }}>
+    <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 16 }}>
       {items.map((item) => (
         <WorkspaceStatCard key={item.label} {...item} />
       ))}
@@ -163,7 +163,7 @@ export function WorkspaceStatCard({ label, value, accent, icon }) {
       border: `1px solid ${C.border}`,
       padding: "18px 20px",
       borderLeft: `3px solid ${color}`,
-      boxShadow: "0 1px 4px rgba(0,0,0,0.05)",
+      boxShadow: "0 8px 22px rgba(15,23,42,0.05)",
       display: "flex",
       flexDirection: "column",
       gap: 10,
@@ -200,7 +200,7 @@ export function WorkspaceInput(props) {
         color: C.t1,
         fontSize: 13,
         outline: "none",
-        transition: "border-color 0.15s ease",
+        transition: "border-color 0.15s ease, box-shadow 0.15s ease, background 0.15s ease",
         ...(props.style || {}),
       }}
     />
@@ -221,7 +221,7 @@ export function WorkspaceSelect(props) {
         color: C.t1,
         fontSize: 13,
         outline: "none",
-        transition: "border-color 0.15s ease",
+        transition: "border-color 0.15s ease, box-shadow 0.15s ease, background 0.15s ease",
         ...(props.style || {}),
       }}
     />
@@ -233,11 +233,11 @@ export function WorkspaceButton({ variant = "primary", children, style, ...props
   const variants = {
     primary: {
       background: C.purple, color: "#fff", border: "none",
-      boxShadow: `0 1px 3px ${C.purple}40, 0 1px 2px ${C.purple}20`,
+      boxShadow: `0 10px 18px ${C.purple}20, 0 2px 6px ${C.purple}18`,
     },
     ghost: {
       background: C.bgElevated, color: C.t2, border: `1px solid ${C.border}`,
-      boxShadow: "0 1px 2px rgba(0,0,0,0.04)",
+      boxShadow: "0 2px 6px rgba(15,23,42,0.04)",
     },
     outline: { background: "transparent", color: C.purple, border: `1px solid ${C.purple}`, boxShadow: "none" },
     danger: { background: "transparent", color: C.danger, border: `1px solid ${C.danger}`, boxShadow: "none" },
@@ -293,11 +293,11 @@ export function WorkspaceEmptyState({ title, subtitle, icon }) {
   return (
     <div style={{
       textAlign: "center",
-      padding: "48px 24px",
-      background: C.card,
-      borderRadius: 14,
+      padding: "52px 28px",
+      background: `linear-gradient(180deg, ${C.card} 0%, ${C.bgElevated} 100%)`,
+      borderRadius: 16,
       border: `1.5px dashed ${C.border}`,
-      boxShadow: "0 1px 3px rgba(0,0,0,0.04)",
+      boxShadow: "0 8px 22px rgba(15,23,42,0.04)",
     }}>
       {icon && (
         <div style={{

@@ -14,6 +14,7 @@ import {
   WorkspacePage,
   WorkspaceSectionHeader,
   WorkspaceSelect,
+  WorkspaceStatGrid,
 } from "../../../shared/components/WorkspaceUI.jsx";
 import { usePortalTheme } from "../../../shared/theme/portalTheme.jsx";
 
@@ -127,6 +128,18 @@ export default function AdminMeeting() {
     });
   }, [meetings, query]);
 
+  const queueStats = useMemo(() => {
+    const active = meetings.filter((meeting) => !["completed", "cancelled", "rejected"].includes(meeting.status)).length;
+    const scheduled = meetings.filter((meeting) => meeting.status === "scheduled").length;
+    const verification = meetings.filter((meeting) => meeting.status === "verification_pending").length;
+    return [
+      { label: "Queue Size", value: meetings.length },
+      { label: "Active", value: active },
+      { label: "Verification", value: verification },
+      { label: "Scheduled", value: scheduled },
+    ];
+  }, [meetings]);
+
   if (meetingId && selectedMeeting) {
     const canAccept = selectedMeeting.status === "pending";
     const canSendVerification = ["accepted", "verified", "not_verified"].includes(selectedMeeting.status);
@@ -171,7 +184,10 @@ export default function AdminMeeting() {
           </div>
 
           <WorkspaceCard style={{ display: "grid", gap: 18 }}>
-            <WorkspaceCardHeader title="Workflow Actions" />
+            <WorkspaceCardHeader
+              title="Workflow Actions"
+              subtitle="All state changes here follow the secured meeting workflow."
+            />
 
             {canAccept && (
               <WorkspaceButton
@@ -184,7 +200,18 @@ export default function AdminMeeting() {
             )}
 
             {(canAccept || canSendVerification || canSchedule || canCompleteOrCancel) && (
-              <div className="space-y-3">
+              <div
+                className="space-y-3"
+                style={{
+                  padding: 18,
+                  borderRadius: 14,
+                  border: `1px solid ${C.border}`,
+                  background: C.bgElevated,
+                }}
+              >
+                <div style={{ fontSize: 11, fontWeight: 700, color: C.t3, textTransform: "uppercase", letterSpacing: ".08em" }}>
+                  Decision Notes
+                </div>
                 <textarea
                   value={decisionReason}
                   onChange={(event) => setDecisionReason(event.target.value)}
@@ -228,8 +255,17 @@ export default function AdminMeeting() {
             )}
 
             {canSendVerification && (
-              <div className="space-y-3 pt-4" style={{ borderTop: `1px solid ${C.border}` }}>
-                <h3 style={{ fontSize: 16, fontWeight: 600, color: C.t1 }}>Send for DEO Verification</h3>
+              <div
+                className="space-y-3 pt-4"
+                style={{
+                  borderTop: `1px solid ${C.border}`,
+                  paddingTop: 20,
+                }}
+              >
+                <div style={{ padding: 18, borderRadius: 14, border: `1px solid ${C.border}`, background: C.bgElevated }}>
+                  <h3 style={{ fontSize: 16, fontWeight: 700, color: C.t1 }}>Send for DEO Verification</h3>
+                  <p style={{ fontSize: 12, color: C.t3, marginTop: 4 }}>Assign a verified DEO to complete the verification pass.</p>
+                </div>
                 <input
                   type="hidden"
                   value={verificationForm.deoId}
@@ -254,8 +290,17 @@ export default function AdminMeeting() {
             )}
 
             {canSchedule && (
-              <div className="space-y-3 pt-4" style={{ borderTop: `1px solid ${C.border}` }}>
-                <h3 style={{ fontSize: 16, fontWeight: 600, color: C.t1 }}>{selectedMeeting.status === "scheduled" ? "Reschedule Meeting" : "Schedule Meeting"}</h3>
+              <div
+                className="space-y-3 pt-4"
+                style={{
+                  borderTop: `1px solid ${C.border}`,
+                  paddingTop: 20,
+                }}
+              >
+                <div style={{ padding: 18, borderRadius: 14, border: `1px solid ${C.border}`, background: C.bgElevated }}>
+                  <h3 style={{ fontSize: 16, fontWeight: 700, color: C.t1 }}>{selectedMeeting.status === "scheduled" ? "Reschedule Meeting" : "Schedule Meeting"}</h3>
+                  <p style={{ fontSize: 12, color: C.t3, marginTop: 4 }}>Finalize the minister, venue, and time window for the citizen meeting.</p>
+                </div>
                 <div className="grid md:grid-cols-2 gap-3">
                   <WorkspaceSelect value={scheduleForm.ministerId} onChange={(event) => setScheduleForm((current) => ({ ...current, ministerId: event.target.value }))}>
                     <option value="">Select Minister</option>
@@ -320,7 +365,7 @@ export default function AdminMeeting() {
           </WorkspaceCard>
 
           <WorkspaceCard>
-            <WorkspaceCardHeader title="Activity Timeline" />
+            <WorkspaceCardHeader title="Activity Timeline" subtitle="Chronological movement of this meeting through the workflow." />
             <div className="space-y-4">
               {history.map((event, index) => (
                 <div key={`${event.created_at}-${index}`} className="flex gap-4">
@@ -353,9 +398,15 @@ export default function AdminMeeting() {
       />
 
       <div style={{ display: "grid", gap: 24 }}>
+        <WorkspaceStatGrid items={queueStats} />
+
         <WorkspaceCard>
+          <WorkspaceCardHeader
+            title="Queue Search"
+            subtitle="Search by title, purpose, citizen identity, or meeting state."
+          />
           <div className="relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2" size={20} style={{ color: C.t3 }} />
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2" size={18} style={{ color: C.t3 }} />
             <WorkspaceInput
               type="text"
               value={query}
@@ -375,22 +426,33 @@ export default function AdminMeeting() {
             {filteredMeetings.map((meeting) => (
               <WorkspaceCard
                 key={meeting.id}
-                style={{ cursor: "pointer" }}
+                style={{ cursor: "pointer", padding: 0, overflow: "hidden" }}
                 onClick={() => navigate(`/admin/meetings/${meeting.id}`)}
               >
-                <div className="flex items-start justify-between gap-2 mb-4">
-                  <div className="flex-1">
-                    <p style={{ fontSize: 11, fontWeight: 700, color: C.t3, textTransform: "uppercase", letterSpacing: ".08em" }}>{meeting.id}</p>
-                    <h3 style={{ fontSize: 14, fontWeight: 700, color: C.t1, marginTop: 6 }}>{meeting.title}</h3>
-                    <p style={{ fontSize: 13, color: C.t2, marginTop: 8 }}>{meeting.purpose}</p>
+                <div style={{ padding: "18px 18px 14px", borderBottom: `1px solid ${C.borderLight}`, background: `linear-gradient(180deg, ${C.card} 0%, ${C.bgElevated} 100%)` }}>
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="flex-1">
+                      <p style={{ fontSize: 11, fontWeight: 700, color: C.t3, textTransform: "uppercase", letterSpacing: ".08em" }}>{meeting.id}</p>
+                      <h3 style={{ fontSize: 14, fontWeight: 700, color: C.t1, marginTop: 6 }}>{meeting.title}</h3>
+                      <p style={{ fontSize: 13, color: C.t2, marginTop: 8, lineHeight: 1.6 }}>{meeting.purpose}</p>
+                    </div>
+                    <WorkspaceBadge status={meeting.status}>{statusLabel(meeting.status)}</WorkspaceBadge>
                   </div>
-                  <WorkspaceBadge status={meeting.status}>{statusLabel(meeting.status)}</WorkspaceBadge>
                 </div>
 
-                <div className="space-y-2" style={{ fontSize: 13, color: C.t2 }}>
-                  <div>{[meeting.first_name, meeting.last_name].filter(Boolean).join(" ")}</div>
-                  <div>{meeting.mobile_number || meeting.email || "No contact"}</div>
-                  <div>{meeting.preferred_time ? new Date(meeting.preferred_time).toLocaleString("en-IN") : "No preferred time"}</div>
+                <div className="space-y-3" style={{ fontSize: 13, color: C.t2, padding: 18 }}>
+                  <div>
+                    <div style={{ fontSize: 11, fontWeight: 700, color: C.t3, textTransform: "uppercase", letterSpacing: ".08em", marginBottom: 6 }}>Citizen</div>
+                    <div>{[meeting.first_name, meeting.last_name].filter(Boolean).join(" ")}</div>
+                  </div>
+                  <div>
+                    <div style={{ fontSize: 11, fontWeight: 700, color: C.t3, textTransform: "uppercase", letterSpacing: ".08em", marginBottom: 6 }}>Contact</div>
+                    <div>{meeting.mobile_number || meeting.email || "No contact"}</div>
+                  </div>
+                  <div>
+                    <div style={{ fontSize: 11, fontWeight: 700, color: C.t3, textTransform: "uppercase", letterSpacing: ".08em", marginBottom: 6 }}>Preferred Slot</div>
+                    <div>{meeting.preferred_time ? new Date(meeting.preferred_time).toLocaleString("en-IN") : "No preferred time"}</div>
+                  </div>
                 </div>
               </WorkspaceCard>
             ))}
@@ -406,7 +468,7 @@ function InfoCard({ label, value, subValue }) {
   return (
     <WorkspaceCard style={{ padding: 18 }}>
       <p style={{ fontSize: 11, fontWeight: 700, color: C.t3, textTransform: "uppercase", letterSpacing: ".08em" }}>{label}</p>
-      <div style={{ marginTop: 8 }}><WorkspaceBadge>{value}</WorkspaceBadge></div>
+      <div style={{ marginTop: 10, fontSize: 18, fontWeight: 700, color: C.t1, lineHeight: 1.4 }}>{value}</div>
       {subValue && <p style={{ fontSize: 12, color: C.t3, marginTop: 8 }}>{subValue}</p>}
     </WorkspaceCard>
   );

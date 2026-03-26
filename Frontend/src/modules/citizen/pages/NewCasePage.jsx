@@ -13,7 +13,7 @@ import { PATHS } from "../../../routes/paths.js";
 import { apiClient, authorizedConfig } from "../../../shared/api/client.js";
 import { useAuth } from "../../../shared/auth/AuthContext.jsx";
 import { usePortalTheme } from "../../../shared/theme/portalTheme.jsx";
-import { WorkspaceButton, WorkspaceCard, WorkspaceInput, WorkspacePage, WorkspaceSectionHeader, WorkspaceSelect } from "../../../shared/components/WorkspaceUI.jsx";
+import { WorkspaceButton, WorkspaceCard, WorkspaceCardHeader, WorkspaceInput, WorkspacePage, WorkspaceSectionHeader, WorkspaceSelect } from "../../../shared/components/WorkspaceUI.jsx";
 
 const FILE_UPLOAD_OPTIONS = {
   maxFiles: 5,
@@ -281,6 +281,28 @@ export default function HCMNewCasePage() {
     };
   }, [session?.accessToken]);
 
+  const sectionLabelStyle = {
+    display: "block",
+    fontSize: 11,
+    fontWeight: 700,
+    color: C.t3,
+    textTransform: "uppercase",
+    letterSpacing: ".08em",
+    marginBottom: 10,
+  };
+
+  const textareaStyle = {
+    width: "100%",
+    padding: "12px 16px",
+    border: `1px solid ${C.border}`,
+    borderRadius: 12,
+    background: C.inp,
+    color: C.t1,
+    fontSize: 14,
+    lineHeight: 1.6,
+    outline: "none",
+  };
+
   const submitMeeting = async (event) => {
     event.preventDefault();
     setLoading(true);
@@ -473,7 +495,7 @@ export default function HCMNewCasePage() {
 
       {/* HEADER */}
       {activeTab && (
-        <div className="sticky top-0 z-40 portal-panel shadow-sm" style={{ background: C.card, borderBottom: `1px solid ${C.border}` }}>
+        <div className="sticky top-0 z-40 portal-panel shadow-sm" style={{ background: `${C.card}F5`, backdropFilter: "blur(14px)", borderBottom: `1px solid ${C.border}` }}>
           <div className="portal-page-wrap max-w-6xl mx-auto px-6 py-4 flex items-center justify-between">
             <button
               onClick={() => {
@@ -514,7 +536,7 @@ export default function HCMNewCasePage() {
             <button
               onClick={() => setActiveTab("meeting")}
               className="group relative rounded-2xl border shadow-sm hover:shadow-lg transition-all duration-300 overflow-hidden text-left"
-              style={{ background: C.card, borderColor: C.border }}
+              style={{ background: `linear-gradient(180deg, ${C.card} 0%, ${C.bgElevated} 100%)`, borderColor: C.border }}
             >
               <div className="absolute top-0 right-0 w-32 h-32 opacity-0 group-hover:opacity-100 transition-opacity duration-300" style={{ background: `linear-gradient(to bottom left, ${C.purpleDim}, transparent)` }}></div>
               <div className="relative p-8">
@@ -536,7 +558,7 @@ export default function HCMNewCasePage() {
             <button
               onClick={() => setActiveTab("complaint")}
               className="group relative rounded-2xl border shadow-sm hover:shadow-lg transition-all duration-300 overflow-hidden text-left"
-              style={{ background: C.card, borderColor: C.border }}
+              style={{ background: `linear-gradient(180deg, ${C.card} 0%, ${C.bgElevated} 100%)`, borderColor: C.border }}
             >
               <div className="absolute top-0 right-0 w-32 h-32 opacity-0 group-hover:opacity-100 transition-opacity duration-300" style={{ background: `linear-gradient(to bottom left, ${C.mint}20, transparent)` }}></div>
               <div className="relative p-8">
@@ -558,10 +580,14 @@ export default function HCMNewCasePage() {
           // MEETING FORM
           <WorkspaceCard style={{ marginBottom: 32 }}>
             <form onSubmit={submitMeeting} className="space-y-8">
+              <WorkspaceCardHeader
+                title="Meeting Request Form"
+                subtitle="Share the purpose, timing, supporting documents, and any accompanying attendees."
+              />
 
               {/* TITLE */}
               <div>
-                <label className="block text-sm font-semibold text-gray-900 mb-3">
+                <label style={sectionLabelStyle}>
                   Meeting Title <span className="text-red-600">*</span>
                 </label>
                 <WorkspaceInput
@@ -580,7 +606,7 @@ export default function HCMNewCasePage() {
 
               {/* PURPOSE */}
               <div>
-                <label className="block text-sm font-semibold text-gray-900 mb-3">
+                <label style={sectionLabelStyle}>
                   Purpose of Meeting <span className="text-red-600">*</span>
                 </label>
                 <textarea
@@ -590,15 +616,19 @@ export default function HCMNewCasePage() {
                     setMeetingForm((current) => ({ ...current, purpose: event.target.value }))
                   }
                   placeholder="Explain the purpose of your meeting request in detail"
-                  style={{ width: "100%", padding: "12px 16px", border: `1px solid ${C.border}`, borderRadius: 10, background: C.inp, color: C.t1 }}
+                  style={textareaStyle}
                   rows={5}
                 />
               </div>
 
               {/* DATE AND TIME */}
-              <div className="grid md:grid-cols-2 gap-6">
+              <div style={{ padding: 20, borderRadius: 16, border: `1px solid ${C.border}`, background: C.bgElevated }}>
+                <div style={{ fontSize: 12, fontWeight: 700, color: C.t3, textTransform: "uppercase", letterSpacing: ".08em", marginBottom: 16 }}>
+                  Scheduling Preferences
+                </div>
+                <div className="grid md:grid-cols-2 gap-6">
                 <div>
-                  <label className="block text-sm font-semibold text-gray-900 mb-3 flex items-center gap-2">
+                  <label className="flex items-center gap-2" style={sectionLabelStyle}>
                     <Calendar size={16} />
                     Preferred Date <span className="text-red-600">*</span>
                   </label>
@@ -615,7 +645,7 @@ export default function HCMNewCasePage() {
                 </div>
 
                 <div>
-                  <label className="block text-sm font-semibold text-gray-900 mb-3 flex items-center gap-2">
+                  <label className="flex items-center gap-2" style={sectionLabelStyle}>
                     <Clock size={16} />
                     Preferred Time <span className="text-red-600">*</span>
                   </label>
@@ -636,10 +666,11 @@ export default function HCMNewCasePage() {
                   <p className="text-xs text-gray-500 mt-2">24-hour slots available • 30-minute intervals</p>
                 </div>
               </div>
+              </div>
 
               {/* ADMIN REFERRAL */}
               <div>
-                <label className="block text-sm font-semibold text-gray-900 mb-3">
+                <label style={sectionLabelStyle}>
                   Admin Desk (Optional)
                 </label>
                 <WorkspaceSelect
@@ -660,13 +691,13 @@ export default function HCMNewCasePage() {
 
               {/* FILE UPLOAD */}
               <div>
-                <label className="block text-sm font-semibold text-gray-900 mb-3">
+                <label style={sectionLabelStyle}>
                   Supporting Documents (Optional)
                 </label>
-                <label className="border-2 border-dashed rounded-lg p-6 cursor-pointer transition-colors block" style={{ borderColor: C.border, background: C.bg }}>
+                <label className="border-2 border-dashed rounded-2xl p-6 cursor-pointer transition-colors block" style={{ borderColor: C.border, background: C.bgElevated }}>
                   <div className="flex items-center gap-4">
-                    <div className="h-12 w-12 bg-gray-100 rounded-lg flex items-center justify-center flex-shrink-0">
-                      <Upload size={24} className="text-gray-400" />
+                    <div className="h-12 w-12 rounded-xl flex items-center justify-center flex-shrink-0" style={{ background: C.card, border: `1px solid ${C.border}` }}>
+                      <Upload size={24} style={{ color: C.t3 }} />
                     </div>
                     <div className="flex-1">
                       <div className="font-semibold text-gray-900">
@@ -698,8 +729,8 @@ export default function HCMNewCasePage() {
               </div>
 
               {/* COMPANIONS */}
-              <div>
-                <label className="block text-sm font-semibold text-gray-900 mb-3 flex items-center gap-2">
+              <div style={{ padding: 20, borderRadius: 16, border: `1px solid ${C.border}`, background: C.bgElevated }}>
+                <label className="flex items-center gap-2" style={sectionLabelStyle}>
                   <Users size={18} />
                   Additional Attendees
                 </label>
@@ -718,7 +749,7 @@ export default function HCMNewCasePage() {
                           }))
                         }
                         placeholder="Full name"
-                        style={{ padding: "12px 16px", border: `1px solid ${C.border}`, borderRadius: 10, background: C.inp, color: C.t1 }}
+                        style={textareaStyle}
                       />
                       <input
                         type="tel"
@@ -734,7 +765,7 @@ export default function HCMNewCasePage() {
                           }))
                         }
                         placeholder="Phone number"
-                        style={{ padding: "12px 16px", border: `1px solid ${C.border}`, borderRadius: 10, background: C.inp, color: C.t1 }}
+                        style={textareaStyle}
                       />
                       <button
                         type="button"
@@ -769,7 +800,6 @@ export default function HCMNewCasePage() {
                   </button>
                 </div>
               </div>
-
               {/* SUBMIT */}
               <WorkspaceButton
                 type="submit"
@@ -784,9 +814,13 @@ export default function HCMNewCasePage() {
           // COMPLAINT FORM
           <WorkspaceCard style={{ marginBottom: 32 }}>
             <form onSubmit={submitComplaint} className="space-y-8">
+              <WorkspaceCardHeader
+                title="Complaint Form"
+                subtitle="Provide a clear issue summary, category, location, and any supporting documents."
+              />
               {/* TITLE */}
               <div>
-                <label className="block text-sm font-semibold text-gray-900 mb-3">
+                <label style={sectionLabelStyle}>
                   Complaint Title <span className="text-red-600">*</span>
                 </label>
                 <WorkspaceInput
@@ -802,7 +836,7 @@ export default function HCMNewCasePage() {
 
               {/* DETAILS */}
               <div>
-                <label className="block text-sm font-semibold text-gray-900 mb-3">
+                <label style={sectionLabelStyle}>
                   Complaint Details <span className="text-red-600">*</span>
                 </label>
                 <textarea
@@ -812,15 +846,16 @@ export default function HCMNewCasePage() {
                     setComplaintForm((current) => ({ ...current, details: event.target.value }))
                   }
                   placeholder="Provide detailed description of the issue"
-                  style={{ width: "100%", padding: "12px 16px", border: `1px solid ${C.border}`, borderRadius: 10, background: C.inp, color: C.t1 }}
+                  style={textareaStyle}
                   rows={6}
                 />
               </div>
 
               {/* LOCATION */}
-              <div className="grid md:grid-cols-2 gap-6">
+              <div style={{ padding: 20, borderRadius: 16, border: `1px solid ${C.border}`, background: C.bgElevated }}>
+                <div className="grid md:grid-cols-2 gap-6">
                 <div>
-                  <label className="block text-sm font-semibold text-gray-900 mb-3 flex items-center gap-2">
+                  <label className="flex items-center gap-2" style={sectionLabelStyle}>
                     <MapPin size={16} />
                     Location <span className="text-red-600">*</span>
                   </label>
@@ -837,7 +872,7 @@ export default function HCMNewCasePage() {
 
                 {/* CATEGORY */}
                 <div>
-                  <label className="block text-sm font-semibold text-gray-900 mb-3 flex items-center gap-2">
+                  <label className="flex items-center gap-2" style={sectionLabelStyle}>
                     <Briefcase size={16} />
                     Category <span className="text-red-600">*</span>
                   </label>
@@ -857,16 +892,17 @@ export default function HCMNewCasePage() {
                   </WorkspaceSelect>
                 </div>
               </div>
+              </div>
 
               {/* FILE UPLOAD */}
               <div>
-                <label className="block text-sm font-semibold text-gray-900 mb-3">
+                <label style={sectionLabelStyle}>
                   Supporting Documents
                 </label>
-                <label className="border-2 border-dashed rounded-lg p-6 cursor-pointer transition-colors block" style={{ borderColor: C.border, background: C.bg }}>
+                <label className="border-2 border-dashed rounded-2xl p-6 cursor-pointer transition-colors block" style={{ borderColor: C.border, background: C.bgElevated }}>
                   <div className="flex items-center gap-4">
-                    <div className="h-12 w-12 bg-gray-100 rounded-lg flex items-center justify-center flex-shrink-0">
-                      <Upload size={24} className="text-gray-400" />
+                    <div className="h-12 w-12 rounded-xl flex items-center justify-center flex-shrink-0" style={{ background: C.card, border: `1px solid ${C.border}` }}>
+                      <Upload size={24} style={{ color: C.t3 }} />
                     </div>
                     <div className="flex-1">
                       <div className="font-semibold text-gray-900">
@@ -911,7 +947,7 @@ export default function HCMNewCasePage() {
 
         {/* TRACK CASES LINK */}
         {!activeTab && (
-          <div className="rounded-2xl p-8 text-center" style={{ background: C.purpleDim, border: `1px solid ${C.purple}33` }}>
+          <div className="rounded-2xl p-8 text-center" style={{ background: `linear-gradient(180deg, ${C.purpleDim} 0%, ${C.card} 100%)`, border: `1px solid ${C.purple}33`, boxShadow: "0 10px 28px rgba(15,23,42,0.05)" }}>
             <p className="text-gray-700 mb-4">Already submitted a request or complaint?</p>
             <Link
               to={PATHS.citizen.cases}

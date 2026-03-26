@@ -72,6 +72,8 @@ export function PortalGlobalStyles() {
       --portal-scrollbar-hover: ${C.scrollbarHover};
       --portal-nav-hover: ${C.navHover};
       --portal-shadow: 0 24px 80px rgba(15,23,42,0.08);
+      --portal-shadow-sm: 0 8px 20px rgba(15,23,42,0.05);
+      --portal-radius-lg: 16px;
     }
 
     html, body, #root {
@@ -164,6 +166,24 @@ export function PortalGlobalStyles() {
       letter-spacing: -0.02em;
     }
 
+    .portal-content table {
+      border-collapse: separate;
+      border-spacing: 0;
+    }
+
+    .portal-content table th {
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: ${C.t3};
+      font-weight: 700;
+      background: ${C.bgElevated};
+    }
+
+    .portal-content table tr:hover td {
+      background: rgba(255,255,255,0.72);
+    }
+
     .portal-content input,
     .portal-content select,
     .portal-content textarea {
@@ -185,6 +205,16 @@ export function PortalGlobalStyles() {
       outline: none !important;
       border-color: ${C.purple} !important;
       box-shadow: 0 0 0 3px ${C.purpleDim} !important;
+    }
+
+    .portal-content a {
+      color: inherit;
+    }
+
+    @media (max-width: 900px) {
+      .portal-shell {
+        min-width: 100%;
+      }
     }
   `;
 

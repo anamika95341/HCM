@@ -7,13 +7,21 @@ import { sanitizeImageSrc } from "../security/url.js";
 import { useAuth } from "../auth/AuthContext.jsx";
 
 const WORKSPACE_TITLES = [
-  { match: "/citizen/", title: "Citizen Module" },
-  { match: "/masteradmin/", title: "Master Admin Module" },
-  { match: "/admin/", title: "Admin Module" },
-  { match: "/Minister/", title: "Minister Module" },
-  { match: "/DEO/", title: "DEO Module" },
+  { match: "/citizen/", title: "Citizen Services" },
+  { match: "/masteradmin/", title: "Master Admin" },
+  { match: "/admin/", title: "Admin Workspace" },
+  { match: "/Minister/", title: "Minister Portal" },
+  { match: "/DEO/", title: "DEO Workspace" },
   { match: "/settings", title: "Settings" },
 ];
+
+const ROLE_LABELS = {
+  citizen: "Citizen",
+  admin: "Admin",
+  masteradmin: "Master Admin",
+  deo: "DEO",
+  minister: "Minister",
+};
 
 const Header = () => {
   const ref = useRef(null);
@@ -33,7 +41,8 @@ const Header = () => {
   };
 
   const safeAvatar = sanitizeImageSrc(currentUser.avatar);
-  const workspaceTitle = WORKSPACE_TITLES.find((item) => location.pathname.startsWith(item.match))?.title || "Unified Portal Interface";
+  const workspaceTitle = WORKSPACE_TITLES.find((item) => location.pathname.startsWith(item.match))?.title || "Unified Portal";
+  const roleLabel = ROLE_LABELS[currentUser.role] || currentUser.role;
 
   useEffect(() => {
     const handleFullscreenChange = () => {
@@ -68,35 +77,79 @@ const Header = () => {
 
   return (
     <header
-      className="flex items-center justify-between px-6 py-4"
-      style={{ background: C.card, borderBottom: `1px solid ${C.border}` }}
+      className="flex items-center justify-between"
+      style={{
+        background: `linear-gradient(180deg, ${C.card} 0%, ${C.bgElevated} 100%)`,
+        borderBottom: `1px solid ${C.border}`,
+        padding: "0 24px",
+        height: 62,
+        flexShrink: 0,
+        boxShadow: "0 1px 0 rgba(255,255,255,0.55)",
+        position: "sticky",
+        top: 0,
+        zIndex: 30,
+        backdropFilter: "blur(12px)",
+      }}
     >
-      <div>
-        <div className="text-[11px] uppercase tracking-[0.18em] font-bold" style={{ color: C.t3 }}>
-          Government Workspace
+      <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+        <div>
+          <div style={{ fontSize: 15, fontWeight: 700, color: C.t1, letterSpacing: "-0.02em", lineHeight: 1.2 }}>
+            {workspaceTitle}
+          </div>
+          <div style={{ fontSize: 11, color: C.t3, marginTop: 2, fontWeight: 500 }}>
+            Government Unified Portal
+          </div>
         </div>
-        <div className="text-sm font-semibold mt-1" style={{ color: C.t1 }}>
-          {workspaceTitle}
+        <div
+          style={{
+            display: "inline-flex",
+            alignItems: "center",
+            padding: "3px 8px",
+            borderRadius: 999,
+            fontSize: 10,
+            fontWeight: 700,
+            background: C.purpleDim,
+            color: C.purple,
+            letterSpacing: "0.04em",
+          }}
+        >
+          {roleLabel.toUpperCase()}
         </div>
       </div>
 
-      <div className="flex items-center gap-3 relative" ref={ref}>
+      <div className="flex items-center gap-2 relative" ref={ref}>
         <HeaderIcon icon={isFullscreen ? FiMinimize : FiMaximize} onClick={toggleFullscreen} title="Toggle Fullscreen" />
-        <HeaderIcon icon={FiCalendar} onClick={() => navigate(getHomePathForRole(session?.role || "citizen"))} title="Open Workspace" />
+        <HeaderIcon icon={FiCalendar} onClick={() => navigate(getHomePathForRole(session?.role || "citizen"))} title="Go Home" />
         <HeaderIcon icon={FiBell} dot={false} onClick={() => setOpen(false)} title="Notifications" />
 
-        <button type="button" onClick={() => setOpen((value) => !value)} className="focus:outline-none" title="User Menu">
+        <button
+          type="button"
+          onClick={() => setOpen((value) => !value)}
+          className="focus:outline-none"
+          title="User Menu"
+          style={{
+            width: 36,
+            height: 36,
+            borderRadius: 999,
+            cursor: "pointer",
+            border: open ? `2px solid ${C.purple}` : `2px solid ${C.border}`,
+            overflow: "hidden",
+            background: C.purpleDim,
+            transition: "border-color 0.15s ease, transform 0.15s ease",
+            flexShrink: 0,
+          }}
+        >
           {safeAvatar ? (
             <img
               src={safeAvatar}
               alt="User Avatar"
               className="w-9 h-9 rounded-full object-cover"
-              style={{ border: `1px solid ${C.border}` }}
+              style={{ width: "100%", height: "100%", objectFit: "cover" }}
             />
           ) : (
             <div
               className="w-9 h-9 rounded-full flex items-center justify-center font-bold text-sm"
-              style={{ background: C.purpleDim, color: C.purple, border: `1px solid ${C.border}` }}
+              style={{ width: "100%", height: "100%", background: C.purpleDim, color: C.purple }}
             >
               {userInitial}
             </div>
@@ -105,8 +158,13 @@ const Header = () => {
 
         {open && (
           <div
-            className="absolute right-0 top-12 w-72 rounded-xl z-50 overflow-hidden"
-            style={{ background: C.card, border: `1px solid ${C.border}`, boxShadow: "var(--portal-shadow)" }}
+            className="absolute right-0 w-72 rounded-xl z-50 overflow-hidden"
+            style={{
+              top: "calc(100% + 10px)",
+              background: C.card,
+              border: `1px solid ${C.border}`,
+              boxShadow: "0 18px 48px rgba(15,23,42,0.14), 0 6px 18px rgba(15,23,42,0.08)",
+            }}
           >
             <div className="flex items-center gap-3 px-4 py-4" style={{ borderBottom: `1px solid ${C.border}`, background: C.bgElevated }}>
               {safeAvatar ? (
@@ -125,7 +183,7 @@ const Header = () => {
                   {currentUser.name}
                 </p>
                 <p className="text-xs font-medium capitalize truncate" style={{ color: C.purple }}>
-                  {currentUser.role}
+                  {roleLabel}
                 </p>
                 <p className="text-[11px] truncate mt-0.5" style={{ color: C.t3 }}>
                   {currentUser.email}
@@ -158,13 +216,14 @@ const HeaderIcon = ({ icon: Icon, badge, dot, onClick, title }) => {
       style={{
         width: 34,
         height: 34,
-        borderRadius: 10,
+        borderRadius: 11,
         border: `1px solid ${C.border}`,
-        background: C.card,
+        background: C.bg,
         color: C.t2,
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
+        boxShadow: "0 1px 2px rgba(0,0,0,0.04)",
       }}
     >
       <Icon size={17} />
@@ -189,7 +248,7 @@ const MenuItem = ({ icon: Icon, label, danger, onClick }) => {
     <li
       className="flex items-center gap-3 px-4 py-2.5 cursor-pointer transition-colors"
       onClick={onClick}
-      style={{ color: danger ? C.danger : C.t2 }}
+      style={{ color: danger ? C.danger : C.t2, borderRadius: 10, margin: "0 8px" }}
     >
       <Icon size={16} />
       {label}

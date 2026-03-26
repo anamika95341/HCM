@@ -210,18 +210,32 @@ export default function AdminCases() {
 
       <div style={{ marginBottom: 20 }}>
         <WorkspaceCard>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))", gap: 16 }}>
-            <WorkspaceInput
-              value={query}
-              onChange={(event) => setQuery(event.target.value)}
-              placeholder="Search by ID, title, citizen name..."
-            />
-            <WorkspaceSelect value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)}>
-              <option value="all">All statuses</option>
-              {statusOptions.map((status) => (
-                <option key={status} value={status}>{humanizeStatus(status)}</option>
-              ))}
-            </WorkspaceSelect>
+          <WorkspaceCardHeader
+            title="Queue Filters"
+            subtitle="Refine the current lane without leaving the work queue."
+          />
+          <div style={{ display: "grid", gridTemplateColumns: "minmax(0, 1.6fr) minmax(220px, 0.8fr)", gap: 16 }}>
+            <div>
+              <div style={{ fontSize: 11, fontWeight: 700, color: C.t3, textTransform: "uppercase", letterSpacing: ".08em", marginBottom: 10 }}>
+                Search
+              </div>
+              <WorkspaceInput
+                value={query}
+                onChange={(event) => setQuery(event.target.value)}
+                placeholder="Search by ID, title, citizen name..."
+              />
+            </div>
+            <div>
+              <div style={{ fontSize: 11, fontWeight: 700, color: C.t3, textTransform: "uppercase", letterSpacing: ".08em", marginBottom: 10 }}>
+                Status
+              </div>
+              <WorkspaceSelect value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)}>
+                <option value="all">All statuses</option>
+                {statusOptions.map((status) => (
+                  <option key={status} value={status}>{humanizeStatus(status)}</option>
+                ))}
+              </WorkspaceSelect>
+            </div>
           </div>
         </WorkspaceCard>
       </div>
@@ -237,6 +251,17 @@ export default function AdminCases() {
         <WorkspaceEmptyState title="No items found" subtitle="Try adjusting your current search or status filters." />
       ) : (
         <WorkspaceCard style={{ padding: 0, overflow: "hidden" }}>
+          <div style={{ padding: "18px 22px", background: `linear-gradient(180deg, ${C.card} 0%, ${C.bgElevated} 100%)`, borderBottom: `1px solid ${C.border}` }}>
+            <div style={{ display: "flex", justifyContent: "space-between", gap: 16, flexWrap: "wrap", alignItems: "center" }}>
+              <div>
+                <div style={{ fontSize: 14, fontWeight: 700, color: C.t1 }}>{tabs.find((item) => item.id === tab)?.label || "Queue Items"}</div>
+                <div style={{ marginTop: 4, fontSize: 12, color: C.t3 }}>
+                  {activeRows.length} item{activeRows.length === 1 ? "" : "s"} match the current view.
+                </div>
+              </div>
+              <WorkspaceBadge>{statusFilter === "all" ? "All statuses" : humanizeStatus(statusFilter)}</WorkspaceBadge>
+            </div>
+          </div>
           <div className="overflow-x-auto">
             <table className="w-full">
                 <thead style={{ background: C.bgElevated, borderBottom: `1px solid ${C.border}` }}>
@@ -267,8 +292,19 @@ export default function AdminCases() {
                       <td className="px-6 py-4 text-center" style={{ borderBottom: `1px solid ${C.borderLight}` }}>
                         <button
                           onClick={() => navigate(item.route)}
-                          className="p-2 rounded-lg transition-colors"
-                          style={{ color: C.purple, background: "transparent" }}
+                          className="transition-colors"
+                          style={{
+                            color: C.purple,
+                            background: `${C.purple}10`,
+                            border: `1px solid ${C.purple}22`,
+                            width: 36,
+                            height: 36,
+                            borderRadius: 12,
+                            display: "inline-flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            boxShadow: "0 6px 18px rgba(15,23,42,0.06)",
+                          }}
                           title="View details"
                         >
                           <Eye size={20} />

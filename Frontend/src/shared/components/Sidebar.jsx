@@ -11,6 +11,14 @@ import { usePortalTheme } from "../theme/portalTheme.jsx";
 import { PATHS } from "../../routes/paths.js";
 import { useAuth } from "../auth/AuthContext.jsx";
 
+const ROLE_LABELS = {
+    citizen: "Citizen",
+    admin: "Admin",
+    masteradmin: "Master Admin",
+    deo: "DEO",
+    minister: "Minister",
+};
+
 function Sidebar({ collapsed, onToggle }) {
     const { C } = usePortalTheme();
     const { session, logout } = useAuth();
@@ -53,78 +61,161 @@ function Sidebar({ collapsed, onToggle }) {
         ],
     };
 
+    const userName = session?.user?.firstName || session?.user?.username || "User";
+    const userInitial = userName.charAt(0).toUpperCase();
+    const roleLabel = ROLE_LABELS[role] || role;
+
     return (
-        <>
-            <div className="h-full flex flex-col" style={{ background: C.bgElevated }}>
-                <div
-                    className="flex items-center justify-between px-4 py-4"
-                    style={{ borderBottom: `1px solid ${C.border}` }}
-                >
-                    {!collapsed && (
-                        <span className="font-semibold" style={{ color: C.t1 }}>
-                            <Link to={PATHS.login}>Citizen Portal</Link>
+        <div className="h-full flex flex-col" style={{ background: `linear-gradient(180deg, ${C.bgElevated} 0%, ${C.bg} 100%)` }}>
+            <div
+                className="flex items-center px-4"
+                style={{
+                    height: 62,
+                    borderBottom: `1px solid ${C.border}`,
+                    gap: 10,
+                    justifyContent: collapsed ? "center" : "space-between",
+                }}
+            >
+                {!collapsed && (
+                    <Link
+                        to={PATHS.login}
+                        style={{
+                            textDecoration: "none",
+                            display: "flex",
+                            flexDirection: "column",
+                            lineHeight: 1.2,
+                        }}
+                    >
+                        <span style={{ fontSize: 13, fontWeight: 800, color: C.purple, letterSpacing: "-0.02em" }}>
+                            Citizen Portal
                         </span>
-                    )}
-                    <SidebarItem type="" collapsed={collapsed} label="Expand Navigation Menu">
-                        <button
-                            onClick={onToggle}
-                            className="p-2 cursor-pointer"
+                        <span style={{ fontSize: 10, fontWeight: 500, color: C.t3, letterSpacing: "0.05em" }}>
+                            GOVT. WORKSPACE
+                        </span>
+                    </Link>
+                )}
+                <SidebarItem type="" collapsed={collapsed} label="Toggle Navigation">
+                    <button
+                        onClick={onToggle}
+                        style={{
+                            width: 32,
+                            height: 32,
+                            borderRadius: 9,
+                            background: C.bg,
+                            color: C.t2,
+                            border: `1px solid ${C.border}`,
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            cursor: "pointer",
+                            flexShrink: 0,
+                            boxShadow: "0 1px 2px rgba(0,0,0,0.04)",
+                        }}
+                    >
+                        <FiMenu size={15} />
+                    </button>
+                </SidebarItem>
+            </div>
+
+            {!collapsed && (
+                <div style={{ padding: "12px 12px 0" }}>
+                    <div
+                        style={{
+                            borderRadius: 12,
+                            background: C.card,
+                            border: `1px solid ${C.border}`,
+                            padding: "12px",
+                            display: "flex",
+                            alignItems: "center",
+                            gap: 10,
+                            boxShadow: "0 1px 3px rgba(0,0,0,0.04)",
+                        }}
+                    >
+                        <div
                             style={{
-                                borderRadius: 10,
-                                background: C.card,
-                                color: C.t2,
-                                border: `1px solid ${C.border}`,
+                                width: 34,
+                                height: 34,
+                                borderRadius: 999,
+                                background: C.purpleDim,
+                                color: C.purple,
+                                display: "flex",
+                                alignItems: "center",
+                                justifyContent: "center",
+                                fontWeight: 800,
+                                fontSize: 13,
+                                border: `2px solid ${C.purple}30`,
+                                flexShrink: 0,
                             }}
                         >
-                            <FiMenu className="text-[16px] min-w-4 h-4" />
-                        </button>
-                    </SidebarItem>
-                </div>
-                <div className="h-full px-3 py-4 overflow-y-auto hide-scroll">
-                    {!collapsed && (
-                        <div
-                            className="mb-4 rounded-xl p-4"
-                            style={{ background: C.card, border: `1px solid ${C.border}` }}
-                        >
-                            <div className="text-[11px] uppercase tracking-[0.18em] font-bold" style={{ color: C.t3 }}>
-                                Government Workspace
+                            {userInitial}
+                        </div>
+                        <div style={{ overflow: "hidden", flex: 1 }}>
+                            <div style={{ fontSize: 13, fontWeight: 700, color: C.t1, lineHeight: 1.2, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                                {userName}
                             </div>
-                            <div className="mt-2 text-sm font-semibold" style={{ color: C.t1 }}>
-                                {role.toUpperCase()} portal
-                            </div>
-                            <div className="mt-1 text-xs leading-5" style={{ color: C.t3 }}>
-                                Navigation aligned to the shared workspace system.
+                            <div style={{ marginTop: 3 }}>
+                                <span
+                                    style={{
+                                        display: "inline-flex",
+                                        alignItems: "center",
+                                        padding: "1px 7px",
+                                        borderRadius: 999,
+                                        fontSize: 10,
+                                        fontWeight: 700,
+                                        background: C.purpleDim,
+                                        color: C.purple,
+                                        letterSpacing: "0.02em",
+                                    }}
+                                >
+                                    {roleLabel}
+                                </span>
                             </div>
                         </div>
-                    )}
-                    <ul className="w-full space-y-1">
-                        {navByRole[role].map((item) => (
-                            <SidebarItem key={item.to} type="NavLink" to={item.to} icon={item.icon} label={item.label} collapsed={collapsed} />
-                        ))}
-                    </ul>
+                    </div>
                 </div>
-                <div className="px-3 py-3" style={{ borderTop: `1px solid ${C.border}` }}>
-                    <SidebarItem type="" collapsed={collapsed} label="Logout">
-                        <button
-                            onClick={handleLogout}
-                            className="flex items-center gap-2 w-full p-3 cursor-pointer"
-                            style={{
-                                color: C.danger,
-                                background: "transparent",
-                                borderRadius: 10,
-                                border: `1px solid ${C.border}`,
-                                justifyContent: collapsed ? "center" : "flex-start",
-                            }}
-                        >
-                            <FiLogOut className="text-[16px] min-w-4 h-4" />
-                            <div className={`whitespace-nowrap transition-all duration-300 text-sm leading-4 h-4 ${collapsed ? "w-0 opacity-0 hidden" : "max-w-fit opacity-100"} `}>
-                                Logout
-                            </div>
-                        </button>
-                    </SidebarItem>
-                </div>
+            )}
+
+            <div className="px-3 py-3 overflow-y-auto hide-scroll" style={{ flex: 1, marginTop: collapsed ? 0 : 6 }}>
+                {!collapsed && (
+                    <div style={{ fontSize: 10, fontWeight: 700, color: C.t3, textTransform: "uppercase", letterSpacing: "0.12em", padding: "8px 4px 6px" }}>
+                        Navigation
+                    </div>
+                )}
+                <ul className="w-full space-y-0.5">
+                    {navByRole[role].map((item) => (
+                        <SidebarItem key={item.to} type="NavLink" to={item.to} icon={item.icon} label={item.label} collapsed={collapsed} />
+                    ))}
+                </ul>
             </div>
-        </>
+
+            <div style={{ padding: "8px 12px 12px", borderTop: `1px solid ${C.border}` }}>
+                <SidebarItem type="" collapsed={collapsed} label="Logout">
+                    <button
+                        onClick={handleLogout}
+                        style={{
+                            display: "flex",
+                            alignItems: "center",
+                            gap: 8,
+                            width: "100%",
+                            padding: collapsed ? "9px" : "9px 12px",
+                            justifyContent: collapsed ? "center" : "flex-start",
+                            cursor: "pointer",
+                            color: C.danger,
+                            background: `${C.danger}08`,
+                            borderRadius: 10,
+                            border: `1px solid ${C.danger}25`,
+                            fontSize: 13,
+                            fontWeight: 600,
+                        }}
+                    >
+                        <FiLogOut className="text-[16px] min-w-4 h-4" />
+                        <div className={`whitespace-nowrap transition-all duration-300 text-sm leading-4 h-4 ${collapsed ? "w-0 opacity-0 hidden" : "max-w-fit opacity-100"} `}>
+                            Logout
+                        </div>
+                    </button>
+                </SidebarItem>
+            </div>
+        </div>
     );
 }
 

@@ -94,8 +94,6 @@ export default function CaseDetailsPage() {
   }
 
   const isMeeting = itemType === "meeting";
-  const statusColor = statusBadgeClass(caseData.status);
-
   return (
     <WorkspacePage width={1200}>
       <WorkspaceSectionHeader
@@ -113,7 +111,7 @@ export default function CaseDetailsPage() {
         <div className="grid md:grid-cols-3 gap-6">
           <div className="md:col-span-2 space-y-6">
             <WorkspaceCard>
-              <WorkspaceCardHeader title="Description" />
+              <WorkspaceCardHeader title="Description" subtitle="Primary context shared for this request or complaint." />
               <p style={{ color: C.t2, lineHeight: 1.7 }}>{caseData.description || caseData.purpose || "No description available"}</p>
             </WorkspaceCard>
 
@@ -127,7 +125,7 @@ export default function CaseDetailsPage() {
             </div>
 
             <WorkspaceCard>
-              <WorkspaceCardHeader title="Workflow Notes" />
+              <WorkspaceCardHeader title="Workflow Notes" subtitle="Latest citizen-visible notes from the active workflow." />
               <div className="space-y-3" style={{ color: C.t2 }}>
                 {isMeeting && caseData.admin_comments && <p><strong>Admin Comments:</strong> {caseData.admin_comments}</p>}
                 {isMeeting && caseData.verification_reason && <p><strong>Verification Note:</strong> {caseData.verification_reason}</p>}
@@ -141,7 +139,7 @@ export default function CaseDetailsPage() {
             </WorkspaceCard>
 
             <WorkspaceCard>
-              <WorkspaceCardHeader title="Timeline" />
+              <WorkspaceCardHeader title="Timeline" subtitle="Citizen-safe history of major status changes." />
               <div className="space-y-4">
                 {history.length === 0 ? (
                   <p style={{ color: C.t3, fontSize: 13 }}>No timeline entries yet.</p>
@@ -169,7 +167,7 @@ export default function CaseDetailsPage() {
 
           <div className="space-y-6">
             <WorkspaceCard>
-              <WorkspaceCardHeader title="Case Summary" />
+              <WorkspaceCardHeader title="Case Summary" subtitle="Reference details tied to this case record." />
               <div className="space-y-4">
                 <SummaryRow label="Created" value={new Date(caseData.createdAt || caseData.created_at).toLocaleString("en-IN")} />
                 {isMeeting && <SummaryRow label="Preferred Time" value={caseData.preferred_time ? new Date(caseData.preferred_time).toLocaleString("en-IN") : "Not provided"} />}
@@ -190,12 +188,12 @@ export default function CaseDetailsPage() {
 function InfoBox({ icon, label, value }) {
   const { C } = usePortalTheme();
   return (
-    <WorkspaceCard style={{ padding: 16 }}>
+    <WorkspaceCard style={{ padding: 18, minHeight: 118 }}>
       <div className="flex items-center gap-2 mb-2">
         {icon}
         <p style={{ fontSize: 11, textTransform: "uppercase", letterSpacing: ".08em", color: C.t3, fontWeight: 700 }}>{label}</p>
       </div>
-      <p style={{ color: C.t1, fontWeight: 500 }}>{value}</p>
+      <p style={{ color: C.t1, fontWeight: 600, lineHeight: 1.5 }}>{value}</p>
     </WorkspaceCard>
   );
 }
