@@ -1,6 +1,7 @@
 const jwt = require('jsonwebtoken');
 const redis = require('../config/redis');
 const { getRoleConfig } = require('../config/jwt');
+const authRepository = require('../modules/auth/auth.repository');
 const logger = require('../utils/logger');
 
 function getBearerToken(req) {
@@ -41,6 +42,19 @@ function authenticate(expectedRole) {
           tokenSub: payload.sub,
           tokenAud: payload.aud,
           tokenRole: payload.role,
+          path: req.originalUrl,
+          method: req.method,
+          ip: req.ip,
+        });
+        return res.status(401).json({ error: 'Unauthorized' });
+      }
+
+      const user = await authRepository.findActiveUserById(expectedRole, payload.sub);
+      if (!user) {
+        logger.warn('Authentication failed', {
+          reason: 'inactive_or_removed_account',
+          expectedRole,
+          tokenSub: payload.sub,
           path: req.originalUrl,
           method: req.method,
           ip: req.ip,

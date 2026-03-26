@@ -17,4 +17,20 @@ async function publishMeetingStatusUpdate({ citizenId, meetingId, status, note }
   );
 }
 
-module.exports = { publishMeetingStatusUpdate };
+async function publishComplaintStatusUpdate({ citizenId, complaintId, status, note }) {
+  await redis.publish(
+    `citizen:${citizenId}`,
+    JSON.stringify({
+      event: events.COMPLAINT_STATUS_UPDATED,
+      payload: {
+        citizenId,
+        complaintId,
+        status,
+        note,
+        timestamp: new Date().toISOString(),
+      },
+    })
+  );
+}
+
+module.exports = { publishMeetingStatusUpdate, publishComplaintStatusUpdate };

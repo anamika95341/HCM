@@ -21,8 +21,11 @@ function statusBadgeClass(status) {
 }
 
 function labelForStatus(status) {
-  if (["pending", "accepted", "verification_pending", "verified", "not_verified"].includes(status)) {
+  if (["pending", "accepted", "verification_pending", "verified"].includes(status)) {
     return "Under Review";
+  }
+  if (status === "not_verified") {
+    return "Verification Failed";
   }
   return String(status || "")
     .split("_")

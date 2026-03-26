@@ -70,6 +70,15 @@ async function reassignComplaint(req, res, next) {
   }
 }
 
+async function startComplaintReview(req, res, next) {
+  try {
+    const complaint = await complaintsService.startComplaintReview(req.params.complaintId, req.user.sub, reqMeta(req));
+    res.json({ complaint });
+  } catch (error) {
+    next(error);
+  }
+}
+
 async function updateComplaintDepartment(req, res, next) {
   try {
     const complaint = await complaintsService.updateComplaintDepartment(req.params.complaintId, req.user.sub, req.body, reqMeta(req));
@@ -140,6 +149,7 @@ module.exports = {
   getAdminComplaintDetail,
   assignComplaintToSelf,
   reassignComplaint,
+  startComplaintReview,
   updateComplaintDepartment,
   scheduleComplaintCall,
   logComplaintCallOutcome,

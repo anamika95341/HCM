@@ -70,8 +70,53 @@ function EventPill({ item, compact = false, onClick }) {
   );
 }
 
-function EventModal({ item, onClose }) {
+function formatFileSize(size = 0) {
+  if (size >= 1024 * 1024) return `${(size / (1024 * 1024)).toFixed(1)} MB`;
+  if (size >= 1024) return `${Math.round(size / 1024)} KB`;
+  return `${size} B`;
+}
+
+function EventModal({ item, accessToken, onClose }) {
   const { C } = usePortalTheme();
+  const [files, setFiles] = useState([]);
+  const [loadingFiles, setLoadingFiles] = useState(false);
+  const [filesError, setFilesError] = useState("");
+  const [selectedFile, setSelectedFile] = useState(null);
+
+  useEffect(() => {
+    let active = true;
+
+    async function loadFiles() {
+      if (!item?.sourceId || !accessToken) {
+        return;
+      }
+      try {
+        setLoadingFiles(true);
+        setFilesError("");
+        const { data } = await apiClient.get(`/minister/calendar/${item.sourceId}/files`, authorizedConfig(accessToken));
+        if (active) {
+          setFiles(Array.isArray(data?.files) ? data.files : []);
+        }
+      } catch (error) {
+        if (active) {
+          setFilesError(error?.response?.data?.error || "Unable to load meeting files");
+        }
+      } finally {
+        if (active) {
+          setLoadingFiles(false);
+        }
+      }
+    }
+
+    setFiles([]);
+    setSelectedFile(null);
+    loadFiles();
+
+    return () => {
+      active = false;
+    };
+  }, [item?.sourceId, accessToken]);
+
   if (!item) return null;
   const tone = item.type === "VIP Meeting" ? C.warn : C.purple;
 
@@ -114,6 +159,73 @@ function EventModal({ item, onClose }) {
             <div>
               <div style={{ fontSize: 11, fontWeight: 700, color: C.t3, textTransform: "uppercase", letterSpacing: ".12em", marginBottom: 8 }}>Comments</div>
               <div style={{ color: C.t2, fontSize: 14, lineHeight: 1.7 }}>{item.details || "No additional comments available."}</div>
+            </div>
+            <div>
+              <div style={{ fontSize: 11, fontWeight: 700, color: C.t3, textTransform: "uppercase", letterSpacing: ".12em", marginBottom: 12 }}>Files</div>
+              {loadingFiles ? (
+                <div style={{ color: C.t3, fontSize: 13 }}>Loading meeting files...</div>
+              ) : filesError ? (
+                <div style={{ color: C.danger, fontSize: 13 }}>{filesError}</div>
+              ) : files.length === 0 ? (
+                <div style={{ color: C.t3, fontSize: 13 }}>No files are attached to this meeting.</div>
+              ) : (
+                <div style={{ display: "grid", gap: 16 }}>
+                  <div
+                    style={{
+                      display: "grid",
+                      gridTemplateColumns: "repeat(auto-fill, minmax(132px, 1fr))",
+                      gap: 14,
+                    }}
+                  >
+                    {files.map((file) => (
+                      <button
+                        key={file.id}
+                        type="button"
+                        onClick={() => setSelectedFile(file)}
+                        style={{
+                          border: `1px solid ${C.border}`,
+                          background: C.bgElevated,
+                          borderRadius: 14,
+                          padding: 10,
+                          textAlign: "left",
+                          cursor: "pointer",
+                        }}
+                      >
+                        <div style={{ aspectRatio: "1 / 1", overflow: "hidden", borderRadius: 10, background: `${tone}12`, border: `1px solid ${tone}22` }}>
+                          <img
+                            src={file.previewUrl}
+                            alt={file.name}
+                            loading="lazy"
+                            style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }}
+                          />
+                        </div>
+                        <div style={{ marginTop: 10, fontSize: 12, fontWeight: 600, color: C.t1, lineHeight: 1.4, wordBreak: "break-word" }}>{file.name}</div>
+                        <div style={{ marginTop: 4, fontSize: 11, color: C.t3 }}>{formatFileSize(file.size)}</div>
+                      </button>
+                    ))}
+                  </div>
+                  {selectedFile && (
+                    <div style={{ border: `1px solid ${C.border}`, borderRadius: 16, overflow: "hidden", background: C.bgElevated }}>
+                      <div style={{ padding: "14px 16px", borderBottom: `1px solid ${C.border}`, display: "flex", justifyContent: "space-between", gap: 12, alignItems: "center" }}>
+                        <div>
+                          <div style={{ fontSize: 13, fontWeight: 700, color: C.t1 }}>{selectedFile.name}</div>
+                          <div style={{ fontSize: 11, color: C.t3, marginTop: 4 }}>{formatFileSize(selectedFile.size)}</div>
+                        </div>
+                        <a href={selectedFile.downloadUrl} target="_blank" rel="noreferrer" style={{ color: tone, fontSize: 12, fontWeight: 700 }}>
+                          Open Full Image
+                        </a>
+                      </div>
+                      <div style={{ padding: 16 }}>
+                        <img
+                          src={selectedFile.downloadUrl}
+                          alt={selectedFile.name}
+                          style={{ width: "100%", maxHeight: 420, objectFit: "contain", borderRadius: 12, background: "#fff" }}
+                        />
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           </div>
         </div>
@@ -377,7 +489,7 @@ export default function MinisterCalendar() {
         </div>
       )}
 
-      <EventModal item={selectedItem} onClose={() => setSelectedItem(null)} />
+      <EventModal item={selectedItem} accessToken={session?.accessToken} onClose={() => setSelectedItem(null)} />
     </WorkspacePage>
   );
 }

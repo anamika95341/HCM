@@ -1,8 +1,9 @@
 const createHttpError = require('http-errors');
 const redis = require('../../config/redis');
 const meetingsRepository = require('./meetings.repository');
+const adminRepository = require('../admin/admin.repository');
 const { sanitizeText } = require('../../utils/sanitize');
-const { persistPrivateUpload } = require('../../middleware/uploadHandler');
+const { persistPrivateUpload, PHOTO_ALLOWED } = require('../../middleware/uploadHandler');
 const { writeAuditLog } = require('../../utils/audit');
 const { publishMeetingStatusUpdate } = require('../../realtime/wsPublisher');
 const { generateCaseCode } = require('../../utils/generateCaseCode');
@@ -44,6 +45,27 @@ async function clearIdempotency(idempotencyKey) {
 function assertAllowedTransition(currentStatus, allowedStatuses, actionLabel) {
   if (!allowedStatuses.includes(currentStatus)) {
     throw createHttpError(409, `Cannot ${actionLabel} when meeting status is ${currentStatus}`);
+  }
+}
+
+function assertMeetingAdminAccess(meeting, adminId, { allowUnassigned = false, actionLabel = 'modify this meeting' } = {}) {
+  if (!meeting.assignedAdminUserId) {
+    if (allowUnassigned) {
+      return;
+    }
+    throw createHttpError(409, `Cannot ${actionLabel} because the meeting is not assigned`);
+  }
+  if (meeting.assignedAdminUserId !== adminId) {
+    throw createHttpError(403, 'Only the assigned admin can perform this action');
+  }
+}
+
+function assertAssignedDeo(meeting, deoId) {
+  if (!meeting.assignedDeoId) {
+    throw createHttpError(409, 'This meeting is not assigned to a DEO');
+  }
+  if (meeting.assignedDeoId !== deoId) {
+    throw createHttpError(403, 'Only the assigned DEO can verify this meeting');
   }
 }
 
@@ -115,6 +137,28 @@ async function getAdminMeetingDetail(meetingId) {
   return { meeting, history };
 }
 
+async function getAdminMeetingFiles(meetingId, adminId) {
+  const meeting = await meetingsRepository.getMeetingById(meetingId);
+  if (!meeting) {
+    throw createHttpError(404, 'Meeting not found');
+  }
+  assertMeetingAdminAccess(meeting, adminId, {
+    allowUnassigned: meeting.status === 'pending',
+    actionLabel: 'view files for this meeting',
+  });
+  const files = await meetingsRepository.listMeetingFilesForAdmin(meetingId, adminId);
+  return {
+    files: files.map((f) => ({
+      id: f.id,
+      name: f.original_name,
+      mimeType: f.mime_type,
+      size: f.file_size,
+      kind: f.entity_type,
+      createdAt: f.created_at,
+    })),
+  };
+}
+
 async function changeMeetingStatus({
   meetingId,
   actorRole,
@@ -154,6 +198,15 @@ async function changeMeetingStatus({
 }
 
 async function rejectMeeting(meetingId, actorId, reason, reqMeta) {
+  const current = await meetingsRepository.getMeetingById(meetingId);
+  if (!current) {
+    throw createHttpError(404, 'Meeting not found');
+  }
+  assertMeetingAdminAccess(current, actorId, {
+    allowUnassigned: current.status === 'pending',
+    actionLabel: 'reject this meeting',
+  });
+
   const cleanReason = sanitizeText(reason);
   const updated = await changeMeetingStatus({
     meetingId,
@@ -184,6 +237,15 @@ async function rejectMeeting(meetingId, actorId, reason, reqMeta) {
 }
 
 async function acceptMeeting(meetingId, actorId, reqMeta) {
+  const current = await meetingsRepository.getMeetingById(meetingId);
+  if (!current) {
+    throw createHttpError(404, 'Meeting not found');
+  }
+  assertMeetingAdminAccess(current, actorId, {
+    allowUnassigned: current.status === 'pending' || current.status === 'not_verified',
+    actionLabel: 'accept this meeting',
+  });
+
   const updated = await changeMeetingStatus({
     meetingId,
     actorRole: 'admin',
@@ -208,6 +270,16 @@ async function acceptMeeting(meetingId, actorId, reqMeta) {
 }
 
 async function assignVerification(meetingId, actorId, deoId, reqMeta) {
+  const current = await meetingsRepository.getMeetingById(meetingId);
+  if (!current) {
+    throw createHttpError(404, 'Meeting not found');
+  }
+  assertMeetingAdminAccess(current, actorId, { actionLabel: 'send this meeting for verification' });
+  const deo = await adminRepository.findActiveDeoById(deoId);
+  if (!deo) {
+    throw createHttpError(404, 'Assigned DEO not found');
+  }
+
   const updated = await changeMeetingStatus({
     meetingId,
     actorRole: 'admin',
@@ -232,6 +304,12 @@ async function assignVerification(meetingId, actorId, deoId, reqMeta) {
 }
 
 async function submitVerification(meetingId, deoId, verified, reason, notes, reqMeta) {
+  const current = await meetingsRepository.getMeetingById(meetingId);
+  if (!current) {
+    throw createHttpError(404, 'Meeting not found');
+  }
+  assertAssignedDeo(current, deoId);
+
   const status = verified ? 'verified' : 'not_verified';
   const updated = await changeMeetingStatus({
     meetingId,
@@ -262,6 +340,11 @@ async function scheduleMeeting(meetingId, adminId, body, reqMeta) {
   const meeting = await meetingsRepository.getMeetingById(meetingId);
   if (!meeting) {
     throw createHttpError(404, 'Meeting not found');
+  }
+  assertMeetingAdminAccess(meeting, adminId, { actionLabel: meeting.status === 'scheduled' ? 'reschedule this meeting' : 'schedule this meeting' });
+  const minister = await adminRepository.findActiveMinisterById(body.ministerId);
+  if (!minister) {
+    throw createHttpError(404, 'Minister not found');
   }
 
   const payload = {
@@ -318,7 +401,58 @@ async function scheduleMeeting(meetingId, adminId, body, reqMeta) {
   return updated;
 }
 
+async function uploadMeetingPhoto(meetingId, adminId, file, reqMeta) {
+  const meeting = await meetingsRepository.getMeetingById(meetingId);
+  if (!meeting) {
+    throw createHttpError(404, 'Meeting not found');
+  }
+  assertMeetingAdminAccess(meeting, adminId, {
+    actionLabel: 'upload files for this meeting',
+  });
+  assertAllowedTransition(meeting.status, ['scheduled', 'completed'], 'upload files for this meeting');
+  if (!file) {
+    throw createHttpError(400, 'File is required');
+  }
+
+  const storedFile = await persistPrivateUpload(file, 'photos', PHOTO_ALLOWED);
+  const uploaded = await meetingsRepository.createUploadedFile(storedFile, {
+    entityType: 'meeting_photo',
+    entityId: meetingId,
+    uploadedByRole: 'admin',
+    uploadedById: adminId,
+  });
+
+  await redis.del(`meeting:files:${meetingId}`);
+
+  await writeAuditLog({
+    actorRole: 'admin',
+    actorId: adminId,
+    entityType: 'meeting',
+    entityId: meetingId,
+    action: 'meeting_photo_uploaded',
+    ipAddress: reqMeta.ip,
+    userAgent: reqMeta.userAgent,
+    metadata: { fileId: uploaded.id, originalName: uploaded.original_name || storedFile.originalName },
+  });
+
+  return {
+    file: {
+      id: uploaded.id,
+      name: uploaded.original_name || storedFile.originalName,
+      mimeType: uploaded.mime_type || storedFile.mimeType,
+      size: uploaded.file_size || storedFile.fileSize,
+      kind: uploaded.entity_type || 'meeting_photo',
+    },
+  };
+}
+
 async function completeMeeting(meetingId, adminId, reason, reqMeta) {
+  const current = await meetingsRepository.getMeetingById(meetingId);
+  if (!current) {
+    throw createHttpError(404, 'Meeting not found');
+  }
+  assertMeetingAdminAccess(current, adminId, { actionLabel: 'complete this meeting' });
+
   const cleanReason = sanitizeText(reason);
   const updated = await changeMeetingStatus({
     meetingId,
@@ -349,6 +483,15 @@ async function completeMeeting(meetingId, adminId, reason, reqMeta) {
 }
 
 async function cancelMeeting(meetingId, adminId, reason, reqMeta) {
+  const current = await meetingsRepository.getMeetingById(meetingId);
+  if (!current) {
+    throw createHttpError(404, 'Meeting not found');
+  }
+  assertMeetingAdminAccess(current, adminId, {
+    allowUnassigned: current.status === 'pending',
+    actionLabel: 'cancel this meeting',
+  });
+
   const cleanReason = sanitizeText(reason);
   const updated = await changeMeetingStatus({
     meetingId,
@@ -383,11 +526,13 @@ module.exports = {
   getCitizenMeetings,
   getCitizenMeetingDetail,
   getAdminMeetingDetail,
+  getAdminMeetingFiles,
   rejectMeeting,
   acceptMeeting,
   assignVerification,
   submitVerification,
   scheduleMeeting,
+  uploadMeetingPhoto,
   completeMeeting,
   cancelMeeting,
 };

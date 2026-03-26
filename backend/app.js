@@ -15,6 +15,7 @@ const ministerRoutes = require('./modules/minister/minister.routes');
 const deoRoutes = require('./modules/deo/deo.routes');
 const meetingRoutes = require('./modules/meetings/meetings.routes');
 const complaintRoutes = require('./modules/complaints/complaints.routes');
+const filesRoutes = require('./modules/files/files.routes');
 
 function createApp() {
   const app = express();
@@ -66,6 +67,7 @@ function createApp() {
   app.use('/api/v1/deo', deoRoutes);
   app.use('/api/v1/meetings', meetingRoutes);
   app.use('/api/v1/complaints', complaintRoutes);
+  app.use('/api/v1/files', filesRoutes);
 
   app.use((req, res, next) => {
     next(createHttpError(404, 'Resource not found'));

@@ -17,12 +17,21 @@ import { usePortalTheme } from "../../../shared/theme/portalTheme.jsx";
 
 function buildComplaintActions(item, userId) {
   const actions = [];
+  const canStartReview = item.status === "assigned";
+  const canDepartment = ["assigned", "in_review", "department_contact_identified", "call_scheduled", "followup_in_progress"].includes(item.status);
+  const canScheduleCall = ["assigned", "in_review", "department_contact_identified", "call_scheduled", "followup_in_progress"].includes(item.status);
+  const canLogCall = ["call_scheduled", "followup_in_progress"].includes(item.status);
+  const canResolve = ["submitted", "assigned", "in_review", "department_contact_identified", "call_scheduled", "followup_in_progress"].includes(item.status);
+  const canEscalate = ["assigned", "in_review", "department_contact_identified", "call_scheduled", "followup_in_progress"].includes(item.status);
   if (!item.assignedAdminUserId) actions.push(["assign", "Assign to Me"]);
   if (item.assignedAdminUserId === userId) {
     actions.push(["reassign", "Reassign"]);
-    if (!["resolved", "completed", "escalated_to_meeting"].includes(item.status)) {
-      actions.push(["department", "Department Flow"], ["scheduleCall", "Schedule Call"], ["logCall", "Log Call"], ["resolve", "Resolve"], ["escalate", "Escalate"]);
-    }
+    if (canStartReview) actions.push(["startReview", "Start Review"]);
+    if (canDepartment) actions.push(["department", "Department Flow"]);
+    if (canScheduleCall) actions.push(["scheduleCall", "Schedule Call"]);
+    if (canLogCall) actions.push(["logCall", "Log Call"]);
+    if (canResolve) actions.push(["resolve", "Resolve"]);
+    if (canEscalate) actions.push(["escalate", "Escalate"]);
   }
   if (["resolved", "completed", "escalated_to_meeting"].includes(item.status)) actions.push(["reopen", "Reopen"]);
   if (item.status === "resolved") actions.push(["close", "Close"]);
@@ -258,6 +267,16 @@ export default function AdminCaseDetail() {
                 Reassign Complaint
               </WorkspaceButton>
             </div>
+          )}
+
+          {activeAction === "startReview" && (
+            <WorkspaceButton
+              type="button"
+              disabled={actionLoading}
+              onClick={() => runAction("startReview", () => apiClient.patch(`/complaints/${id}/start-review`, {}, authorizedConfig(session.accessToken)))}
+            >
+              Start Review
+            </WorkspaceButton>
           )}
 
           {activeAction === "department" && (

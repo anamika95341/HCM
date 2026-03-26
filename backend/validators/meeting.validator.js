@@ -21,6 +21,9 @@ const meetingScheduleSchema = z.object({
   location: z.string().min(3).max(500),
   isVip: z.boolean().default(false),
   comments: z.string().max(2000).optional().or(z.literal('')),
+}).refine((value) => new Date(value.endsAt).getTime() > new Date(value.startsAt).getTime(), {
+  message: 'End time must be after start time',
+  path: ['endsAt'],
 });
 
 const meetingActionNoteSchema = z.object({

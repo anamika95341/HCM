@@ -50,6 +50,9 @@ export default function AdminMeeting() {
     comments: "",
   });
   const [workflowDirectory, setWorkflowDirectory] = useState({ deos: [], ministers: [] });
+  const [meetingFiles, setMeetingFiles] = useState([]);
+  const [uploadFile, setUploadFile] = useState(null);
+  const [uploadingFile, setUploadingFile] = useState(false);
 
   useEffect(() => {
     let mounted = true;
@@ -91,14 +94,27 @@ export default function AdminMeeting() {
       if (!meetingId || !session?.accessToken) {
         setSelectedMeeting(null);
         setHistory([]);
+        setMeetingFiles([]);
         return;
       }
 
       try {
-        const { data } = await apiClient.get(`/meetings/${meetingId}/admin-view`, authorizedConfig(session.accessToken));
+        const [detailResult, filesResult] = await Promise.allSettled([
+          apiClient.get(`/meetings/${meetingId}/admin-view`, authorizedConfig(session.accessToken)),
+          apiClient.get(`/meetings/${meetingId}/files`, authorizedConfig(session.accessToken)),
+        ]);
+
+        if (detailResult.status === "rejected") {
+          throw detailResult.reason;
+        }
+
         if (mounted) {
+          const { data } = detailResult.value;
           setSelectedMeeting(data.meeting);
           setHistory(data.history || []);
+          if (filesResult.status === "fulfilled") {
+            setMeetingFiles(filesResult.value.data.files || []);
+          }
         }
       } catch (detailError) {
         if (mounted) {
@@ -141,24 +157,50 @@ export default function AdminMeeting() {
   }, [meetings]);
 
   if (meetingId && selectedMeeting) {
-    const canAccept = selectedMeeting.status === "pending";
-    const canSendVerification = ["accepted", "verified", "not_verified"].includes(selectedMeeting.status);
-    const canSchedule = ["accepted", "verified", "not_verified", "scheduled"].includes(selectedMeeting.status);
+    const canAccept = ["pending", "not_verified"].includes(selectedMeeting.status);
+    const canSendVerification = ["accepted", "not_verified"].includes(selectedMeeting.status);
+    const canSchedule = ["accepted", "verified", "scheduled"].includes(selectedMeeting.status);
     const canCompleteOrCancel = selectedMeeting.status === "scheduled";
+    const canUploadPhotos = ["scheduled", "completed"].includes(selectedMeeting.status);
 
     const runAction = async (request) => {
       setActionLoading(true);
       setActionError("");
       try {
-        const { data } = await request();
-        setSelectedMeeting(data.meeting);
-        const detail = await apiClient.get(`/meetings/${meetingId}/admin-view`, authorizedConfig(session.accessToken));
-        setSelectedMeeting(detail.data.meeting);
-        setHistory(detail.data.history || []);
+        await request();
+        const [detailResult, filesResult] = await Promise.allSettled([
+          apiClient.get(`/meetings/${meetingId}/admin-view`, authorizedConfig(session.accessToken)),
+          apiClient.get(`/meetings/${meetingId}/files`, authorizedConfig(session.accessToken)),
+        ]);
+        if (detailResult.status === "fulfilled") {
+          setSelectedMeeting(detailResult.value.data.meeting);
+          setHistory(detailResult.value.data.history || []);
+        }
+        if (filesResult.status === "fulfilled") {
+          setMeetingFiles(filesResult.value.data.files || []);
+        }
       } catch (error) {
         setActionError(error?.response?.data?.error || "Unable to update meeting");
       } finally {
         setActionLoading(false);
+      }
+    };
+
+    const uploadMeetingPhoto = async () => {
+      if (!uploadFile) return;
+      setUploadingFile(true);
+      setActionError("");
+      try {
+        const formData = new FormData();
+        formData.append("file", uploadFile);
+        await apiClient.post(`/meetings/${meetingId}/photos`, formData, authorizedConfig(session.accessToken));
+        const { data } = await apiClient.get(`/meetings/${meetingId}/files`, authorizedConfig(session.accessToken));
+        setMeetingFiles(data.files || []);
+        setUploadFile(null);
+      } catch (error) {
+        setActionError(error?.response?.data?.error || "Unable to upload meeting photo");
+      } finally {
+        setUploadingFile(false);
       }
     };
 
@@ -333,6 +375,39 @@ export default function AdminMeeting() {
                 >
                   {selectedMeeting.status === "scheduled" ? "Reschedule Meeting" : "Schedule Meeting"}
                 </WorkspaceButton>
+              </div>
+            )}
+          </WorkspaceCard>
+
+          <WorkspaceCard style={{ display: "grid", gap: 16 }}>
+            <WorkspaceCardHeader
+              title="Meeting Files"
+              subtitle="This meeting only. Uploaded photos here are what the minister sees in the calendar details."
+            />
+            {canUploadPhotos ? (
+              <div className="flex flex-wrap items-center gap-3">
+                <input
+                  type="file"
+                  accept="image/png,image/jpeg"
+                  onChange={(event) => setUploadFile(event.target.files?.[0] || null)}
+                />
+                <WorkspaceButton type="button" disabled={!uploadFile || uploadingFile} onClick={uploadMeetingPhoto}>
+                  {uploadingFile ? "Uploading..." : "Upload Photo"}
+                </WorkspaceButton>
+              </div>
+            ) : (
+              <div style={{ fontSize: 13, color: C.t3 }}>Photos can be uploaded after the meeting is scheduled.</div>
+            )}
+            {meetingFiles.length === 0 ? (
+              <div style={{ fontSize: 13, color: C.t3 }}>No files attached to this meeting yet.</div>
+            ) : (
+              <div style={{ display: "grid", gap: 10 }}>
+                {meetingFiles.map((file) => (
+                  <div key={file.id} style={{ padding: 12, borderRadius: 12, border: `1px solid ${C.border}`, background: C.bgElevated }}>
+                    <div style={{ fontSize: 13, fontWeight: 700, color: C.t1 }}>{file.name}</div>
+                    <div style={{ marginTop: 4, fontSize: 12, color: C.t3 }}>{file.mimeType}</div>
+                  </div>
+                ))}
               </div>
             )}
           </WorkspaceCard>

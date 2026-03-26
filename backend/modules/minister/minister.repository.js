@@ -11,4 +11,16 @@ async function getCalendar(ministerId) {
   return result.rows;
 }
 
-module.exports = { getCalendar };
+async function hasCalendarAccessToMeeting(ministerId, meetingId) {
+  const result = await pool.query(
+    `SELECT 1
+       FROM minister_calendar_events
+      WHERE minister_id = $1
+        AND meeting_id = $2
+      LIMIT 1`,
+    [ministerId, meetingId]
+  );
+  return Boolean(result.rows[0]);
+}
+
+module.exports = { getCalendar, hasCalendarAccessToMeeting };

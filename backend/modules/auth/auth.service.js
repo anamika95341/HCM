@@ -634,7 +634,7 @@ async function refreshSession(refreshToken) {
     throw createHttpError(401, 'Unauthorized');
   }
 
-  const user = await authRepository.findUserById(role, payload.sub);
+  const user = await authRepository.findActiveUserById(role, payload.sub);
   if (!user) {
     throw createHttpError(401, 'Unauthorized');
   }

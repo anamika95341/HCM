@@ -9,4 +9,13 @@ async function getCalendar(req, res, next) {
   }
 }
 
-module.exports = { getCalendar };
+async function getMeetingFiles(req, res, next) {
+  try {
+    const result = await ministerService.getMeetingFiles(req.user.sub, req.params.meetingId);
+    res.json(result);
+  } catch (error) {
+    next(error);
+  }
+}
+
+module.exports = { getCalendar, getMeetingFiles };

@@ -5,6 +5,7 @@ const crypto = require('crypto');
 const env = require('../config/env');
 
 const ALLOWED = new Set(['image/jpeg', 'image/png', 'application/pdf']);
+const PHOTO_ALLOWED = new Set(['image/jpeg', 'image/png']);
 
 fs.mkdirSync(path.resolve(process.cwd(), env.uploadDir, 'photos'), { recursive: true });
 fs.mkdirSync(path.resolve(process.cwd(), env.uploadDir, 'documents'), { recursive: true });
@@ -21,10 +22,10 @@ function createUploader({ maxSizeBytes, subdir }) {
   }).single('file');
 }
 
-async function persistPrivateUpload(file, subdir) {
+async function persistPrivateUpload(file, subdir, allowedMimes = ALLOWED) {
   const { fileTypeFromBuffer } = await import('file-type');
   const type = await fileTypeFromBuffer(file.buffer);
-  if (!type || !ALLOWED.has(type.mime)) {
+  if (!type || !allowedMimes.has(type.mime)) {
     const error = new Error('Invalid file type');
     error.status = 400;
     throw error;
@@ -49,4 +50,5 @@ module.exports = {
   photoUpload: createUploader({ maxSizeBytes: 2 * 1024 * 1024, subdir: 'photos' }),
   documentUpload: createUploader({ maxSizeBytes: 10 * 1024 * 1024, subdir: 'documents' }),
   persistPrivateUpload,
+  PHOTO_ALLOWED,
 };

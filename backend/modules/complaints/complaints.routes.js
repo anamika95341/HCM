@@ -25,6 +25,7 @@ router.get('/my/:complaintId', authenticate('citizen'), authorize('citizen'), co
 router.get('/:complaintId/admin-view', authenticate('admin'), authorize('admin'), complaintsController.getAdminComplaintDetail);
 router.patch('/:complaintId/assign-self', authenticate('admin'), authorize('admin'), validateRequest(assignComplaintSchema), complaintsController.assignComplaintToSelf);
 router.patch('/:complaintId/reassign', authenticate('admin'), authorize('admin'), validateRequest(reassignComplaintSchema), complaintsController.reassignComplaint);
+router.patch('/:complaintId/start-review', authenticate('admin'), authorize('admin'), validateRequest(assignComplaintSchema), complaintsController.startComplaintReview);
 router.patch('/:complaintId/department', authenticate('admin'), authorize('admin'), validateRequest(complaintDepartmentSchema), complaintsController.updateComplaintDepartment);
 router.patch('/:complaintId/schedule-call', authenticate('admin'), authorize('admin'), validateRequest(complaintScheduleCallSchema), complaintsController.scheduleComplaintCall);
 router.patch('/:complaintId/log-call', authenticate('admin'), authorize('admin'), validateRequest(complaintCallOutcomeSchema), complaintsController.logComplaintCallOutcome);

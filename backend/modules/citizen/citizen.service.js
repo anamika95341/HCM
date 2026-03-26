@@ -34,12 +34,8 @@ async function getAdminDirectory() {
 }
 
 async function getMyCases(citizenId) {
-  const [meetings, complaints] = await Promise.all([
-    meetingsRepository.getCitizenMeetings(citizenId),
-    complaintsRepository.getCitizenComplaints(citizenId),
-  ]);
-
-  return { meetings, complaints };
+  const complaints = await complaintsRepository.getCitizenComplaints(citizenId);
+  return { complaints };
 }
 
 async function getCaseDetail(citizenId, caseId) {

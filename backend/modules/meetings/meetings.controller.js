@@ -46,6 +46,15 @@ async function getAdminMeetingDetail(req, res, next) {
   }
 }
 
+async function getAdminMeetingFiles(req, res, next) {
+  try {
+    const result = await meetingsService.getAdminMeetingFiles(req.params.meetingId, req.user.sub);
+    res.json(result);
+  } catch (error) {
+    next(error);
+  }
+}
+
 async function acceptMeeting(req, res, next) {
   try {
     const meeting = await meetingsService.acceptMeeting(req.params.meetingId, req.user.sub, reqMeta(req));
@@ -98,6 +107,15 @@ async function scheduleMeeting(req, res, next) {
   }
 }
 
+async function uploadMeetingPhoto(req, res, next) {
+  try {
+    const result = await meetingsService.uploadMeetingPhoto(req.params.meetingId, req.user.sub, req.file, reqMeta(req));
+    res.status(201).json(result);
+  } catch (error) {
+    next(error);
+  }
+}
+
 async function completeMeeting(req, res, next) {
   try {
     const meeting = await meetingsService.completeMeeting(req.params.meetingId, req.user.sub, req.body.reason, reqMeta(req));
@@ -121,11 +139,13 @@ module.exports = {
   getCitizenMeetings,
   getCitizenMeetingDetail,
   getAdminMeetingDetail,
+  getAdminMeetingFiles,
   acceptMeeting,
   rejectMeeting,
   assignVerification,
   submitVerification,
   scheduleMeeting,
+  uploadMeetingPhoto,
   completeMeeting,
   cancelMeeting,
 };

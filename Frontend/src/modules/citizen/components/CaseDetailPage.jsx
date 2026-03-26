@@ -22,8 +22,11 @@ function getStatusIcon(status) {
 }
 
 function citizenFacingStatus(caseData, itemType) {
-  if (itemType === "meeting" && ["verification_pending", "accepted", "verified", "not_verified", "pending"].includes(caseData?.status)) {
+  if (itemType === "meeting" && ["verification_pending", "accepted", "verified", "pending"].includes(caseData?.status)) {
     return "Under Review";
+  }
+  if (itemType === "meeting" && caseData?.status === "not_verified") {
+    return "Verification Failed";
   }
   if (itemType === "complaint" && ["assigned", "department_contact_identified", "call_scheduled", "followup_in_progress", "escalated_to_meeting"].includes(caseData?.status)) {
     return "Under Review";

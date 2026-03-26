@@ -143,6 +143,15 @@ async function createMeeting({
     );
     const meeting = meetingResult.rows[0];
 
+    if (documentFileId) {
+      await client.query(
+        `UPDATE uploaded_files
+            SET entity_id = $2
+          WHERE id = $1`,
+        [documentFileId, meeting.id]
+      );
+    }
+
     for (const attendee of additionalAttendees) {
       await client.query(
         `INSERT INTO meeting_additional_attendees (meeting_id, attendee_name, attendee_phone)
@@ -291,6 +300,43 @@ async function getMeetingHistory(meetingId) {
   return result.rows;
 }
 
+async function listMeetingFilesForMinister(meetingId, ministerId) {
+  const result = await pool.query(
+    `SELECT uf.id, uf.entity_type, uf.original_name, uf.mime_type, uf.file_size, uf.created_at, uf.storage_path
+       FROM minister_calendar_events mce
+       JOIN meetings m ON m.id = mce.meeting_id
+       JOIN uploaded_files uf
+         ON (
+              (uf.id = m.document_file_id AND uf.mime_type LIKE 'image/%')
+              OR
+              (uf.entity_id = m.id AND uf.entity_type = 'meeting_photo')
+            )
+      WHERE mce.meeting_id = $1
+        AND mce.minister_id = $2
+      ORDER BY uf.created_at ASC`,
+    [meetingId, ministerId]
+  );
+  return result.rows;
+}
+
+async function listMeetingFilesForAdmin(meetingId, adminId) {
+  const result = await pool.query(
+    `SELECT uf.id, uf.entity_type, uf.original_name, uf.mime_type, uf.file_size, uf.created_at, uf.storage_path
+       FROM meetings m
+       JOIN uploaded_files uf
+         ON (
+              (uf.id = m.document_file_id AND uf.mime_type LIKE 'image/%')
+              OR
+              (uf.entity_id = m.id AND uf.entity_type = 'meeting_photo')
+            )
+      WHERE m.id = $1
+        AND m.assigned_admin_id = $2
+      ORDER BY uf.created_at ASC`,
+    [meetingId, adminId]
+  );
+  return result.rows;
+}
+
 module.exports = {
   createUploadedFile,
   createMeeting,
@@ -303,4 +349,6 @@ module.exports = {
   createCalendarEvent,
   updateCalendarEventByMeetingId,
   getMeetingHistory,
+  listMeetingFilesForMinister,
+  listMeetingFilesForAdmin,
 };

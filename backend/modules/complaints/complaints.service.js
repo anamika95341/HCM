@@ -6,6 +6,7 @@ const adminRepository = require('../admin/admin.repository');
 const { persistPrivateUpload } = require('../../middleware/uploadHandler');
 const { sanitizeText } = require('../../utils/sanitize');
 const { writeAuditLog } = require('../../utils/audit');
+const { publishComplaintStatusUpdate } = require('../../realtime/wsPublisher');
 
 async function withIdempotency(idempotencyKey, producer) {
   if (!idempotencyKey) {
@@ -128,6 +129,18 @@ function assertAllowedComplaintTransition(currentStatus, allowedStatuses, action
   }
 }
 
+function assertComplaintAdminAccess(complaint, adminId, { allowUnassigned = false, actionLabel = 'modify this complaint' } = {}) {
+  if (!complaint.assignedAdminUserId) {
+    if (allowUnassigned) {
+      return;
+    }
+    throw createHttpError(409, `Cannot ${actionLabel} because the complaint is not assigned`);
+  }
+  if (complaint.assignedAdminUserId !== adminId) {
+    throw createHttpError(403, 'Only the assigned admin can perform this action');
+  }
+}
+
 async function applyComplaintTransition({
   complaintId,
   actorId,
@@ -160,10 +173,25 @@ async function applyComplaintTransition({
     patch,
   });
 
-  return complaintsRepository.getComplaintById(complaintId);
+  const updated = await complaintsRepository.getComplaintById(complaintId);
+  await publishComplaintStatusUpdate({
+    citizenId: complaint.citizen_id,
+    complaintId,
+    status: nextStatus,
+    note,
+  });
+  return updated;
 }
 
 async function assignComplaintToSelf(complaintId, adminId, reqMeta) {
+  const current = await complaintsRepository.getComplaintById(complaintId);
+  if (!current) {
+    throw createHttpError(404, 'Complaint not found');
+  }
+  if (current.assignedAdminUserId && current.assignedAdminUserId !== adminId) {
+    throw createHttpError(403, 'Complaint is already assigned to another admin');
+  }
+
   const complaint = await applyComplaintTransition({
     complaintId,
     actorId: adminId,
@@ -189,6 +217,15 @@ async function assignComplaintToSelf(complaintId, adminId, reqMeta) {
 }
 
 async function reassignComplaint(complaintId, actorId, adminId, reason, reqMeta) {
+  const current = await complaintsRepository.getComplaintById(complaintId);
+  if (!current) {
+    throw createHttpError(404, 'Complaint not found');
+  }
+  assertComplaintAdminAccess(current, actorId, {
+    allowUnassigned: false,
+    actionLabel: 'reassign this complaint',
+  });
+
   const complaint = await applyComplaintTransition({
     complaintId,
     actorId,
@@ -224,7 +261,46 @@ async function reassignComplaint(complaintId, actorId, adminId, reason, reqMeta)
   return complaint;
 }
 
+async function startComplaintReview(complaintId, actorId, reqMeta) {
+  const current = await complaintsRepository.getComplaintById(complaintId);
+  if (!current) {
+    throw createHttpError(404, 'Complaint not found');
+  }
+  assertComplaintAdminAccess(current, actorId, { actionLabel: 'start review for this complaint' });
+
+  const complaint = await applyComplaintTransition({
+    complaintId,
+    actorId,
+    actorRole: 'admin',
+    nextStatus: 'in_review',
+    allowedPreviousStatuses: ['assigned', 'in_review'],
+    actionLabel: 'start review for this complaint',
+    note: 'Complaint review started',
+    patch: {
+      status_reason: 'Complaint review started',
+    },
+  });
+
+  await writeAuditLog({
+    actorRole: 'admin',
+    actorId,
+    entityType: 'complaint',
+    entityId: complaintId,
+    action: 'complaint_review_started',
+    ipAddress: reqMeta.ip,
+    userAgent: reqMeta.userAgent,
+  });
+
+  return complaint;
+}
+
 async function updateComplaintDepartment(complaintId, actorId, body, reqMeta) {
+  const current = await complaintsRepository.getComplaintById(complaintId);
+  if (!current) {
+    throw createHttpError(404, 'Complaint not found');
+  }
+  assertComplaintAdminAccess(current, actorId, { actionLabel: 'update department handling for this complaint' });
+
   const complaint = await applyComplaintTransition({
     complaintId,
     actorId,
@@ -262,6 +338,12 @@ async function updateComplaintDepartment(complaintId, actorId, body, reqMeta) {
 }
 
 async function scheduleComplaintCall(complaintId, actorId, callScheduledAt, reqMeta) {
+  const current = await complaintsRepository.getComplaintById(complaintId);
+  if (!current) {
+    throw createHttpError(404, 'Complaint not found');
+  }
+  assertComplaintAdminAccess(current, actorId, { actionLabel: 'schedule a call for this complaint' });
+
   const complaint = await applyComplaintTransition({
     complaintId,
     actorId,
@@ -296,6 +378,12 @@ async function scheduleComplaintCall(complaintId, actorId, callScheduledAt, reqM
 }
 
 async function logComplaintCallOutcome(complaintId, actorId, callOutcome, reqMeta) {
+  const current = await complaintsRepository.getComplaintById(complaintId);
+  if (!current) {
+    throw createHttpError(404, 'Complaint not found');
+  }
+  assertComplaintAdminAccess(current, actorId, { actionLabel: 'log a call outcome for this complaint' });
+
   const complaint = await applyComplaintTransition({
     complaintId,
     actorId,
@@ -324,6 +412,12 @@ async function logComplaintCallOutcome(complaintId, actorId, callOutcome, reqMet
 }
 
 async function resolveComplaint(complaintId, actorId, body, reqMeta) {
+  const current = await complaintsRepository.getComplaintById(complaintId);
+  if (!current) {
+    throw createHttpError(404, 'Complaint not found');
+  }
+  assertComplaintAdminAccess(current, actorId, { actionLabel: 'resolve this complaint' });
+
   const docNames = (body.resolutionDocs || []).map((doc) => sanitizeText(doc.name)).filter(Boolean);
   const complaint = await applyComplaintTransition({
     complaintId,
@@ -366,6 +460,7 @@ async function escalateComplaintToMeeting(complaintId, actorId, body, reqMeta) {
   if (!complaint) {
     throw createHttpError(404, 'Complaint not found');
   }
+  assertComplaintAdminAccess(complaint, actorId, { actionLabel: 'escalate this complaint to a meeting' });
   assertAllowedComplaintTransition(
     complaint.status,
     ['assigned', 'in_review', 'department_contact_identified', 'call_scheduled', 'followup_in_progress'],
@@ -396,6 +491,13 @@ async function escalateComplaintToMeeting(complaintId, actorId, body, reqMeta) {
     },
   });
 
+  await publishComplaintStatusUpdate({
+    citizenId: complaint.citizen_id,
+    complaintId,
+    status: 'escalated_to_meeting',
+    note: 'Complaint escalated to meeting',
+  });
+
   await writeAuditLog({
     actorRole: 'admin',
     actorId,
@@ -412,6 +514,10 @@ async function escalateComplaintToMeeting(complaintId, actorId, body, reqMeta) {
 
 async function reopenComplaint(complaintId, actorId, reason, reqMeta) {
   const current = await complaintsRepository.getComplaintById(complaintId);
+  if (!current) {
+    throw createHttpError(404, 'Complaint not found');
+  }
+  assertComplaintAdminAccess(current, actorId, { actionLabel: 'reopen this complaint' });
   const reopenedCount = (current?.reopenedCount || 0) + 1;
   const complaint = await applyComplaintTransition({
     complaintId,
@@ -442,6 +548,12 @@ async function reopenComplaint(complaintId, actorId, reason, reqMeta) {
 }
 
 async function closeComplaint(complaintId, actorId, note, reqMeta) {
+  const current = await complaintsRepository.getComplaintById(complaintId);
+  if (!current) {
+    throw createHttpError(404, 'Complaint not found');
+  }
+  assertComplaintAdminAccess(current, actorId, { actionLabel: 'close this complaint' });
+
   const complaint = await applyComplaintTransition({
     complaintId,
     actorId,
@@ -476,6 +588,7 @@ module.exports = {
   getAdminComplaintDetail,
   assignComplaintToSelf,
   reassignComplaint,
+  startComplaintReview,
   updateComplaintDepartment,
   scheduleComplaintCall,
   logComplaintCallOutcome,

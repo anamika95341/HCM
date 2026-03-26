@@ -22,6 +22,67 @@ async function findUserById(role, id) {
   return result.rows[0] || null;
 }
 
+async function findActiveUserById(role, id) {
+  let result;
+  if (role === 'citizen') {
+    result = await pool.query(
+      `SELECT * FROM citizens
+        WHERE id = $1
+          AND deleted_at IS NULL
+          AND status = 'active'
+          AND is_verified = TRUE`,
+      [id]
+    );
+    return result.rows[0] || null;
+  }
+
+  if (role === 'admin') {
+    result = await pool.query(
+      `SELECT * FROM admins
+        WHERE id = $1
+          AND removed_at IS NULL
+          AND status = 'active'
+          AND is_verified = TRUE`,
+      [id]
+    );
+    return result.rows[0] || null;
+  }
+
+  if (role === 'deo') {
+    result = await pool.query(
+      `SELECT * FROM deos
+        WHERE id = $1
+          AND removed_at IS NULL
+          AND status = 'active'
+          AND is_verified = TRUE`,
+      [id]
+    );
+    return result.rows[0] || null;
+  }
+
+  if (role === 'minister') {
+    result = await pool.query(
+      `SELECT * FROM ministers
+        WHERE id = $1
+          AND status = 'active'`,
+      [id]
+    );
+    return result.rows[0] || null;
+  }
+
+  if (role === 'masteradmin') {
+    result = await pool.query(
+      `SELECT * FROM master_admins
+        WHERE id = $1
+          AND status = 'active'`,
+      [id]
+    );
+    return result.rows[0] || null;
+  }
+
+  throw new Error(`Unsupported role: ${role}`);
+}
+
 async function findCitizenByCitizenId(citizenId) {
   const result = await pool.query('SELECT * FROM citizens WHERE citizen_id = $1 AND deleted_at IS NULL', [citizenId]);
   return result.rows[0] || null;
@@ -167,6 +228,7 @@ async function updateAdminVerification(userId) {
 
 module.exports = {
   findUserById,
+  findActiveUserById,
   findCitizenByCitizenId,
   findCitizenByForgotPassword,
   findAdminByUsernameOrEmail,

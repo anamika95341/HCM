@@ -51,6 +51,8 @@ async function listActiveAdminsForCitizenDirectory() {
     `SELECT id, username, first_name, last_name, designation
      FROM admins
      WHERE status = 'active'
+       AND is_verified = TRUE
+       AND removed_at IS NULL
      ORDER BY first_name ASC, last_name ASC`
   );
   return result.rows;
@@ -76,6 +78,30 @@ async function listWorkflowDirectory() {
     deos: deos.rows,
     ministers: ministers.rows,
   };
+}
+
+async function findActiveDeoById(deoId) {
+  const result = await pool.query(
+    `SELECT id, first_name, last_name, designation
+       FROM deos
+      WHERE id = $1
+        AND status = 'active'
+        AND is_verified = TRUE
+        AND removed_at IS NULL`,
+    [deoId]
+  );
+  return result.rows[0] || null;
+}
+
+async function findActiveMinisterById(ministerId) {
+  const result = await pool.query(
+    `SELECT id, first_name, last_name
+       FROM ministers
+      WHERE id = $1
+        AND status = 'active'`,
+    [ministerId]
+  );
+  return result.rows[0] || null;
 }
 
 function createDeoUsername({ firstName, lastName, email }) {
@@ -186,6 +212,8 @@ module.exports = {
   createDeo,
   deleteDeoById,
   findDeoByIdentityConflict,
+  findActiveDeoById,
+  findActiveMinisterById,
   getDashboard,
   listActiveAdminsForCitizenDirectory,
   listWorkflowDirectory,

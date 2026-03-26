@@ -1,7 +1,18 @@
 const { z } = require('zod');
 
 const complaintStatusUpdateSchema = z.object({
-  status: z.enum(['in_review', 'resolved', 'rejected', 'escalated']),
+  status: z.enum([
+    'submitted',
+    'assigned',
+    'in_review',
+    'department_contact_identified',
+    'call_scheduled',
+    'followup_in_progress',
+    'resolved',
+    'rejected',
+    'completed',
+    'escalated_to_meeting',
+  ]),
   note: z.string().min(3).max(2000),
 });
 
