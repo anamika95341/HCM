@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { usePortalTheme } from "../theme/portalTheme.jsx";
 
 // Derive a semantic color from a status string
@@ -54,17 +55,24 @@ export function WorkspaceSectionHeader({ eyebrow, title, subtitle, action, icon 
   );
 }
 
-export function WorkspaceCard({ children, style }) {
+export function WorkspaceCard({ children, style, hoverable = false }) {
   const { C } = usePortalTheme();
+  const [hovered, setHovered] = useState(false);
+  const isHovered = hoverable && hovered;
   return (
     <div
+      onMouseEnter={hoverable ? () => setHovered(true) : undefined}
+      onMouseLeave={hoverable ? () => setHovered(false) : undefined}
       style={{
         background: `linear-gradient(180deg, ${C.card} 0%, ${C.bgElevated} 100%)`,
         borderRadius: 16,
-        border: `1px solid ${C.border}`,
+        border: `1px solid ${isHovered ? `${C.purple}28` : C.border}`,
         padding: 24,
-        boxShadow: "0 10px 30px rgba(15,23,42,0.05), 0 2px 8px rgba(15,23,42,0.03)",
+        boxShadow: isHovered
+          ? "0 16px 40px rgba(15,23,42,0.09), 0 4px 12px rgba(15,23,42,0.05)"
+          : "0 10px 30px rgba(15,23,42,0.05), 0 2px 8px rgba(15,23,42,0.03)",
         transition: "border-color 0.15s ease, box-shadow 0.15s ease, transform 0.15s ease",
+        transform: isHovered ? "translateY(-1px)" : "none",
         ...style,
       }}
     >
@@ -188,19 +196,23 @@ export function WorkspaceStatCard({ label, value, accent, icon }) {
 
 export function WorkspaceInput(props) {
   const { C } = usePortalTheme();
+  const [focused, setFocused] = useState(false);
   return (
     <input
       {...props}
+      onFocus={(e) => { setFocused(true); props.onFocus?.(e); }}
+      onBlur={(e) => { setFocused(false); props.onBlur?.(e); }}
       style={{
         width: "100%",
         padding: "9px 13px",
         borderRadius: 10,
-        border: `1px solid ${C.border}`,
+        border: `1px solid ${focused ? C.purple : C.border}`,
         background: C.inp,
         color: C.t1,
         fontSize: 13,
         outline: "none",
-        transition: "border-color 0.15s ease, box-shadow 0.15s ease, background 0.15s ease",
+        boxShadow: focused ? `0 0 0 3px ${C.purpleDim}` : "none",
+        transition: "border-color 0.15s ease, box-shadow 0.15s ease",
         ...(props.style || {}),
       }}
     />
@@ -209,19 +221,24 @@ export function WorkspaceInput(props) {
 
 export function WorkspaceSelect(props) {
   const { C } = usePortalTheme();
+  const [focused, setFocused] = useState(false);
   return (
     <select
       {...props}
+      onFocus={(e) => { setFocused(true); props.onFocus?.(e); }}
+      onBlur={(e) => { setFocused(false); props.onBlur?.(e); }}
       style={{
         width: "100%",
         padding: "9px 13px",
         borderRadius: 10,
-        border: `1px solid ${C.border}`,
+        border: `1px solid ${focused ? C.purple : C.border}`,
         background: C.inp,
         color: C.t1,
         fontSize: 13,
         outline: "none",
-        transition: "border-color 0.15s ease, box-shadow 0.15s ease, background 0.15s ease",
+        cursor: "pointer",
+        boxShadow: focused ? `0 0 0 3px ${C.purpleDim}` : "none",
+        transition: "border-color 0.15s ease, box-shadow 0.15s ease",
         ...(props.style || {}),
       }}
     />
@@ -230,22 +247,43 @@ export function WorkspaceSelect(props) {
 
 export function WorkspaceButton({ variant = "primary", children, style, ...props }) {
   const { C } = usePortalTheme();
+  const [hovered, setHovered] = useState(false);
+  const h = hovered && !props.disabled;
+
   const variants = {
     primary: {
-      background: C.purple, color: "#fff", border: "none",
-      boxShadow: `0 10px 18px ${C.purple}20, 0 2px 6px ${C.purple}18`,
+      background: h ? `${C.purple}e8` : C.purple,
+      color: "#fff",
+      border: "none",
+      boxShadow: h
+        ? `0 14px 24px ${C.purple}28, 0 4px 8px ${C.purple}20`
+        : `0 10px 18px ${C.purple}20, 0 2px 6px ${C.purple}18`,
     },
     ghost: {
-      background: C.bgElevated, color: C.t2, border: `1px solid ${C.border}`,
-      boxShadow: "0 2px 6px rgba(15,23,42,0.04)",
+      background: h ? C.card : C.bgElevated,
+      color: h ? C.t1 : C.t2,
+      border: `1px solid ${h ? C.border : C.border}`,
+      boxShadow: h ? "0 4px 12px rgba(15,23,42,0.08)" : "0 2px 6px rgba(15,23,42,0.04)",
     },
-    outline: { background: "transparent", color: C.purple, border: `1px solid ${C.purple}`, boxShadow: "none" },
-    danger: { background: "transparent", color: C.danger, border: `1px solid ${C.danger}`, boxShadow: "none" },
+    outline: {
+      background: h ? C.purpleDim : "transparent",
+      color: C.purple,
+      border: `1px solid ${C.purple}`,
+      boxShadow: "none",
+    },
+    danger: {
+      background: h ? `${C.danger}08` : "transparent",
+      color: C.danger,
+      border: `1px solid ${C.danger}`,
+      boxShadow: "none",
+    },
   };
   const current = variants[variant] || variants.primary;
   return (
     <button
       {...props}
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
       style={{
         display: "inline-flex",
         alignItems: "center",
@@ -257,7 +295,8 @@ export function WorkspaceButton({ variant = "primary", children, style, ...props
         fontWeight: 600,
         cursor: props.disabled ? "not-allowed" : "pointer",
         opacity: props.disabled ? 0.55 : 1,
-        transition: "opacity 0.15s ease, box-shadow 0.15s ease, background 0.15s ease",
+        transition: "background 0.15s ease, box-shadow 0.15s ease, color 0.15s ease, transform 0.12s ease",
+        transform: h ? "translateY(-1px)" : "none",
         letterSpacing: "-0.01em",
         ...current,
         ...style,
@@ -322,7 +361,7 @@ export function WorkspaceEmptyState({ title, subtitle, icon }) {
         </div>
       )}
       <div style={{ fontSize: 14, fontWeight: 700, color: C.t1, letterSpacing: "-0.01em" }}>{title}</div>
-      {subtitle && <div style={{ fontSize: 12, color: C.t3, marginTop: 6, lineHeight: 1.6, maxWidth: 280, margin: "6px auto 0" }}>{subtitle}</div>}
+      {subtitle && <div style={{ fontSize: 12, color: C.t3, lineHeight: 1.6, maxWidth: 280, margin: "6px auto 0" }}>{subtitle}</div>}
     </div>
   );
 }

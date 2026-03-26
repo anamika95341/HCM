@@ -206,24 +206,28 @@ const Header = () => {
 
 const HeaderIcon = ({ icon: Icon, badge, dot, onClick, title }) => {
   const { C } = usePortalTheme();
+  const [hovered, setHovered] = useState(false);
 
   return (
     <button
       type="button"
-      className="relative cursor-pointer transition-colors"
+      className="relative cursor-pointer"
       onClick={onClick}
       title={title}
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
       style={{
         width: 34,
         height: 34,
         borderRadius: 11,
-        border: `1px solid ${C.border}`,
-        background: C.bg,
-        color: C.t2,
+        border: `1px solid ${hovered ? `${C.purple}30` : C.border}`,
+        background: hovered ? C.purpleDim : C.bg,
+        color: hovered ? C.purple : C.t2,
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
-        boxShadow: "0 1px 2px rgba(0,0,0,0.04)",
+        boxShadow: hovered ? `0 2px 8px ${C.purple}14` : "0 1px 2px rgba(0,0,0,0.04)",
+        transition: "background 0.15s ease, border-color 0.15s ease, color 0.15s ease, box-shadow 0.15s ease",
       }}
     >
       <Icon size={17} />
@@ -243,12 +247,21 @@ const HeaderIcon = ({ icon: Icon, badge, dot, onClick, title }) => {
 
 const MenuItem = ({ icon: Icon, label, danger, onClick }) => {
   const { C } = usePortalTheme();
+  const [hovered, setHovered] = useState(false);
 
   return (
     <li
-      className="flex items-center gap-3 px-4 py-2.5 cursor-pointer transition-colors"
+      className="flex items-center gap-3 px-4 py-2.5 cursor-pointer"
       onClick={onClick}
-      style={{ color: danger ? C.danger : C.t2, borderRadius: 10, margin: "0 8px" }}
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+      style={{
+        color: danger ? C.danger : C.t2,
+        borderRadius: 10,
+        margin: "0 8px",
+        background: hovered ? (danger ? `${C.danger}08` : C.navHover) : "transparent",
+        transition: "background 0.15s ease, color 0.15s ease",
+      }}
     >
       <Icon size={16} />
       {label}

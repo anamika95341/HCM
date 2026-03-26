@@ -118,23 +118,23 @@ function Sidebar({ collapsed, onToggle }) {
             </div>
 
             {!collapsed && (
-                <div style={{ padding: "12px 12px 0" }}>
+                <div style={{ padding: "10px 12px 0" }}>
                     <div
                         style={{
                             borderRadius: 12,
                             background: C.card,
                             border: `1px solid ${C.border}`,
-                            padding: "12px",
+                            padding: "12px 14px",
                             display: "flex",
                             alignItems: "center",
-                            gap: 10,
+                            gap: 12,
                             boxShadow: "0 1px 3px rgba(0,0,0,0.04)",
                         }}
                     >
                         <div
                             style={{
-                                width: 34,
-                                height: 34,
+                                width: 36,
+                                height: 36,
                                 borderRadius: 999,
                                 background: C.purpleDim,
                                 color: C.purple,
@@ -142,7 +142,7 @@ function Sidebar({ collapsed, onToggle }) {
                                 alignItems: "center",
                                 justifyContent: "center",
                                 fontWeight: 800,
-                                fontSize: 13,
+                                fontSize: 14,
                                 border: `2px solid ${C.purple}30`,
                                 flexShrink: 0,
                             }}
@@ -150,24 +150,24 @@ function Sidebar({ collapsed, onToggle }) {
                             {userInitial}
                         </div>
                         <div style={{ overflow: "hidden", flex: 1 }}>
-                            <div style={{ fontSize: 13, fontWeight: 700, color: C.t1, lineHeight: 1.2, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                            <div style={{ fontSize: 13, fontWeight: 700, color: C.t1, lineHeight: 1.25, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
                                 {userName}
                             </div>
-                            <div style={{ marginTop: 3 }}>
+                            <div style={{ marginTop: 4 }}>
                                 <span
                                     style={{
                                         display: "inline-flex",
                                         alignItems: "center",
-                                        padding: "1px 7px",
+                                        padding: "2px 8px",
                                         borderRadius: 999,
                                         fontSize: 10,
                                         fontWeight: 700,
                                         background: C.purpleDim,
                                         color: C.purple,
-                                        letterSpacing: "0.02em",
+                                        letterSpacing: "0.04em",
                                     }}
                                 >
-                                    {roleLabel}
+                                    {roleLabel.toUpperCase()}
                                 </span>
                             </div>
                         </div>
@@ -175,9 +175,9 @@ function Sidebar({ collapsed, onToggle }) {
                 </div>
             )}
 
-            <div className="px-3 py-3 overflow-y-auto hide-scroll" style={{ flex: 1, marginTop: collapsed ? 0 : 6 }}>
+            <div className="px-3 py-3 overflow-y-auto hide-scroll" style={{ flex: 1, marginTop: collapsed ? 0 : 8 }}>
                 {!collapsed && (
-                    <div style={{ fontSize: 10, fontWeight: 700, color: C.t3, textTransform: "uppercase", letterSpacing: "0.12em", padding: "8px 4px 6px" }}>
+                    <div style={{ fontSize: 10, fontWeight: 700, color: C.t3, textTransform: "uppercase", letterSpacing: "0.12em", padding: "6px 4px 6px" }}>
                         Navigation
                     </div>
                 )}

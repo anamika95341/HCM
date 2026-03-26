@@ -10,10 +10,11 @@ function Layout() {
 
     return (
         <div
-            className="portal-shell w-full min-h-screen flex"
+            className="portal-shell w-full h-screen flex"
             style={{
                 background: C.bg,
                 position: "relative",
+                overflow: "hidden",
             }}
         >
             <div
@@ -37,6 +38,9 @@ function Layout() {
                     background: C.bgElevated,
                     position: "relative",
                     zIndex: 2,
+                    height: "100%",
+                    overflow: "hidden",
+                    flexShrink: 0,
                 }}
             >
                 <Sidebar
@@ -45,10 +49,10 @@ function Layout() {
                 />
             </aside>
 
-            <div className="flex flex-col flex-1 min-w-0" style={{ background: "transparent", position: "relative", zIndex: 1 }}>
+            <div className="flex flex-col flex-1 min-w-0 overflow-hidden" style={{ background: "transparent", position: "relative", zIndex: 1 }}>
                 <Header />
 
-                <main className="portal-content flex-1 overflow-auto" style={{ background: "transparent" }}>
+                <main className="portal-content flex-1 overflow-auto min-h-0" style={{ background: "transparent" }}>
                     <Outlet />
                 </main>
             </div>

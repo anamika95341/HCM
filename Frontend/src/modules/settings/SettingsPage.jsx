@@ -52,7 +52,7 @@ const PillSegmented = ({ options, value, onChange }) => {
   return (
     <div style={{
       display: 'inline-flex', padding: 4, borderRadius: 999, background: C.bgElevated,
-      boxShadow: 'inset 0 1px 3px rgba(0,0,0,0.08)', borderRadius: 999, gap: 2,
+      boxShadow: 'inset 0 1px 3px rgba(0,0,0,0.08)', gap: 2,
     }}>
       {options.map((opt) => {
         const active = value === opt.id;
