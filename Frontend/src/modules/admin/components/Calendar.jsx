@@ -102,7 +102,7 @@ function EventPill({ item, compact = false, onClick }) {
     <button
       type="button"
       onClick={onClick}
-      className={`w-full text-left rounded-lg px-3 py-2 transition-all hover:shadow-md ${compact ? "text-[10px]" : "text-xs"}`}
+      className={`w-full text-left rounded-lg px-3 py-2 transition-[opacity,border-color] duration-200 hover:opacity-90 ${compact ? "text-[10px]" : "text-xs"}`}
       style={{ border: `1px solid ${tone}33`, background: `${tone}12`, color: tone }}
     >
       <div className="font-semibold truncate">{item.title}</div>
@@ -128,7 +128,7 @@ function Modal({ item, mode, editForm, setEditForm, onClose, onSave, onModeChang
       <div className="fixed inset-0 z-50 flex  sm:items-center justify-center overflow-y-auto">
         <div 
           className="w-full max-w-2xl rounded-t-3xl sm:rounded-2xl overflow-hidden animate-in slide-in-from-bottom-5 sm:zoom-in-95 fade-in duration-300"
-          style={{ background: C.card, border: `1px solid ${C.border}`, boxShadow: "0 24px 80px rgba(15,23,42,0.18)" }}
+          style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 12, boxShadow: C.dialogShadow }}
           onClick={(e) => e.stopPropagation()}
         >
           
@@ -463,7 +463,7 @@ export default function Calendar() {
                 <div>
                   <div className="grid grid-cols-7 border-b" style={{ background: C.bgElevated, borderColor: C.border }}>
                     {DAYS.map((day) => (
-                      <div key={day} className="px-4 py-4 text-xs font-bold uppercase tracking-wider text-gray-600 text-center">
+                      <div key={day} style={{ padding: "12px 16px", fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", color: C.t3, textAlign: "center" }}>
                         {day}
                       </div>
                     ))}
@@ -482,7 +482,7 @@ export default function Calendar() {
                           <button
                             type="button"
                             className="w-8 h-8 rounded-lg text-sm font-semibold transition-colors"
-                            style={isToday ? { background: C.purple, color: "#fff" } : { color: inMonth ? C.t1 : C.t3, background: "transparent" }}
+                            style={isToday ? { background: C.purple, color: "#ffffff" } : { color: inMonth ? C.t1 : C.t3, background: "transparent" }}
                           >
                             {cell.date.getDate()}
                           </button>
@@ -507,11 +507,11 @@ export default function Calendar() {
                 <div>
                   <div className="grid grid-cols-7 border-b" style={{ background: C.bgElevated, borderColor: C.border }}>
                     {weekDays.map((day) => (
-                      <div key={day.date.toISOString()} className="px-3 py-4 text-center border-r border-gray-200 last:border-r-0">
-                        <div className="text-xs font-bold uppercase tracking-wider text-gray-600">{DAYS[day.date.getDay()]}</div>
+                      <div key={day.date.toISOString()} className="px-3 py-4 text-center last:border-r-0" style={{ borderRight: `1px solid ${C.border}` }}>
+                        <div style={{ fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", color: C.t3 }}>{DAYS[day.date.getDay()]}</div>
                         <div
                           className="mt-2 inline-flex w-10 h-10 items-center justify-center rounded-lg text-sm font-semibold transition-colors"
-                          style={isSameDay(day.date, new Date()) ? { background: C.purple, color: "#fff" } : { color: C.t1 }}
+                          style={isSameDay(day.date, new Date()) ? { background: C.purple, color: "#ffffff" } : { color: C.t1 }}
                         >
                           {day.date.getDate()}
                         </div>
@@ -522,7 +522,7 @@ export default function Calendar() {
                     {weekDays.map((day) => (
                       <div key={day.date.toISOString()} className="p-3 space-y-2" style={{ borderRight: `1px solid ${C.border}` }}>
                         {day.items.length === 0 ? (
-                          <div className="text-xs text-gray-400 py-4">No meetings</div>
+                          <div style={{ fontSize: 11, color: C.t3, padding: "16px 0" }}>No meetings</div>
                         ) : (
                           day.items.map((item) => <EventPill key={item.id} item={item} onClick={() => openItem(item)} />)
                         )}
@@ -534,12 +534,12 @@ export default function Calendar() {
 
               {view === "day" && (
                 <div className="p-6 min-h-[520px]">
-                  <div className="text-lg font-bold mb-6 text-gray-900">
+                  <div style={{ fontSize: 16, fontWeight: 700, marginBottom: 24, color: C.t1 }}>
                     {cursorDate.toLocaleDateString(undefined, { weekday: "long", month: "long", day: "numeric" })}
                   </div>
                   <div className="space-y-3">
                     {dayItems.length === 0 ? (
-                      <div className="text-gray-500 py-8 text-center">No meetings for this day.</div>
+                      <div style={{ fontSize: 13, color: C.t3, padding: "32px 0", textAlign: "center" }}>No meetings for this day.</div>
                     ) : (
                       dayItems.map((item) => (
                         <button
@@ -554,14 +554,14 @@ export default function Calendar() {
                               <div className="inline-flex px-3 py-1 rounded-full text-xs font-semibold border" style={{ borderColor: `${item.type === "VIP Meeting" ? C.warn : C.purple}33`, background: `${item.type === "VIP Meeting" ? C.warn : C.purple}12`, color: item.type === "VIP Meeting" ? C.warn : C.purple }}>
                                 {item.type}
                               </div>
-                              <div className="mt-2 font-bold text-gray-900">{item.title}</div>
-                              <div className="text-xs text-gray-600 mt-1">{item.source} • {item.location || "Location pending"}</div>
+                              <div style={{ marginTop: 8, fontSize: 13, fontWeight: 700, color: C.t1 }}>{item.title}</div>
+                              <div style={{ fontSize: 11, color: C.t2, marginTop: 4 }}>{item.source} • {item.location || "Location pending"}</div>
                             </div>
-                            <div className="text-xs text-gray-600 whitespace-nowrap">
+                            <div style={{ fontSize: 11, color: C.t2, whiteSpace: "nowrap" }}>
                               {formatTime(item.startsAt)} - {formatTime(item.endsAt)}
                             </div>
                           </div>
-                          <div className="text-xs text-gray-600 mt-3">{item.details}</div>
+                          <div style={{ fontSize: 11, color: C.t2, marginTop: 12 }}>{item.details}</div>
                         </button>
                       ))
                     )}

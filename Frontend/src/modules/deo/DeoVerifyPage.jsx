@@ -8,12 +8,17 @@ import { normalizeInputText, toSafeUserMessage } from "../../shared/security/tex
 
 const fieldStyle = (C) => ({
   width: "100%",
-  padding: "12px 14px 12px 40px",
+  minHeight: 40,
+  padding: "10px 14px 10px 38px",
   borderRadius: 10,
   border: `1px solid ${C.border}`,
   background: C.inp,
   color: C.t1,
   fontSize: 13,
+  fontWeight: 500,
+  lineHeight: 1.5,
+  outline: "none",
+  transition: "border-color 0.2s ease, box-shadow 0.2s ease",
 });
 
 export default function DeoVerifyPage() {
@@ -85,8 +90,8 @@ export default function DeoVerifyPage() {
           maxWidth: 460,
           background: C.card,
           border: `1px solid ${C.border}`,
-          borderRadius: 18,
-          boxShadow: "var(--portal-shadow)",
+          borderRadius: 12,
+          boxShadow: "none",
           overflow: "hidden",
         }}
       >
@@ -95,7 +100,7 @@ export default function DeoVerifyPage() {
             style={{
               width: 56,
               height: 56,
-              borderRadius: 14,
+              borderRadius: 12,
               background: C.purpleDim,
               display: "flex",
               alignItems: "center",
@@ -108,8 +113,8 @@ export default function DeoVerifyPage() {
           <div style={{ fontSize: 11, fontWeight: 700, color: C.t3, textTransform: "uppercase", letterSpacing: ".18em" }}>
             Government Workspace
           </div>
-          <h1 style={{ margin: "10px 0 6px", fontSize: 28, lineHeight: 1.1, color: C.t1 }}>Verify DEO</h1>
-          <p style={{ margin: 0, color: C.t3, fontSize: 13, lineHeight: 1.6 }}>
+          <h1 style={{ margin: "10px 0 6px", fontSize: 24, fontWeight: 700, lineHeight: 1.25, color: C.t1 }}>Verify DEO</h1>
+          <p style={{ margin: 0, color: C.t2, fontSize: 13, fontWeight: 500, lineHeight: 1.5 }}>
             Enter the verification code sent to the DEO email address to activate the account.
           </p>
         </div>
@@ -179,7 +184,7 @@ function Field({ label, icon, children }) {
 
   return (
     <label style={{ display: "grid", gap: 8 }}>
-      <span style={{ fontSize: 12, fontWeight: 600, color: C.t2 }}>{label}</span>
+      <span style={{ fontSize: 12, fontWeight: 500, lineHeight: 1.45, color: C.t2 }}>{label}</span>
       <div style={{ position: "relative" }}>
         <div style={{ position: "absolute", left: 14, top: "50%", transform: "translateY(-50%)", pointerEvents: "none" }}>
           {icon}
@@ -216,27 +221,32 @@ function MessageBox({ color, bg, icon, message }) {
 function primaryButtonStyle(C) {
   return {
     width: "100%",
-    padding: "12px 16px",
+    minHeight: 40,
+    padding: "10px 18px",
     borderRadius: 10,
     border: "none",
     background: C.purple,
-    color: "#fff",
+    color: "#ffffff",
     fontSize: 13,
-    fontWeight: 700,
+    fontWeight: 600,
+    lineHeight: 1.5,
     cursor: "pointer",
+    transition: "opacity 0.2s ease, transform 0.2s ease",
   };
 }
 
 function secondaryButtonStyle(C) {
   return {
     width: "100%",
-    padding: "12px 16px",
+    minHeight: 40,
+    padding: "10px 18px",
     borderRadius: 10,
     border: `1px solid ${C.border}`,
-    background: "transparent",
+    background: C.bgElevated,
     color: C.t2,
     fontSize: 13,
-    fontWeight: 700,
+    fontWeight: 600,
+    lineHeight: 1.5,
     cursor: "pointer",
   };
 }

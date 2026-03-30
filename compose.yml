@@ -10,6 +10,9 @@ services:
     depends_on:
       backend:
         condition: service_healthy
+    environment:
+      # Browser calls /api/v1 on the same origin; server.cjs forwards to the API container.
+      API_UPSTREAM: http://backend:3000
     ports:
       - "${FRONTEND_PORT:-5173}:5173"
     healthcheck:

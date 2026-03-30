@@ -15,6 +15,7 @@ import {
   WorkspaceSelect,
   WorkspaceStatGrid,
 } from "../../shared/components/WorkspaceUI.jsx";
+import { usePortalTheme } from "../../shared/theme/portalTheme.jsx";
 
 const emptyAdminForm = {
   username: "",
@@ -64,24 +65,26 @@ function humanizeStatus(status) {
 function FormField({ label, children }) {
   return (
     <label style={{ display: "grid", gap: 6 }}>
-      <span style={{ fontSize: 12, fontWeight: 600, color: "var(--portal-t2)" }}>{label}</span>
+      <span style={{ fontSize: 12, fontWeight: 600, color: "var(--portal-text)" }}>{label}</span>
       {children}
     </label>
   );
 }
 
 function MessageStrip({ tone = "error", message }) {
+  const { C } = usePortalTheme();
   if (!message) return null;
-  const colors = tone === "success"
-    ? { border: "rgba(16,185,129,0.18)", background: "rgba(16,185,129,0.08)", color: "#059669" }
-    : { border: "rgba(239,68,68,0.18)", background: "rgba(239,68,68,0.08)", color: "#dc2626" };
+  const colors =
+    tone === "success"
+      ? { border: `1px solid ${C.mint}4D`, background: C.mintDim, color: C.mint }
+      : { border: `1px solid ${C.danger}4D`, background: `${C.danger}14`, color: C.danger };
 
   return (
     <div
       style={{
         padding: "12px 14px",
         borderRadius: 12,
-        border: `1px solid ${colors.border}`,
+        border: colors.border,
         background: colors.background,
         color: colors.color,
         fontSize: 13,
@@ -113,7 +116,7 @@ function AccountDirectory({ items, type, loading, onRemove }) {
               display: "grid",
               gap: 14,
               padding: 18,
-              borderRadius: 14,
+              borderRadius: 12,
               border: "1px solid var(--portal-border)",
               background: "var(--portal-bg-elevated)",
             }}

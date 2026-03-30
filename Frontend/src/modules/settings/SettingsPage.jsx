@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { usePortalTheme } from "../../shared/theme/portalTheme.jsx";
+import { usePortalTheme, PORTAL_THEME_PREVIEW_LIGHT, PORTAL_THEME_PREVIEW_DARK } from "../../shared/theme/portalTheme.jsx";
 import { useAuth } from "../../shared/auth/AuthContext.jsx";
 
 const useTheme = usePortalTheme;
@@ -52,7 +52,7 @@ const PillSegmented = ({ options, value, onChange }) => {
   return (
     <div style={{
       display: 'inline-flex', padding: 4, borderRadius: 999, background: C.bgElevated,
-      boxShadow: 'inset 0 1px 3px rgba(0,0,0,0.08)', gap: 2,
+      boxShadow: C.insetShadow, gap: 2,
     }}>
       {options.map((opt) => {
         const active = value === opt.id;
@@ -64,7 +64,7 @@ const PillSegmented = ({ options, value, onChange }) => {
               display: 'inline-flex', alignItems: 'center', gap: 8, padding: '6px 10px', borderRadius: 999,
               border: 'none', cursor: 'pointer', background: active ? C.card : 'transparent',
               color: active ? C.t1 : C.t3, fontSize: 12, fontWeight: 500,
-              boxShadow: active ? '0 1px 4px rgba(0,0,0,0.1)' : 'none',
+              boxShadow: active ? C.activePillShadow : 'none',
               transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
             }}
           >
@@ -86,13 +86,13 @@ const Toggle = ({ on, set }) => {
       onClick={() => set(!on)}
       style={{
         width: 44, height: 24, borderRadius: 999, cursor: 'pointer', position: 'relative', flexShrink: 0,
-        background: C.bgElevated, boxShadow: 'inset 0 1px 3px rgba(0,0,0,0.08)',
+        background: C.bgElevated, boxShadow: C.insetShadow,
         transition: 'background 0.3s ease',
       }}
     >
       <div style={{
         position: 'absolute', top: 3, left: on ? 23 : 3, width: 18, height: 18, borderRadius: 999,
-        background: on ? C.purple : C.t3, boxShadow: on ? '0 2px 8px rgba(168,85,247,0.4)' : '0 1px 2px rgba(0,0,0,0.1)',
+        background: on ? C.purple : C.t3, boxShadow: on ? C.activeGlow : C.knobShadow,
         transition: 'left 0.3s cubic-bezier(0.4, 0, 0.2, 1), background 0.3s ease, box-shadow 0.3s ease',
       }} />
     </div>
@@ -167,7 +167,7 @@ const Sel = ({ label, value, onChange, children }) => {
 const Btn = ({ label, variant = 'primary', icon, onClick, sm }) => {
   const { C } = useTheme();
   const v = {
-    primary: { bg: C.purple, color: '#fff', border: 'none' },
+    primary: { bg: C.purple, color: '#ffffff', border: 'none' },
     outline: { bg: 'transparent', color: C.purple, border: `1px solid ${C.purple}` },
     ghost: { bg: C.bgElevated, color: C.t2, border: `1px solid ${C.border}` },
     danger: { bg: 'transparent', color: C.danger, border: `1px solid ${C.danger}` },
@@ -245,10 +245,10 @@ const ProfileSection = () => {
             <Btn label="Browse File" variant="outline" sm />
           </div>
           <div style={{ flex: 1 }}>
-            <div style={{ background: C.mintDim, border: `1px solid rgba(52,211,153,0.3)`, borderRadius: 10, padding: 16, marginBottom: 14 }}>
+            <div style={{ background: C.mintDim, border: `1px solid ${C.mint}4D`, borderRadius: 10, padding: 16, marginBottom: 14 }}>
               <div style={{ fontSize: 10, fontWeight: 700, color: C.mint, textTransform: 'uppercase', letterSpacing: '.06em', marginBottom: 6 }}>Current Status</div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                <div style={{ width: 8, height: 8, borderRadius: 4, background: C.mint, boxShadow: `0 0 8px ${C.mint}` }} />
+                <div className="portal-status-dot" style={{ color: C.mint }} />
                 <span style={{ fontSize: 13, fontWeight: 700, color: C.mint }}>e-Sign Active</span>
               </div>
               <div style={{ fontSize: 12, color: C.t2, marginTop: 8 }}>Valid until: 31 March 2026</div>
@@ -345,7 +345,7 @@ const NotificationsSection = () => {
             on={tr[item.k]} set={v => setTr(p => ({ ...p, [item.k]: v }))} />
         ))}
         {tr.deadline && (
-          <div style={{ marginTop: 16, padding: 16, background: C.purpleDim, border: `1px solid rgba(168,85,247,0.3)`, borderRadius: 10, display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+          <div style={{ marginTop: 16, padding: 16, background: C.purpleDim, border: `1px solid ${C.purple}4D`, borderRadius: 10, display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
             <span style={{ fontSize: 13, color: C.t2 }}>Alert me</span>
             <input type="number" value={days} min={1} max={14} onChange={e => setDays(+e.target.value)}
               style={{ width: 60, padding: '8px 12px', border: `1px solid ${C.border}`, borderRadius: 8, fontSize: 14, color: C.purple, fontWeight: 700, textAlign: 'center', background: C.inp }} />
@@ -391,7 +391,7 @@ const WorkflowSection = () => {
     { id: 3, stage: 'Draft Submitted', days: 3, target: 'Joint Secretary' },
   ]);
   const [labels, setLabels] = useState([
-    { id: 1, label: 'Draft Submitted', color: '#64748b' },
+    { id: 1, label: 'Draft Submitted', color: C.t3 },
     { id: 2, label: 'Under Review', color: C.warn },
     { id: 3, label: 'Awaiting Approval', color: C.purple },
     { id: 4, label: 'Closed (Approved)', color: C.mint },
@@ -566,7 +566,7 @@ const DepartmentSection = () => {
             </tbody>
           </table>
         </div>
-        <div style={{ marginTop: 16, padding: 14, background: 'rgba(245,158,11,0.1)', border: `1px solid rgba(245,158,11,0.3)`, borderRadius: 10, display: 'flex', gap: 10, alignItems: 'flex-start' }}>
+        <div style={{ marginTop: 16, padding: 14, background: `${C.warn}1A`, border: `1px solid ${C.warn}4D`, borderRadius: 10, display: 'flex', gap: 10, alignItems: 'flex-start' }}>
           <Ico n="info" s={14} c={C.warn} />
           <span style={{ fontSize: 12, color: C.t2, lineHeight: 1.55 }}>Permissions are applied at the role level. Individual overrides can be configured by the System Administrator.</span>
         </div>
@@ -579,7 +579,7 @@ const DepartmentSection = () => {
 //  SECTION 5 — DISPLAY & DASHBOARD
 // ═══════════════════════════════════════════
 const DisplaySection = () => {
-  const { C } = useTheme();
+  const { C, theme, setTheme } = useTheme();
   const [page, setPage] = useState('dashboard');
   const [widgets, setWidgets] = useState({ metrics: true, pipeline: true, escalations: true, chart: true, perf: true, flow: true });
   const pageOpts = [
@@ -606,20 +606,20 @@ const DisplaySection = () => {
         </div>
       </Card>
       <Card>
-        <CH title="Theme Preferences" />
-        <div style={{ borderRadius: 12, overflow: 'hidden', border: `2px solid ${C.purple}` }}>
-          <div style={{ height: 72, background: '#edf1f6', display: 'flex' }}>
-            <div style={{ width: 24, background: '#0b1929', flexShrink: 0 }} />
-            <div style={{ flex: 1, padding: '10px', display: 'flex', flexDirection: 'column', gap: 6 }}>
-              <div style={{ height: 16, borderRadius: 4, background: 'rgba(255,255,255,.85)' }} />
-              <div style={{ height: 10, borderRadius: 4, background: 'rgba(255,255,255,.7)', width: '70%' }} />
-              <div style={{ height: 10, borderRadius: 4, background: 'rgba(255,255,255,.7)', width: '45%' }} />
-            </div>
-          </div>
-          <div style={{ padding: '10px 14px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: C.purpleDim }}>
-            <span style={{ fontSize: 12, fontWeight: 600, color: C.purple }}>Light Mode Only</span>
-            <Ico n="check" s={13} c={C.purple} />
-          </div>
+        <CH title="Theme Preferences" sub="Choose between the fully resolved light and dark themes defined by the design system." />
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
+          <ThemePreviewCard
+            label="Light Theme"
+            selected={theme === 'light'}
+            onClick={() => setTheme('light')}
+            preview={PORTAL_THEME_PREVIEW_LIGHT}
+          />
+          <ThemePreviewCard
+            label="Dark Theme"
+            selected={theme === 'dark'}
+            onClick={() => setTheme('dark')}
+            preview={PORTAL_THEME_PREVIEW_DARK}
+          />
         </div>
       </Card>
       <Card>
@@ -663,7 +663,7 @@ const DataSection = () => {
             <div style={{ fontSize: 12, fontWeight: 600, color: C.t2, marginBottom: 10 }}>Archive tasks after completion:</div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
               <input type="number" value={archiveDays} onChange={e => setArchiveDays(+e.target.value)}
-                style={{ width: 72, padding: '10px 14px', border: `1px solid ${C.border}`, borderRadius: 8, fontSize: 14, color: C.purple, fontWeight: 700, background: C.inp }} />
+                style={{ width: 72, padding: '10px 14px', border: `1px solid ${C.border}`, borderRadius: 10, fontSize: 13, color: C.purple, fontWeight: 700, textAlign: 'center', background: C.inp, transition: 'all 0.2s ease' }} />
               <span style={{ fontSize: 13, color: C.t2 }}>Days</span>
             </div>
           </div>
@@ -689,7 +689,7 @@ const DataSection = () => {
           <div style={{ marginTop: 16, padding: 16, background: C.inp, border: `1px solid ${C.border}`, borderRadius: 10, display: 'flex', alignItems: 'center', gap: 14 }}>
             <span style={{ fontSize: 13, color: C.t2 }}>Retain logs for</span>
             <input type="number" value={retDays} min={30} onChange={e => setRetDays(+e.target.value)}
-              style={{ width: 84, padding: '8px 12px', border: `1px solid ${C.border}`, borderRadius: 8, fontSize: 14, color: C.purple, fontWeight: 700, textAlign: 'center', background: C.bgElevated }} />
+              style={{ width: 84, padding: '10px 14px', border: `1px solid ${C.border}`, borderRadius: 10, fontSize: 13, color: C.purple, fontWeight: 700, textAlign: 'center', background: C.bgElevated, transition: 'all 0.2s ease' }} />
             <span style={{ fontSize: 13, color: C.t2 }}>days before permanent deletion</span>
           </div>
         )}
@@ -725,13 +725,13 @@ function SettingsPortalContent() {
           <div style={{ width: 36, height: 36, borderRadius: 10, background: C.purpleDim, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
             <Ico n="settings" s={18} c={C.purple} />
           </div>
-          <h1 style={{ fontSize: 20, fontWeight: 700, color: C.t1 }}>Settings</h1>
+          <h1 style={{ fontSize: 24, fontWeight: 700, lineHeight: 1.25, color: C.t1 }}>Settings</h1>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
           <div style={{ position: 'relative' }}>
             <Ico n="search" s={14} c={C.t3} style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none' }} />
             <input type="text" value={search} onChange={e => setSearch(e.target.value)} placeholder="Search settings..."
-              style={{ width: 200, padding: '8px 12px 8px 34px', border: `1px solid ${C.border}`, borderRadius: 10, fontSize: 12, color: C.t1, background: C.inp, transition: 'border-color 0.2s' }} />
+              style={{ width: 200, padding: '10px 14px 10px 38px', border: `1px solid ${C.border}`, borderRadius: 10, fontSize: 13, fontWeight: 500, color: C.t1, background: C.inp, transition: 'border-color 0.2s ease, box-shadow 0.2s ease' }} />
           </div>
         </div>
       </header>
@@ -745,10 +745,10 @@ function SettingsPortalContent() {
               onClick={() => setActiveTab(t.id)}
               style={{
                 display: 'flex', alignItems: 'center', gap: 12, padding: '12px 16px', cursor: 'pointer',
-                background: activeTab === t.id ? C.purpleDim : 'transparent', border: 'none', borderRadius: 10,
-                color: activeTab === t.id ? C.purple : C.t3,
+                background: activeTab === t.id ? C.card : 'transparent', border: 'none', borderRadius: 10,
+                color: activeTab === t.id ? C.t1 : C.t3,
                 fontSize: 13, fontWeight: activeTab === t.id ? 600 : 500,
-                transition: 'all 0.2s ease', textAlign: 'left',
+                transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)', textAlign: 'left',
               }}
             >
               <Ico n={t.icon} s={16} c={activeTab === t.id ? C.purple : C.t3} />
@@ -776,4 +776,40 @@ function SettingsPortalContent() {
 
 export default function Setting() {
   return <SettingsPortalContent />;
+}
+
+function ThemePreviewCard({ label, selected, onClick, preview }) {
+  const { C } = useTheme();
+
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      style={{
+        padding: 0,
+        borderRadius: 12,
+        overflow: 'hidden',
+        border: `2px solid ${selected ? C.purple : C.border}`,
+        background: 'transparent',
+        cursor: 'pointer',
+        textAlign: 'left',
+        transition: 'all 0.2s ease',
+      }}
+    >
+      <div style={{ height: 72, background: preview.appBg, display: 'flex' }}>
+        <div style={{ width: 24, background: preview.sidebar, borderRight: `1px solid ${preview.line}`, flexShrink: 0 }} />
+        <div style={{ flex: 1, padding: 10, display: 'flex', flexDirection: 'column', gap: 6 }}>
+          <div style={{ height: 16, borderRadius: 4, background: preview.panel, border: `1px solid ${preview.line}`, position: 'relative' }}>
+            <div style={{ position: 'absolute', left: 8, top: 5, width: 28, height: 4, borderRadius: 999, background: preview.accent }} />
+          </div>
+          <div style={{ height: 10, borderRadius: 4, background: preview.panel, border: `1px solid ${preview.line}`, width: '70%' }} />
+          <div style={{ height: 10, borderRadius: 4, background: preview.panel, border: `1px solid ${preview.line}`, width: '45%' }} />
+        </div>
+      </div>
+      <div style={{ padding: '10px 14px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: selected ? C.purpleDim : C.bgElevated }}>
+        <span style={{ fontSize: 12, fontWeight: 600, color: selected ? C.purple : C.t2 }}>{label}</span>
+        {selected ? <Ico n="check" s={13} c={C.purple} /> : <span style={{ fontSize: 11, color: C.t3 }}>Apply</span>}
+      </div>
+    </button>
+  );
 }

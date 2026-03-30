@@ -91,7 +91,7 @@ export default function MasterAdminDashboard() {
                 border: `1px solid ${C.border}`,
                 background: C.bg,
                 textDecoration: "none",
-                transition: "border-color 0.15s ease, box-shadow 0.15s ease",
+                transition: "border-color 0.2s ease, opacity 0.2s ease",
                 gap: 10,
               }}
             >

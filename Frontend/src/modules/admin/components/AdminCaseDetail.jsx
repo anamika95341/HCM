@@ -74,7 +74,7 @@ function SuccessModal({ open, message, onClose }) {
     <div className="fixed inset-0 z-[120] flex items-center justify-center px-4 bg-black/40 backdrop-blur-sm">
       <div
         className="w-full max-w-md p-8 text-center"
-        style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 18, boxShadow: "0 24px 80px rgba(15,23,42,0.18)" }}
+        style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 16, boxShadow: C.dialogShadow }}
       >
         <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full text-white text-3xl" style={{ background: C.mint }}>✓</div>
         <h3 style={{ fontSize: 24, fontWeight: 700, color: C.t1 }}>Success</h3>
@@ -373,8 +373,8 @@ export default function AdminCaseDetail() {
               <DetailItem label="Reopened Count" value={String(item.reopenedCount || 0)} />
             </div>
             <div className="mt-6">
-              <p className="text-xs text-gray-500 font-medium uppercase mb-2">Description</p>
-              <p className="text-sm text-gray-700">{item.description}</p>
+              <p style={{ fontSize: 10, fontWeight: 600, color: C.t3, textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 8 }}>Description</p>
+              <p style={{ fontSize: 13, color: C.t2 }}>{item.description}</p>
             </div>
             {(item.statusReason || item.callOutcome || item.resolutionSummary) && (
               <div className="mt-6 space-y-3">

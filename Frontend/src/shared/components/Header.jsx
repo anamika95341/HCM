@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { FiBell, FiCalendar, FiLogOut, FiMaximize, FiMinimize, FiSettings, FiUser } from "react-icons/fi";
+import { FiBell, FiCalendar, FiLogOut, FiMaximize, FiMinimize, FiMoon, FiSettings, FiSun, FiUser } from "react-icons/fi";
 import { useLocation, useNavigate } from "react-router-dom";
 import { usePortalTheme } from "../theme/portalTheme.jsx";
 import { getHomePathForRole, PATHS } from "../../routes/paths.js";
@@ -27,7 +27,7 @@ const Header = () => {
   const ref = useRef(null);
   const navigate = useNavigate();
   const location = useLocation();
-  const { C } = usePortalTheme();
+  const { C, theme, toggleTheme } = usePortalTheme();
   const { session, logout } = useAuth();
 
   const [open, setOpen] = useState(false);
@@ -77,47 +77,41 @@ const Header = () => {
 
   return (
     <header
-      className="flex items-center justify-between"
       style={{
-        background: `linear-gradient(180deg, ${C.card} 0%, ${C.bgElevated} 100%)`,
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "space-between",
+        gap: 16,
+        background: C.bgElevated,
         borderBottom: `1px solid ${C.border}`,
-        padding: "0 24px",
-        height: 62,
+        padding: "24px 32px",
+        minHeight: 73,
         flexShrink: 0,
-        boxShadow: "0 1px 0 rgba(255,255,255,0.55)",
         position: "sticky",
         top: 0,
         zIndex: 30,
-        backdropFilter: "blur(12px)",
       }}
     >
-      <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 12, minWidth: 0, flexWrap: "wrap" }}>
         <div>
           <div style={{ fontSize: 15, fontWeight: 700, color: C.t1, letterSpacing: "-0.02em", lineHeight: 1.2 }}>
             {workspaceTitle}
           </div>
           <div style={{ fontSize: 11, color: C.t3, marginTop: 2, fontWeight: 500 }}>
-            Government Unified Portal
+            E-Parinam workspace
           </div>
         </div>
-        <div
-          style={{
-            display: "inline-flex",
-            alignItems: "center",
-            padding: "3px 8px",
-            borderRadius: 999,
-            fontSize: 10,
-            fontWeight: 700,
-            background: C.purpleDim,
-            color: C.purple,
-            letterSpacing: "0.04em",
-          }}
-        >
+        <div className="portal-badge" style={{ background: C.purpleDim, color: C.purple }}>
           {roleLabel.toUpperCase()}
         </div>
       </div>
 
-      <div className="flex items-center gap-2 relative" ref={ref}>
+      <div style={{ display: "flex", alignItems: "center", gap: 8, position: "relative" }} ref={ref}>
+        <HeaderIcon
+          icon={theme === "dark" ? FiSun : FiMoon}
+          onClick={toggleTheme}
+          title={theme === "dark" ? "Switch to Light Mode" : "Switch to Dark Mode"}
+        />
         <HeaderIcon icon={isFullscreen ? FiMinimize : FiMaximize} onClick={toggleFullscreen} title="Toggle Fullscreen" />
         <HeaderIcon icon={FiCalendar} onClick={() => navigate(getHomePathForRole(session?.role || "citizen"))} title="Go Home" />
         <HeaderIcon icon={FiBell} dot={false} onClick={() => setOpen(false)} title="Notifications" />
@@ -125,17 +119,16 @@ const Header = () => {
         <button
           type="button"
           onClick={() => setOpen((value) => !value)}
-          className="focus:outline-none"
           title="User Menu"
           style={{
-            width: 36,
-            height: 36,
+            width: 40,
+            height: 40,
             borderRadius: 999,
             cursor: "pointer",
-            border: open ? `2px solid ${C.purple}` : `2px solid ${C.border}`,
+            border: open ? `2px solid ${C.purple}` : `1px solid ${C.border}`,
             overflow: "hidden",
             background: C.purpleDim,
-            transition: "border-color 0.15s ease, transform 0.15s ease",
+            transition: "border-color var(--portal-duration-fast) ease, transform var(--portal-duration-fast) ease",
             flexShrink: 0,
           }}
         >
@@ -143,13 +136,21 @@ const Header = () => {
             <img
               src={safeAvatar}
               alt="User Avatar"
-              className="w-9 h-9 rounded-full object-cover"
               style={{ width: "100%", height: "100%", objectFit: "cover" }}
             />
           ) : (
             <div
-              className="w-9 h-9 rounded-full flex items-center justify-center font-bold text-sm"
-              style={{ width: "100%", height: "100%", background: C.purpleDim, color: C.purple }}
+              style={{
+                width: "100%",
+                height: "100%",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                background: C.purpleDim,
+                color: C.purple,
+                fontWeight: 700,
+                fontSize: 14,
+              }}
             >
               {userInitial}
             </div>
@@ -158,40 +159,66 @@ const Header = () => {
 
         {open && (
           <div
-            className="absolute right-0 w-72 rounded-xl z-50 overflow-hidden"
+            className="portal-floating portal-fade-slide"
             style={{
+              position: "absolute",
               top: "calc(100% + 10px)",
+              right: 0,
+              width: 288,
+              borderRadius: 12,
+              zIndex: 50,
+              overflow: "hidden",
               background: C.card,
               border: `1px solid ${C.border}`,
-              boxShadow: "0 18px 48px rgba(15,23,42,0.14), 0 6px 18px rgba(15,23,42,0.08)",
             }}
           >
-            <div className="flex items-center gap-3 px-4 py-4" style={{ borderBottom: `1px solid ${C.border}`, background: C.bgElevated }}>
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 12,
+                padding: 16,
+                borderBottom: `1px solid ${C.border}`,
+                background: C.bgElevated,
+              }}
+            >
               {safeAvatar ? (
-                <img src={safeAvatar} alt="Avatar" className="w-10 h-10 rounded-full object-cover shrink-0" style={{ border: `1px solid ${C.border}` }} />
+                <img src={safeAvatar} alt="Avatar" style={{ width: 40, height: 40, borderRadius: 999, objectFit: "cover", border: `1px solid ${C.border}` }} />
               ) : (
                 <div
-                  className="w-10 h-10 rounded-full flex items-center justify-center font-bold text-lg shrink-0"
-                  style={{ background: C.purpleDim, color: C.purple, border: `1px solid ${C.border}` }}
+                  style={{
+                    width: 40,
+                    height: 40,
+                    borderRadius: 999,
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    fontWeight: 700,
+                    fontSize: 18,
+                    background: C.purpleDim,
+                    color: C.purple,
+                    border: `1px solid ${C.border}`,
+                    flexShrink: 0,
+                  }}
                 >
                   {userInitial}
                 </div>
               )}
 
-              <div className="flex flex-col overflow-hidden">
-                <p className="font-bold text-sm truncate" style={{ color: C.t1 }}>
+              <div style={{ display: "flex", flexDirection: "column", overflow: "hidden" }}>
+                <p style={{ color: C.t1, fontWeight: 700, fontSize: 13, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
                   {currentUser.name}
                 </p>
-                <p className="text-xs font-medium capitalize truncate" style={{ color: C.purple }}>
+                <p style={{ color: C.purple, fontSize: 12, fontWeight: 600, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
                   {roleLabel}
                 </p>
-                <p className="text-[11px] truncate mt-0.5" style={{ color: C.t3 }}>
+                <p style={{ color: C.t3, fontSize: 11, marginTop: 2, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
                   {currentUser.email}
                 </p>
               </div>
             </div>
 
-            <ul className="py-2 text-sm">
+            <ul style={{ padding: "8px 0", margin: 0, listStyle: "none" }}>
               <MenuItem icon={FiUser} label="Profile" onClick={() => setOpen(false)} />
               <MenuItem icon={FiSettings} label="Settings" onClick={() => { navigate(PATHS.settings); setOpen(false); }} />
               <MenuItem icon={FiCalendar} label="Workspace" onClick={() => { navigate(getHomePathForRole(session?.role || "citizen")); setOpen(false); }} />
@@ -211,35 +238,35 @@ const HeaderIcon = ({ icon: Icon, badge, dot, onClick, title }) => {
   return (
     <button
       type="button"
-      className="relative cursor-pointer"
       onClick={onClick}
       title={title}
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
       style={{
-        width: 34,
-        height: 34,
-        borderRadius: 11,
-        border: `1px solid ${hovered ? `${C.purple}30` : C.border}`,
-        background: hovered ? C.purpleDim : C.bg,
+        position: "relative",
+        width: 36,
+        height: 36,
+        borderRadius: 10,
+        border: `1px solid ${hovered ? `${C.purple}40` : C.border}`,
+        background: hovered ? C.purpleDim : C.bgElevated,
         color: hovered ? C.purple : C.t2,
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
-        boxShadow: hovered ? `0 2px 8px ${C.purple}14` : "0 1px 2px rgba(0,0,0,0.04)",
-        transition: "background 0.15s ease, border-color 0.15s ease, color 0.15s ease, box-shadow 0.15s ease",
+        transition: "background var(--portal-duration-fast) ease, border-color var(--portal-duration-fast) ease, color var(--portal-duration-fast) ease",
+        cursor: "pointer",
       }}
     >
       <Icon size={17} />
 
       {badge && badge > 0 && (
-        <span className="absolute -top-2 -right-2 text-white text-[10px] px-1.5 rounded-full" style={{ background: C.purple }}>
+        <span style={{ position: "absolute", top: -8, right: -8, fontSize: 10, fontWeight: 700, padding: "2px 8px", lineHeight: "14px", borderRadius: 999, background: C.mintDim, color: C.mint }}>
           {badge}
         </span>
       )}
 
       {dot && (
-        <span className="absolute -top-1 -right-1 w-2 h-2 rounded-full" style={{ background: C.danger }} />
+        <span style={{ position: "absolute", top: -3, right: -3, width: 8, height: 8, borderRadius: 999, background: C.danger }} />
       )}
     </button>
   );
@@ -251,15 +278,19 @@ const MenuItem = ({ icon: Icon, label, danger, onClick }) => {
 
   return (
     <li
-      className="flex items-center gap-3 px-4 py-2.5 cursor-pointer"
       onClick={onClick}
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
       style={{
+        display: "flex",
+        alignItems: "center",
+        gap: 12,
+        padding: "10px 16px",
+        cursor: "pointer",
         color: danger ? C.danger : C.t2,
         borderRadius: 10,
         margin: "0 8px",
-        background: hovered ? (danger ? `${C.danger}08` : C.navHover) : "transparent",
+        background: hovered ? (danger ? `${C.danger}12` : C.navHover) : "transparent",
         transition: "background 0.15s ease, color 0.15s ease",
       }}
     >

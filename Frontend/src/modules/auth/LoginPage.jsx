@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { AlertCircle, ArrowRight, CheckCircle, Eye, EyeOff, Lock, Mail, Shield } from "lucide-react";
+import { AlertCircle, ArrowRight, CheckCircle, Eye, EyeOff, Lock, Mail, Moon, Shield, Sun } from "lucide-react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { usePortalTheme } from "../../shared/theme/portalTheme.jsx";
 import { getHomePathForRole, PATHS } from "../../routes/paths.js";
@@ -43,18 +43,23 @@ const ROLE_COPY = {
 
 const fieldStyle = (C, hasIcon = true, hasRightAction = false) => ({
   width: "100%",
-  padding: hasIcon ? `12px ${hasRightAction ? "42px" : "14px"} 12px 40px` : "12px 14px",
+  minHeight: 40,
+  padding: hasIcon ? `10px ${hasRightAction ? "42px" : "14px"} 10px 38px` : "10px 14px",
   borderRadius: 10,
   border: `1px solid ${C.border}`,
   background: C.inp,
   color: C.t1,
   fontSize: 13,
+  fontWeight: 500,
+  lineHeight: 1.5,
+  outline: "none",
+  transition: "border-color 0.2s ease, box-shadow 0.2s ease",
 });
 
 export default function LoginPage({ defaultRole = "citizen" }) {
   const navigate = useNavigate();
   const location = useLocation();
-  const { C } = usePortalTheme();
+  const { C, theme, toggleTheme } = usePortalTheme();
   const { session, login, isAuthenticated } = useAuth();
 
   const role = useMemo(() => {
@@ -235,9 +240,9 @@ export default function LoginPage({ defaultRole = "citizen" }) {
     maxWidth: 460,
     background: C.card,
     border: `1px solid ${C.border}`,
-    borderRadius: 18,
-    boxShadow: "var(--portal-shadow)",
+    borderRadius: 12,
     overflow: "hidden",
+    boxShadow: "none",
   };
 
   const showCitizenActions = role === "citizen";
@@ -251,17 +256,41 @@ export default function LoginPage({ defaultRole = "citizen" }) {
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
-        padding: "24px 16px",
+        padding: "var(--portal-space-11) var(--portal-space-8)",
         background: C.bg,
+        transition: "background-color var(--portal-duration-slow, 0.3s) ease",
       }}
     >
+      <button
+        type="button"
+        onClick={toggleTheme}
+        aria-label={theme === "dark" ? "Switch to light mode" : "Switch to dark mode"}
+        style={{
+          position: "fixed",
+          top: 20,
+          right: 20,
+          width: 40,
+          height: 40,
+          borderRadius: 10,
+          border: `1px solid ${C.border}`,
+          background: C.bgElevated,
+          color: C.t2,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          cursor: "pointer",
+        }}
+      >
+        {theme === "dark" ? <Sun size={16} /> : <Moon size={16} />}
+      </button>
+
       <div style={cardStyle}>
         <div style={{ padding: "32px 32px 28px", background: C.bgElevated, borderBottom: `1px solid ${C.border}` }}>
           <div
             style={{
               width: 56,
               height: 56,
-              borderRadius: 14,
+              borderRadius: 12,
               background: C.purpleDim,
               display: "flex",
               alignItems: "center",
@@ -272,10 +301,10 @@ export default function LoginPage({ defaultRole = "citizen" }) {
             <Shield size={28} color={C.purple} />
           </div>
           <div style={{ fontSize: 11, fontWeight: 700, color: C.t3, textTransform: "uppercase", letterSpacing: ".18em" }}>
-            Government Workspace
+            E-Parinam
           </div>
-          <h1 style={{ margin: "10px 0 6px", fontSize: 28, lineHeight: 1.1, color: C.t1 }}>{roleCopy.title}</h1>
-          <p style={{ margin: 0, color: C.t3, fontSize: 13, lineHeight: 1.6 }}>{roleCopy.subtitle}</p>
+          <h1 style={{ margin: "10px 0 6px", fontSize: 24, fontWeight: 700, lineHeight: 1.25, color: C.t1 }}>{roleCopy.title}</h1>
+          <p style={{ margin: 0, color: C.t2, fontSize: 13, fontWeight: 500, lineHeight: 1.5 }}>{roleCopy.subtitle}</p>
         </div>
 
         <div style={{ padding: 32 }}>
@@ -334,13 +363,13 @@ export default function LoginPage({ defaultRole = "citizen" }) {
                 style={{
                   marginTop: 6,
                   width: "100%",
-                  padding: "12px 16px",
+                  padding: "10px 18px",
                   borderRadius: 10,
                   border: "none",
                   background: C.purple,
-                  color: "#fff",
+                  color: "#ffffff",
                   fontSize: 13,
-                  fontWeight: 700,
+                  fontWeight: 600,
                   display: "inline-flex",
                   alignItems: "center",
                   justifyContent: "center",
@@ -460,7 +489,7 @@ export default function LoginPage({ defaultRole = "citizen" }) {
                   <input type="number" min="1" max="120" value={registerForm.age} onChange={(event) => setRegisterForm((current) => ({ ...current, age: event.target.value }))} required style={fieldStyle(C)} />
                 </Field>
                 <label style={{ display: "grid", gap: 8 }}>
-                  <span style={{ fontSize: 12, fontWeight: 600, color: C.t2 }}>Sex</span>
+                  <span style={{ fontSize: 12, fontWeight: 500, lineHeight: 1.45, color: C.t2 }}>Sex</span>
                   <select value={registerForm.sex} onChange={(event) => setRegisterForm((current) => ({ ...current, sex: event.target.value }))} style={fieldStyle(C, false)}>
                     <option value="male">Male</option>
                     <option value="female">Female</option>
@@ -556,7 +585,7 @@ function Field({ label, icon, children }) {
 
   return (
     <label style={{ display: "grid", gap: 8 }}>
-      <span style={{ fontSize: 12, fontWeight: 600, color: C.t2 }}>{label}</span>
+      <span style={{ fontSize: 12, fontWeight: 500, lineHeight: 1.45, color: C.t2 }}>{label}</span>
       <div style={{ position: "relative" }}>
         <div style={{ position: "absolute", left: 14, top: "50%", transform: "translateY(-50%)", pointerEvents: "none" }}>
           {icon}
@@ -592,28 +621,34 @@ function MessageBox({ color, bg, icon, message }) {
 function primaryButtonStyle(C) {
   return {
     width: "100%",
-    padding: "12px 16px",
+    minHeight: 40,
+    padding: "10px 18px",
     borderRadius: 10,
     border: "none",
     background: C.purple,
-    color: "#fff",
+    color: "#ffffff",
     fontSize: 13,
-    fontWeight: 700,
+    fontWeight: 600,
+    lineHeight: 1.5,
     cursor: "pointer",
+    transition: "opacity 0.2s ease, transform 0.2s ease",
   };
 }
 
 function secondaryButtonStyle(C) {
   return {
     width: "100%",
-    padding: "12px 16px",
+    minHeight: 40,
+    padding: "10px 18px",
     borderRadius: 10,
     border: `1px solid ${C.border}`,
-    background: "transparent",
+    background: C.bgElevated,
     color: C.t2,
     fontSize: 13,
-    fontWeight: 700,
+    fontWeight: 600,
+    lineHeight: 1.5,
     cursor: "pointer",
+    transition: "opacity 0.2s ease, transform 0.2s ease, border-color 0.2s ease",
   };
 }
 

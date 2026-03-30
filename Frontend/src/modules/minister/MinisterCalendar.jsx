@@ -61,7 +61,7 @@ function EventPill({ item, compact = false, onClick }) {
     <button
       type="button"
       onClick={onClick}
-      className={`w-full text-left rounded-lg px-3 py-2 transition-all hover:shadow-sm ${compact ? "text-[10px]" : "text-xs"}`}
+      className={`w-full text-left rounded-lg px-3 py-2 transition-[opacity,border-color] duration-200 hover:opacity-90 ${compact ? "text-[10px]" : "text-xs"}`}
       style={{ border: `1px solid ${tone}33`, background: `${tone}12`, color: tone }}
     >
       <div className="font-semibold truncate">{item.title}</div>
@@ -126,7 +126,7 @@ function EventModal({ item, accessToken, onClose }) {
       <div className="fixed inset-0 z-50 flex sm:items-center justify-center overflow-y-auto p-4">
         <div
           className="w-full max-w-2xl rounded-2xl overflow-hidden"
-          style={{ background: C.card, border: `1px solid ${C.border}`, boxShadow: "0 24px 80px rgba(15,23,42,0.18)" }}
+          style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 12, boxShadow: C.dialogShadow }}
           onClick={(event) => event.stopPropagation()}
         >
           <div className="px-6 py-6 border-b flex items-start justify-between gap-4" style={{ background: C.bgElevated, borderColor: C.border }}>
@@ -185,7 +185,7 @@ function EventModal({ item, accessToken, onClose }) {
                         style={{
                           border: `1px solid ${C.border}`,
                           background: C.bgElevated,
-                          borderRadius: 14,
+                          borderRadius: 12,
                           padding: 10,
                           textAlign: "left",
                           cursor: "pointer",
@@ -205,7 +205,7 @@ function EventModal({ item, accessToken, onClose }) {
                     ))}
                   </div>
                   {selectedFile && (
-                    <div style={{ border: `1px solid ${C.border}`, borderRadius: 16, overflow: "hidden", background: C.bgElevated }}>
+                    <div style={{ border: `1px solid ${C.border}`, borderRadius: 12, overflow: "hidden", background: C.bgElevated }}>
                       <div style={{ padding: "14px 16px", borderBottom: `1px solid ${C.border}`, display: "flex", justifyContent: "space-between", gap: 12, alignItems: "center" }}>
                         <div>
                           <div style={{ fontSize: 13, fontWeight: 700, color: C.t1 }}>{selectedFile.name}</div>
@@ -219,7 +219,7 @@ function EventModal({ item, accessToken, onClose }) {
                         <img
                           src={selectedFile.downloadUrl}
                           alt={selectedFile.name}
-                          style={{ width: "100%", maxHeight: 420, objectFit: "contain", borderRadius: 12, background: "#fff" }}
+                          style={{ width: "100%", maxHeight: 420, objectFit: "contain", borderRadius: 12, background: C.card }}
                         />
                       </div>
                     </div>

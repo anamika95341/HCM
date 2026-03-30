@@ -11,11 +11,16 @@ function statusColor(status, C) {
   return C.purple;
 }
 
-export function WorkspacePage({ children, width = 1240 }) {
-  const { C } = usePortalTheme();
+export function WorkspacePage({ children, width = 900 }) {
   return (
-    <div style={{ minHeight: "100%", background: C.bg }}>
-      <div style={{ maxWidth: width, margin: "0 auto", padding: "32px 28px 40px" }}>
+    <div className="portal-page" style={{ minHeight: "100%", background: "transparent" }}>
+      <div
+        style={{
+          maxWidth: width,
+          margin: "0 auto",
+          padding: "var(--portal-space-13) var(--portal-space-14) var(--portal-space-14)",
+        }}
+      >
         {children}
       </div>
     </div>
@@ -25,9 +30,9 @@ export function WorkspacePage({ children, width = 1240 }) {
 export function WorkspaceSectionHeader({ eyebrow, title, subtitle, action, icon }) {
   const { C } = usePortalTheme();
   return (
-    <div style={{ marginBottom: 30 }}>
+    <div style={{ marginBottom: 28 }}>
       {eyebrow && (
-        <div style={{ fontSize: 11, fontWeight: 700, color: C.t3, textTransform: "uppercase", letterSpacing: ".18em", marginBottom: 10 }}>
+        <div style={{ fontSize: 10, fontWeight: 600, color: C.t3, textTransform: "uppercase", letterSpacing: "0.07em", marginBottom: 10 }}>
           {eyebrow}
         </div>
       )}
@@ -35,18 +40,17 @@ export function WorkspaceSectionHeader({ eyebrow, title, subtitle, action, icon 
         <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
           {icon ? (
             <div style={{
-              width: 46, height: 46, borderRadius: 13,
+              width: 44, height: 44, borderRadius: 12,
               background: C.purpleDim,
               display: "flex", alignItems: "center", justifyContent: "center",
               color: C.purple, flexShrink: 0,
-              border: `1px solid ${C.purple}22`,
             }}>
               {icon}
             </div>
           ) : null}
           <div>
-            <h1 style={{ margin: 0, fontSize: 22, lineHeight: 1.2, fontWeight: 700, color: C.t1, letterSpacing: "-0.02em" }}>{title}</h1>
-            {subtitle && <p style={{ margin: "5px 0 0", fontSize: 13, lineHeight: 1.6, color: C.t3 }}>{subtitle}</p>}
+            <h1 style={{ margin: 0, fontSize: 20, lineHeight: 1.3, fontWeight: 600, color: C.t1 }}>{title}</h1>
+            {subtitle && <p style={{ margin: "4px 0 0", fontSize: 12, lineHeight: 1.5, color: C.t3 }}>{subtitle}</p>}
           </div>
         </div>
         {action && <div style={{ flexShrink: 0 }}>{action}</div>}
@@ -61,18 +65,15 @@ export function WorkspaceCard({ children, style, hoverable = false }) {
   const isHovered = hoverable && hovered;
   return (
     <div
+      className="portal-card"
       onMouseEnter={hoverable ? () => setHovered(true) : undefined}
       onMouseLeave={hoverable ? () => setHovered(false) : undefined}
       style={{
-        background: `linear-gradient(180deg, ${C.card} 0%, ${C.bgElevated} 100%)`,
-        borderRadius: 16,
-        border: `1px solid ${isHovered ? `${C.purple}28` : C.border}`,
+        border: `1px solid ${isHovered ? C.purple : C.border}`,
         padding: 24,
-        boxShadow: isHovered
-          ? "0 16px 40px rgba(15,23,42,0.09), 0 4px 12px rgba(15,23,42,0.05)"
-          : "0 10px 30px rgba(15,23,42,0.05), 0 2px 8px rgba(15,23,42,0.03)",
-        transition: "border-color 0.15s ease, box-shadow 0.15s ease, transform 0.15s ease",
-        transform: isHovered ? "translateY(-1px)" : "none",
+        marginBottom: 20,
+        background: isHovered ? C.cardHover : C.card,
+        transition: "border-color var(--portal-duration-fast) ease, background var(--portal-duration-fast) ease",
         ...style,
       }}
     >
@@ -87,11 +88,11 @@ export function WorkspaceCardHeader({ title, subtitle, action }) {
     <div style={{
       display: "flex", justifyContent: "space-between", alignItems: subtitle ? "flex-start" : "center",
       gap: 12, paddingBottom: 16, marginBottom: 20,
-      borderBottom: `1px solid ${C.borderLight}`,
+      borderBottom: `1px solid ${C.border}`,
     }}>
       <div>
-        <div style={{ fontSize: 14, fontWeight: 700, color: C.t1, letterSpacing: "-0.01em" }}>{title}</div>
-        {subtitle && <div style={{ fontSize: 12, color: C.t3, marginTop: 3 }}>{subtitle}</div>}
+        <div style={{ fontSize: 14, fontWeight: 600, lineHeight: 1.4, color: C.t1 }}>{title}</div>
+        {subtitle && <div style={{ fontSize: 12, fontWeight: 400, lineHeight: 1.45, color: C.t3, marginTop: 4 }}>{subtitle}</div>}
       </div>
       {action}
     </div>
@@ -101,13 +102,7 @@ export function WorkspaceCardHeader({ title, subtitle, action }) {
 export function WorkspaceTabs({ items, value, onChange }) {
   const { C } = usePortalTheme();
   return (
-    <div style={{
-      display: "inline-flex", gap: 2, padding: "4px",
-      borderRadius: 12, background: C.bgElevated,
-      border: `1px solid ${C.border}`,
-      boxShadow: "inset 0 1px 3px rgba(0,0,0,0.05), 0 1px 2px rgba(255,255,255,0.65)",
-      flexWrap: "wrap",
-    }}>
+    <div className="portal-pill-track" style={{ flexWrap: "wrap" }}>
       {items.map((item) => {
         const active = item.id === value;
         return (
@@ -115,20 +110,9 @@ export function WorkspaceTabs({ items, value, onChange }) {
             key={item.id}
             type="button"
             onClick={() => onChange(item.id)}
+            className={`portal-pill-segment${active ? " is-active" : ""}`}
             style={{
-              border: "none",
-              borderRadius: 9,
-              padding: "7px 13px",
-              cursor: "pointer",
-              background: active ? C.card : "transparent",
-              color: active ? C.purple : C.t3,
-              fontSize: 12,
-              fontWeight: active ? 700 : 500,
-              boxShadow: active ? "0 4px 12px rgba(15,23,42,0.08)" : "none",
-              transition: "all 0.18s ease",
-              display: "flex",
-              alignItems: "center",
-              gap: 6,
+              color: active ? C.t1 : C.t3,
             }}
           >
             {item.label}
@@ -139,7 +123,7 @@ export function WorkspaceTabs({ items, value, onChange }) {
                 borderRadius: 999, fontSize: 10, fontWeight: 700,
                 background: active ? C.purpleDim : `${C.t3}20`,
                 color: active ? C.purple : C.t3,
-                transition: "all 0.18s ease",
+                transition: "all var(--portal-duration-slow) cubic-bezier(0.4, 0, 0.2, 1)",
               }}>
                 {item.count}
               </span>
@@ -165,23 +149,13 @@ export function WorkspaceStatCard({ label, value, accent, icon }) {
   const { C } = usePortalTheme();
   const color = accent || C.purple;
   return (
-    <div style={{
-      background: C.card,
-      borderRadius: 14,
-      border: `1px solid ${C.border}`,
-      padding: "18px 20px",
-      borderLeft: `3px solid ${color}`,
-      boxShadow: "0 8px 22px rgba(15,23,42,0.05)",
-      display: "flex",
-      flexDirection: "column",
-      gap: 10,
-    }}>
+    <div className="portal-card" style={{ padding: "18px 20px", display: "flex", flexDirection: "column", gap: 10 }}>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-        <div style={{ fontSize: 11, fontWeight: 700, color: C.t3, textTransform: "uppercase", letterSpacing: ".08em" }}>{label}</div>
+        <div style={{ fontSize: 10, fontWeight: 600, color: C.t3, textTransform: "uppercase", letterSpacing: "0.06em" }}>{label}</div>
         {icon && (
           <div style={{
-            width: 30, height: 30, borderRadius: 8,
-            background: `${color}15`,
+            width: 32, height: 32, borderRadius: 8,
+            background: `${color}20`,
             display: "flex", alignItems: "center", justifyContent: "center",
             color,
           }}>
@@ -189,7 +163,7 @@ export function WorkspaceStatCard({ label, value, accent, icon }) {
           </div>
         )}
       </div>
-      <div style={{ fontSize: 30, fontWeight: 800, color, lineHeight: 1, letterSpacing: "-0.03em" }}>{value}</div>
+      <div style={{ fontSize: 28, fontWeight: 700, color, lineHeight: 1, letterSpacing: "-0.02em" }}>{value}</div>
     </div>
   );
 }
@@ -204,15 +178,15 @@ export function WorkspaceInput(props) {
       onBlur={(e) => { setFocused(false); props.onBlur?.(e); }}
       style={{
         width: "100%",
-        padding: "9px 13px",
-        borderRadius: 10,
+        padding: "10px 14px",
         border: `1px solid ${focused ? C.purple : C.border}`,
         background: C.inp,
         color: C.t1,
         fontSize: 13,
         outline: "none",
         boxShadow: focused ? `0 0 0 3px ${C.purpleDim}` : "none",
-        transition: "border-color 0.15s ease, box-shadow 0.15s ease",
+        borderRadius: "var(--portal-radius-sm, 10px)",
+        transition: "border-color var(--portal-duration-fast) ease, box-shadow var(--portal-duration-fast) ease",
         ...(props.style || {}),
       }}
     />
@@ -229,8 +203,7 @@ export function WorkspaceSelect(props) {
       onBlur={(e) => { setFocused(false); props.onBlur?.(e); }}
       style={{
         width: "100%",
-        padding: "9px 13px",
-        borderRadius: 10,
+        padding: "10px 14px",
         border: `1px solid ${focused ? C.purple : C.border}`,
         background: C.inp,
         color: C.t1,
@@ -238,7 +211,8 @@ export function WorkspaceSelect(props) {
         outline: "none",
         cursor: "pointer",
         boxShadow: focused ? `0 0 0 3px ${C.purpleDim}` : "none",
-        transition: "border-color 0.15s ease, box-shadow 0.15s ease",
+        borderRadius: "var(--portal-radius-sm, 10px)",
+        transition: "border-color var(--portal-duration-fast) ease, box-shadow var(--portal-duration-fast) ease",
         ...(props.style || {}),
       }}
     />
@@ -248,56 +222,44 @@ export function WorkspaceSelect(props) {
 export function WorkspaceButton({ variant = "primary", children, style, ...props }) {
   const { C } = usePortalTheme();
   const [hovered, setHovered] = useState(false);
+  const [pressed, setPressed] = useState(false);
   const h = hovered && !props.disabled;
+  const p = pressed && !props.disabled;
 
   const variants = {
     primary: {
-      background: h ? `${C.purple}e8` : C.purple,
-      color: "#fff",
+      background: C.purple,
+      color: "#ffffff",
       border: "none",
-      boxShadow: h
-        ? `0 14px 24px ${C.purple}28, 0 4px 8px ${C.purple}20`
-        : `0 10px 18px ${C.purple}20, 0 2px 6px ${C.purple}18`,
     },
     ghost: {
-      background: h ? C.card : C.bgElevated,
-      color: h ? C.t1 : C.t2,
-      border: `1px solid ${h ? C.border : C.border}`,
-      boxShadow: h ? "0 4px 12px rgba(15,23,42,0.08)" : "0 2px 6px rgba(15,23,42,0.04)",
+      background: C.bgElevated,
+      color: C.t2,
+      border: `1px solid ${C.border}`,
     },
     outline: {
-      background: h ? C.purpleDim : "transparent",
+      background: "transparent",
       color: C.purple,
       border: `1px solid ${C.purple}`,
-      boxShadow: "none",
     },
     danger: {
-      background: h ? `${C.danger}08` : "transparent",
+      background: "transparent",
       color: C.danger,
       border: `1px solid ${C.danger}`,
-      boxShadow: "none",
     },
   };
   const current = variants[variant] || variants.primary;
   return (
     <button
       {...props}
+      className={`portal-btn portal-btn-${variant === "primary" ? "primary" : variant === "ghost" ? "ghost" : variant === "outline" ? "outline" : "danger"}`}
       onMouseEnter={() => setHovered(true)}
-      onMouseLeave={() => setHovered(false)}
+      onMouseLeave={() => { setHovered(false); setPressed(false); }}
+      onMouseDown={() => setPressed(true)}
+      onMouseUp={() => setPressed(false)}
       style={{
-        display: "inline-flex",
-        alignItems: "center",
-        justifyContent: "center",
-        gap: 7,
-        padding: "9px 16px",
-        borderRadius: 10,
-        fontSize: 13,
-        fontWeight: 600,
-        cursor: props.disabled ? "not-allowed" : "pointer",
-        opacity: props.disabled ? 0.55 : 1,
-        transition: "background 0.15s ease, box-shadow 0.15s ease, color 0.15s ease, transform 0.12s ease",
-        transform: h ? "translateY(-1px)" : "none",
-        letterSpacing: "-0.01em",
+        opacity: props.disabled ? 0.4 : h ? 0.9 : 1,
+        transform: p ? "scale(0.98)" : "none",
         ...current,
         ...style,
       }}
@@ -312,14 +274,10 @@ export function WorkspaceBadge({ children, color, status }) {
   // Auto-color from status string if no explicit color given
   const tone = color || (status ? statusColor(status, C) : C.purple);
   return (
-    <span style={{
-      display: "inline-flex", alignItems: "center",
-      padding: "3px 10px", borderRadius: 999,
-      fontSize: 11, fontWeight: 700,
+    <span className="portal-badge" style={{
       background: `${tone}18`,
       color: tone,
       border: `1px solid ${tone}28`,
-      letterSpacing: "0.01em",
       whiteSpace: "nowrap",
     }}>
       {children}
@@ -332,36 +290,35 @@ export function WorkspaceEmptyState({ title, subtitle, icon }) {
   return (
     <div style={{
       textAlign: "center",
-      padding: "52px 28px",
-      background: `linear-gradient(180deg, ${C.card} 0%, ${C.bgElevated} 100%)`,
-      borderRadius: 16,
-      border: `1.5px dashed ${C.border}`,
-      boxShadow: "0 8px 22px rgba(15,23,42,0.04)",
+      padding: "var(--portal-space-12) var(--portal-space-12)",
+      background: C.bgElevated,
+      borderRadius: "var(--portal-radius-md, 12px)",
+      border: `2px dashed ${C.border}`,
     }}>
       {icon && (
         <div style={{
-          width: 48, height: 48, borderRadius: 14,
+          width: 56, height: 56, borderRadius: "var(--portal-radius-md, 12px)",
           background: C.purpleDim, color: C.purple,
           display: "flex", alignItems: "center", justifyContent: "center",
-          margin: "0 auto 16px",
-          border: `1px solid ${C.purple}20`,
+          margin: "0 auto var(--portal-space-8)",
+          border: `1px solid ${C.purple}33`,
         }}>
           {icon}
         </div>
       )}
       {!icon && (
         <div style={{
-          width: 48, height: 48, borderRadius: 14,
+          width: 56, height: 56, borderRadius: "var(--portal-radius-md, 12px)",
           background: C.bgElevated, border: `1px solid ${C.border}`,
           display: "flex", alignItems: "center", justifyContent: "center",
-          margin: "0 auto 16px",
-          color: C.t3, fontSize: 20,
+          margin: "0 auto var(--portal-space-8)",
+          color: C.t3, fontSize: 28,
         }}>
           ○
         </div>
       )}
-      <div style={{ fontSize: 14, fontWeight: 700, color: C.t1, letterSpacing: "-0.01em" }}>{title}</div>
-      {subtitle && <div style={{ fontSize: 12, color: C.t3, lineHeight: 1.6, maxWidth: 280, margin: "6px auto 0" }}>{subtitle}</div>}
+      <div style={{ fontSize: 13, fontWeight: 600, lineHeight: 1.35, color: C.t2 }}>{title}</div>
+      {subtitle && <div style={{ fontSize: 11, fontWeight: 400, lineHeight: 1.55, color: C.t3, maxWidth: 280, margin: "var(--portal-space-2) auto 0" }}>{subtitle}</div>}
     </div>
   );
 }

@@ -1,25 +1,11 @@
 import { useEffect, useState } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
-import { ArrowLeft, Clock, CheckCircle2, AlertCircle, FileText, User, MapPin, Calendar, Users, FileCheck } from "lucide-react";
+import { ArrowLeft, FileText, User, MapPin, Calendar, Users, FileCheck } from "lucide-react";
 import { apiClient, authorizedConfig } from "../../../shared/api/client.js";
 import { useAuth } from "../../../shared/auth/AuthContext.jsx";
 import { PATHS } from "../../../routes/paths.js";
 import { WorkspaceBadge, WorkspaceButton, WorkspaceCard, WorkspaceCardHeader, WorkspaceEmptyState, WorkspacePage, WorkspaceSectionHeader } from "../../../shared/components/WorkspaceUI.jsx";
 import { usePortalTheme } from "../../../shared/theme/portalTheme.jsx";
-
-function statusBadgeClass(status) {
-  if (status === "scheduled") return "bg-emerald-100 text-emerald-700 border border-emerald-300";
-  if (["accepted", "verified", "resolved", "completed"].includes(status)) return "bg-sky-100 text-sky-700 border border-sky-300";
-  if (["verification_pending", "pending", "assigned", "in_review", "department_contact_identified", "call_scheduled", "followup_in_progress", "escalated_to_meeting"].includes(status)) return "bg-amber-100 text-amber-700 border border-amber-300";
-  if (["rejected", "cancelled", "not_verified"].includes(status)) return "bg-red-100 text-red-700 border border-red-300";
-  return "bg-slate-100 text-slate-700 border border-slate-300";
-}
-
-function getStatusIcon(status) {
-  if (["resolved", "completed"].includes(status)) return <CheckCircle2 size={24} className="text-green-600" />;
-  if (["rejected", "cancelled", "not_verified"].includes(status)) return <AlertCircle size={24} className="text-red-600" />;
-  return <Clock size={24} className="text-amber-600" />;
-}
 
 function citizenFacingStatus(caseData, itemType) {
   if (itemType === "meeting" && ["verification_pending", "accepted", "verified", "pending"].includes(caseData?.status)) {

@@ -246,7 +246,7 @@ export default function AdminMeeting() {
                 className="space-y-3"
                 style={{
                   padding: 18,
-                  borderRadius: 14,
+                  borderRadius: 12,
                   border: `1px solid ${C.border}`,
                   background: C.bgElevated,
                 }}
@@ -278,7 +278,7 @@ export default function AdminMeeting() {
                         type="button"
                         disabled={actionLoading || decisionReason.trim().length < 3}
                         onClick={() => runAction(() => apiClient.patch(`/meetings/${meetingId}/complete`, { reason: decisionReason }, authorizedConfig(session.accessToken)))}
-                        style={{ background: C.mint, color: "#fff", border: "none" }}
+                        style={{ background: C.mint, color: "#ffffff", border: "none" }}
                       >
                         Mark Completed
                       </WorkspaceButton>
@@ -304,7 +304,7 @@ export default function AdminMeeting() {
                   paddingTop: 20,
                 }}
               >
-                <div style={{ padding: 18, borderRadius: 14, border: `1px solid ${C.border}`, background: C.bgElevated }}>
+                <div style={{ padding: 18, borderRadius: 12, border: `1px solid ${C.border}`, background: C.bgElevated }}>
                   <h3 style={{ fontSize: 16, fontWeight: 700, color: C.t1 }}>Send for DEO Verification</h3>
                   <p style={{ fontSize: 12, color: C.t3, marginTop: 4 }}>Assign a verified DEO to complete the verification pass.</p>
                 </div>
@@ -339,7 +339,7 @@ export default function AdminMeeting() {
                   paddingTop: 20,
                 }}
               >
-                <div style={{ padding: 18, borderRadius: 14, border: `1px solid ${C.border}`, background: C.bgElevated }}>
+                <div style={{ padding: 18, borderRadius: 12, border: `1px solid ${C.border}`, background: C.bgElevated }}>
                   <h3 style={{ fontSize: 16, fontWeight: 700, color: C.t1 }}>{selectedMeeting.status === "scheduled" ? "Reschedule Meeting" : "Schedule Meeting"}</h3>
                   <p style={{ fontSize: 12, color: C.t3, marginTop: 4 }}>Finalize the minister, venue, and time window for the citizen meeting.</p>
                 </div>
@@ -504,7 +504,7 @@ export default function AdminMeeting() {
                 style={{ cursor: "pointer", padding: 0, overflow: "hidden" }}
                 onClick={() => navigate(`/admin/meetings/${meeting.id}`)}
               >
-                <div style={{ padding: "18px 18px 14px", borderBottom: `1px solid ${C.borderLight}`, background: `linear-gradient(180deg, ${C.card} 0%, ${C.bgElevated} 100%)` }}>
+                <div style={{ padding: "18px 18px 14px", borderBottom: `1px solid ${C.borderLight}`, background: C.bgElevated }}>
                   <div className="flex items-start justify-between gap-2">
                     <div className="flex-1">
                       <p style={{ fontSize: 11, fontWeight: 700, color: C.t3, textTransform: "uppercase", letterSpacing: ".08em" }}>{meeting.id}</p>

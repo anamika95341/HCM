@@ -251,7 +251,7 @@ export default function AdminCases() {
         <WorkspaceEmptyState title="No items found" subtitle="Try adjusting your current search or status filters." />
       ) : (
         <WorkspaceCard style={{ padding: 0, overflow: "hidden" }}>
-          <div style={{ padding: "18px 22px", background: `linear-gradient(180deg, ${C.card} 0%, ${C.bgElevated} 100%)`, borderBottom: `1px solid ${C.border}` }}>
+          <div style={{ padding: "18px 22px", background: C.bgElevated, borderBottom: `1px solid ${C.border}` }}>
             <div style={{ display: "flex", justifyContent: "space-between", gap: 16, flexWrap: "wrap", alignItems: "center" }}>
               <div>
                 <div style={{ fontSize: 14, fontWeight: 700, color: C.t1 }}>{tabs.find((item) => item.id === tab)?.label || "Queue Items"}</div>
@@ -267,7 +267,7 @@ export default function AdminCases() {
                 <thead style={{ background: C.bgElevated, borderBottom: `1px solid ${C.border}` }}>
                   <tr>
                     {["ID", "Type", "Title", "Citizen", "Owner", "Reference", "Created", "Status", "Action"].map((label) => (
-                      <th key={label} className="px-6 py-4 text-left text-xs font-semibold uppercase tracking-[0.08em]" style={{ color: C.t3, textAlign: label === "Status" || label === "Action" ? "center" : "left" }}>
+                      <th key={label} style={{ padding: "12px 16px", fontSize: 10, fontWeight: 600, color: C.t3, textTransform: "uppercase", letterSpacing: "0.06em", whiteSpace: "nowrap", textAlign: label === "Status" || label === "Action" ? "center" : "left" }}>
                         {label}
                       </th>
                     ))}
@@ -276,20 +276,20 @@ export default function AdminCases() {
                 <tbody>
                   {paginatedRows.map((item, index) => (
                     <tr key={`${item.itemType}-${item.id}`} style={{ background: index % 2 === 0 ? C.card : C.bgElevated }}>
-                      <td className="px-6 py-4 text-sm font-semibold" style={{ color: C.purple, borderBottom: `1px solid ${C.borderLight}` }}>{item.primaryId}</td>
-                      <td className="px-6 py-4 text-sm capitalize" style={{ color: C.t2, borderBottom: `1px solid ${C.borderLight}` }}>{item.itemType}</td>
-                      <td className="px-6 py-4 text-sm" style={{ color: C.t1, borderBottom: `1px solid ${C.borderLight}` }}>{item.title}</td>
-                      <td className="px-6 py-4 text-sm" style={{ color: C.t2, borderBottom: `1px solid ${C.borderLight}` }}>
+                      <td style={{ padding: "12px 16px", fontSize: 13, fontWeight: 600, color: C.purple, borderBottom: `1px solid ${C.borderLight}` }}>{item.primaryId}</td>
+                      <td style={{ padding: "12px 16px", fontSize: 13, textTransform: "capitalize", color: C.t2, borderBottom: `1px solid ${C.borderLight}` }}>{item.itemType}</td>
+                      <td style={{ padding: "12px 16px", fontSize: 13, color: C.t1, borderBottom: `1px solid ${C.borderLight}` }}>{item.title}</td>
+                      <td style={{ padding: "12px 16px", fontSize: 13, color: C.t2, borderBottom: `1px solid ${C.borderLight}` }}>
                         <div>{item.citizenName}</div>
-                        <div className="text-xs" style={{ color: C.t3 }}>{item.citizenId}</div>
+                        <div style={{ fontSize: 11, color: C.t3, marginTop: 2 }}>{item.citizenId}</div>
                       </td>
-                      <td className="px-6 py-4 text-sm" style={{ color: C.t2, borderBottom: `1px solid ${C.borderLight}` }}>{item.owner}</td>
-                      <td className="px-6 py-4 text-sm" style={{ color: C.t3, borderBottom: `1px solid ${C.borderLight}` }}>{item.reference}</td>
-                      <td className="px-6 py-4 text-sm" style={{ color: C.t3, borderBottom: `1px solid ${C.borderLight}` }}>{item.createdAt ? new Date(item.createdAt).toLocaleDateString("en-IN") : "-"}</td>
-                      <td className="px-6 py-4 text-center" style={{ borderBottom: `1px solid ${C.borderLight}` }}>
+                      <td style={{ padding: "12px 16px", fontSize: 13, color: C.t2, borderBottom: `1px solid ${C.borderLight}` }}>{item.owner}</td>
+                      <td style={{ padding: "12px 16px", fontSize: 13, color: C.t3, borderBottom: `1px solid ${C.borderLight}` }}>{item.reference}</td>
+                      <td style={{ padding: "12px 16px", fontSize: 13, color: C.t3, borderBottom: `1px solid ${C.borderLight}` }}>{item.createdAt ? new Date(item.createdAt).toLocaleDateString("en-IN") : "-"}</td>
+                      <td style={{ padding: "12px 16px", textAlign: "center", borderBottom: `1px solid ${C.borderLight}` }}>
                         <WorkspaceBadge status={item.status}>{item.statusLabel}</WorkspaceBadge>
                       </td>
-                      <td className="px-6 py-4 text-center" style={{ borderBottom: `1px solid ${C.borderLight}` }}>
+                      <td style={{ padding: "12px 16px", textAlign: "center", borderBottom: `1px solid ${C.borderLight}` }}>
                         <button
                           onClick={() => navigate(item.route)}
                           className="transition-colors"
@@ -303,7 +303,6 @@ export default function AdminCases() {
                             display: "inline-flex",
                             alignItems: "center",
                             justifyContent: "center",
-                            boxShadow: "0 6px 18px rgba(15,23,42,0.06)",
                           }}
                           title="View details"
                         >

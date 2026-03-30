@@ -43,5 +43,6 @@ The production deploy workflow:
 - Host-level nginx on the EC2 instance should proxy:
   - `/` to `http://127.0.0.1:5173`
   - `/api/` and `/ws` to `http://127.0.0.1:3000`
+- **Same-origin API:** Production builds often set `VITE_API_BASE_URL=/api/v1` so the browser calls the same host as the SPA. If `/api` is not routed to Node (host nginx, or `API_UPSTREAM` in `Frontend/server.cjs` for Docker), responses can be `index.html` (HTTP 200) and login or data loads fail silently. Vite dev/preview proxy `/api` in `vite.config.js`; Compose sets `API_UPSTREAM` for the frontend container.
 - Restrict EC2 security groups according to your environment. For a public dev server, keep the intended ports open only as needed.
 - A ready-to-use EC2 nginx config is in [`deploy/nginx/hcm-ec2.conf`](/mnt/d/hcmproject/HCM/deploy/nginx/hcm-ec2.conf)

@@ -7,6 +7,13 @@ export default defineConfig({
   plugins: [react(), tailwindcss()],
   server: {
     host: "0.0.0.0",
+    // When VITE_API_BASE_URL is relative (/api/v1), dev server must forward /api to the backend.
+    proxy: {
+      "/api": {
+        target: "http://127.0.0.1:3000",
+        changeOrigin: true,
+      },
+    },
     allowedHosts: [
       "localhost",
       "127.0.0.1",
@@ -15,6 +22,13 @@ export default defineConfig({
   },
   preview: {
     host: "0.0.0.0",
+    // Matches dev server: `vite preview` after a build with relative VITE_API_BASE_URL must proxy /api.
+    proxy: {
+      "/api": {
+        target: "http://127.0.0.1:3000",
+        changeOrigin: true,
+      },
+    },
     allowedHosts: [
       "localhost",
       "127.0.0.1",

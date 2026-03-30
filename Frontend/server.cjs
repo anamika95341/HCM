@@ -1,10 +1,14 @@
 const http = require('node:http');
+const https = require('node:https');
 const fs = require('node:fs');
 const path = require('node:path');
+const { URL } = require('node:url');
 
 const HOST = process.env.HOST || '0.0.0.0';
 const PORT = Number(process.env.PORT || 5173);
 const DIST_DIR = path.join(__dirname, 'dist');
+/** When the SPA is built with a relative VITE_API_BASE_URL (e.g. /api/v1), browser calls hit this server — forward them to the backend. Override in Docker: http://backend:3000 */
+const API_UPSTREAM = (process.env.API_UPSTREAM || 'http://127.0.0.1:3000').trim();
 
 const CONTENT_TYPES = {
   '.html': 'text/html; charset=utf-8',
@@ -35,10 +39,15 @@ function sendFile(res, filePath) {
   const contentType = CONTENT_TYPES[ext] || 'application/octet-stream';
   const stream = fs.createReadStream(filePath);
 
+  const isHtml = ext === '.html';
   res.writeHead(200, {
     'Content-Type': contentType,
     'X-Content-Type-Options': 'nosniff',
-    'Cache-Control': ext === '.html' ? 'no-cache' : 'public, max-age=31536000, immutable',
+    // HTML must always revalidate so new index.html picks up new hashed JS/CSS after deploys.
+    'Cache-Control': isHtml
+      ? 'no-cache, no-store, must-revalidate'
+      : 'public, max-age=31536000, immutable',
+    ...(isHtml ? { Pragma: 'no-cache' } : {}),
   });
 
   stream.on('error', () => {
@@ -51,8 +60,67 @@ function sendFile(res, filePath) {
   stream.pipe(res);
 }
 
+function stripConnectionHeader(headers) {
+  const out = { ...headers };
+  delete out.connection;
+  return out;
+}
+
+function proxyApiToUpstream(req, res) {
+  let upstreamBase;
+  try {
+    upstreamBase = new URL(API_UPSTREAM);
+  } catch {
+    res.writeHead(500, { 'Content-Type': 'text/plain; charset=utf-8' });
+    res.end('API_UPSTREAM is invalid');
+    return;
+  }
+
+  const incoming = new URL(req.url || '/', `http://${req.headers.host || 'localhost'}`);
+  const targetPath = incoming.pathname + incoming.search;
+
+  const isHttps = upstreamBase.protocol === 'https:';
+  const lib = isHttps ? https : http;
+  const defaultPort = isHttps ? 443 : 80;
+  const port = upstreamBase.port ? Number(upstreamBase.port) : defaultPort;
+
+  const hostHeader = port === defaultPort
+    ? upstreamBase.hostname
+    : `${upstreamBase.hostname}:${port}`;
+
+  const headers = { ...req.headers, host: hostHeader };
+
+  const options = {
+    hostname: upstreamBase.hostname,
+    port,
+    path: targetPath,
+    method: req.method,
+    headers,
+  };
+
+  const proxyReq = lib.request(options, (proxyRes) => {
+    res.writeHead(proxyRes.statusCode || 502, stripConnectionHeader(proxyRes.headers));
+    proxyRes.pipe(res);
+  });
+
+  proxyReq.on('error', () => {
+    if (!res.headersSent) {
+      res.writeHead(502, { 'Content-Type': 'text/plain; charset=utf-8' });
+    }
+    res.end('Bad Gateway');
+  });
+
+  req.pipe(proxyReq);
+}
+
 const server = http.createServer((req, res) => {
   const requestPath = (req.url || '/').split('?')[0];
+
+  if (requestPath.startsWith('/api/')) {
+    proxyApiToUpstream(req, res);
+    return;
+  }
+
   const safePath = getSafePath(requestPath === '/' ? '/index.html' : requestPath);
 
   if (!safePath) {

@@ -136,7 +136,7 @@ export default function DeoCalendarEvent() {
                     type="button"
                     disabled={submittingId === meeting.id}
                     onClick={() => submitVerification(meeting.id, true)}
-                    style={{ background: "#10b981", color: "#fff" }}
+                    style={{ background: C.mint, color: "#ffffff" }}
                   >
                     <CheckCircle2 size={16} />
                     Mark Verified
@@ -145,7 +145,7 @@ export default function DeoCalendarEvent() {
                     type="button"
                     disabled={submittingId === meeting.id}
                     onClick={() => submitVerification(meeting.id, false)}
-                    style={{ background: "#ef4444", color: "#fff" }}
+                    style={{ background: C.danger, color: "#ffffff" }}
                   >
                     <XCircle size={16} />
                     Mark Not Verified

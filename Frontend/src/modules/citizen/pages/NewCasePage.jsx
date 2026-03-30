@@ -28,8 +28,8 @@ function SuccessModal({ open, title, message, onClose }) {
   return (
     <div className="fixed inset-0 z-[120] flex items-center justify-center px-4 bg-black/40 backdrop-blur-sm">
       <div
-        className="w-full max-w-md rounded-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-300"
-        style={{ background: C.card, border: `1px solid ${C.border}`, boxShadow: "0 24px 80px rgba(15,23,42,0.18)" }}
+        className="w-full max-w-md rounded-xl overflow-hidden animate-in fade-in zoom-in-95 duration-300"
+        style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 12, boxShadow: C.dialogShadow }}
       >
         <div className="px-6 py-6 border-b" style={{ background: C.bgElevated, borderColor: C.border }}>
           <div className="flex items-center justify-center mb-4">
@@ -446,22 +446,22 @@ export default function HCMNewCasePage() {
     return (
       <div
         key={index}
-        className={`flex items-center justify-between p-4 ${colorClass} border rounded-xl hover:shadow-md transition-all group`}
+        className={`flex items-center justify-between p-4 ${colorClass} border rounded-xl transition-[opacity,border-color] duration-200 hover:opacity-95 group`}
         onClick={(e) => e.preventDefault()}
       >
         <div className="flex items-center gap-3 overflow-hidden flex-1">
-          <div className="p-2.5 bg-white rounded-lg border border-current border-opacity-20 group-hover:shadow-sm transition-all flex-shrink-0">
+          <div className="p-2.5 rounded-lg border border-current border-opacity-20 transition-colors flex-shrink-0" style={{ background: C.bgElevated }}>
             {icon}
           </div>
           <div className="flex-1 min-w-0">
-            <p className="text-sm font-semibold text-gray-900 truncate transition-colors" style={{ color: C.t1 }} title={file.name}>
+            <p className="truncate transition-colors" style={{ fontSize: 13, fontWeight: 600, color: C.t1 }} title={file.name}>
               {file.name}
             </p>
             <div className="flex items-center gap-2 mt-1">
-              <span className="text-xs bg-white bg-opacity-50 px-2 py-0.5 rounded font-medium text-gray-700">
+              <span style={{ fontSize: 11, background: C.bgElevated, border: `1px solid ${C.borderLight}`, padding: "2px 8px", borderRadius: 6, fontWeight: 500, color: C.t2 }}>
                 {fileType}
               </span>
-              <span className="text-xs text-gray-500">
+              <span style={{ fontSize: 11, color: C.t3 }}>
                 {formatFileSize(file.size)}
               </span>
             </div>
@@ -473,7 +473,7 @@ export default function HCMNewCasePage() {
             e.preventDefault();
             handleRemove(index);
           }}
-          className="text-gray-400 hover:text-red-500 p-2 hover:bg-red-50 rounded-lg transition-all ml-2 flex-shrink-0"
+          className="p-2 rounded-lg transition-opacity ml-2 flex-shrink-0 hover:opacity-80" style={{ color: C.t3 }}
         >
           <X size={18} />
         </button>
@@ -495,7 +495,7 @@ export default function HCMNewCasePage() {
 
       {/* HEADER */}
       {activeTab && (
-        <div className="sticky top-0 z-40 portal-panel shadow-sm" style={{ background: `${C.card}F5`, backdropFilter: "blur(14px)", borderBottom: `1px solid ${C.border}` }}>
+        <div className="sticky top-0 z-40 portal-panel" style={{ background: C.bgElevated, backdropFilter: "blur(14px)", borderBottom: `1px solid ${C.border}`, boxShadow: "none" }}>
           <div className="portal-page-wrap max-w-6xl mx-auto px-6 py-4 flex items-center justify-between">
             <button
               onClick={() => {
@@ -508,7 +508,7 @@ export default function HCMNewCasePage() {
               <ChevronRight size={20} className="rotate-180" />
               Back to Services
             </button>
-            <h2 className="text-xl font-bold text-gray-900">
+            <h2 style={{ fontSize: 20, fontWeight: 600, color: C.t1 }}>
               {activeTab === "meeting" ? "Meeting Request" : "Submit Complaint"}
             </h2>
             <div className="w-20"></div>
@@ -520,11 +520,11 @@ export default function HCMNewCasePage() {
 
         {/* ERROR ALERT */}
         {error && (
-          <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg flex items-start gap-3">
-            <AlertCircle size={20} className="text-red-600 flex-shrink-0 mt-0.5" />
+          <div className="mb-6 p-4 flex items-start gap-3" style={{ background: `${C.danger}12`, border: `1px solid ${C.danger}4D`, borderRadius: 10 }}>
+            <AlertCircle size={20} style={{ color: C.danger, flexShrink: 0, marginTop: 2 }} />
             <div>
-              <h4 className="font-semibold text-red-900">Error</h4>
-              <p className="text-sm text-red-700 mt-1">{error}</p>
+              <h4 style={{ fontWeight: 600, color: C.danger }}>Error</h4>
+              <p style={{ fontSize: 13, color: C.danger, marginTop: 4 }}>{error}</p>
             </div>
           </div>
         )}
@@ -535,16 +535,15 @@ export default function HCMNewCasePage() {
             {/* MEETING REQUEST */}
             <button
               onClick={() => setActiveTab("meeting")}
-              className="group relative rounded-2xl border shadow-sm hover:shadow-lg transition-all duration-300 overflow-hidden text-left"
-              style={{ background: `linear-gradient(180deg, ${C.card} 0%, ${C.bgElevated} 100%)`, borderColor: C.border }}
+              className="group relative rounded-xl border transition-[border-color,opacity] duration-200 overflow-hidden text-left hover:opacity-[0.98]"
+              style={{ background: C.card, borderColor: C.border, boxShadow: "none" }}
             >
-              <div className="absolute top-0 right-0 w-32 h-32 opacity-0 group-hover:opacity-100 transition-opacity duration-300" style={{ background: `linear-gradient(to bottom left, ${C.purpleDim}, transparent)` }}></div>
               <div className="relative p-8">
                 <div className="h-12 w-12 rounded-xl flex items-center justify-center mb-4" style={{ background: C.purpleDim }}>
                   <Calendar size={24} style={{ color: C.purple }} />
                 </div>
-                <h3 className="text-xl font-bold text-gray-900 mb-2">Request a Meeting</h3>
-                <p className="text-gray-600 text-sm leading-relaxed mb-6">
+                <h3 style={{ fontSize: 20, fontWeight: 600, color: C.t1, marginBottom: 8 }}>Request a Meeting</h3>
+                <p style={{ color: C.t2, fontSize: 13, lineHeight: 1.6, marginBottom: 24 }}>
                   Schedule a meeting with an administration desk. You can specify purpose, add supporting documents, and invite companions.
                 </p>
                 <div className="flex items-center gap-2 font-medium group-hover:gap-3 transition-all duration-300" style={{ color: C.purple }}>
@@ -557,16 +556,15 @@ export default function HCMNewCasePage() {
             {/* SUBMIT COMPLAINT */}
             <button
               onClick={() => setActiveTab("complaint")}
-              className="group relative rounded-2xl border shadow-sm hover:shadow-lg transition-all duration-300 overflow-hidden text-left"
-              style={{ background: `linear-gradient(180deg, ${C.card} 0%, ${C.bgElevated} 100%)`, borderColor: C.border }}
+              className="group relative rounded-xl border transition-[border-color,opacity] duration-200 overflow-hidden text-left hover:opacity-[0.98]"
+              style={{ background: C.card, borderColor: C.border, boxShadow: "none" }}
             >
-              <div className="absolute top-0 right-0 w-32 h-32 opacity-0 group-hover:opacity-100 transition-opacity duration-300" style={{ background: `linear-gradient(to bottom left, ${C.mint}20, transparent)` }}></div>
               <div className="relative p-8">
                 <div className="h-12 w-12 rounded-xl flex items-center justify-center mb-4" style={{ background: `${C.mint}20` }}>
                   <FileText size={24} style={{ color: C.mint }} />
                 </div>
-                <h3 className="text-xl font-bold text-gray-900 mb-2">Submit a Complaint</h3>
-                <p className="text-gray-600 text-sm leading-relaxed mb-6">
+                <h3 style={{ fontSize: 20, fontWeight: 600, color: C.t1, marginBottom: 8 }}>Submit a Complaint</h3>
+                <p style={{ color: C.t2, fontSize: 13, lineHeight: 1.6, marginBottom: 24 }}>
                   File a formal complaint regarding any civic or government issue. Supports multiple document formats and categories.
                 </p>
                 <div className="flex items-center gap-2 font-medium group-hover:gap-3 transition-all duration-300" style={{ color: C.mint }}>
@@ -588,7 +586,7 @@ export default function HCMNewCasePage() {
               {/* TITLE */}
               <div>
                 <label style={sectionLabelStyle}>
-                  Meeting Title <span className="text-red-600">*</span>
+                  Meeting Title <span style={{ color: C.danger }}>*</span>
                 </label>
                 <WorkspaceInput
                   required
@@ -607,7 +605,7 @@ export default function HCMNewCasePage() {
               {/* PURPOSE */}
               <div>
                 <label style={sectionLabelStyle}>
-                  Purpose of Meeting <span className="text-red-600">*</span>
+                  Purpose of Meeting <span style={{ color: C.danger }}>*</span>
                 </label>
                 <textarea
                   required
@@ -622,7 +620,7 @@ export default function HCMNewCasePage() {
               </div>
 
               {/* DATE AND TIME */}
-              <div style={{ padding: 20, borderRadius: 16, border: `1px solid ${C.border}`, background: C.bgElevated }}>
+              <div style={{ padding: 20, borderRadius: 12, border: `1px solid ${C.border}`, background: C.bgElevated }}>
                 <div style={{ fontSize: 12, fontWeight: 700, color: C.t3, textTransform: "uppercase", letterSpacing: ".08em", marginBottom: 16 }}>
                   Scheduling Preferences
                 </div>
@@ -630,7 +628,7 @@ export default function HCMNewCasePage() {
                 <div>
                   <label className="flex items-center gap-2" style={sectionLabelStyle}>
                     <Calendar size={16} />
-                    Preferred Date <span className="text-red-600">*</span>
+                    Preferred Date <span style={{ color: C.danger }}>*</span>
                   </label>
                   <WorkspaceInput
                     required
@@ -641,13 +639,13 @@ export default function HCMNewCasePage() {
                     }
                     min={getTomorrowDate()}
                   />
-                  <p className="text-xs text-gray-500 mt-2">Select a date from tomorrow onwards</p>
+                  <p style={{ fontSize: 11, color: C.t3, marginTop: 8 }}>Select a date from tomorrow onwards</p>
                 </div>
 
                 <div>
                   <label className="flex items-center gap-2" style={sectionLabelStyle}>
                     <Clock size={16} />
-                    Preferred Time <span className="text-red-600">*</span>
+                    Preferred Time <span style={{ color: C.danger }}>*</span>
                   </label>
                   <WorkspaceSelect
                     required
@@ -663,7 +661,7 @@ export default function HCMNewCasePage() {
                       </option>
                     ))}
                   </WorkspaceSelect>
-                  <p className="text-xs text-gray-500 mt-2">24-hour slots available • 30-minute intervals</p>
+                  <p style={{ fontSize: 11, color: C.t3, marginTop: 8 }}>24-hour slots available • 30-minute intervals</p>
                 </div>
               </div>
               </div>
@@ -686,7 +684,7 @@ export default function HCMNewCasePage() {
                     </option>
                   ))}
                 </WorkspaceSelect>
-                <p className="text-xs text-gray-500 mt-2">Not sure? Leave blank to auto-assign.</p>
+                <p style={{ fontSize: 11, color: C.t3, marginTop: 8 }}>Not sure? Leave blank to auto-assign.</p>
               </div>
 
               {/* FILE UPLOAD */}
@@ -694,18 +692,18 @@ export default function HCMNewCasePage() {
                 <label style={sectionLabelStyle}>
                   Supporting Documents (Optional)
                 </label>
-                <label className="border-2 border-dashed rounded-2xl p-6 cursor-pointer transition-colors block" style={{ borderColor: C.border, background: C.bgElevated }}>
+                <label className="border-2 border-dashed rounded-xl p-6 cursor-pointer transition-colors block" style={{ borderColor: C.border, background: C.bgElevated }}>
                   <div className="flex items-center gap-4">
                     <div className="h-12 w-12 rounded-xl flex items-center justify-center flex-shrink-0" style={{ background: C.card, border: `1px solid ${C.border}` }}>
                       <Upload size={24} style={{ color: C.t3 }} />
                     </div>
                     <div className="flex-1">
-                      <div className="font-semibold text-gray-900">
+                      <div style={{ fontWeight: 600, color: C.t1 }}>
                         {meetingForm.files.length > 0
                           ? `${meetingForm.files.length} file(s) selected`
                           : "Click to upload or drag and drop"}
                       </div>
-                      <p className="text-xs text-gray-500 mt-1">PDF, images, or office documents</p>
+                      <p style={{ fontSize: 11, color: C.t3, marginTop: 4 }}>PDF, images, or office documents</p>
                     </div>
                   </div>
 
@@ -729,7 +727,7 @@ export default function HCMNewCasePage() {
               </div>
 
               {/* COMPANIONS */}
-              <div style={{ padding: 20, borderRadius: 16, border: `1px solid ${C.border}`, background: C.bgElevated }}>
+              <div style={{ padding: 20, borderRadius: 12, border: `1px solid ${C.border}`, background: C.bgElevated }}>
                 <label className="flex items-center gap-2" style={sectionLabelStyle}>
                   <Users size={18} />
                   Additional Attendees
@@ -821,7 +819,7 @@ export default function HCMNewCasePage() {
               {/* TITLE */}
               <div>
                 <label style={sectionLabelStyle}>
-                  Complaint Title <span className="text-red-600">*</span>
+                  Complaint Title <span style={{ color: C.danger }}>*</span>
                 </label>
                 <WorkspaceInput
                   required
@@ -837,7 +835,7 @@ export default function HCMNewCasePage() {
               {/* DETAILS */}
               <div>
                 <label style={sectionLabelStyle}>
-                  Complaint Details <span className="text-red-600">*</span>
+                  Complaint Details <span style={{ color: C.danger }}>*</span>
                 </label>
                 <textarea
                   required
@@ -852,12 +850,12 @@ export default function HCMNewCasePage() {
               </div>
 
               {/* LOCATION */}
-              <div style={{ padding: 20, borderRadius: 16, border: `1px solid ${C.border}`, background: C.bgElevated }}>
+              <div style={{ padding: 20, borderRadius: 12, border: `1px solid ${C.border}`, background: C.bgElevated }}>
                 <div className="grid md:grid-cols-2 gap-6">
                 <div>
                   <label className="flex items-center gap-2" style={sectionLabelStyle}>
                     <MapPin size={16} />
-                    Location <span className="text-red-600">*</span>
+                    Location <span style={{ color: C.danger }}>*</span>
                   </label>
                   <WorkspaceInput
                     required
@@ -874,7 +872,7 @@ export default function HCMNewCasePage() {
                 <div>
                   <label className="flex items-center gap-2" style={sectionLabelStyle}>
                     <Briefcase size={16} />
-                    Category <span className="text-red-600">*</span>
+                    Category <span style={{ color: C.danger }}>*</span>
                   </label>
                   <WorkspaceSelect
                     required
@@ -899,18 +897,18 @@ export default function HCMNewCasePage() {
                 <label style={sectionLabelStyle}>
                   Supporting Documents
                 </label>
-                <label className="border-2 border-dashed rounded-2xl p-6 cursor-pointer transition-colors block" style={{ borderColor: C.border, background: C.bgElevated }}>
+                <label className="border-2 border-dashed rounded-xl p-6 cursor-pointer transition-colors block" style={{ borderColor: C.border, background: C.bgElevated }}>
                   <div className="flex items-center gap-4">
                     <div className="h-12 w-12 rounded-xl flex items-center justify-center flex-shrink-0" style={{ background: C.card, border: `1px solid ${C.border}` }}>
                       <Upload size={24} style={{ color: C.t3 }} />
                     </div>
                     <div className="flex-1">
-                      <div className="font-semibold text-gray-900">
+                      <div style={{ fontWeight: 600, color: C.t1 }}>
                         {complaintForm.files.length > 0
                           ? `${complaintForm.files.length} file(s) selected`
                           : "Click to upload or drag and drop"}
                       </div>
-                      <p className="text-xs text-gray-500 mt-1">PDF, images, Excel (max 50 MB per file)</p>
+                      <p style={{ fontSize: 11, color: C.t3, marginTop: 4 }}>PDF, images, Excel (max 50 MB per file)</p>
                     </div>
                   </div>
 
@@ -947,8 +945,8 @@ export default function HCMNewCasePage() {
 
         {/* TRACK CASES LINK */}
         {!activeTab && (
-          <div className="rounded-2xl p-8 text-center" style={{ background: `linear-gradient(180deg, ${C.purpleDim} 0%, ${C.card} 100%)`, border: `1px solid ${C.purple}33`, boxShadow: "0 10px 28px rgba(15,23,42,0.05)" }}>
-            <p className="text-gray-700 mb-4">Already submitted a request or complaint?</p>
+          <div className="rounded-xl p-8 text-center" style={{ background: C.purpleDim, border: `1px solid ${C.purple}33` }}>
+            <p style={{ color: C.t2, marginBottom: 16 }}>Already submitted a request or complaint?</p>
             <Link
               to={PATHS.citizen.cases}
               className="inline-flex items-center gap-2 px-6 py-3 text-white font-semibold rounded-lg transition-colors"

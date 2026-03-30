@@ -170,16 +170,16 @@ export default function MyCases() {
                     <table className="w-full text-sm">
                       <thead style={{ background: C.bgElevated, borderBottom: `1px solid ${C.border}` }}>
                         <tr>
-                          <th className="px-4 py-4 text-left font-semibold text-slate-700 text-xs uppercase tracking-wide rounded-tl-xl">Case ID</th>
-                          <th className="px-4 py-4 text-left font-semibold text-slate-700 text-xs uppercase tracking-wide">Subject</th>
-                          <th className="px-4 py-4 text-left font-semibold text-slate-700 text-xs uppercase tracking-wide">Department</th>
-                          <th className="px-4 py-4 text-left font-semibold text-slate-700 text-xs uppercase tracking-wide">Status</th>
-                          <th className="px-4 py-4 text-left font-semibold text-slate-700 text-xs uppercase tracking-wide">Owner</th>
-                          <th className="px-4 py-4 text-left font-semibold text-slate-700 text-xs uppercase tracking-wide">Reference</th>
-                          <th className="px-4 py-4 text-center font-semibold text-slate-700 text-xs uppercase tracking-wide rounded-tr-xl">Action</th>
+                          <th style={{ padding: "12px 16px", fontSize: 10, fontWeight: 600, color: C.t3, textTransform: "uppercase", letterSpacing: "0.06em", textAlign: "left", whiteSpace: "nowrap" }}>Case ID</th>
+                          <th style={{ padding: "12px 16px", fontSize: 10, fontWeight: 600, color: C.t3, textTransform: "uppercase", letterSpacing: "0.06em", textAlign: "left", whiteSpace: "nowrap" }}>Subject</th>
+                          <th style={{ padding: "12px 16px", fontSize: 10, fontWeight: 600, color: C.t3, textTransform: "uppercase", letterSpacing: "0.06em", textAlign: "left", whiteSpace: "nowrap" }}>Department</th>
+                          <th style={{ padding: "12px 16px", fontSize: 10, fontWeight: 600, color: C.t3, textTransform: "uppercase", letterSpacing: "0.06em", textAlign: "left", whiteSpace: "nowrap" }}>Status</th>
+                          <th style={{ padding: "12px 16px", fontSize: 10, fontWeight: 600, color: C.t3, textTransform: "uppercase", letterSpacing: "0.06em", textAlign: "left", whiteSpace: "nowrap" }}>Owner</th>
+                          <th style={{ padding: "12px 16px", fontSize: 10, fontWeight: 600, color: C.t3, textTransform: "uppercase", letterSpacing: "0.06em", textAlign: "left", whiteSpace: "nowrap" }}>Reference</th>
+                          <th style={{ padding: "12px 16px", fontSize: 10, fontWeight: 600, color: C.t3, textTransform: "uppercase", letterSpacing: "0.06em", textAlign: "center", whiteSpace: "nowrap" }}>Action</th>
                         </tr>
                       </thead>
-                      <tbody className="divide-y divide-slate-200">
+                      <tbody>
                         {paginatedItems.map((item) => {
                           const status = citizenStatus(item);
                           const secondaryLine = item.callOutcome || item.resolutionSummary || item.statusReason || "Complaint under process";
@@ -188,20 +188,20 @@ export default function MyCases() {
 
                           return (
                             <tr key={`${item.itemType}-${item._id}`} style={{ borderBottom: `1px solid ${C.borderLight}` }}>
-                              <td className="px-4 py-4"><span style={{ fontWeight: 600, color: C.purple, fontSize: 13 }}>{item.primaryId}</span></td>
-                              <td className="px-4 py-4">
+                              <td style={{ padding: "12px 16px" }}><span style={{ fontWeight: 600, color: C.purple, fontSize: 13 }}>{item.primaryId}</span></td>
+                              <td style={{ padding: "12px 16px" }}>
                                 <div>
-                                  <p style={{ fontWeight: 600, color: C.t1 }}>{item.primaryTitle}</p>
-                                  <p style={{ fontSize: 12, color: C.t3, marginTop: 4 }}>{secondaryLine}</p>
+                                  <p style={{ fontSize: 13, fontWeight: 600, color: C.t1 }}>{item.primaryTitle}</p>
+                                  <p style={{ fontSize: 11, color: C.t3, marginTop: 4 }}>{secondaryLine}</p>
                                 </div>
                               </td>
-                              <td className="px-4 py-4 text-sm" style={{ color: C.t2 }}>{departmentLabel}</td>
-                              <td className="px-4 py-4">
+                              <td style={{ padding: "12px 16px", fontSize: 13, color: C.t2 }}>{departmentLabel}</td>
+                              <td style={{ padding: "12px 16px" }}>
                                 <WorkspaceBadge status={status.value}>{status.label}</WorkspaceBadge>
                               </td>
-                              <td className="px-4 py-4 text-sm" style={{ color: C.t2 }}>{item.currentOwner || "Pending"}</td>
-                              <td className="px-4 py-4 text-sm" style={{ color: C.t2 }}>{referenceLabel}</td>
-                              <td className="px-4 py-4 text-center">
+                              <td style={{ padding: "12px 16px", fontSize: 13, color: C.t2 }}>{item.currentOwner || "Pending"}</td>
+                              <td style={{ padding: "12px 16px", fontSize: 13, color: C.t2 }}>{referenceLabel}</td>
+                              <td style={{ padding: "12px 16px", textAlign: "center" }}>
                                 <WorkspaceButton
                                   type="button"
                                   onClick={() => navigate(`/citizen/cases/${item._id}`, { state: { caseData: item, itemType: item.itemType } })}

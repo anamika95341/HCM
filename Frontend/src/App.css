@@ -1,71 +1,72 @@
-body {
-  background: var(--portal-bg);
-  color: var(--portal-text);
-}
-
 .portal-page {
   min-height: 100%;
-  background: var(--portal-bg);
+  background: transparent;
 }
 
 .portal-page-wrap {
   width: 100%;
-  padding: 28px 24px 36px;
+  max-width: var(--portal-content-max);
+  margin: 0 auto;
+  padding: var(--portal-space-13) var(--portal-space-14) var(--portal-space-14);
 }
 
 .portal-page-header {
-  margin-bottom: 28px;
+  margin-bottom: var(--portal-space-12);
 }
 
 .portal-page-header h1 {
   margin: 0;
-  font-size: 28px;
-  line-height: 1.15;
-  font-weight: 600;
-  color: var(--portal-text);
+  color: var(--portal-text-strong);
+  font-size: 24px;
+  font-weight: 700;
+  line-height: 1.25;
 }
 
 .portal-page-header p {
-  margin: 8px 0 0;
-  font-size: 12px;
-  line-height: 1.7;
+  margin: var(--portal-space-4) 0 0;
   color: var(--portal-text-muted);
+  font-size: 11px;
+  font-weight: 400;
+  line-height: 1.55;
+}
+
+.portal-hero,
+.portal-panel {
+  background: var(--portal-card);
+  border: 1px solid var(--portal-border);
+  border-radius: var(--portal-radius-md);
 }
 
 .portal-hero {
-  margin-bottom: 24px;
-  padding: 24px;
-  background: linear-gradient(180deg, var(--portal-card) 0%, var(--portal-bg-elevated) 100%);
-  border: 1px solid var(--portal-border);
-  border-radius: 16px;
-  box-shadow: var(--portal-shadow-sm);
+  margin-bottom: var(--portal-space-11);
+  padding: var(--portal-space-11);
 }
 
 .portal-hero-subtitle {
-  margin: 6px 0 0;
-  font-size: 12px;
-  line-height: 1.7;
+  margin: var(--portal-space-3) 0 0;
   color: var(--portal-text-muted);
-}
-
-.portal-panel {
-  background: linear-gradient(180deg, var(--portal-card) 0%, var(--portal-bg-elevated) 100%);
-  border: 1px solid var(--portal-border);
-  border-radius: 16px;
-  box-shadow: var(--portal-shadow-sm);
+  font-size: 11px;
+  line-height: 1.55;
 }
 
 .portal-soft-divider {
   height: 1px;
-  background: linear-gradient(90deg, transparent 0%, var(--portal-border) 20%, var(--portal-border) 80%, transparent 100%);
+  background: var(--portal-border);
 }
 
-@media (max-width: 768px) {
+@media (max-width: 1024px) {
   .portal-page-wrap {
-    padding: 20px 16px 28px;
+    padding: var(--portal-space-11) var(--portal-space-11) var(--portal-space-13);
+  }
+}
+
+@media (max-width: 640px) {
+  .portal-page-wrap {
+    padding: var(--portal-space-8) var(--portal-space-8) var(--portal-space-11);
   }
 
   .portal-page-header h1 {
-    font-size: 24px;
+    font-size: 20px;
+    line-height: 1.3;
   }
 }

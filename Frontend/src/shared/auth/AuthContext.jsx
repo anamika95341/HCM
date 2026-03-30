@@ -24,12 +24,21 @@ export function AuthProvider({ children }) {
     };
   }, []);
 
+  function assertSessionPayload(data, contextLabel) {
+    const token = data?.accessToken;
+    if (typeof token !== "string" || token.trim().length < 20) {
+      const hint = " If the app is served from Docker or a static server, ensure API requests reach the backend (e.g. API_UPSTREAM / reverse proxy for /api).";
+      throw new Error(`Invalid login response (${contextLabel}).${hint}`);
+    }
+  }
+
   async function login({ role, identifier, password }) {
     if (role === "citizen") {
       const { data } = await apiClient.post("/auth/citizen/login", {
         citizenId: identifier,
         password,
       });
+      assertSessionPayload(data, "citizen");
       setSession({ ...data, role: "citizen" });
       return { requiresOtp: false };
     }
@@ -39,6 +48,7 @@ export function AuthProvider({ children }) {
         usernameOrEmail: identifier,
         password,
       });
+      assertSessionPayload(data, "minister");
       setSession({ ...data, role: "minister" });
       return { requiresOtp: false };
     }
@@ -48,6 +58,7 @@ export function AuthProvider({ children }) {
         usernameOrEmail: identifier,
         password,
       });
+      assertSessionPayload(data, "masteradmin");
       setSession({ ...data, role: "masteradmin" });
       return { requiresOtp: false };
     }
@@ -58,6 +69,7 @@ export function AuthProvider({ children }) {
       password,
     });
 
+    assertSessionPayload(data, role);
     setSession({ ...data, role });
     return { requiresOtp: false };
   }

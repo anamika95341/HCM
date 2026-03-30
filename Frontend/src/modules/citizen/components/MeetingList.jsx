@@ -12,13 +12,6 @@ import {
 } from "../../../shared/components/WorkspaceUI.jsx";
 import { usePortalTheme } from "../../../shared/theme/portalTheme.jsx";
 
-function statusBadgeClass(status) {
-  if (status === "scheduled") return "bg-emerald-100 text-emerald-700";
-  if (status === "accepted" || status === "verified") return "bg-sky-100 text-sky-700";
-  if (status === "verification_pending" || status === "pending") return "bg-amber-100 text-amber-700";
-  if (status === "rejected" || status === "not_verified") return "bg-rose-100 text-rose-700";
-  return "bg-slate-100 text-slate-700";
-}
 
 function labelForStatus(status) {
   if (["pending", "accepted", "verification_pending", "verified"].includes(status)) {
