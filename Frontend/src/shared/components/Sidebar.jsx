@@ -72,7 +72,7 @@ function Sidebar({ collapsed, onToggle }) {
           display: "flex",
           alignItems: "center",
           justifyContent: collapsed ? "center" : "space-between",
-          minHeight: 73,
+          height: 55,
           padding: collapsed ? "var(--portal-space-10) var(--portal-space-8)" : "var(--portal-space-11) var(--portal-space-10)",
           borderBottom: `1px solid ${C.border}`,
           gap: 10,
@@ -88,12 +88,7 @@ function Sidebar({ collapsed, onToggle }) {
               minWidth: 0,
             }}
           >
-            <span style={{ fontSize: 16, fontWeight: 700, color: C.t1, lineHeight: 1.35 }}>
-              E-Parinam
-            </span>
-            <span style={{ fontSize: 10, fontWeight: 700, color: C.t3, letterSpacing: "0.08em", textTransform: "uppercase" }}>
-              Unified Portal
-            </span>
+           
           </Link>
         )}
         <SidebarItem type="" collapsed={collapsed} label="Toggle Navigation">
@@ -118,53 +113,8 @@ function Sidebar({ collapsed, onToggle }) {
         </SidebarItem>
       </div>
 
-      {!collapsed && (
-        <div style={{ padding: "16px 12px 0", borderBottom: `1px solid ${C.border}` }}>
-          <div
-            style={{
-              padding: "0 0 16px",
-              display: "flex",
-              alignItems: "center",
-              gap: 12,
-            }}
-          >
-            <div
-              style={{
-                width: 40,
-                height: 40,
-                borderRadius: 999,
-                background: C.purpleDim,
-                color: C.purple,
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                fontWeight: 700,
-                fontSize: 14,
-                flexShrink: 0,
-              }}
-            >
-              {userInitial}
-            </div>
-            <div style={{ overflow: "hidden", flex: 1 }}>
-              <div style={{ fontSize: 13, fontWeight: 600, color: C.t1, lineHeight: 1.4, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-                {userName}
-              </div>
-              <div style={{ marginTop: 4 }}>
-                <span className="portal-badge" style={{ background: C.purpleDim, color: C.purple }}>
-                  {roleLabel.toUpperCase()}
-                </span>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
       <div style={{ padding: collapsed ? "12px 8px" : "12px 8px 16px", overflowY: "auto", flex: 1 }}>
-        {!collapsed && (
-          <div style={{ padding: "6px 8px 10px", fontSize: 10, fontWeight: 700, color: C.t3, textTransform: "uppercase", letterSpacing: "0.08em" }}>
-            Navigation
-          </div>
-        )}
+       
         <ul style={{ width: "100%", display: "grid", gap: 2, margin: 0, padding: 0, listStyle: "none" }}>
           {navByRole[role].map((item) => (
             <SidebarItem key={item.to} type="NavLink" to={item.to} icon={item.icon} label={item.label} collapsed={collapsed} />

@@ -15,13 +15,7 @@ const WORKSPACE_TITLES = [
   { match: "/settings", title: "Settings" },
 ];
 
-const ROLE_LABELS = {
-  citizen: "Citizen",
-  admin: "Admin",
-  masteradmin: "Master Admin",
-  deo: "DEO",
-  minister: "Minister",
-};
+
 
 const Header = () => {
   const ref = useRef(null);
@@ -42,7 +36,7 @@ const Header = () => {
 
   const safeAvatar = sanitizeImageSrc(currentUser.avatar);
   const workspaceTitle = WORKSPACE_TITLES.find((item) => location.pathname.startsWith(item.match))?.title || "Unified Portal";
-  const roleLabel = ROLE_LABELS[currentUser.role] || currentUser.role;
+
 
   useEffect(() => {
     const handleFullscreenChange = () => {
@@ -85,7 +79,7 @@ const Header = () => {
         background: C.bgElevated,
         borderBottom: `1px solid ${C.border}`,
         padding: "24px 32px",
-        minHeight: 73,
+        height:55,
         flexShrink: 0,
         position: "sticky",
         top: 0,
@@ -93,17 +87,7 @@ const Header = () => {
       }}
     >
       <div style={{ display: "flex", alignItems: "center", gap: 12, minWidth: 0, flexWrap: "wrap" }}>
-        <div>
-          <div style={{ fontSize: 15, fontWeight: 700, color: C.t1, letterSpacing: "-0.02em", lineHeight: 1.2 }}>
-            {workspaceTitle}
-          </div>
-          <div style={{ fontSize: 11, color: C.t3, marginTop: 2, fontWeight: 500 }}>
-            E-Parinam workspace
-          </div>
-        </div>
-        <div className="portal-badge" style={{ background: C.purpleDim, color: C.purple }}>
-          {roleLabel.toUpperCase()}
-        </div>
+        
       </div>
 
       <div style={{ display: "flex", alignItems: "center", gap: 8, position: "relative" }} ref={ref}>
@@ -113,7 +97,6 @@ const Header = () => {
           title={theme === "dark" ? "Switch to Light Mode" : "Switch to Dark Mode"}
         />
         <HeaderIcon icon={isFullscreen ? FiMinimize : FiMaximize} onClick={toggleFullscreen} title="Toggle Fullscreen" />
-        <HeaderIcon icon={FiCalendar} onClick={() => navigate(getHomePathForRole(session?.role || "citizen"))} title="Go Home" />
         <HeaderIcon icon={FiBell} dot={false} onClick={() => setOpen(false)} title="Notifications" />
 
         <button
@@ -209,9 +192,7 @@ const Header = () => {
                 <p style={{ color: C.t1, fontWeight: 700, fontSize: 13, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
                   {currentUser.name}
                 </p>
-                <p style={{ color: C.purple, fontSize: 12, fontWeight: 600, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-                  {roleLabel}
-                </p>
+             
                 <p style={{ color: C.t3, fontSize: 11, marginTop: 2, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
                   {currentUser.email}
                 </p>

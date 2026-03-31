@@ -113,10 +113,6 @@ export default function MyCases() {
       />
 
       <div style={{ marginBottom: 20 }}>
-        <WorkspaceStatGrid items={[{ label: "Total Requests", value: totalItems }]} />
-      </div>
-
-      <div style={{ marginBottom: 20 }}>
         <WorkspaceCard>
           <div className="grid md:grid-cols-2 gap-3">
             <div className="relative">
