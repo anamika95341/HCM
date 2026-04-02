@@ -1,4 +1,5 @@
 const redis = require('../config/redis');
+const logger = require('../utils/logger');
 
 function createLimiter({ windowSeconds, max, prefix, skip, identifierResolver }) {
   return async function limit(req, res, next) {
@@ -23,6 +24,10 @@ function createLimiter({ windowSeconds, max, prefix, skip, identifierResolver })
       }
       return next();
     } catch (error) {
+      logger.warn('Rate limiter Redis unavailable, bypassing', {
+        prefix,
+        error: error.message,
+      });
       return next();
     }
   };
