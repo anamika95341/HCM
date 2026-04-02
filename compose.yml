@@ -35,6 +35,7 @@ services:
     environment:
       NODE_ENV: production
       PORT: 3000
+      RUN_MIGRATIONS: "true"
       FRONTEND_ORIGINS: ${FRONTEND_ORIGINS:-http://localhost:5173}
       DATABASE_URL: postgresql://app_user:${DB_PASSWORD:-change_me}@postgres:5432/citizen_portal
       REDIS_URL: redis://:${REDIS_PASSWORD:-change_me}@redis:6379

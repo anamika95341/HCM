@@ -22,6 +22,7 @@ services:
       - ./backend/.env
     environment:
       NODE_ENV: development
+      RUN_MIGRATIONS: "true"
       FRONTEND_ORIGINS: http://localhost:5173
       DATABASE_URL: postgresql://app_user:${DB_PASSWORD:-change_me}@postgres:5432/citizen_portal
       REDIS_URL: redis://:${REDIS_PASSWORD:-change_me}@redis:6379

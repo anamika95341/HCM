@@ -1,4 +1,5 @@
 const complaintsService = require('./complaints.service');
+const logger = require('../../utils/logger');
 
 function reqMeta(req) {
   return { ip: req.ip, userAgent: req.get('user-agent') };
@@ -6,6 +7,14 @@ function reqMeta(req) {
 
 async function submitComplaint(req, res, next) {
   try {
+    logger.info('Complaint submission request received', {
+      citizenId: req.user?.sub || null,
+      hasFile: Boolean(req.file),
+      hasIdempotencyKey: Boolean(req.get('Idempotency-Key')),
+      path: req.originalUrl,
+      method: req.method,
+      ip: req.ip,
+    });
     const result = await complaintsService.submitComplaint({
       citizenId: req.user.sub,
       body: req.body,

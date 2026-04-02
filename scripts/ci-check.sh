@@ -16,4 +16,8 @@ popd >/dev/null
 pushd "${ROOT_DIR}" >/dev/null
 docker compose --env-file backend/.env.example -f compose.yml config >/dev/null
 docker compose --env-file backend/.env.example -f compose.yml -f compose.dev.yml config >/dev/null
+docker compose --env-file backend/.env.example -f backend/docker-compose.yml config >/dev/null
+docker build -f backend/Dockerfile --target dev backend >/dev/null
+docker build -f backend/Dockerfile --target runner backend >/dev/null
+docker build -f Frontend/Dockerfile --target prod Frontend >/dev/null
 popd >/dev/null

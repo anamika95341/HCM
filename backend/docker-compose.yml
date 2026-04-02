@@ -27,6 +27,7 @@ services:
     environment:
       NODE_ENV: ${NODE_ENV}
       PORT: ${PORT}
+      RUN_MIGRATIONS: "true"
       DATABASE_URL: ${DATABASE_URL}
       REDIS_URL: ${REDIS_URL}
       FRONTEND_ORIGINS: ${FRONTEND_ORIGINS}
@@ -75,6 +76,7 @@ services:
     command: ["node", "workers/jobRunner.js"]
     environment:
       NODE_ENV: ${NODE_ENV}
+      RUN_MIGRATIONS: "false"
       DATABASE_URL: ${DATABASE_URL}
       REDIS_URL: ${REDIS_URL}
     depends_on:
@@ -134,6 +136,7 @@ services:
     command: ["node", "monitoring/monitor.js"]
     environment:
       NODE_ENV: ${NODE_ENV}
+      RUN_MIGRATIONS: "false"
       DATABASE_URL: ${DATABASE_URL}
       REDIS_URL: ${REDIS_URL}
       TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN}

@@ -199,6 +199,17 @@ async function updatePassword(role, userId, passwordHash) {
   );
 }
 
+async function getPasswordChangedAt(role, userId) {
+  const meta = getRoleMeta(role);
+  const result = await pool.query(
+    `SELECT password_changed_at
+       FROM ${meta.table}
+      WHERE id = $1`,
+    [userId]
+  );
+  return result.rows[0]?.password_changed_at || null;
+}
+
 async function updateCitizenVerification(userId, citizenId) {
   await pool.query(
     `UPDATE citizens
@@ -242,6 +253,7 @@ module.exports = {
   findActiveRefreshToken,
   revokeRefreshToken,
   updatePassword,
+  getPasswordChangedAt,
   updateCitizenVerification,
   updateAdminVerification,
   updateDeoVerification,

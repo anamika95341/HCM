@@ -1,5 +1,6 @@
 const pool = require('../../config/database');
 const { generateCaseCode } = require('../../utils/generateCaseCode');
+const logger = require('../../utils/logger');
 
 const complaintSelect = `
   SELECT
@@ -101,6 +102,11 @@ async function createComplaint({
 }) {
   const client = await pool.connect();
   try {
+    logger.info('Creating complaint record', {
+      citizenId,
+      hasDocument: Boolean(documentFileId),
+      complaintType: complaintType || null,
+    });
     await client.query('BEGIN');
     const complaintId = generateCaseCode('COMP');
     const result = await client.query(
@@ -118,9 +124,19 @@ async function createComplaint({
       [complaint.id, citizenId]
     );
     await client.query('COMMIT');
+    logger.info('Complaint record created', {
+      complaintDbId: complaint.id,
+      complaintId: complaint.complaint_id,
+      citizenId,
+    });
     return complaint;
   } catch (error) {
     await client.query('ROLLBACK');
+    logger.error('Complaint creation failed', {
+      citizenId,
+      hasDocument: Boolean(documentFileId),
+      error,
+    });
     throw error;
   } finally {
     client.release();

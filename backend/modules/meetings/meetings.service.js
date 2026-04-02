@@ -7,40 +7,8 @@ const { persistPrivateUpload, PHOTO_ALLOWED } = require('../../middleware/upload
 const { writeAuditLog } = require('../../utils/audit');
 const { publishMeetingStatusUpdate } = require('../../realtime/wsPublisher');
 const { generateCaseCode } = require('../../utils/generateCaseCode');
-
-async function enforceIdempotency(idempotencyKey, payload) {
-  if (!idempotencyKey) {
-    throw createHttpError(400, 'Idempotency-Key header is required');
-  }
-  const key = `idempotency:${idempotencyKey}`;
-  const existing = await redis.get(key);
-  if (existing) {
-    return JSON.parse(existing);
-  }
-  const pending = JSON.stringify({ pending: true, payload });
-  const claimed = await redis.set(key, pending, 'EX', 600, 'NX');
-  if (claimed) {
-    return null;
-  }
-  const current = await redis.get(key);
-  if (current) {
-    const parsed = JSON.parse(current);
-    if (parsed.pending) {
-      throw createHttpError(409, 'Request is already being processed');
-    }
-    return parsed;
-  }
-  throw createHttpError(409, 'Duplicate request detected');
-}
-
-async function saveIdempotencyResult(idempotencyKey, result) {
-  await redis.set(`idempotency:${idempotencyKey}`, JSON.stringify(result), 'EX', 600);
-}
-
-async function clearIdempotency(idempotencyKey) {
-  if (!idempotencyKey) return;
-  await redis.del(`idempotency:${idempotencyKey}`);
-}
+const logger = require('../../utils/logger');
+const { claimIdempotency, storeIdempotencyResult, clearIdempotency } = require('../../utils/idempotency');
 
 function assertAllowedTransition(currentStatus, allowedStatuses, actionLabel) {
   if (!allowedStatuses.includes(currentStatus)) {
@@ -70,9 +38,20 @@ function assertAssignedDeo(meeting, deoId) {
 }
 
 async function submitMeetingRequest({ citizenId, body, file, reqMeta, idempotencyKey }) {
-  const existing = await enforceIdempotency(idempotencyKey, body);
-  if (existing && !existing.pending) {
-    return existing;
+  const claim = await claimIdempotency(redis, {
+    scope: 'meeting_submission',
+    explicitKey: idempotencyKey,
+    actorId: citizenId,
+    body,
+    file,
+    payload: body,
+  });
+  if (claim.existing && !claim.existing.pending) {
+    logger.info('Returning cached meeting submission response', {
+      citizenId,
+      keySource: claim.source,
+    });
+    return claim.existing;
   }
 
   try {
@@ -86,7 +65,7 @@ async function submitMeetingRequest({ citizenId, body, file, reqMeta, idempotenc
       });
     }
 
-    const meeting = await meetingsRepository.createMeeting({
+    const createdMeeting = await meetingsRepository.createMeeting({
       citizenId,
       title: sanitizeText(body.title),
       purpose: sanitizeText(body.purpose),
@@ -95,6 +74,7 @@ async function submitMeetingRequest({ citizenId, body, file, reqMeta, idempotenc
       documentFileId: document?.id,
       additionalAttendees: body.additionalAttendees || [],
     });
+    const meeting = await meetingsRepository.getMeetingById(createdMeeting.id) || createdMeeting;
 
     await writeAuditLog({
       actorRole: 'citizen',
@@ -107,10 +87,10 @@ async function submitMeetingRequest({ citizenId, body, file, reqMeta, idempotenc
     });
 
     const result = { meeting };
-    await saveIdempotencyResult(idempotencyKey, result);
+    await storeIdempotencyResult(redis, claim, result);
     return result;
   } catch (error) {
-    await clearIdempotency(idempotencyKey);
+    await clearIdempotency(redis, claim);
     throw error;
   }
 }

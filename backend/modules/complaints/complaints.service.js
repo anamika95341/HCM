@@ -7,37 +7,8 @@ const { persistPrivateUpload } = require('../../middleware/uploadHandler');
 const { sanitizeText } = require('../../utils/sanitize');
 const { writeAuditLog } = require('../../utils/audit');
 const { publishComplaintStatusUpdate } = require('../../realtime/wsPublisher');
-
-async function withIdempotency(idempotencyKey, producer) {
-  if (!idempotencyKey) {
-    throw createHttpError(400, 'Idempotency-Key header is required');
-  }
-  const key = `idempotency:${idempotencyKey}`;
-  const existing = await redis.get(key);
-  if (existing) {
-    return JSON.parse(existing);
-  }
-  const claimed = await redis.set(key, JSON.stringify({ pending: true }), 'EX', 600, 'NX');
-  if (!claimed) {
-    const current = await redis.get(key);
-    if (current) {
-      const parsed = JSON.parse(current);
-      if (parsed.pending) {
-        throw createHttpError(409, 'Request is already being processed');
-      }
-      return parsed;
-    }
-    throw createHttpError(409, 'Duplicate request detected');
-  }
-  try {
-    const result = await producer();
-    await redis.set(key, JSON.stringify(result), 'EX', 600);
-    return result;
-  } catch (error) {
-    await redis.del(key);
-    throw error;
-  }
-}
+const logger = require('../../utils/logger');
+const { claimIdempotency, storeIdempotencyResult, clearIdempotency } = require('../../utils/idempotency');
 
 function sanitizeOptional(input) {
   if (!input) return null;
@@ -45,7 +16,24 @@ function sanitizeOptional(input) {
 }
 
 async function submitComplaint({ citizenId, body, file, reqMeta, idempotencyKey }) {
-  return withIdempotency(idempotencyKey, async () => {
+  const claim = await claimIdempotency(redis, {
+    scope: 'complaint_submission',
+    explicitKey: idempotencyKey,
+    actorId: citizenId,
+    body,
+    file,
+    payload: body,
+  });
+
+  if (claim.existing && !claim.existing.pending) {
+    logger.info('Returning cached complaint submission response', {
+      citizenId,
+      keySource: claim.source,
+    });
+    return claim.existing;
+  }
+
+  try {
     let document = null;
     if (file) {
       const storedFile = await persistPrivateUpload(file, 'documents');
@@ -56,7 +44,7 @@ async function submitComplaint({ citizenId, body, file, reqMeta, idempotencyKey 
       });
     }
 
-    const complaint = await complaintsRepository.createComplaint({
+    const createdComplaint = await complaintsRepository.createComplaint({
       citizenId,
       subject: sanitizeText(body.subject),
       description: sanitizeText(body.description),
@@ -64,6 +52,7 @@ async function submitComplaint({ citizenId, body, file, reqMeta, idempotencyKey 
       complaintType: sanitizeOptional(body.complaintType),
       documentFileId: document?.id,
     });
+    const complaint = await complaintsRepository.getComplaintById(createdComplaint.id) || createdComplaint;
 
     await writeAuditLog({
       actorRole: 'citizen',
@@ -75,8 +64,13 @@ async function submitComplaint({ citizenId, body, file, reqMeta, idempotencyKey 
       userAgent: reqMeta.userAgent,
     });
 
-    return { complaint };
-  });
+    const result = { complaint };
+    await storeIdempotencyResult(redis, claim, result);
+    return result;
+  } catch (error) {
+    await clearIdempotency(redis, claim);
+    throw error;
+  }
 }
 
 async function getCitizenComplaints(citizenId) {

@@ -1,5 +1,6 @@
 const pool = require('../../config/database');
 const { generateCaseCode } = require('../../utils/generateCaseCode');
+const logger = require('../../utils/logger');
 
 const meetingSelect = `
   SELECT
@@ -132,6 +133,11 @@ async function createMeeting({
 }) {
   const client = await pool.connect();
   try {
+    logger.info('Creating meeting record', {
+      citizenId,
+      hasDocument: Boolean(documentFileId),
+      attendeeCount: Array.isArray(additionalAttendees) ? additionalAttendees.length : 0,
+    });
     await client.query('BEGIN');
     const requestId = generateCaseCode('MREQ');
     const meetingResult = await client.query(
@@ -167,9 +173,19 @@ async function createMeeting({
     );
 
     await client.query('COMMIT');
+    logger.info('Meeting record created', {
+      meetingId: meeting.id,
+      requestId: meeting.request_id,
+      citizenId,
+    });
     return meeting;
   } catch (error) {
     await client.query('ROLLBACK');
+    logger.error('Meeting creation failed', {
+      citizenId,
+      hasDocument: Boolean(documentFileId),
+      error,
+    });
     throw error;
   } finally {
     client.release();

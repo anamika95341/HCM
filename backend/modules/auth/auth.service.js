@@ -459,10 +459,22 @@ async function resendDeoVerificationCode({ usernameOrEmail }, reqMeta) {
 async function checkLockout({ role, userId, ip, email }) {
   const userKey = `login:fail:${role}:${userId}`;
   const ipKey = `login:fail:ip:${role}:${ip}`;
-  const [userAttempts, ipAttempts] = await Promise.all([
-    redis.get(userKey),
-    redis.get(ipKey),
-  ]);
+  let userAttempts;
+  let ipAttempts;
+  try {
+    [userAttempts, ipAttempts] = await Promise.all([
+      redis.get(userKey),
+      redis.get(ipKey),
+    ]);
+  } catch (error) {
+    logger.warn('Login lockout check unavailable, bypassing Redis-backed lockout', {
+      role,
+      userId,
+      ip,
+      error,
+    });
+    return;
+  }
 
   if (Number(userAttempts || 0) >= 10) {
     throw createHttpError(423, 'Account requires manual unlock');
@@ -482,24 +494,42 @@ async function checkLockout({ role, userId, ip, email }) {
 async function recordLoginFailure({ role, userId, ip }) {
   const userKey = `login:fail:${role}:${userId}`;
   const ipKey = `login:fail:ip:${role}:${ip}`;
-  const [userAttempts] = await Promise.all([
-    redis.incr(userKey),
-    redis.incr(ipKey),
-  ]);
-  await Promise.all([
-    redis.expire(userKey, 900),
-    redis.expire(ipKey, 900),
-  ]);
-  if (userAttempts >= 10) {
-    await redis.set(`login:manual_unlock:${role}:${userId}`, '1', 'EX', 86400);
+  try {
+    const [userAttempts] = await Promise.all([
+      redis.incr(userKey),
+      redis.incr(ipKey),
+    ]);
+    await Promise.all([
+      redis.expire(userKey, 900),
+      redis.expire(ipKey, 900),
+    ]);
+    if (userAttempts >= 10) {
+      await redis.set(`login:manual_unlock:${role}:${userId}`, '1', 'EX', 86400);
+    }
+  } catch (error) {
+    logger.warn('Login failure counter unavailable, skipping Redis-backed lockout write', {
+      role,
+      userId,
+      ip,
+      error,
+    });
   }
 }
 
 async function clearLoginFailures({ role, userId, ip }) {
-  await Promise.all([
-    redis.del(`login:fail:${role}:${userId}`),
-    redis.del(`login:fail:ip:${role}:${ip}`),
-  ]);
+  try {
+    await Promise.all([
+      redis.del(`login:fail:${role}:${userId}`),
+      redis.del(`login:fail:ip:${role}:${ip}`),
+    ]);
+  } catch (error) {
+    logger.warn('Login failure cleanup unavailable, skipping Redis-backed lockout cleanup', {
+      role,
+      userId,
+      ip,
+      error,
+    });
+  }
 }
 
 async function loginCitizen({ citizenId, password }, reqMeta) {
@@ -606,26 +636,27 @@ async function resetCitizenPassword({ citizenId, otp, password }, reqMeta) {
 
   const passwordHash = await bcrypt.hash(password, 12);
   await authRepository.updatePassword('citizen', user.id, passwordHash);
-  await redis.set(`password_changed:citizen:${user.id}`, String(Date.now()), 'EX', 86400);
+  try {
+    await redis.set(`password_changed:citizen:${user.id}`, String(Date.now()), 'EX', 86400);
+  } catch (error) {
+    logger.warn('Password-change cache marker unavailable; relying on DB timestamp', {
+      role: 'citizen',
+      userId: user.id,
+      error,
+    });
+  }
   return { message: 'Password reset completed if the account exists.' };
 }
 
 async function refreshSession(refreshToken) {
-  let payload;
-  let role;
-  for (const candidate of ['citizen', 'admin', 'masteradmin', 'deo', 'minister']) {
-    try {
-      payload = verifyJwtByRole(candidate, refreshToken);
-      if (payload.type === 'refresh') {
-        role = candidate;
-        break;
-      }
-    } catch (error) {
-      continue;
-    }
-  }
+  const decoded = jwt.decode(refreshToken);
+  const role = decoded?.role;
 
-  if (!payload || !role) {
+  if (!['citizen', 'admin', 'masteradmin', 'deo', 'minister'].includes(role)) {
+    throw createHttpError(401, 'Unauthorized');
+  }
+  const payload = verifyJwtByRole(role, refreshToken);
+  if (payload.type !== 'refresh') {
     throw createHttpError(401, 'Unauthorized');
   }
 
@@ -649,7 +680,16 @@ async function refreshSession(refreshToken) {
 async function logout(role, token, refreshToken) {
   const accessPayload = verifyJwtByRole(role, token);
   const ttl = Math.max(accessPayload.exp - Math.floor(Date.now() / 1000), 1);
-  await redis.set(`revoked:jti:${accessPayload.jti}`, '1', 'EX', ttl);
+  try {
+    await redis.set(`revoked:jti:${accessPayload.jti}`, '1', 'EX', ttl);
+  } catch (error) {
+    logger.warn('Logout token revocation cache unavailable; refresh token revocation will still proceed', {
+      role,
+      userId: accessPayload.sub,
+      jti: accessPayload.jti,
+      error,
+    });
+  }
 
   if (refreshToken) {
     const refreshPayload = verifyJwtByRole(role, refreshToken);

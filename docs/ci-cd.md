@@ -33,7 +33,8 @@ The production deploy workflow:
 2. Uses the existing `backend/.env` on the target server
 3. Runs `scripts/deploy-prod.sh`
 4. Rebuilds and starts the stack with `docker compose --env-file backend/.env -f compose.yml up -d --build --remove-orphans`
-5. Runs backend migrations
+5. Backend startup auto-runs migrations through `backend/docker-entrypoint.sh` when `RUN_MIGRATIONS=true`
+6. The deploy script also runs `npm run migrate` inside the backend container as an explicit post-start safety step
 
 ## Security Notes
 

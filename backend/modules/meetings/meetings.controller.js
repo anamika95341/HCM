@@ -1,4 +1,5 @@
 const meetingsService = require('./meetings.service');
+const logger = require('../../utils/logger');
 
 function reqMeta(req) {
   return { ip: req.ip, userAgent: req.get('user-agent') };
@@ -6,6 +7,14 @@ function reqMeta(req) {
 
 async function submitMeetingRequest(req, res, next) {
   try {
+    logger.info('Meeting submission request received', {
+      citizenId: req.user?.sub || null,
+      hasFile: Boolean(req.file),
+      hasIdempotencyKey: Boolean(req.get('Idempotency-Key')),
+      path: req.originalUrl,
+      method: req.method,
+      ip: req.ip,
+    });
     const result = await meetingsService.submitMeetingRequest({
       citizenId: req.user.sub,
       body: req.body,
