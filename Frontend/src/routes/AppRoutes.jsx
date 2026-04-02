@@ -11,6 +11,7 @@ const LoginPage = lazy(() => import("../modules/auth/LoginPage.jsx"));
 const NewCasePage = lazy(() => import("../modules/citizen/pages/NewCasePage.jsx"));
 const MyCases = lazy(() => import("../modules/citizen/components/MyCases.jsx"));
 const MeetingList = lazy(() => import("../modules/citizen/components/MeetingList.jsx"));
+const MeetingDetail = lazy(() => import("../modules/citizen/components/MeetingDetail.jsx"));
 const CaseDetailPage = lazy(() => import("../modules/citizen/components/CaseDetailPage.jsx"));
 const SettingsPage = lazy(() => import("../modules/settings/SettingsPage.jsx"));
 const Calendar = lazy(() => import("../modules/admin/components/Calendar.jsx"));
@@ -60,6 +61,7 @@ export default function AppRoutes() {
             <Route path={PATHS.citizen.cases} element={<MyCases />} />
             <Route path={PATHS.citizen.legacyCases} element={<MyCases />} />
             <Route path={PATHS.citizen.meetings} element={<MeetingList />} />
+            <Route path={PATHS.citizen.meetingDetail} element={<MeetingDetail />} />
             <Route path={PATHS.citizen.legacyMeetings} element={<MeetingList />} />
             <Route path={PATHS.citizen.caseDetail} element={<CaseDetailPage />} />
             <Route path={PATHS.citizen.legacyCaseDetail} element={<CaseDetailPage />} />

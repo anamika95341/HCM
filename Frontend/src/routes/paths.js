@@ -13,6 +13,7 @@ export const PATHS = {
     cases: "/citizen/cases",
     legacyCases: "/citizencase",
     meetings: "/citizen/meetings",
+    meetingDetail: "/citizen/meetings/:id",
     legacyMeetings: "/meeting",
     caseDetail: "/citizen/cases/:id",
     legacyCaseDetail: "/case/:id",
