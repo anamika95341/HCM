@@ -4,7 +4,12 @@ jest.mock('../config/redis', () => ({
   del: jest.fn(),
 }));
 
+jest.mock('../config/database', () => ({
+  query: jest.fn(),
+}));
+
 const redis = require('../config/redis');
+const pool = require('../config/database');
 const { generateOtp, verifyOtp } = require('../utils/otpService');
 
 describe('otpService Redis resilience', () => {
@@ -12,6 +17,7 @@ describe('otpService Redis resilience', () => {
 
   test('generateOtp throws 503 when Redis set fails', async () => {
     redis.set.mockRejectedValue(new Error('redis down'));
+    pool.query.mockRejectedValue({ code: 'ECONNREFUSED' });
 
     await expect(
       generateOtp({ role: 'citizen', userId: 'user-1', purpose: 'registration_verification', ip: '127.0.0.1' }),
@@ -20,6 +26,7 @@ describe('otpService Redis resilience', () => {
 
   test('verifyOtp throws 503 when Redis get fails', async () => {
     redis.get.mockRejectedValue(new Error('redis down'));
+    pool.query.mockRejectedValue({ code: 'ECONNREFUSED' });
 
     await expect(
       verifyOtp({ role: 'citizen', userId: 'user-1', purpose: 'registration_verification', ip: '127.0.0.1', otp: '123456' }),

@@ -4,6 +4,10 @@ jest.mock('../config/redis', () => ({
   del: jest.fn(),
 }));
 
+jest.mock('../config/database', () => ({
+  query: jest.fn(),
+}));
+
 jest.mock('../modules/meetings/meetings.repository', () => ({
   createUploadedFile: jest.fn(),
   createMeeting: jest.fn(),
@@ -42,6 +46,7 @@ jest.mock('../utils/logger', () => ({
 }));
 
 const redis = require('../config/redis');
+const pool = require('../config/database');
 const meetingsRepository = require('../modules/meetings/meetings.repository');
 const complaintsRepository = require('../modules/complaints/complaints.repository');
 const meetingsService = require('../modules/meetings/meetings.service');
@@ -54,6 +59,9 @@ describe('submission workflow services', () => {
 
   test('meeting submission works without an idempotency header when Redis is unavailable', async () => {
     redis.get.mockRejectedValue(new Error('redis down'));
+    pool.query
+      .mockResolvedValueOnce({ rows: [{ id: 'idempo-1' }] })
+      .mockResolvedValueOnce({ rows: [] });
     meetingsRepository.createMeeting.mockResolvedValue({ id: 'meeting-db-1' });
     meetingsRepository.getMeetingById.mockResolvedValue({ id: 'meeting-db-1', requestId: 'MREQ-2026-000001', status: 'pending' });
 
@@ -78,10 +86,17 @@ describe('submission workflow services', () => {
     expect(result).toEqual({
       meeting: { id: 'meeting-db-1', requestId: 'MREQ-2026-000001', status: 'pending' },
     });
+    expect(pool.query).toHaveBeenCalledWith(
+      expect.stringContaining('INSERT INTO idempotency_requests'),
+      expect.arrayContaining(['meeting_submission', 'citizen-1'])
+    );
   });
 
   test('complaint submission works without an idempotency header when Redis is unavailable', async () => {
     redis.get.mockRejectedValue(new Error('redis down'));
+    pool.query
+      .mockResolvedValueOnce({ rows: [{ id: 'idempo-2' }] })
+      .mockResolvedValueOnce({ rows: [] });
     complaintsRepository.createComplaint.mockResolvedValue({ id: 'complaint-db-1' });
     complaintsRepository.getComplaintById.mockResolvedValue({ id: 'complaint-db-1', complaintId: 'COMP-2026-000001', status: 'submitted' });
 
@@ -105,5 +120,9 @@ describe('submission workflow services', () => {
     expect(result).toEqual({
       complaint: { id: 'complaint-db-1', complaintId: 'COMP-2026-000001', status: 'submitted' },
     });
+    expect(pool.query).toHaveBeenCalledWith(
+      expect.stringContaining('INSERT INTO idempotency_requests'),
+      expect.arrayContaining(['complaint_submission', 'citizen-1'])
+    );
   });
 });
