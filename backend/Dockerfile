@@ -3,7 +3,9 @@ WORKDIR /app
 COPY package*.json ./
 RUN npm ci
 COPY . .
-RUN chmod +x /app/docker-entrypoint.sh
+# Strip CRLF from Windows checkouts — wrong shebang causes: exec ... no such file or directory
+RUN sed -i 's/\r$//' /app/docker-entrypoint.sh \
+  && chmod +x /app/docker-entrypoint.sh
 EXPOSE 3000
 ENTRYPOINT ["/app/docker-entrypoint.sh"]
 CMD ["npm","run","dev"]
@@ -22,7 +24,8 @@ RUN apt-get update \
 RUN groupadd --system appgroup && useradd --system --gid appgroup appuser
 COPY --from=builder /app/node_modules ./node_modules
 COPY --from=builder --chown=appuser:appgroup /app ./
-RUN chmod +x /app/docker-entrypoint.sh
+RUN sed -i 's/\r$//' /app/docker-entrypoint.sh \
+  && chmod +x /app/docker-entrypoint.sh
 USER appuser
 EXPOSE 3000
 ENTRYPOINT ["/usr/bin/tini","--","/app/docker-entrypoint.sh"]
