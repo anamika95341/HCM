@@ -52,6 +52,9 @@ function Sidebar({ collapsed, onToggle }) {
         ],
         deo: [
             { to: PATHS.deo.calendarEvents, icon: RiTeamLine, label: "Verification Queue" },
+            { to: PATHS.deo.createEvent, icon: FiCalendar, label: "Create Event" },
+            { to: PATHS.deo.manageEvent, icon: FiClipboard, label: "Manage Event" },
+            { to: PATHS.deo.citizenMeetingFiles, icon: LuBox, label: "Citizen Meeting Files" },
             { to: PATHS.settings, icon: BsFillGearFill, label: "Settings" },
         ],
         minister: [

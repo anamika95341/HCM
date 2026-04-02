@@ -52,6 +52,9 @@ export const PATHS = {
     verify: "/DEO/verify",
     calendarEvents: "/DEO/calendar-events",
     legacyCalendarEvents: "/CalendarEvent",
+    createEvent: "/DEO/create-event",
+    manageEvent: "/DEO/manage-event",
+    citizenMeetingFiles: "/DEO/citizen-meeting-files",
   },
 };
 
