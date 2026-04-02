@@ -13,7 +13,6 @@ import {
   WorkspacePage,
   WorkspaceSectionHeader,
   WorkspaceSelect,
-  WorkspaceStatGrid,
   WorkspaceTabs,
 } from "../../../shared/components/WorkspaceUI.jsx";
 import { usePortalTheme } from "../../../shared/theme/portalTheme.jsx";
@@ -85,189 +84,196 @@ export default function AdminCases() {
 
   useEffect(() => {
     let active = true;
-
     async function loadQueue() {
       if (!session?.accessToken) {
-        if (active) {
-          setLoading(false);
-          setError("Admin session not available");
-        }
+        if (active) { setLoading(false); setError("Admin session not available"); }
         return;
       }
-
       try {
         setLoading(true);
         setError("");
         const response = await apiClient.get("/admin/work-queue", authorizedConfig(session.accessToken));
-        if (!active) {
-          return;
-        }
+        if (!active) return;
         setComplaints(Array.isArray(response.data?.complaints) ? response.data.complaints : []);
         setMeetings(Array.isArray(response.data?.meetings) ? response.data.meetings : []);
       } catch (loadError) {
-        if (active) {
-          setError(loadError?.response?.data?.error || "Unable to load work queue");
-        }
+        if (active) setError(loadError?.response?.data?.error || "Unable to load work queue");
       } finally {
-        if (active) {
-          setLoading(false);
-        }
+        if (active) setLoading(false);
       }
     }
-
     loadQueue();
-
-    return () => {
-      active = false;
-    };
+    return () => { active = false; };
   }, [session?.accessToken]);
 
   const complaintPool = complaints.filter((item) => !item.assignedAdminUserId && !isResolvedComplaint(item.status)).map(complaintRow);
-  const meetingQueue = meetings.filter((item) => !isResolvedMeeting(item.status)).map(meetingRow);
+  const meetingQueue  = meetings.filter((item) => !isResolvedMeeting(item.status)).map(meetingRow);
   const myCases = [
-    ...complaints
-      .filter((item) => item.assignedAdminUserId === session?.user?.id && !isResolvedComplaint(item.status) && item.status !== "escalated_to_meeting")
-      .map(complaintRow),
+    ...complaints.filter((item) => item.assignedAdminUserId === session?.user?.id && !isResolvedComplaint(item.status) && item.status !== "escalated_to_meeting").map(complaintRow),
     ...meetings.filter((item) => item.assignedAdminUserId === session?.user?.id && !isResolvedMeeting(item.status)).map(meetingRow),
   ];
-  const resolved = [
-    ...complaints.filter((item) => isResolvedComplaint(item.status)).map(complaintRow),
-    ...meetings.filter((item) => isResolvedMeeting(item.status)).map(meetingRow),
-  ];
+  const resolved  = [...complaints.filter((item) => isResolvedComplaint(item.status)).map(complaintRow), ...meetings.filter((item) => isResolvedMeeting(item.status)).map(meetingRow)];
   const escalated = complaints.filter((item) => item.status === "escalated_to_meeting").map(complaintRow);
 
-  const sections = {
-    complaintPool,
-    meetingQueue,
-    myCases,
-    resolved,
-    escalated,
-  };
+  const sections = { complaintPool, meetingQueue, myCases, resolved, escalated };
 
   const activeRows = (sections[tab] || []).filter((item) => {
     const matchesStatus = statusFilter === "all" || item.status === statusFilter;
-    const haystack = [
-      item.primaryId,
-      item.itemType,
-      item.title,
-      item.citizenName,
-      item.citizenId,
-      item.owner,
-      item.reference,
-      item.statusLabel,
-    ].filter(Boolean).join(" ").toLowerCase();
+    const haystack = [item.primaryId, item.itemType, item.title, item.citizenName, item.citizenId, item.owner, item.reference, item.statusLabel]
+      .filter(Boolean).join(" ").toLowerCase();
     const search = query.trim().toLowerCase();
     return matchesStatus && (!search || haystack.includes(search));
   });
 
-  useEffect(() => {
-    setCurrentPage(1);
-  }, [tab, query, statusFilter]);
+  useEffect(() => { setCurrentPage(1); }, [tab, query, statusFilter]);
 
-  const totalPages = Math.max(1, Math.ceil(activeRows.length / ITEMS_PER_PAGE));
+  const totalPages    = Math.max(1, Math.ceil(activeRows.length / ITEMS_PER_PAGE));
   const paginatedRows = activeRows.slice((currentPage - 1) * ITEMS_PER_PAGE, currentPage * ITEMS_PER_PAGE);
   const statusOptions = Array.from(new Set((sections[tab] || []).map((item) => item.status).filter(Boolean))).sort();
 
   const tabs = [
-    { id: "complaintPool", label: "Complaint Pool", count: complaintPool.length },
-    { id: "meetingQueue", label: "Meeting Queue", count: meetingQueue.length },
-    { id: "myCases", label: "My Cases", count: myCases.length },
-    { id: "resolved", label: "Resolved / Completed", count: resolved.length },
-    { id: "escalated", label: "Escalated Requests", count: escalated.length },
+    { id: "complaintPool", label: "Complaint Pool",       count: complaintPool.length },
+    { id: "meetingQueue",  label: "Meeting Queue",        count: meetingQueue.length  },
+    { id: "myCases",       label: "My Cases",             count: myCases.length       },
+    { id: "resolved",      label: "Resolved / Completed", count: resolved.length      },
+    { id: "escalated",     label: "Escalated Requests",   count: escalated.length     },
   ];
 
   useEffect(() => {
-    if (tabInitialized || loading) {
-      return;
-    }
-    const preferredTab = tabs.find((item) => item.id === "myCases" && item.count > 0)?.id
-      || tabs.find((item) => item.id === "complaintPool" && item.count > 0)?.id
-      || tabs.find((item) => item.id === "meetingQueue" && item.count > 0)?.id
-      || tabs.find((item) => item.id === "escalated" && item.count > 0)?.id
-      || tabs.find((item) => item.id === "resolved" && item.count > 0)?.id
-      || "complaintPool";
-    if (preferredTab !== tab) {
-      setTab(preferredTab);
-    }
+    if (tabInitialized || loading) return;
+    const preferredTab =
+      tabs.find((t) => t.id === "myCases"       && t.count > 0)?.id ||
+      tabs.find((t) => t.id === "complaintPool" && t.count > 0)?.id ||
+      tabs.find((t) => t.id === "meetingQueue"  && t.count > 0)?.id ||
+      tabs.find((t) => t.id === "escalated"     && t.count > 0)?.id ||
+      tabs.find((t) => t.id === "resolved"      && t.count > 0)?.id ||
+      "complaintPool";
+    if (preferredTab !== tab) setTab(preferredTab);
     setTabInitialized(true);
   }, [loading, tab, tabInitialized, tabs]);
 
   return (
-    <WorkspacePage>
-      <WorkspaceSectionHeader
-        eyebrow="Admin Workspace"
-        title="Work Queue"
-        subtitle="Manage complaint pool, meeting queue, assigned cases, escalations, and completed records."
-      />
+    <WorkspacePage width={99999} style={{ padding: 0 }}>
+      {/* ── Full-width wrapper with tight side padding matching the image ── */}
+      <div style={{ width: "100%", padding: "0 20px", boxSizing: "border-box" }}>
 
-      <div style={{ marginBottom: 20 }}>
-        <WorkspaceTabs items={tabs} value={tab} onChange={setTab} />
-      </div>
+        {/* HEADER */}
+        <WorkspaceSectionHeader
+          eyebrow="Admin Workspace"
+          title="Work Queue"
+          subtitle="Manage complaint pool, meeting queue, assigned cases, escalations, and completed records."
+        />
 
-      <div style={{ marginBottom: 20 }}>
-        <WorkspaceStatGrid items={tabs.map((item) => ({ label: item.label, value: item.count }))} />
-      </div>
-
-      <div style={{ marginBottom: 20 }}>
-        <WorkspaceCard>
-          <WorkspaceCardHeader
-            title="Queue Filters"
-            subtitle="Refine the current lane without leaving the work queue."
-          />
-          <div style={{ display: "grid", gridTemplateColumns: "minmax(0, 1.6fr) minmax(220px, 0.8fr)", gap: 16 }}>
-            <div>
-              <div style={{ fontSize: 11, fontWeight: 700, color: C.t3, textTransform: "uppercase", letterSpacing: ".08em", marginBottom: 10 }}>
-                Search
+        {/* STAT CARDS — 5 in one row, clickable to switch tab */}
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: "repeat(5, 1fr)",
+            gap: 14,
+            marginBottom: 20,
+          }}
+        >
+          {tabs.map((item) => (
+            <div
+              key={item.id}
+              onClick={() => setTab(item.id)}
+              style={{
+                background: tab === item.id ? C.purple : C.card,
+                border: `1px solid ${tab === item.id ? C.purple : C.border}`,
+                borderRadius: 14,
+                padding: "18px 20px",
+                cursor: "pointer",
+                transition: "all 0.15s",
+              }}
+            >
+              <div style={{ fontSize: 26, fontWeight: 800, color: tab === item.id ? "#fff" : C.t1, lineHeight: 1 }}>
+                {item.count}
               </div>
-              <WorkspaceInput
-                value={query}
-                onChange={(event) => setQuery(event.target.value)}
-                placeholder="Search by ID, title, citizen name..."
-              />
-            </div>
-            <div>
-              <div style={{ fontSize: 11, fontWeight: 700, color: C.t3, textTransform: "uppercase", letterSpacing: ".08em", marginBottom: 10 }}>
-                Status
+              <div style={{ fontSize: 12, fontWeight: 600, color: tab === item.id ? "rgba(255,255,255,0.8)" : C.t3, marginTop: 6 }}>
+                {item.label}
               </div>
-              <WorkspaceSelect value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)}>
-                <option value="all">All statuses</option>
-                {statusOptions.map((status) => (
-                  <option key={status} value={status}>{humanizeStatus(status)}</option>
-                ))}
-              </WorkspaceSelect>
             </div>
-          </div>
-        </WorkspaceCard>
-      </div>
+          ))}
+        </div>
 
-      {loading ? (
-        <WorkspaceEmptyState title="Loading work queue..." />
-      ) : error ? (
-        <WorkspaceCard style={{ color: C.danger }}>
-          <div style={{ fontSize: 14, fontWeight: 600 }}>Unable to load work queue</div>
-          <div style={{ marginTop: 8, fontSize: 12 }}>{error}</div>
-        </WorkspaceCard>
-      ) : activeRows.length === 0 ? (
-        <WorkspaceEmptyState title="No items found" subtitle="Try adjusting your current search or status filters." />
-      ) : (
-        <WorkspaceCard style={{ padding: 0, overflow: "hidden" }}>
-          <div style={{ padding: "18px 22px", background: C.bgElevated, borderBottom: `1px solid ${C.border}` }}>
-            <div style={{ display: "flex", justifyContent: "space-between", gap: 16, flexWrap: "wrap", alignItems: "center" }}>
+        {/* QUEUE FILTERS */}
+        <div style={{ marginBottom: 20 }}>
+          <WorkspaceCard>
+            <WorkspaceCardHeader
+              title="Queue Filters"
+              subtitle="Refine the current lane without leaving the work queue."
+            />
+            <div style={{ display: "grid", gridTemplateColumns: "minmax(0, 1.6fr) minmax(220px, 0.8fr)", gap: 16 }}>
               <div>
-                <div style={{ fontSize: 14, fontWeight: 700, color: C.t1 }}>{tabs.find((item) => item.id === tab)?.label || "Queue Items"}</div>
-                <div style={{ marginTop: 4, fontSize: 12, color: C.t3 }}>
-                  {activeRows.length} item{activeRows.length === 1 ? "" : "s"} match the current view.
+                <div style={{ fontSize: 11, fontWeight: 700, color: C.t3, textTransform: "uppercase", letterSpacing: ".08em", marginBottom: 10 }}>
+                  Search
                 </div>
+                <WorkspaceInput
+                  value={query}
+                  onChange={(e) => setQuery(e.target.value)}
+                  placeholder="Search by ID, title, citizen name..."
+                />
               </div>
-              <WorkspaceBadge>{statusFilter === "all" ? "All statuses" : humanizeStatus(statusFilter)}</WorkspaceBadge>
+              <div>
+                <div style={{ fontSize: 11, fontWeight: 700, color: C.t3, textTransform: "uppercase", letterSpacing: ".08em", marginBottom: 10 }}>
+                  Status
+                </div>
+                <WorkspaceSelect value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
+                  <option value="all">All statuses</option>
+                  {statusOptions.map((status) => (
+                    <option key={status} value={status}>{humanizeStatus(status)}</option>
+                  ))}
+                </WorkspaceSelect>
+              </div>
             </div>
-          </div>
-          <div className="overflow-x-auto">
-            <table className="w-full">
+          </WorkspaceCard>
+        </div>
+
+        {/* TABLE / STATES */}
+        {loading ? (
+          <WorkspaceEmptyState title="Loading work queue..." />
+        ) : error ? (
+          <WorkspaceCard style={{ color: C.danger }}>
+            <div style={{ fontSize: 14, fontWeight: 600 }}>Unable to load work queue</div>
+            <div style={{ marginTop: 8, fontSize: 12 }}>{error}</div>
+          </WorkspaceCard>
+        ) : activeRows.length === 0 ? (
+          <WorkspaceEmptyState title="No items found" subtitle="Try adjusting your current search or status filters." />
+        ) : (
+          <WorkspaceCard style={{ padding: 0, overflow: "hidden" }}>
+            {/* Table header bar */}
+            <div style={{ padding: "18px 22px", background: C.bgElevated, borderBottom: `1px solid ${C.border}` }}>
+              <div style={{ display: "flex", justifyContent: "space-between", gap: 16, flexWrap: "wrap", alignItems: "center" }}>
+                <div>
+                  <div style={{ fontSize: 14, fontWeight: 700, color: C.t1 }}>
+                    {tabs.find((t) => t.id === tab)?.label || "Queue Items"}
+                  </div>
+                  <div style={{ marginTop: 4, fontSize: 12, color: C.t3 }}>
+                    {activeRows.length} item{activeRows.length === 1 ? "" : "s"} match the current view.
+                  </div>
+                </div>
+                <WorkspaceBadge>{statusFilter === "all" ? "All statuses" : humanizeStatus(statusFilter)}</WorkspaceBadge>
+              </div>
+            </div>
+
+            <div className="overflow-x-auto">
+              <table className="w-full">
                 <thead style={{ background: C.bgElevated, borderBottom: `1px solid ${C.border}` }}>
                   <tr>
                     {["ID", "Type", "Title", "Citizen", "Owner", "Reference", "Created", "Status", "Action"].map((label) => (
-                      <th key={label} style={{ padding: "12px 16px", fontSize: 10, fontWeight: 600, color: C.t3, textTransform: "uppercase", letterSpacing: "0.06em", whiteSpace: "nowrap", textAlign: label === "Status" || label === "Action" ? "center" : "left" }}>
+                      <th
+                        key={label}
+                        style={{
+                          padding: "12px 16px",
+                          fontSize: 10,
+                          fontWeight: 600,
+                          color: C.t3,
+                          textTransform: "uppercase",
+                          letterSpacing: "0.06em",
+                          whiteSpace: "nowrap",
+                          textAlign: label === "Status" || label === "Action" ? "center" : "left",
+                        }}
+                      >
                         {label}
                       </th>
                     ))}
@@ -281,11 +287,13 @@ export default function AdminCases() {
                       <td style={{ padding: "12px 16px", fontSize: 13, color: C.t1, borderBottom: `1px solid ${C.borderLight}` }}>{item.title}</td>
                       <td style={{ padding: "12px 16px", fontSize: 13, color: C.t2, borderBottom: `1px solid ${C.borderLight}` }}>
                         <div>{item.citizenName}</div>
-                        <div style={{ fontSize: 11, color: C.t3, marginTop: 2 }}>{item.citizenId}</div>
+                      
                       </td>
                       <td style={{ padding: "12px 16px", fontSize: 13, color: C.t2, borderBottom: `1px solid ${C.borderLight}` }}>{item.owner}</td>
                       <td style={{ padding: "12px 16px", fontSize: 13, color: C.t3, borderBottom: `1px solid ${C.borderLight}` }}>{item.reference}</td>
-                      <td style={{ padding: "12px 16px", fontSize: 13, color: C.t3, borderBottom: `1px solid ${C.borderLight}` }}>{item.createdAt ? new Date(item.createdAt).toLocaleDateString("en-IN") : "-"}</td>
+                      <td style={{ padding: "12px 16px", fontSize: 13, color: C.t3, borderBottom: `1px solid ${C.borderLight}` }}>
+                        {item.createdAt ? new Date(item.createdAt).toLocaleDateString("en-IN") : "-"}
+                      </td>
                       <td style={{ padding: "12px 16px", textAlign: "center", borderBottom: `1px solid ${C.borderLight}` }}>
                         <WorkspaceBadge status={item.status}>{item.statusLabel}</WorkspaceBadge>
                       </td>
@@ -303,6 +311,7 @@ export default function AdminCases() {
                             display: "inline-flex",
                             alignItems: "center",
                             justifyContent: "center",
+                            cursor: "pointer",
                           }}
                           title="View details"
                         >
@@ -316,32 +325,33 @@ export default function AdminCases() {
             </div>
 
             {totalPages > 1 && (
-              <div className="flex items-center justify-between px-6 py-4" style={{ background: C.bgElevated, borderTop: `1px solid ${C.border}` }}>
+              <div
+                className="flex items-center justify-between px-6 py-4"
+                style={{ background: C.bgElevated, borderTop: `1px solid ${C.border}` }}
+              >
                 <WorkspaceButton
                   type="button"
                   variant="ghost"
                   disabled={currentPage === 1}
-                  onClick={() => setCurrentPage((page) => Math.max(1, page - 1))}
+                  onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
                 >
-                  <ChevronLeft size={16} />
-                  Previous
+                  <ChevronLeft size={16} /> Previous
                 </WorkspaceButton>
-
                 <span style={{ fontSize: 12, color: C.t3 }}>Page {currentPage} of {totalPages}</span>
-
                 <WorkspaceButton
                   type="button"
                   variant="ghost"
                   disabled={currentPage === totalPages}
-                  onClick={() => setCurrentPage((page) => Math.min(totalPages, page + 1))}
+                  onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
                 >
-                  Next
-                  <ChevronRight size={16} />
+                  Next <ChevronRight size={16} />
                 </WorkspaceButton>
               </div>
             )}
-        </WorkspaceCard>
-      )}
+          </WorkspaceCard>
+        )}
+
+      </div>
     </WorkspacePage>
   );
 }

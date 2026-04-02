@@ -88,14 +88,14 @@ export default function MeetingDetail() {
         style={{
           position: "sticky", top: 0, zIndex: 40,
           background: C.card, border: `1px solid ${C.border}`, borderRadius: 16,
-          padding: "16px 24px", display: "flex", alignItems: "center", justifyContent: "space-between",
+          padding: "0 24px", height: 56, display: "flex", alignItems: "center", justifyContent: "space-between",
         }}
       >
         <div style={{ width: 160, flexShrink: 0 }}>
           <button
             onClick={() => navigate(-1)}
             className="flex items-center gap-2 font-medium transition-colors"
-            style={{ color: C.purple }}
+            style={{ color: C.purple, whiteSpace: "nowrap" }}
           >
             <ChevronRight size={20} className="rotate-180" />
             Back to Meetings
@@ -107,16 +107,22 @@ export default function MeetingDetail() {
 
       {/* TITLE + STATUS */}
       <WorkspaceCard style={{ marginBottom: 16 }}>
-        <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 16, flexWrap: "wrap" }}>
-          <div>
-            <h1 style={{ fontSize: 22, fontWeight: 700, color: C.t1, marginBottom: 6 }}>{item.primaryTitle || item.title}</h1>
-            {item.purpose && (
-              <p style={{ fontSize: 14, color: C.t2, lineHeight: 1.6, maxWidth: 700 }}>{item.purpose}</p>
-            )}
-          </div>
-          <WorkspaceBadge status={statusObj.value} style={{ flexShrink: 0, marginTop: 4 }}>
-            {statusObj.label}
-          </WorkspaceBadge>
+        <div style={{ flex: 1, minWidth: 0, overflow: "hidden" }}> 
+          <h1 style={{ fontSize: 22, fontWeight: 700, color: C.t1, marginBottom: 6 }}>
+            {item.primaryTitle || item.title}
+          </h1>
+          {item.purpose && (
+            <p style={{
+              fontSize: 14,
+              color: C.t2,
+              lineHeight: 1.6,
+              overflowWrap: "break-word",   // ← add
+              wordBreak: "break-word",      // ← add
+              // maxWidth: 700  ← remove this, let the container control width
+            }}>
+              {item.purpose}
+            </p>
+          )}
         </div>
       </WorkspaceCard>
 
