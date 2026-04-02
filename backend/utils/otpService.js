@@ -1,5 +1,6 @@
 const crypto = require('crypto');
 const bcrypt = require('bcryptjs');
+const createHttpError = require('http-errors');
 const redis = require('../config/redis');
 
 function otpKey({ role, userId, purpose, ip, scope }) {
@@ -10,17 +11,25 @@ async function generateOtp({ role, userId, purpose, ip, scope }) {
   const otp = crypto.randomInt(100000, 999999).toString();
   const hash = await bcrypt.hash(otp, 10);
   const key = otpKey({ role, userId, purpose, ip, scope });
-  await redis.set(key, hash, 'EX', 300);
+  try {
+    await redis.set(key, hash, 'EX', 300);
+  } catch (err) {
+    throw createHttpError(503, 'OTP service temporarily unavailable, please try again shortly');
+  }
   return otp;
 }
 
 async function verifyOtp({ role, userId, purpose, ip, scope, otp }) {
   const key = otpKey({ role, userId, purpose, ip, scope });
-  const hash = await redis.get(key);
+  let hash;
+  try {
+    hash = await redis.get(key);
+  } catch (err) {
+    throw createHttpError(503, 'OTP service temporarily unavailable, please try again shortly');
+  }
   if (!hash) {
     return false;
   }
-
   const valid = await bcrypt.compare(otp, hash);
   if (valid) {
     await redis.del(key);
