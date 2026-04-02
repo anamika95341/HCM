@@ -1,7 +1,11 @@
 const authService = require('./auth.service');
 
 function reqMeta(req) {
-  return { ip: req.ip, userAgent: req.get('user-agent') };
+  return {
+    ip: req.ip,
+    userAgent: req.get('user-agent'),
+    requestId: req.get('x-request-id'),
+  };
 }
 
 async function citizenRegister(req, res, next) {
@@ -136,7 +140,7 @@ async function refresh(req, res, next) {
 
 async function logout(req, res, next) {
   try {
-    const result = await authService.logout(req.user.role, req.token, req.body.refreshToken);
+    const result = await authService.logout(req.user.role, req.token, req.body.refreshToken, reqMeta(req));
     res.json(result);
   } catch (error) {
     next(error);

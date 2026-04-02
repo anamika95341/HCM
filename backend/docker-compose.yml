@@ -21,6 +21,7 @@ services:
       - frontend-backend-net
 
   api:
+    image: ${API_IMAGE:-citizen-portal-api:latest}
     build:
       context: .
       dockerfile: Dockerfile
@@ -70,10 +71,37 @@ services:
       - backend-data-net
 
   worker:
+    image: ${JOB_WORKER_IMAGE:-citizen-portal-job-worker:latest}
     build:
       context: .
       dockerfile: Dockerfile
     command: ["node", "workers/jobRunner.js"]
+    environment:
+      NODE_ENV: ${NODE_ENV}
+      RUN_MIGRATIONS: "false"
+      DATABASE_URL: ${DATABASE_URL}
+      REDIS_URL: ${REDIS_URL}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "node -e \"process.exit(0)\""]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+    cpus: 0.5
+    mem_limit: 128m
+    networks:
+      - backend-data-net
+
+  auth-stream-worker:
+    image: ${AUTH_STREAM_WORKER_IMAGE:-citizen-portal-auth-stream-worker:latest}
+    build:
+      context: .
+      dockerfile: Dockerfile
+    command: ["npm", "run", "worker:auth-stream"]
     environment:
       NODE_ENV: ${NODE_ENV}
       RUN_MIGRATIONS: "false"
@@ -126,42 +154,6 @@ services:
       retries: 5
     cpus: 0.2
     mem_limit: 80m
-    networks:
-      - backend-data-net
-
-  monitor:
-    build:
-      context: .
-      dockerfile: Dockerfile
-    command: ["node", "monitoring/monitor.js"]
-    environment:
-      NODE_ENV: ${NODE_ENV}
-      RUN_MIGRATIONS: "false"
-      DATABASE_URL: ${DATABASE_URL}
-      REDIS_URL: ${REDIS_URL}
-      TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN}
-      TELEGRAM_CHAT_ID: ${TELEGRAM_CHAT_ID}
-      ALERT_EMAIL_TO: ${ALERT_EMAIL_TO}
-      SMTP_HOST: ${SMTP_HOST}
-      SMTP_PORT: ${SMTP_PORT}
-      SMTP_USER: ${SMTP_USER}
-      SMTP_PASSWORD: ${SMTP_PASSWORD}
-      SMTP_FROM: ${SMTP_FROM}
-    volumes:
-      - /var/run/docker.sock:/var/run/docker.sock:ro
-      - /proc:/host/proc:ro
-    depends_on:
-      postgres:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
-    healthcheck:
-      test: ["CMD-SHELL", "node -e \"process.exit(0)\""]
-      interval: 30s
-      timeout: 5s
-      retries: 3
-    cpus: 0.1
-    mem_limit: 64m
     networks:
       - backend-data-net
 

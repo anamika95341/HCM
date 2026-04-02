@@ -43,6 +43,7 @@ jest.mock('../utils/otpService', () => ({ generateOtp: jest.fn(), verifyOtp: jes
 jest.mock('../utils/captchaVerify', () => ({ verifyCaptcha: jest.fn() }));
 jest.mock('../utils/audit', () => ({ writeAuditLog: jest.fn() }));
 jest.mock('../utils/logger', () => ({ warn: jest.fn(), error: jest.fn(), info: jest.fn() }));
+jest.mock('../utils/authStream', () => ({ publishAuthEvent: jest.fn().mockResolvedValue('1000-0') }));
 jest.mock('../modules/citizen/citizen.repository', () => ({}));
 jest.mock('../utils/mpLookup', () => ({ lookupMp: jest.fn() }));
 
@@ -51,6 +52,7 @@ const jwt = require('jsonwebtoken');
 const redis = require('../config/redis');
 const authRepository = require('../modules/auth/auth.repository');
 const { verifyOtp } = require('../utils/otpService');
+const { publishAuthEvent } = require('../utils/authStream');
 const authService = require('../modules/auth/auth.service');
 
 describe('auth service resilience', () => {
@@ -91,6 +93,10 @@ describe('auth service resilience', () => {
       accessToken: 'signed-token',
       refreshToken: 'signed-token',
     }));
+    expect(publishAuthEvent).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ event: 'login_success', role: 'citizen', userId: 'user-1' }),
+    );
   });
 
   test('logout succeeds when Redis token blacklist write fails', async () => {
@@ -102,6 +108,14 @@ describe('auth service resilience', () => {
 
     expect(result).toEqual({ message: 'Logged out successfully' });
     expect(authRepository.revokeRefreshToken).toHaveBeenCalledWith('refresh-row-1');
+    expect(publishAuthEvent).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ event: 'token_revoked', userId: 'user-1' }),
+    );
+    expect(publishAuthEvent).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ event: 'logout', userId: 'user-1' }),
+    );
   });
 
   test('resetCitizenPassword succeeds when Redis password marker write fails', async () => {
@@ -117,6 +131,32 @@ describe('auth service resilience', () => {
 
     expect(authRepository.updatePassword).toHaveBeenCalledWith('citizen', 'user-1', 'new-hash');
     expect(result).toEqual({ message: 'Password reset completed if the account exists.' });
+    expect(publishAuthEvent).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ event: 'password_reset', userId: 'user-1' }),
+    );
+  });
+
+  test('loginCitizen publishes failure when user is missing', async () => {
+    authRepository.findCitizenByCitizenId.mockResolvedValue(null);
+
+    await expect(
+      authService.loginCitizen(
+        { citizenId: 'CTZ-404', password: 'WrongPass123!' },
+        { ip: '127.0.0.1', userAgent: 'jest', requestId: 'req-404' }
+      )
+    ).rejects.toMatchObject({ statusCode: 401 });
+
+    expect(publishAuthEvent).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        event: 'login_failure',
+        role: 'citizen',
+        userId: 'unknown',
+        reason: 'user_not_found',
+        requestId: 'req-404',
+      }),
+    );
   });
 
   test('refreshSession verifies only the decoded role path', async () => {
