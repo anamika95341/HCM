@@ -18,7 +18,7 @@ async function publishAuthEvent(redis, { event, role, userId, ip, reason } = {})
       event,
       role,
       userId,
-      error: err.message,
+      error: err,
     });
   }
 }

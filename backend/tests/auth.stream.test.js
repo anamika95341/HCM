@@ -1,5 +1,3 @@
-jest.mock('../utils/logger', () => ({ warn: jest.fn() }));
-
 describe('publishAuthEvent', () => {
   let redis;
   let publishAuthEvent;
