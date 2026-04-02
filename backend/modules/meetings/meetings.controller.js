@@ -64,6 +64,15 @@ async function getAdminMeetingFiles(req, res, next) {
   }
 }
 
+async function assignMeetingToSelf(req, res, next) {
+  try {
+    const meeting = await meetingsService.assignMeetingToSelf(req.params.meetingId, req.user.sub, reqMeta(req));
+    res.json({ meeting });
+  } catch (error) {
+    next(error);
+  }
+}
+
 async function acceptMeeting(req, res, next) {
   try {
     const meeting = await meetingsService.acceptMeeting(req.params.meetingId, req.user.sub, reqMeta(req));
@@ -149,6 +158,7 @@ module.exports = {
   getCitizenMeetingDetail,
   getAdminMeetingDetail,
   getAdminMeetingFiles,
+  assignMeetingToSelf,
   acceptMeeting,
   rejectMeeting,
   assignVerification,

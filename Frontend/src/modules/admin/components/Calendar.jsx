@@ -1,9 +1,9 @@
 import { useEffect, useMemo, useState } from "react";
-import { ChevronLeft, ChevronRight, X, Calendar as CalendarIcon } from "lucide-react";
+import { ChevronLeft, ChevronRight, X } from "lucide-react";
 import { apiClient, authorizedConfig } from "../../../shared/api/client.js";
 import { useAuth } from "../../../shared/auth/AuthContext.jsx";
 import { usePortalTheme } from "../../../shared/theme/portalTheme.jsx";
-import { WorkspaceButton, WorkspaceCard, WorkspaceCardHeader, WorkspaceEmptyState, WorkspaceInput, WorkspacePage, WorkspaceSectionHeader, WorkspaceTabs } from "../../../shared/components/WorkspaceUI.jsx";
+import { WorkspaceButton, WorkspaceCard, WorkspaceCardHeader, WorkspaceEmptyState, WorkspacePage, WorkspaceSectionHeader, WorkspaceTabs } from "../../../shared/components/WorkspaceUI.jsx";
 
 const VIEW_OPTIONS = ["month", "week", "day"];
 const DAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
@@ -95,9 +95,18 @@ function formatTime(dateString) {
   return new Date(dateString).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
 }
 
+function sortByStartTime(items) {
+  return [...items].sort((a, b) => new Date(a.startsAt).getTime() - new Date(b.startsAt).getTime());
+}
+
+function getItemTone(item, C) {
+  if (item.calendarKind === "complaintCall") return C.mint;
+  return item.type === "VIP Meeting" ? C.warn : C.purple;
+}
+
 function EventPill({ item, compact = false, onClick }) {
   const { C } = usePortalTheme();
-  const tone = item.type === "VIP Meeting" ? C.warn : C.purple;
+  const tone = getItemTone(item, C);
   return (
     <button
       type="button"
@@ -111,10 +120,94 @@ function EventPill({ item, compact = false, onClick }) {
   );
 }
 
+function DayMeetingsModal({ date, items, onClose, onSelectMeeting }) {
+  const { C } = usePortalTheme();
+
+  if (!date) return null;
+
+  return (
+    <>
+      <div
+        className="fixed inset-0 bg-black/50 backdrop-blur-sm z-40 animate-in fade-in duration-200"
+        onClick={onClose}
+      />
+      <div className="fixed inset-0 z-50 flex sm:items-center justify-center overflow-y-auto">
+        <div
+          className="w-full max-w-2xl rounded-t-3xl sm:rounded-2xl overflow-hidden animate-in slide-in-from-bottom-5 sm:zoom-in-95 fade-in duration-300"
+          style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 12, boxShadow: C.dialogShadow }}
+          onClick={(event) => event.stopPropagation()}
+        >
+          <div className="px-6 sm:px-8 py-6 border-b flex items-start justify-between gap-4" style={{ background: C.bgElevated, borderColor: C.border }}>
+            <div className="min-w-0">
+              <div style={{ fontSize: 11, fontWeight: 700, color: C.t3, textTransform: "uppercase", letterSpacing: ".1em" }}>
+                Meeting Schedule
+              </div>
+              <h3 className="mt-3 text-2xl font-bold break-words" style={{ color: C.t1 }}>
+                {date.toLocaleDateString(undefined, { weekday: "long", month: "long", day: "numeric", year: "numeric" })}
+              </h3>
+              <div className="mt-2 text-sm" style={{ color: C.t2 }}>
+                Total Meetings: {items.length}
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={onClose}
+              className="p-2 rounded-lg transition-colors flex-shrink-0"
+              style={{ color: C.t2, background: "transparent" }}
+              aria-label="Close"
+            >
+              <X size={20} />
+            </button>
+          </div>
+
+          <div className="p-6 sm:p-8 max-h-[70vh] overflow-y-auto">
+            {items.length === 0 ? (
+              <div style={{ fontSize: 13, color: C.t3, textAlign: "center", padding: "24px 0" }}>No meetings for this date.</div>
+            ) : (
+              <div className="space-y-3">
+                {items.map((item) => {
+                  const tone = getItemTone(item, C);
+                  return (
+                    <button
+                      key={item.id}
+                      type="button"
+                      onClick={() => onSelectMeeting(item)}
+                      className="w-full text-left rounded-xl p-4 transition-all"
+                      style={{ border: `1px solid ${C.border}`, background: C.bgElevated }}
+                    >
+                      <div className="flex items-start justify-between gap-4">
+                        <div className="min-w-0">
+                          <div className="inline-flex px-3 py-1 rounded-full text-xs font-semibold border" style={{ borderColor: `${tone}33`, background: `${tone}12`, color: tone }}>
+                            {item.type}
+                          </div>
+                          <div style={{ marginTop: 10, fontSize: 14, fontWeight: 700, color: C.t1 }} className="break-words">
+                            {item.title}
+                          </div>
+                          <div style={{ fontSize: 12, color: C.t2, marginTop: 6 }}>
+                            {item.location || "Location pending"}
+                          </div>
+                        </div>
+                        <div style={{ fontSize: 12, color: C.t2, whiteSpace: "nowrap", fontWeight: 600 }}>
+                          {formatTime(item.startsAt)} - {formatTime(item.endsAt)}
+                        </div>
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    </>
+  );
+}
+
 function Modal({ item, mode, editForm, setEditForm, onClose, onSave, onModeChange, saving }) {
   const { C } = usePortalTheme();
   if (!item) return null;
-  const tone = item.type === "VIP Meeting" ? C.warn : C.purple;
+  const tone = getItemTone(item, C);
+  const isComplaintCall = item.calendarKind === "complaintCall";
   
   return (
     <>
@@ -161,10 +254,9 @@ function Modal({ item, mode, editForm, setEditForm, onClose, onSave, onModeChang
           {/* Tabs */}
           <div style={{ padding: "14px 20px", borderBottom: `1px solid ${C.border}`, background: C.card }}>
             <WorkspaceTabs
-              items={[
-                { id: "details", label: "Details" },
-                { id: "edit", label: "Edit" },
-              ]}
+              items={isComplaintCall
+                ? [{ id: "details", label: "Details" }, { id: "edit", label: "Edit" }]
+                : [{ id: "details", label: "Details" }, { id: "edit", label: "Edit" }]}
               value={mode}
               onChange={onModeChange}
             />
@@ -176,8 +268,12 @@ function Modal({ item, mode, editForm, setEditForm, onClose, onSave, onModeChang
               <div className="space-y-8 animate-in fade-in duration-200">
                 <div className="grid sm:grid-cols-2 gap-6 sm:gap-8">
                   <div>
-                    <p style={{ fontSize: 11, fontWeight: 700, color: C.t3, textTransform: "uppercase", letterSpacing: ".1em", marginBottom: 12 }}>Location</p>
-                    <p style={{ fontSize: 16, color: C.t1, fontWeight: 600 }} className="break-words">{item.location || "Location pending"}</p>
+                    <p style={{ fontSize: 11, fontWeight: 700, color: C.t3, textTransform: "uppercase", letterSpacing: ".1em", marginBottom: 12 }}>
+                      {isComplaintCall ? "Citizen / Contact" : "Location"}
+                    </p>
+                    <p style={{ fontSize: 16, color: C.t1, fontWeight: 600 }} className="break-words">
+                      {isComplaintCall ? item.location || "Contact pending" : item.location || "Location pending"}
+                    </p>
                   </div>
                   <div>
                     <p style={{ fontSize: 11, fontWeight: 700, color: C.t3, textTransform: "uppercase", letterSpacing: ".1em", marginBottom: 12 }}>Source</p>
@@ -250,15 +346,17 @@ function Modal({ item, mode, editForm, setEditForm, onClose, onSave, onModeChang
                   </div>
                 </div>
 
-                <div>
-                  <label style={{ display: "block", fontSize: 12, fontWeight: 700, color: C.t2, marginBottom: 10 }}>Location</label>
-                  <input
-                    value={editForm.location}
-                    onChange={(event) => setEditForm((current) => ({ ...current, location: event.target.value }))}
-                    style={{ width: "100%", padding: "10px 14px", border: `1px solid ${C.border}`, borderRadius: 10, background: C.inp, color: C.t1, fontSize: 14 }}
-                    placeholder="Meeting location"
-                  />
-                </div>
+                {!isComplaintCall && (
+                  <div>
+                    <label style={{ display: "block", fontSize: 12, fontWeight: 700, color: C.t2, marginBottom: 10 }}>Location</label>
+                    <input
+                      value={editForm.location}
+                      onChange={(event) => setEditForm((current) => ({ ...current, location: event.target.value }))}
+                      style={{ width: "100%", padding: "10px 14px", border: `1px solid ${C.border}`, borderRadius: 10, background: C.inp, color: C.t1, fontSize: 14 }}
+                      placeholder="Meeting location"
+                    />
+                  </div>
+                )}
 
                 <div className="pt-4 flex gap-3">
                   <WorkspaceButton type="button" variant="ghost" onClick={onClose} style={{ flex: 1 }}>
@@ -286,6 +384,7 @@ export default function Calendar() {
   const [view, setView] = useState("month");
   const [cursorDate, setCursorDate] = useState(startOfDay(new Date()));
   const [selectedItem, setSelectedItem] = useState(null);
+  const [selectedDateItems, setSelectedDateItems] = useState(null);
   const [modalMode, setModalMode] = useState("details");
   const [saving, setSaving] = useState(false);
   const [editForm, setEditForm] = useState({ title: "", details: "", meetingDate: "", startTime: "", endTime: "", location: "" });
@@ -295,12 +394,15 @@ export default function Calendar() {
 
     async function loadCalendar() {
       try {
-        const { data } = await apiClient.get("/admin/work-queue", authorizedConfig(session.accessToken));
+        const queueResponse = await apiClient.get("/admin/work-queue", authorizedConfig(session.accessToken));
+        const data = queueResponse.data;
         const scheduledMeetings = (data.meetings || [])
           .filter((meeting) => meeting.status === "scheduled" && meeting.scheduled_at)
           .map((meeting) => ({
             id: meeting.id,
+            calendarKind: "meeting",
             sourceId: meeting.requestId || meeting.id,
+            ministerId: meeting.ministerId,
             title: meeting.title || meeting.purpose,
             details: meeting.admin_comments || meeting.purpose,
             startsAt: meeting.scheduled_at,
@@ -308,10 +410,32 @@ export default function Calendar() {
             location: meeting.scheduled_location || "Location pending",
             type: meeting.is_vip ? "VIP Meeting" : "Scheduled Meeting",
             source: "Citizen Meeting Workflow",
+            isVip: Boolean(meeting.is_vip),
           }));
 
+        const scheduledCalls = (data.complaints || [])
+          .filter((complaint) => complaint.callScheduledAt)
+          .map((complaint) => {
+            const startAt = complaint.callScheduledAt;
+            const endAt = new Date(new Date(startAt).getTime() + 30 * 60 * 1000).toISOString();
+            return {
+              id: complaint.id,
+              calendarKind: "complaintCall",
+              sourceId: complaint.complaintId || complaint.id,
+              title: complaint.title || complaint.subject || "Scheduled Call",
+              details: complaint.description || complaint.details || "Complaint follow-up call",
+              startsAt: startAt,
+              endsAt: endAt,
+              location: complaint.citizenSnapshot?.name || complaint.currentOwner || "Citizen call",
+              type: "Scheduled Call",
+              source: "Complaint Workflow",
+              callStatus: complaint.status,
+            };
+          });
+
         if (mounted) {
-          setItems(scheduledMeetings.length ? scheduledMeetings : getStaticData());
+          const calendarItems = [...scheduledMeetings, ...scheduledCalls];
+          setItems(calendarItems.length ? calendarItems : getStaticData());
         }
       } catch (loadError) {
         if (mounted) {
@@ -335,7 +459,7 @@ export default function Calendar() {
   }, [session?.accessToken]);
 
   const normalizedItems = useMemo(
-    () => items.map((item) => ({ ...item, startDate: new Date(item.startsAt), endDate: new Date(item.endsAt) })),
+    () => sortByStartTime(items.map((item) => ({ ...item, startDate: new Date(item.startsAt), endDate: new Date(item.endsAt) }))),
     [items]
   );
 
@@ -361,9 +485,35 @@ export default function Calendar() {
   }, [cursorDate, normalizedItems]);
 
   const dayItems = useMemo(
-    () => normalizedItems.filter((item) => item.startDate >= startOfDay(cursorDate) && item.startDate <= endOfDay(cursorDate)),
+    () => sortByStartTime(normalizedItems.filter((item) => item.startDate >= startOfDay(cursorDate) && item.startDate <= endOfDay(cursorDate))),
     [cursorDate, normalizedItems]
   );
+
+  const visibleUpcomingItems = useMemo(() => {
+    const today = startOfDay(new Date());
+    const tomorrow = addDays(today, 1);
+    const tomorrowEnd = endOfDay(tomorrow);
+
+    return normalizedItems.filter((item) => item.startDate >= today && item.startDate <= tomorrowEnd);
+  }, [normalizedItems]);
+
+  const upcomingGroups = useMemo(() => {
+    const today = startOfDay(new Date());
+    const tomorrow = addDays(today, 1);
+
+    return [
+      {
+        key: "today",
+        label: today.toLocaleDateString(undefined, { weekday: "long", month: "short", day: "numeric" }),
+        items: visibleUpcomingItems.filter((item) => isSameDay(item.startDate, today)),
+      },
+      {
+        key: "tomorrow",
+        label: tomorrow.toLocaleDateString(undefined, { weekday: "long", month: "short", day: "numeric" }),
+        items: visibleUpcomingItems.filter((item) => isSameDay(item.startDate, tomorrow)),
+      },
+    ].filter((group) => group.items.length > 0);
+  }, [visibleUpcomingItems]);
 
   const openItem = (item, mode = "details") => {
     const start = item.startsAt ? new Date(item.startsAt) : null;
@@ -380,6 +530,14 @@ export default function Calendar() {
     });
   };
 
+  const openDateMeetings = (date, dayItemsForDate) => {
+    setCursorDate(startOfDay(date));
+    setSelectedDateItems({
+      date: startOfDay(date),
+      items: sortByStartTime(dayItemsForDate),
+    });
+  };
+
   const shiftCursor = (direction) => {
     const next = new Date(cursorDate);
     if (view === "month") next.setMonth(next.getMonth() + direction);
@@ -388,30 +546,69 @@ export default function Calendar() {
     setCursorDate(startOfDay(next));
   };
 
-  const saveEdit = () => {
+  const saveEdit = async () => {
     if (!selectedItem) return;
+    if (selectedItem.calendarKind === "meeting" && !selectedItem.ministerId) {
+      setError("This meeting cannot be edited from calendar because the assigned minister is missing.");
+      return;
+    }
+    if (!editForm.meetingDate || !editForm.startTime || !editForm.endTime || (selectedItem.calendarKind === "meeting" && !editForm.location.trim())) {
+      setError("Date, time, and location are required to update this meeting.");
+      return;
+    }
+
     setSaving(true);
     setError("");
-    
-    setTimeout(() => {
+
+    try {
+      if (selectedItem.calendarKind === "complaintCall") {
+        await apiClient.patch(
+          `/complaints/${selectedItem.id}/schedule-call`,
+          {
+            callScheduledAt: new Date(`${editForm.meetingDate}T${editForm.startTime}`).toISOString(),
+          },
+          authorizedConfig(session.accessToken)
+        );
+      } else {
+        await apiClient.patch(
+          `/meetings/${selectedItem.id}/schedule`,
+          {
+            ministerId: selectedItem.ministerId,
+            startsAt: new Date(`${editForm.meetingDate}T${editForm.startTime}`).toISOString(),
+            endsAt: new Date(`${editForm.meetingDate}T${editForm.endTime}`).toISOString(),
+            location: editForm.location,
+            isVip: selectedItem.isVip || false,
+            comments: editForm.details,
+          },
+          authorizedConfig(session.accessToken)
+        );
+      }
+
       const updatedItem = {
         ...selectedItem,
         title: editForm.title,
         details: editForm.details,
-        startsAt: `${editForm.meetingDate}T${editForm.startTime}`,
-        endsAt: `${editForm.meetingDate}T${editForm.endTime}`,
-        location: editForm.location,
+        startsAt: new Date(`${editForm.meetingDate}T${editForm.startTime}`).toISOString(),
+        endsAt: new Date(`${editForm.meetingDate}T${editForm.endTime}`).toISOString(),
+        location: selectedItem.calendarKind === "complaintCall" ? selectedItem.location : editForm.location,
+        isVip: selectedItem.isVip || false,
       };
 
-      setItems((prevItems) => {
-        return prevItems.map((item) =>
-          item.id === selectedItem.id ? updatedItem : item
-        );
-      });
+      setItems((prevItems) => prevItems.map((item) => (item.id === selectedItem.id ? updatedItem : item)));
 
       openItem(updatedItem, "details");
+      setSelectedDateItems((current) => {
+        if (!current) return current;
+        return {
+          ...current,
+          items: sortByStartTime(current.items.map((item) => (item.id === selectedItem.id ? updatedItem : item))),
+        };
+      });
+    } catch (saveError) {
+      setError(saveError?.response?.data?.error || "Unable to save meeting changes");
+    } finally {
       setSaving(false);
-    }, 600);
+    }
   };
 
   return (
@@ -486,16 +683,39 @@ export default function Calendar() {
                           >
                             {cell.date.getDate()}
                           </button>
-                          <div className="mt-2 space-y-1">
-                            {cell.items.slice(0, 2).map((item) => (
-                              <EventPill key={item.id} item={item} compact onClick={() => openItem(item)} />
-                            ))}
-                            {cell.items.length > 2 && (
-                              <div className="text-[10px] px-2 py-1 font-semibold" style={{ color: C.purple }}>
-                                +{cell.items.length - 2} more
+                          {cell.items.length === 1 && (
+                            <button
+                              type="button"
+                              onClick={(event) => {
+                                event.stopPropagation();
+                                openItem(cell.items[0]);
+                              }}
+                              className="mt-2 w-full text-left rounded-lg px-2.5 py-2 transition-colors"
+                              style={{ border: `1px solid ${C.border}`, background: C.bgElevated }}
+                            >
+                              <div className="text-[11px] font-semibold truncate" style={{ color: C.t1 }}>
+                                {cell.items[0].title}
                               </div>
-                            )}
-                          </div>
+                            </button>
+                          )}
+                          {cell.items.length > 1 && (
+                            <button
+                              type="button"
+                              onClick={(event) => {
+                                event.stopPropagation();
+                                openDateMeetings(cell.date, cell.items);
+                              }}
+                              className="mt-2 w-full text-left rounded-lg px-2.5 py-2 transition-colors"
+                              style={{ border: `1px solid ${C.border}`, background: C.bgElevated }}
+                            >
+                              <div className="text-[10px] font-semibold uppercase tracking-[0.08em]" style={{ color: C.purple }}>
+                                Meetings
+                              </div>
+                              <div className="mt-1 text-[11px] font-semibold" style={{ color: C.t2 }}>
+                                Total Meetings: {cell.items.length}
+                              </div>
+                            </button>
+                          )}
                         </div>
                       );
                     })}
@@ -552,10 +772,10 @@ export default function Calendar() {
                           <div className="flex items-start justify-between gap-4">
                             <div>
                               <div className="inline-flex px-3 py-1 rounded-full text-xs font-semibold border" style={{ borderColor: `${item.type === "VIP Meeting" ? C.warn : C.purple}33`, background: `${item.type === "VIP Meeting" ? C.warn : C.purple}12`, color: item.type === "VIP Meeting" ? C.warn : C.purple }}>
-                                {item.type}
+                              {item.type}
                               </div>
                               <div style={{ marginTop: 8, fontSize: 13, fontWeight: 700, color: C.t1 }}>{item.title}</div>
-                              <div style={{ fontSize: 11, color: C.t2, marginTop: 4 }}>{item.source} • {item.location || "Location pending"}</div>
+                              <div style={{ fontSize: 11, color: C.t2, marginTop: 4 }}>{item.source} • {item.location || (item.calendarKind === "complaintCall" ? "Contact pending" : "Location pending")}</div>
                             </div>
                             <div style={{ fontSize: 11, color: C.t2, whiteSpace: "nowrap" }}>
                               {formatTime(item.startsAt)} - {formatTime(item.endsAt)}
@@ -573,30 +793,50 @@ export default function Calendar() {
             <WorkspaceCard style={{ padding: 24, height: "fit-content", position: "sticky", top: 24 }}>
               <h3 className="text-sm font-bold uppercase tracking-wider mb-4" style={{ color: C.t3 }}>Upcoming Meetings</h3>
               <div className="space-y-3 max-h-[600px] overflow-y-auto">
-                {[...normalizedItems]
-                  .sort((a, b) => a.startDate - b.startDate)
-                  .slice(0, 12)
-                  .map((item) => (
-                    <button
-                      key={item.id}
-                      type="button"
-                      onClick={() => {
-                        setCursorDate(startOfDay(item.startDate));
-                        openItem(item);
-                      }}
-                      className="w-full text-left pb-3 last:border-b-0 transition-colors group"
-                      style={{ borderBottom: `1px solid ${C.border}` }}
-                    >
-                      <div className="font-semibold" style={{ color: C.t1 }}>{item.title}</div>
-                      <div className="text-xs mt-1" style={{ color: C.t3 }}>
-                        {new Date(item.startsAt).toLocaleDateString()} • {formatTime(item.startsAt)}
+                {upcomingGroups.length === 0 ? (
+                  <div style={{ fontSize: 13, color: C.t3 }}>No meetings scheduled for today or tomorrow.</div>
+                ) : (
+                  upcomingGroups.map((group) => (
+                    <div key={group.key}>
+                      <div className="text-[11px] font-bold uppercase tracking-[0.08em] mb-2" style={{ color: C.t3 }}>
+                        {group.label}
                       </div>
-                    </button>
-                  ))}
+                      <div className="space-y-3">
+                        {group.items.map((item) => (
+                          <button
+                            key={item.id}
+                            type="button"
+                            onClick={() => {
+                              setCursorDate(startOfDay(item.startDate));
+                              openItem(item);
+                            }}
+                            className="w-full text-left pb-3 last:border-b-0 transition-colors group"
+                            style={{ borderBottom: `1px solid ${C.border}` }}
+                          >
+                            <div className="font-semibold" style={{ color: C.t1 }}>{item.title}</div>
+                            <div className="text-xs mt-1" style={{ color: C.t3 }}>
+                              {formatTime(item.startsAt)}
+                            </div>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  ))
+                )}
               </div>
             </WorkspaceCard>
           </div>
         )}
+
+      <DayMeetingsModal
+        date={selectedDateItems?.date || null}
+        items={selectedDateItems?.items || []}
+        onClose={() => setSelectedDateItems(null)}
+        onSelectMeeting={(item) => {
+          setSelectedDateItems(null);
+          openItem(item);
+        }}
+      />
 
       <Modal
         item={selectedItem}

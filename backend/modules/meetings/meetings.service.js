@@ -177,13 +177,45 @@ async function changeMeetingStatus({
   return meetingsRepository.getMeetingById(meetingId);
 }
 
+async function assignMeetingToSelf(meetingId, adminId, reqMeta) {
+  const current = await meetingsRepository.getMeetingById(meetingId);
+  if (!current) {
+    throw createHttpError(404, 'Meeting not found');
+  }
+  if (current.assignedAdminUserId && current.assignedAdminUserId !== adminId) {
+    throw createHttpError(403, 'Meeting is already assigned to another admin');
+  }
+
+  const updated = await changeMeetingStatus({
+    meetingId,
+    actorRole: 'admin',
+    actorId: adminId,
+    status: current.status,
+    allowedPreviousStatuses: ['pending'],
+    actionLabel: 'assign this meeting',
+    note: 'Meeting assigned to admin',
+    patch: { assigned_admin_id: adminId },
+  });
+
+  await writeAuditLog({
+    actorRole: 'admin',
+    actorId: adminId,
+    entityType: 'meeting',
+    entityId: meetingId,
+    action: 'meeting_assigned_to_self',
+    ipAddress: reqMeta.ip,
+    userAgent: reqMeta.userAgent,
+  });
+
+  return updated;
+}
+
 async function rejectMeeting(meetingId, actorId, reason, reqMeta) {
   const current = await meetingsRepository.getMeetingById(meetingId);
   if (!current) {
     throw createHttpError(404, 'Meeting not found');
   }
   assertMeetingAdminAccess(current, actorId, {
-    allowUnassigned: current.status === 'pending',
     actionLabel: 'reject this meeting',
   });
 
@@ -222,7 +254,6 @@ async function acceptMeeting(meetingId, actorId, reqMeta) {
     throw createHttpError(404, 'Meeting not found');
   }
   assertMeetingAdminAccess(current, actorId, {
-    allowUnassigned: current.status === 'pending' || current.status === 'not_verified',
     actionLabel: 'accept this meeting',
   });
 
@@ -507,6 +538,7 @@ module.exports = {
   getCitizenMeetingDetail,
   getAdminMeetingDetail,
   getAdminMeetingFiles,
+  assignMeetingToSelf,
   rejectMeeting,
   acceptMeeting,
   assignVerification,

@@ -1267,7 +1267,7 @@ export default function HCMNewCasePage() {
       setSuccessModal({
         open: true,
         title: "Meeting Submitted",
-        message: "Your meeting request has been submitted to the admin meeting queue.",
+        message: "Your meeting request has been submitted to the admin meeting pool.",
       });
       setMeetingForm({
         title: "",

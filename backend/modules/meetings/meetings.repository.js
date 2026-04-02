@@ -87,7 +87,7 @@ function mapMeeting(row) {
     assignedDeoName: [row.deo_first_name, row.deo_last_name].filter(Boolean).join(' ') || '',
     currentOwner: [row.deo_first_name, row.deo_last_name].filter(Boolean).join(' ')
       || [row.admin_first_name, row.admin_last_name].filter(Boolean).join(' ')
-      || 'Admin Queue',
+      || 'Meeting Pool',
     citizenSnapshot: {
       name: [row.first_name, row.last_name].filter(Boolean).join(' '),
       citizenId: row.citizen_code,

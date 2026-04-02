@@ -1,5 +1,7 @@
 const { z } = require('zod');
 
+const assignMeetingSchema = z.object({});
+
 const assignVerificationSchema = z.object({
   deoId: z.string().uuid(),
 });
@@ -31,6 +33,7 @@ const meetingActionNoteSchema = z.object({
 });
 
 module.exports = {
+  assignMeetingSchema,
   assignVerificationSchema,
   meetingRejectSchema,
   meetingVerificationSchema,

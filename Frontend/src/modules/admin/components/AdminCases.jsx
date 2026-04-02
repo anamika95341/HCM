@@ -107,7 +107,7 @@ export default function AdminCases() {
   }, [session?.accessToken]);
 
   const complaintPool = complaints.filter((item) => !item.assignedAdminUserId && !isResolvedComplaint(item.status)).map(complaintRow);
-  const meetingQueue  = meetings.filter((item) => !isResolvedMeeting(item.status)).map(meetingRow);
+  const meetingPool = meetings.filter((item) => !item.assignedAdminUserId && !isResolvedMeeting(item.status)).map(meetingRow);
   const myCases = [
     ...complaints.filter((item) => item.assignedAdminUserId === session?.user?.id && !isResolvedComplaint(item.status) && item.status !== "escalated_to_meeting").map(complaintRow),
     ...meetings.filter((item) => item.assignedAdminUserId === session?.user?.id && !isResolvedMeeting(item.status)).map(meetingRow),
@@ -115,7 +115,7 @@ export default function AdminCases() {
   const resolved  = [...complaints.filter((item) => isResolvedComplaint(item.status)).map(complaintRow), ...meetings.filter((item) => isResolvedMeeting(item.status)).map(meetingRow)];
   const escalated = complaints.filter((item) => item.status === "escalated_to_meeting").map(complaintRow);
 
-  const sections = { complaintPool, meetingQueue, myCases, resolved, escalated };
+  const sections = { complaintPool, meetingPool, myCases, resolved, escalated };
 
   const activeRows = (sections[tab] || []).filter((item) => {
     const matchesStatus = statusFilter === "all" || item.status === statusFilter;
@@ -133,7 +133,7 @@ export default function AdminCases() {
 
   const tabs = [
     { id: "complaintPool", label: "Complaint Pool",       count: complaintPool.length },
-    { id: "meetingQueue",  label: "Meeting Queue",        count: meetingQueue.length  },
+    { id: "meetingPool",   label: "Meeting Pool",         count: meetingPool.length   },
     { id: "myCases",       label: "My Cases",             count: myCases.length       },
     { id: "resolved",      label: "Resolved / Completed", count: resolved.length      },
     { id: "escalated",     label: "Escalated Requests",   count: escalated.length     },
@@ -144,7 +144,7 @@ export default function AdminCases() {
     const preferredTab =
       tabs.find((t) => t.id === "myCases"       && t.count > 0)?.id ||
       tabs.find((t) => t.id === "complaintPool" && t.count > 0)?.id ||
-      tabs.find((t) => t.id === "meetingQueue"  && t.count > 0)?.id ||
+      tabs.find((t) => t.id === "meetingPool"   && t.count > 0)?.id ||
       tabs.find((t) => t.id === "escalated"     && t.count > 0)?.id ||
       tabs.find((t) => t.id === "resolved"      && t.count > 0)?.id ||
       "complaintPool";
@@ -161,7 +161,6 @@ export default function AdminCases() {
         <WorkspaceSectionHeader
           eyebrow="Admin Workspace"
           title="Work Queue"
-          subtitle="Manage complaint pool, meeting queue, assigned cases, escalations, and completed records."
         />
 
         {/* STAT CARDS — 5 in one row, clickable to switch tab */}
@@ -199,15 +198,9 @@ export default function AdminCases() {
         {/* QUEUE FILTERS */}
         <div style={{ marginBottom: 20 }}>
           <WorkspaceCard>
-            <WorkspaceCardHeader
-              title="Queue Filters"
-              subtitle="Refine the current lane without leaving the work queue."
-            />
             <div style={{ display: "grid", gridTemplateColumns: "minmax(0, 1.6fr) minmax(220px, 0.8fr)", gap: 16 }}>
               <div>
-                <div style={{ fontSize: 11, fontWeight: 700, color: C.t3, textTransform: "uppercase", letterSpacing: ".08em", marginBottom: 10 }}>
-                  Search
-                </div>
+                
                 <WorkspaceInput
                   value={query}
                   onChange={(e) => setQuery(e.target.value)}
@@ -215,9 +208,6 @@ export default function AdminCases() {
                 />
               </div>
               <div>
-                <div style={{ fontSize: 11, fontWeight: 700, color: C.t3, textTransform: "uppercase", letterSpacing: ".08em", marginBottom: 10 }}>
-                  Status
-                </div>
                 <WorkspaceSelect value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
                   <option value="all">All statuses</option>
                   {statusOptions.map((status) => (
@@ -299,7 +289,11 @@ export default function AdminCases() {
                       </td>
                       <td style={{ padding: "12px 16px", textAlign: "center", borderBottom: `1px solid ${C.borderLight}` }}>
                         <button
-                          onClick={() => navigate(item.route)}
+                          onClick={() => navigate(
+                            item.itemType === "meeting" && tab === "meetingPool"
+                              ? `${item.route}?source=work-queue`
+                              : item.route
+                          )}
                           className="transition-colors"
                           style={{
                             color: C.purple,
