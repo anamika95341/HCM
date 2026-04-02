@@ -1,0 +1,3 @@
+# Linux containers need LF in shell scripts; CRLF breaks the shebang and causes:
+# exec /app/docker-entrypoint.sh: no such file or directory
+*.sh text eol=lf
