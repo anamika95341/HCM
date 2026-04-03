@@ -162,35 +162,7 @@ function EditModal({ event, onSave, onClose }) {
             </div>
 
             <hr className="border-[var(--portal-border-light)] my-2" />
-            <div className="text-[12px] font-semibold text-[var(--portal-text)] mb-1.5">Event Files</div>
-
-            <div
-              className={`border-2 border-dashed rounded-xl p-6 text-center cursor-pointer transition-colors ${drag ? "border-[var(--portal-purple)] bg-[var(--portal-purple-dim)]" : "border-[var(--portal-border)] bg-[var(--portal-bg-elevated)] hover:bg-[var(--portal-card-hover)]"}`}
-              onDragOver={e => { e.preventDefault(); setDrag(true); }}
-              onDragLeave={() => setDrag(false)}
-              onDrop={e => { e.preventDefault(); setDrag(false); addFiles(e.dataTransfer.files); }}
-              onClick={() => fileRef.current?.click()}
-            >
-              <input ref={fileRef} type="file" multiple accept="image/*,video/*,.pdf,.doc,.docx,.xls,.xlsx" className="hidden" onChange={e => addFiles(e.target.files)} />
-              <div className="flex justify-center mb-2">
-                <FiUploadCloud size={26} color={drag ? "var(--portal-purple)" : "var(--portal-text-muted)"} />
-              </div>
-              <div className="text-sm font-semibold text-[var(--portal-text)] mb-1">Click or drag & drop</div>
-              <div className="text-xs text-[var(--portal-text-muted)]">Photos, Videos, Documents (PDF, DOC, XLS)</div>
-            </div>
-
-            {files.length > 0 && (
-              <div className="mt-3 space-y-2">
-                {files.map(f => (
-                  <div key={f.id} className="flex items-center gap-3 p-2.5 border border-[var(--portal-border)] rounded-lg bg-[var(--portal-bg-elevated)]">
-                    <FileIcon type={f.type} />
-                    <span className="flex-1 text-sm font-medium text-[var(--portal-text)] truncate">{f.name}</span>
-                    <span className="text-xs text-[var(--portal-text-muted)] mr-1">{f.size}</span>
-                    <button className="flex items-center justify-center w-7 h-7 rounded border border-red-200 bg-red-50 text-red-500 hover:bg-red-100 transition-colors" onClick={() => setFileToDelete(f)}><FiTrash2 size={12} /></button>
-                  </div>
-                ))}
-              </div>
-            )}
+         
           </div>
         </div>
 
