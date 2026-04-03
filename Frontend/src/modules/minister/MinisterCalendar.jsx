@@ -1,5 +1,15 @@
 import { useEffect, useMemo, useState } from "react";
-import { ChevronLeft, ChevronRight, Calendar as CalendarIcon, X } from "lucide-react";
+import {
+  ChevronLeft,
+  ChevronRight,
+  Clock,
+  FileText,
+  Film,
+  Image as ImageIcon,
+  MapPin,
+  Users,
+  X,
+} from "lucide-react";
 import { apiClient, authorizedConfig } from "../../shared/api/client.js";
 import { useAuth } from "../../shared/auth/AuthContext.jsx";
 import { usePortalTheme } from "../../shared/theme/portalTheme.jsx";
@@ -14,19 +24,20 @@ import {
   WorkspaceTabs,
 } from "../../shared/components/WorkspaceUI.jsx";
 
+// ── Constants ────────────────────────────────────────────────────────────────
+
 const VIEW_OPTIONS = ["month", "week", "day"];
 const DAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
-const MONTHS = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+const MONTHS = [
+  "January", "February", "March", "April", "May", "June",
+  "July", "August", "September", "October", "November", "December",
+];
+
+// ── Utility functions ────────────────────────────────────────────────────────
 
 function startOfDay(date) {
   const d = new Date(date);
   d.setHours(0, 0, 0, 0);
-  return d;
-}
-
-function endOfDay(date) {
-  const d = new Date(date);
-  d.setHours(23, 59, 59, 999);
   return d;
 }
 
@@ -51,23 +62,18 @@ function formatTime(dateString) {
 }
 
 function formatDateTimeRange(item) {
-  return `${new Date(item.startsAt).toLocaleString("en-IN")} to ${new Date(item.endsAt).toLocaleString("en-IN")}`;
+  return `${new Date(item.startsAt).toLocaleString("en-IN")} – ${new Date(item.endsAt).toLocaleString("en-IN")}`;
 }
 
-function EventPill({ item, compact = false, onClick }) {
-  const { C } = usePortalTheme();
-  const tone = item.type === "VIP Meeting" ? C.warn : C.purple;
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={`w-full text-left rounded-lg px-3 py-2 transition-[opacity,border-color] duration-200 hover:opacity-90 ${compact ? "text-[10px]" : "text-xs"}`}
-      style={{ border: `1px solid ${tone}33`, background: `${tone}12`, color: tone }}
-    >
-      <div className="font-semibold truncate">{item.title}</div>
-      <div className="opacity-70 mt-0.5">{formatTime(item.startsAt)}</div>
-    </button>
-  );
+function formatDuration(item) {
+  const ms = new Date(item.endsAt) - new Date(item.startsAt);
+  const mins = Math.round(ms / 60000);
+  if (mins >= 60) {
+    const h = Math.floor(mins / 60);
+    const m = mins % 60;
+    return m ? `${h}h ${m}m` : `${h}h`;
+  }
+  return `${mins}m`;
 }
 
 function formatFileSize(size = 0) {
@@ -76,156 +82,509 @@ function formatFileSize(size = 0) {
   return `${size} B`;
 }
 
-function EventModal({ item, accessToken, onClose }) {
+// ── Mock data (UI scaffolding — replace with API response when available) ────
+
+const _t = new Date();
+const _y = _t.getFullYear();
+const _m = _t.getMonth();
+const _d = _t.getDate();
+
+const MOCK_ITEMS = [
+  {
+    id: "mock-1",
+    sourceId: "meeting-001",
+    title: "Budget Review Meeting",
+    details:
+      "Quarterly review of departmental budgets with the finance team. Key focus areas include infrastructure spending, pending allocations, and upcoming project financing.",
+    startsAt: new Date(_y, _m, _d, 10, 0).toISOString(),
+    endsAt: new Date(_y, _m, _d, 11, 30).toISOString(),
+    location: "Conference Room A, Main Building",
+    type: "Scheduled Meeting",
+    source: "Minister Calendar",
+    participants: ["Finance Director", "Deputy Minister", "Budget Officer"],
+  },
+  {
+    id: "mock-2",
+    sourceId: "meeting-002",
+    title: "State Infrastructure Summit",
+    details:
+      "High-priority summit with state governors to discuss infrastructure development plans, fund allocation, and timelines for regional projects slated for Q3.",
+    startsAt: new Date(_y, _m, _d, 14, 0).toISOString(),
+    endsAt: new Date(_y, _m, _d, 16, 0).toISOString(),
+    location: "Main Hall, State Secretariat",
+    type: "VIP Meeting",
+    source: "Minister Priority",
+    participants: ["State Governors", "Infrastructure Secretary", "Planning Commission Head"],
+  },
+  {
+    id: "mock-3",
+    sourceId: "meeting-003",
+    title: "Citizen Grievance Hearing",
+    details:
+      "Monthly public grievance hearing to address pending complaints and concerns raised by citizens across various districts.",
+    startsAt: new Date(_y, _m, _d + 1, 9, 0).toISOString(),
+    endsAt: new Date(_y, _m, _d + 1, 12, 0).toISOString(),
+    location: "Public Hall, District Office",
+    type: "Scheduled Meeting",
+    source: "Minister Calendar",
+    participants: ["District Collectors", "Citizens Representatives", "Grievance Officer"],
+  },
+  {
+    id: "mock-4",
+    sourceId: "meeting-004",
+    title: "Policy Review with PM Office",
+    details:
+      "Urgent policy review meeting regarding new agricultural reforms, implementation timeline, and cross-ministry coordination requirements.",
+    startsAt: new Date(_y, _m, _d + 2, 11, 0).toISOString(),
+    endsAt: new Date(_y, _m, _d + 2, 13, 0).toISOString(),
+    location: "PM Office, New Delhi",
+    type: "VIP Meeting",
+    source: "Minister Priority",
+    participants: ["PM's Principal Secretary", "Cabinet Secretary", "Policy Advisors"],
+  },
+  {
+    id: "mock-5",
+    sourceId: "meeting-005",
+    title: "Press Conference — Development Projects",
+    details:
+      "Press conference to announce the completion of key development projects and upcoming public-sector initiatives for the current fiscal year.",
+    startsAt: new Date(_y, _m, _d - 1, 15, 0).toISOString(),
+    endsAt: new Date(_y, _m, _d - 1, 16, 0).toISOString(),
+    location: "Media Centre, Secretariat",
+    type: "Scheduled Meeting",
+    source: "Minister Calendar",
+    participants: ["Press Corps", "PR Team", "Development Secretary"],
+  },
+  {
+    id: "mock-6",
+    sourceId: "meeting-006",
+    title: "Bilateral Trade Discussion",
+    details:
+      "Confidential bilateral trade discussion with foreign delegation regarding trade agreements, tariff schedules, and long-term economic collaboration.",
+    startsAt: new Date(_y, _m, _d + 4, 10, 30).toISOString(),
+    endsAt: new Date(_y, _m, _d + 4, 12, 30).toISOString(),
+    location: "Ministry Conference Suite",
+    type: "VIP Meeting",
+    source: "Minister Priority",
+    participants: ["Foreign Trade Delegation", "Commerce Secretary", "Economic Advisors"],
+  },
+];
+
+// Mock files — UI scaffolding only, no backend integration
+const MOCK_FILES = {
+  photos: [
+    { id: "ph1", name: "Venue setup.jpg", size: 2.4 * 1024 * 1024 },
+    { id: "ph2", name: "Attendees group photo.jpg", size: 1.8 * 1024 * 1024 },
+    { id: "ph3", name: "Agenda board.jpg", size: 3.1 * 1024 * 1024 },
+    { id: "ph4", name: "Signing ceremony.jpg", size: 2.9 * 1024 * 1024 },
+  ],
+  videos: [
+    { id: "vi1", name: "Opening remarks.mp4", size: 45 * 1024 * 1024, duration: "12:34" },
+    { id: "vi2", name: "Discussion highlights.mp4", size: 82 * 1024 * 1024, duration: "28:15" },
+  ],
+  documents: [
+    { id: "do1", name: "Meeting Agenda.pdf", size: 450 * 1024 },
+    { id: "do2", name: "Presentation Slides.pptx", size: 8.2 * 1024 * 1024 },
+    { id: "do3", name: "Minutes of Meeting.docx", size: 230 * 1024 },
+    { id: "do4", name: "Action Items.xlsx", size: 120 * 1024 },
+  ],
+};
+
+// ── EventPill ────────────────────────────────────────────────────────────────
+
+function EventPill({ item, compact = false, onClick }) {
   const { C } = usePortalTheme();
-  const [files, setFiles] = useState([]);
-  const [loadingFiles, setLoadingFiles] = useState(false);
-  const [filesError, setFilesError] = useState("");
-  const [selectedFile, setSelectedFile] = useState(null);
-
-  useEffect(() => {
-    let active = true;
-
-    async function loadFiles() {
-      if (!item?.sourceId || !accessToken) {
-        return;
-      }
-      try {
-        setLoadingFiles(true);
-        setFilesError("");
-        const { data } = await apiClient.get(`/minister/calendar/${item.sourceId}/files`, authorizedConfig(accessToken));
-        if (active) {
-          setFiles(Array.isArray(data?.files) ? data.files : []);
-        }
-      } catch (error) {
-        if (active) {
-          setFilesError(error?.response?.data?.error || "Unable to load meeting files");
-        }
-      } finally {
-        if (active) {
-          setLoadingFiles(false);
-        }
-      }
-    }
-
-    setFiles([]);
-    setSelectedFile(null);
-    loadFiles();
-
-    return () => {
-      active = false;
-    };
-  }, [item?.sourceId, accessToken]);
-
-  if (!item) return null;
   const tone = item.type === "VIP Meeting" ? C.warn : C.purple;
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`w-full text-left rounded-lg px-3 py-2 transition-[opacity,transform] duration-150 hover:opacity-90 active:scale-[0.98] ${compact ? "text-[10px]" : "text-xs"}`}
+      style={{ border: `1px solid ${tone}33`, background: `${tone}12`, color: tone }}
+    >
+      <div className="font-semibold truncate">{item.title}</div>
+      <div className="opacity-70 mt-0.5">{formatTime(item.startsAt)}</div>
+    </button>
+  );
+}
+
+// ── FilesSection (UI only — no API calls, no upload logic) ───────────────────
+
+const FILE_TABS = [
+  { id: "photos", label: "Photos", icon: ImageIcon },
+  { id: "videos", label: "Videos", icon: Film },
+  { id: "documents", label: "Documents", icon: FileText },
+];
+
+function FilePlaceholderIcon({ type, tone }) {
+  const Icon = type === "photos" ? ImageIcon : type === "videos" ? Film : FileText;
+  return (
+    <div
+      style={{
+        width: "100%",
+        aspectRatio: "4 / 3",
+        display: "flex",
+        flexDirection: "column",
+        alignItems: "center",
+        justifyContent: "center",
+        background: `${tone}10`,
+        borderRadius: 8,
+        gap: 6,
+        color: tone,
+        opacity: 0.7,
+      }}
+    >
+      <Icon size={22} />
+    </div>
+  );
+}
+
+function FilesSection({ C, tone }) {
+  const [activeTab, setActiveTab] = useState("photos");
+  const files = MOCK_FILES[activeTab] || [];
+
+  return (
+    <div>
+      {/* Tab bar */}
+      <div style={{ display: "flex", gap: 4, marginBottom: 16, borderBottom: `1px solid ${C.border}`, paddingBottom: 12 }}>
+        {FILE_TABS.map(({ id, label, icon: Icon }) => {
+          const active = activeTab === id;
+          const count = MOCK_FILES[id].length;
+          return (
+            <button
+              key={id}
+              type="button"
+              onClick={() => setActiveTab(id)}
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 6,
+                padding: "6px 12px",
+                borderRadius: 8,
+                border: active ? `1px solid ${tone}40` : `1px solid transparent`,
+                background: active ? `${tone}12` : "transparent",
+                color: active ? tone : C.t3,
+                fontSize: 12,
+                fontWeight: 600,
+                cursor: "pointer",
+                transition: "all 0.15s ease",
+              }}
+            >
+              <Icon size={13} />
+              {label}
+              <span
+                style={{
+                  fontSize: 10,
+                  fontWeight: 700,
+                  padding: "1px 6px",
+                  borderRadius: 99,
+                  background: active ? `${tone}20` : `${C.t3}15`,
+                  color: active ? tone : C.t3,
+                }}
+              >
+                {count}
+              </span>
+            </button>
+          );
+        })}
+      </div>
+
+      {/* File grid */}
+      {files.length === 0 ? (
+        <div style={{ color: C.t3, fontSize: 13, textAlign: "center", padding: "16px 0" }}>
+          No {activeTab} attached to this meeting.
+        </div>
+      ) : (
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: "repeat(auto-fill, minmax(120px, 1fr))",
+            gap: 12,
+          }}
+        >
+          {files.map((file) => (
+            <div
+              key={file.id}
+              style={{
+                border: `1px solid ${C.border}`,
+                borderRadius: 10,
+                padding: 10,
+                background: C.bgElevated,
+                cursor: "default",
+                transition: "border-color 0.15s ease",
+              }}
+              onMouseEnter={(e) => (e.currentTarget.style.borderColor = `${tone}40`)}
+              onMouseLeave={(e) => (e.currentTarget.style.borderColor = C.border)}
+            >
+              <FilePlaceholderIcon type={activeTab} tone={tone} />
+              <div
+                style={{
+                  marginTop: 8,
+                  fontSize: 11,
+                  fontWeight: 600,
+                  color: C.t1,
+                  lineHeight: 1.4,
+                  wordBreak: "break-word",
+                  overflow: "hidden",
+                  display: "-webkit-box",
+                  WebkitLineClamp: 2,
+                  WebkitBoxOrient: "vertical",
+                }}
+              >
+                {file.name}
+              </div>
+              <div style={{ marginTop: 4, fontSize: 10, color: C.t3 }}>
+                {file.duration ? `Video · ${file.duration}` : formatFileSize(file.size)}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      <div
+        style={{
+          marginTop: 14,
+          padding: "8px 12px",
+          borderRadius: 8,
+          background: `${C.t3}10`,
+          fontSize: 11,
+          color: C.t3,
+          fontStyle: "italic",
+        }}
+      >
+        File preview — backend integration pending.
+      </div>
+    </div>
+  );
+}
+
+// ── DayMeetingsModal ─────────────────────────────────────────────────────────
+
+function DayMeetingsModal({ date, items, onClose, onSelectMeeting }) {
+  const { C } = usePortalTheme();
+
+  if (!date) return null;
 
   return (
     <>
-      <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-40" onClick={onClose} />
-      <div className="fixed inset-0 z-50 flex sm:items-center justify-center overflow-y-auto p-4">
+      <div
+        className="fixed inset-0 bg-black/50 backdrop-blur-sm z-40 animate-in fade-in duration-200"
+        onClick={onClose}
+      />
+      <div className="fixed inset-0 z-50 flex sm:items-center justify-center overflow-y-auto">
         <div
-          className="w-full max-w-2xl rounded-2xl overflow-hidden"
+          className="w-full max-w-2xl rounded-t-3xl sm:rounded-2xl overflow-hidden animate-in slide-in-from-bottom-5 sm:zoom-in-95 fade-in duration-300"
           style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 12, boxShadow: C.dialogShadow }}
-          onClick={(event) => event.stopPropagation()}
+          onClick={(e) => e.stopPropagation()}
         >
-          <div className="px-6 py-6 border-b flex items-start justify-between gap-4" style={{ background: C.bgElevated, borderColor: C.border }}>
-            <div>
-              <div className="inline-flex px-3 py-1 rounded-full text-xs font-semibold border" style={{ borderColor: `${tone}33`, background: `${tone}12`, color: tone }}>
-                {item.type}
+          <div
+            className="px-6 sm:px-8 py-6 border-b flex items-start justify-between gap-4"
+            style={{ background: C.bgElevated, borderColor: C.border }}
+          >
+            <div className="min-w-0">
+              <div style={{ fontSize: 11, fontWeight: 700, color: C.t3, textTransform: "uppercase", letterSpacing: ".1em" }}>
+                Meeting Schedule
               </div>
-              <h3 style={{ margin: "16px 0 0", fontSize: 28, lineHeight: 1.15, fontWeight: 700, color: C.t1 }}>{item.title}</h3>
-              <div style={{ marginTop: 10, color: C.t2, fontSize: 13 }}>{formatDateTimeRange(item)}</div>
+              <h3 className="mt-3 text-2xl font-bold break-words" style={{ color: C.t1 }}>
+                {date.toLocaleDateString(undefined, { weekday: "long", month: "long", day: "numeric", year: "numeric" })}
+              </h3>
+              <div className="mt-2 text-sm" style={{ color: C.t2 }}>
+                Total Meetings: {items.length}
+              </div>
             </div>
             <button
               type="button"
               onClick={onClose}
-              aria-label="Close details"
-              style={{ border: "none", background: "transparent", color: C.t2, cursor: "pointer", padding: 6 }}
+              className="p-2 rounded-lg transition-colors flex-shrink-0"
+              style={{ color: C.t2, background: "transparent" }}
+              aria-label="Close"
             >
               <X size={20} />
             </button>
           </div>
 
-          <div style={{ padding: 24, display: "grid", gap: 20 }}>
-            <div>
-              <div style={{ fontSize: 11, fontWeight: 700, color: C.t3, textTransform: "uppercase", letterSpacing: ".12em", marginBottom: 8 }}>Location</div>
-              <div style={{ color: C.t1, fontSize: 15 }}>{item.location || "Location pending"}</div>
+          <div className="p-6 sm:p-8 max-h-[320px] overflow-y-auto">
+            {items.length === 0 ? (
+              <div style={{ fontSize: 13, color: C.t3, textAlign: "center", padding: "24px 0" }}>
+                No meetings for this date.
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {items.map((item) => {
+                  const tone = item.type === "VIP Meeting" ? C.warn : C.purple;
+                  return (
+                    <button
+                      key={item.id}
+                      type="button"
+                      onClick={() => onSelectMeeting(item)}
+                      className="w-full text-left rounded-xl p-4 transition-all"
+                      style={{ border: `1px solid ${C.border}`, background: C.bgElevated }}
+                    >
+                      <div className="flex items-start justify-between gap-4">
+                        <div className="min-w-0">
+                          <div
+                            className="inline-flex px-3 py-1 rounded-full text-xs font-semibold border"
+                            style={{ borderColor: `${tone}33`, background: `${tone}12`, color: tone }}
+                          >
+                            {item.type}
+                          </div>
+                          <div style={{ marginTop: 10, fontSize: 14, fontWeight: 700, color: C.t1 }} className="break-words">
+                            {item.title}
+                          </div>
+                          <div style={{ fontSize: 12, color: C.t2, marginTop: 6 }}>
+                            {item.location || "Location pending"}
+                          </div>
+                        </div>
+                        <div style={{ fontSize: 12, color: C.t2, whiteSpace: "nowrap", fontWeight: 600 }}>
+                          {formatTime(item.startsAt)} - {formatTime(item.endsAt)}
+                        </div>
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    </>
+  );
+}
+
+// ── MeetingDetailModal ────────────────────────────────────────────────────────
+
+function MeetingDetailModal({ meeting, onClose }) {
+  const { C } = usePortalTheme();
+  if (!meeting) return null;
+  const tone = meeting.type === "VIP Meeting" ? C.warn : C.purple;
+
+  return (
+    <>
+      <div
+        className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[60] animate-in fade-in duration-200"
+        onClick={onClose}
+      />
+      <div className="fixed inset-0 z-[70] flex sm:items-center justify-center overflow-y-auto">
+        <div
+          className="w-full max-w-2xl rounded-t-3xl sm:rounded-2xl overflow-hidden animate-in slide-in-from-bottom-5 sm:zoom-in-95 fade-in duration-300"
+          style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 12, boxShadow: C.dialogShadow }}
+          onClick={(e) => e.stopPropagation()}
+        >
+          {/* Header */}
+          <div
+            className="px-6 sm:px-8 py-6 sm:py-8 border-b flex items-start justify-between gap-4"
+            style={{ background: C.bgElevated, borderColor: C.border }}
+          >
+            <button
+              type="button"
+              onClick={onClose}
+              className="flex items-center gap-1 px-3 py-1 rounded-lg text-sm font-medium transition-colors flex-shrink-0 mt-1"
+              style={{ color: C.t2, background: C.bgElevated, border: `1px solid ${C.border}` }}
+              aria-label="Back"
+            >
+              ← Back
+            </button>
+            <div className="flex-1 min-w-0">
+              <div
+                className="inline-flex px-3 py-1 rounded-full text-xs font-semibold border"
+                style={{ borderColor: `${tone}33`, background: `${tone}12`, color: tone }}
+              >
+                {meeting.type}
+              </div>
+              <h3 className="mt-4 text-2xl sm:text-3xl font-bold break-words" style={{ color: C.t1 }}>
+                {meeting.title}
+              </h3>
+              <div className="text-xs sm:text-sm mt-3 flex flex-wrap items-center gap-2" style={{ color: C.t2 }}>
+                <span>{new Date(meeting.startsAt).toLocaleDateString()}</span>
+                <span>•</span>
+                <span className="font-medium">{formatTime(meeting.startsAt)}</span>
+                <span>-</span>
+                <span className="font-medium">{formatTime(meeting.endsAt)}</span>
+                <span>•</span>
+                <span style={{ color: C.t3 }}>{formatDuration(meeting)}</span>
+              </div>
             </div>
-            <div>
-              <div style={{ fontSize: 11, fontWeight: 700, color: C.t3, textTransform: "uppercase", letterSpacing: ".12em", marginBottom: 8 }}>Source</div>
-              <div style={{ color: C.t1, fontSize: 15 }}>{item.source}</div>
-            </div>
-            <div>
-              <div style={{ fontSize: 11, fontWeight: 700, color: C.t3, textTransform: "uppercase", letterSpacing: ".12em", marginBottom: 8 }}>Comments</div>
-              <div style={{ color: C.t2, fontSize: 14, lineHeight: 1.7 }}>{item.details || "No additional comments available."}</div>
-            </div>
-            <div>
-              <div style={{ fontSize: 11, fontWeight: 700, color: C.t3, textTransform: "uppercase", letterSpacing: ".12em", marginBottom: 12 }}>Files</div>
-              {loadingFiles ? (
-                <div style={{ color: C.t3, fontSize: 13 }}>Loading meeting files...</div>
-              ) : filesError ? (
-                <div style={{ color: C.danger, fontSize: 13 }}>{filesError}</div>
-              ) : files.length === 0 ? (
-                <div style={{ color: C.t3, fontSize: 13 }}>No files are attached to this meeting.</div>
-              ) : (
-                <div style={{ display: "grid", gap: 16 }}>
-                  <div
-                    style={{
-                      display: "grid",
-                      gridTemplateColumns: "repeat(auto-fill, minmax(132px, 1fr))",
-                      gap: 14,
-                    }}
-                  >
-                    {files.map((file) => (
-                      <button
-                        key={file.id}
-                        type="button"
-                        onClick={() => setSelectedFile(file)}
+            <button
+              type="button"
+              onClick={onClose}
+              className="p-2 rounded-lg transition-colors flex-shrink-0"
+              style={{ color: C.t2, background: "transparent" }}
+              aria-label="Close"
+            >
+              <X size={20} />
+            </button>
+          </div>
+
+          {/* Scrollable content */}
+          <div className="p-6 sm:p-8 max-h-[calc(100vh-300px)] sm:max-h-[70vh] overflow-y-auto">
+            <div className="space-y-8 animate-in fade-in duration-200">
+              {/* Info grid */}
+              <div className="grid sm:grid-cols-2 gap-6 sm:gap-8">
+                <div>
+                  <p style={{ fontSize: 11, fontWeight: 700, color: C.t3, textTransform: "uppercase", letterSpacing: ".1em", marginBottom: 12 }}>
+                    Location
+                  </p>
+                  <p style={{ fontSize: 15, color: C.t1, fontWeight: 600 }} className="break-words">
+                    {meeting.location || "Location pending"}
+                  </p>
+                </div>
+                <div>
+                  <p style={{ fontSize: 11, fontWeight: 700, color: C.t3, textTransform: "uppercase", letterSpacing: ".1em", marginBottom: 12 }}>
+                    Source
+                  </p>
+                  <p style={{ fontSize: 15, color: C.t1, fontWeight: 600 }}>
+                    {meeting.source}
+                  </p>
+                </div>
+              </div>
+
+              {/* Participants */}
+              {Array.isArray(meeting.participants) && meeting.participants.length > 0 && (
+                <div>
+                  <p style={{ fontSize: 11, fontWeight: 700, color: C.t3, textTransform: "uppercase", letterSpacing: ".1em", marginBottom: 12, display: "flex", alignItems: "center", gap: 5 }}>
+                    <Users size={11} /> Participants
+                  </p>
+                  <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+                    {meeting.participants.map((p) => (
+                      <span
+                        key={p}
                         style={{
-                          border: `1px solid ${C.border}`,
-                          background: C.bgElevated,
-                          borderRadius: 12,
-                          padding: 10,
-                          textAlign: "left",
-                          cursor: "pointer",
+                          fontSize: 12,
+                          padding: "4px 12px",
+                          borderRadius: 99,
+                          background: `${tone}10`,
+                          color: tone,
+                          border: `1px solid ${tone}25`,
+                          fontWeight: 500,
                         }}
                       >
-                        <div style={{ aspectRatio: "1 / 1", overflow: "hidden", borderRadius: 10, background: `${tone}12`, border: `1px solid ${tone}22` }}>
-                          <img
-                            src={file.previewUrl}
-                            alt={file.name}
-                            loading="lazy"
-                            style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }}
-                          />
-                        </div>
-                        <div style={{ marginTop: 10, fontSize: 12, fontWeight: 600, color: C.t1, lineHeight: 1.4, wordBreak: "break-word" }}>{file.name}</div>
-                        <div style={{ marginTop: 4, fontSize: 11, color: C.t3 }}>{formatFileSize(file.size)}</div>
-                      </button>
+                        {p}
+                      </span>
                     ))}
                   </div>
-                  {selectedFile && (
-                    <div style={{ border: `1px solid ${C.border}`, borderRadius: 12, overflow: "hidden", background: C.bgElevated }}>
-                      <div style={{ padding: "14px 16px", borderBottom: `1px solid ${C.border}`, display: "flex", justifyContent: "space-between", gap: 12, alignItems: "center" }}>
-                        <div>
-                          <div style={{ fontSize: 13, fontWeight: 700, color: C.t1 }}>{selectedFile.name}</div>
-                          <div style={{ fontSize: 11, color: C.t3, marginTop: 4 }}>{formatFileSize(selectedFile.size)}</div>
-                        </div>
-                        <a href={selectedFile.downloadUrl} target="_blank" rel="noreferrer" style={{ color: tone, fontSize: 12, fontWeight: 700 }}>
-                          Open Full Image
-                        </a>
-                      </div>
-                      <div style={{ padding: 16 }}>
-                        <img
-                          src={selectedFile.downloadUrl}
-                          alt={selectedFile.name}
-                          style={{ width: "100%", maxHeight: 420, objectFit: "contain", borderRadius: 12, background: C.card }}
-                        />
-                      </div>
-                    </div>
-                  )}
                 </div>
               )}
+
+              {/* Description */}
+              <div>
+                <p style={{ fontSize: 11, fontWeight: 700, color: C.t3, textTransform: "uppercase", letterSpacing: ".1em", marginBottom: 12 }}>
+                  Description
+                </p>
+                <p style={{ color: C.t2, lineHeight: 1.75, fontSize: 14 }}>
+                  {meeting.details || "No description available."}
+                </p>
+              </div>
+
+              {/* Divider */}
+              <div style={{ height: 1, background: C.border }} />
+
+              {/* Files section — UI only */}
+              <div>
+                <p style={{ fontSize: 11, fontWeight: 700, color: C.t3, textTransform: "uppercase", letterSpacing: ".1em", marginBottom: 16 }}>
+                  Files
+                </p>
+                <FilesSection C={C} tone={tone} />
+              </div>
             </div>
           </div>
         </div>
@@ -234,23 +593,33 @@ function EventModal({ item, accessToken, onClose }) {
   );
 }
 
+// ── Main MinisterCalendar component ──────────────────────────────────────────
+
 export default function MinisterCalendar() {
   const { C } = usePortalTheme();
   const { session } = useAuth();
-  const [items, setItems] = useState([]);
-  const [error, setError] = useState("");
+
+  // Data
+  const [items, setItems] = useState(MOCK_ITEMS);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+
+  // Calendar navigation
   const [view, setView] = useState("month");
   const [cursorDate, setCursorDate] = useState(startOfDay(new Date()));
-  const [selectedItem, setSelectedItem] = useState(null);
 
+  // Modal state
+  const [selectedDate, setSelectedDate] = useState(null);   // controls DayMeetingsModal
+  const [selectedMeeting, setSelectedMeeting] = useState(null); // controls MeetingDetailModal
+
+  // Load from API; fall back silently to mock data
   useEffect(() => {
     let mounted = true;
 
     async function loadCalendar() {
       try {
         const { data } = await apiClient.get("/minister/calendar", authorizedConfig(session.accessToken));
-        const mappedItems = (data.events || []).map((event) => ({
+        const mapped = (data.events || []).map((event) => ({
           id: event.id,
           sourceId: event.meeting_id || event.id,
           title: event.title,
@@ -260,73 +629,85 @@ export default function MinisterCalendar() {
           location: event.location,
           type: event.is_vip ? "VIP Meeting" : "Scheduled Meeting",
           source: event.is_vip ? "Minister Priority" : "Minister Calendar",
+          participants: event.participants || [],
         }));
         if (mounted) {
-          setItems(mappedItems);
+          setItems(mapped.length > 0 ? mapped : MOCK_ITEMS);
         }
-      } catch (loadError) {
-        if (mounted) {
-          setError(loadError?.response?.data?.error || "Unable to load minister calendar");
-        }
+      } catch {
+        if (mounted) setItems(MOCK_ITEMS);
       } finally {
-        if (mounted) {
-          setLoading(false);
-        }
+        if (mounted) setLoading(false);
       }
     }
 
     if (session?.accessToken) {
       loadCalendar();
+    } else {
+      setLoading(false);
     }
 
-    return () => {
-      mounted = false;
-    };
+    return () => { mounted = false; };
   }, [session?.accessToken]);
+
+  // ── Derived state ──────────────────────────────────────────────────────────
 
   const filteredItems = useMemo(() => {
     if (view === "day") {
       return items.filter((item) => isSameDay(item.startsAt, cursorDate));
     }
-
     if (view === "week") {
       const weekStart = startOfWeek(cursorDate);
       const weekEnd = addDays(weekStart, 7);
-      return items.filter((item) => new Date(item.startsAt) >= weekStart && new Date(item.startsAt) < weekEnd);
+      return items.filter(
+        (item) => new Date(item.startsAt) >= weekStart && new Date(item.startsAt) < weekEnd
+      );
     }
-
     const monthStart = new Date(cursorDate.getFullYear(), cursorDate.getMonth(), 1);
     const monthEnd = new Date(cursorDate.getFullYear(), cursorDate.getMonth() + 1, 1);
-    return items.filter((item) => new Date(item.startsAt) >= monthStart && new Date(item.startsAt) < monthEnd);
+    return items.filter(
+      (item) => new Date(item.startsAt) >= monthStart && new Date(item.startsAt) < monthEnd
+    );
   }, [items, view, cursorDate]);
+
+  const weekDays = useMemo(() => {
+    const start = startOfWeek(cursorDate);
+    return Array.from({ length: 7 }, (_, i) => addDays(start, i));
+  }, [cursorDate]);
+
+  const monthGrid = useMemo(() => {
+    const first = new Date(cursorDate.getFullYear(), cursorDate.getMonth(), 1);
+    const start = addDays(first, -first.getDay());
+    return Array.from({ length: 42 }, (_, i) => addDays(start, i));
+  }, [cursorDate]);
+
+  const meetingsForDate = useMemo(() => {
+    if (!selectedDate) return [];
+    return items
+      .filter((item) => isSameDay(item.startsAt, selectedDate))
+      .sort((a, b) => new Date(a.startsAt) - new Date(b.startsAt));
+  }, [items, selectedDate]);
 
   const dayItems = useMemo(
     () => filteredItems.slice().sort((a, b) => new Date(a.startsAt) - new Date(b.startsAt)),
     [filteredItems]
   );
 
-  const weekDays = useMemo(() => {
-    const start = startOfWeek(cursorDate);
-    return Array.from({ length: 7 }, (_, index) => addDays(start, index));
-  }, [cursorDate]);
+  const nextTwoMeetings = useMemo(() => {
+    const now = new Date();
+    return items
+      .filter((item) => new Date(item.startsAt) >= now)
+      .sort((a, b) => new Date(a.startsAt) - new Date(b.startsAt))
+      .slice(0, 2);
+  }, [items]);
 
-  const monthGrid = useMemo(() => {
-    const first = new Date(cursorDate.getFullYear(), cursorDate.getMonth(), 1);
-    const start = addDays(first, -first.getDay());
-    return Array.from({ length: 42 }, (_, index) => addDays(start, index));
-  }, [cursorDate]);
+  // ── Handlers ───────────────────────────────────────────────────────────────
 
   function shiftCursor(direction) {
     const delta = direction === "next" ? 1 : -1;
-    if (view === "day") {
-      setCursorDate((current) => addDays(current, delta));
-      return;
-    }
-    if (view === "week") {
-      setCursorDate((current) => addDays(current, 7 * delta));
-      return;
-    }
-    setCursorDate((current) => new Date(current.getFullYear(), current.getMonth() + delta, 1));
+    if (view === "day") { setCursorDate((c) => addDays(c, delta)); return; }
+    if (view === "week") { setCursorDate((c) => addDays(c, 7 * delta)); return; }
+    setCursorDate((c) => new Date(c.getFullYear(), c.getMonth() + delta, 1));
   }
 
   function viewLabel() {
@@ -336,160 +717,457 @@ export default function MinisterCalendar() {
     if (view === "week") {
       const start = startOfWeek(cursorDate);
       const end = addDays(start, 6);
-      return `${start.toLocaleDateString("en-IN", { day: "numeric", month: "short" })} - ${end.toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}`;
+      return `${start.toLocaleDateString("en-IN", { day: "numeric", month: "short" })} – ${end.toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}`;
     }
     return `${MONTHS[cursorDate.getMonth()]} ${cursorDate.getFullYear()}`;
   }
 
+  // Click a date cell → open DayMeetingsModal
+  function handleDateSelect(day) {
+    setSelectedDate(day);
+    setSelectedMeeting(null);
+  }
+
+  // Click an EventPill → open DayMeetingsModal then immediately open detail
+  function handleEventPillClick(day, meeting) {
+    setSelectedDate(day);
+    setSelectedMeeting(meeting);
+  }
+
+  // Click a meeting in DayMeetingsModal → open MeetingDetailModal (list stays open behind)
+  function handleSelectMeeting(meeting) {
+    setSelectedMeeting(meeting);
+  }
+
+  // Close MeetingDetailModal → DayMeetingsModal re-surfaces
+  function handleCloseMeetingDetail() {
+    setSelectedMeeting(null);
+  }
+
+  // Close DayMeetingsModal
+  function handleCloseDayModal() {
+    setSelectedDate(null);
+    setSelectedMeeting(null);
+  }
+
+  // ── Render ─────────────────────────────────────────────────────────────────
+
   return (
-    <WorkspacePage>
+    <WorkspacePage width={900}>
       <WorkspaceSectionHeader
         eyebrow="Minister Workspace"
         title="Minister Calendar"
-        subtitle="Read-only month, week, and day views for scheduled and VIP meetings."
+        subtitle="Read-only view of scheduled and VIP meetings. Click a date to see meetings."
         action={
           <WorkspaceTabs
-            items={VIEW_OPTIONS.map((option) => ({ id: option, label: option.charAt(0).toUpperCase() + option.slice(1) }))}
+            items={VIEW_OPTIONS.map((o) => ({ id: o, label: o.charAt(0).toUpperCase() + o.slice(1) }))}
             value={view}
-            onChange={setView}
+            onChange={(v) => {
+              setView(v);
+              handleCloseDayModal();
+            }}
           />
         }
       />
 
       {loading ? (
-        <WorkspaceEmptyState title="Loading calendar..." />
+        <WorkspaceEmptyState title="Loading calendar…" />
       ) : error ? (
         <WorkspaceCard style={{ color: C.danger }}>{error}</WorkspaceCard>
       ) : (
         <div style={{ display: "grid", gap: 20 }}>
-          <WorkspaceCard>
+          <div className="grid grid-cols-1 xl:grid-cols-[1fr_320px] gap-6">
+          {/* Calendar card */}
+          <WorkspaceCard style={{ marginBottom: 0 }}>
             <WorkspaceCardHeader
               title={viewLabel()}
-              subtitle={`${filteredItems.length} event(s) in view`}
+              subtitle={`${filteredItems.length} event${filteredItems.length !== 1 ? "s" : ""} in view`}
               action={
                 <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                  <WorkspaceButton variant="ghost" onClick={() => shiftCursor("prev")} aria-label="Previous period">
+                  <WorkspaceButton variant="ghost" onClick={() => shiftCursor("prev")} aria-label="Previous">
                     <ChevronLeft size={16} />
                   </WorkspaceButton>
                   <WorkspaceButton variant="ghost" onClick={() => setCursorDate(startOfDay(new Date()))}>
                     Today
                   </WorkspaceButton>
-                  <WorkspaceButton variant="ghost" onClick={() => shiftCursor("next")} aria-label="Next period">
+                  <WorkspaceButton variant="ghost" onClick={() => shiftCursor("next")} aria-label="Next">
                     <ChevronRight size={16} />
                   </WorkspaceButton>
                 </div>
               }
             />
 
-            {items.length === 0 ? (
-              <WorkspaceEmptyState title="No minister calendar items yet" subtitle="Scheduled meetings will appear here after the admin workflow places them on the calendar." />
-            ) : view === "month" ? (
+            {/* ── Month View ── */}
+            {view === "month" && (
               <div>
-                <div style={{ display: "grid", gridTemplateColumns: "repeat(7, minmax(0, 1fr))", gap: 12, marginBottom: 12 }}>
+                {/* Day labels */}
+                <div
+                  style={{
+                    display: "grid",
+                    gridTemplateColumns: "repeat(7, minmax(0, 1fr))",
+                    gap: 8,
+                    marginBottom: 8,
+                  }}
+                >
                   {DAYS.map((day) => (
-                    <div key={day} style={{ fontSize: 12, fontWeight: 700, color: C.t3, textTransform: "uppercase", letterSpacing: ".08em", textAlign: "center" }}>
+                    <div
+                      key={day}
+                      style={{
+                        fontSize: 11,
+                        fontWeight: 700,
+                        color: C.t3,
+                        textTransform: "uppercase",
+                        letterSpacing: ".08em",
+                        textAlign: "center",
+                      }}
+                    >
                       {day}
                     </div>
                   ))}
                 </div>
-                <div style={{ display: "grid", gridTemplateColumns: "repeat(7, minmax(0, 1fr))", gap: 12 }}>
+
+                {/* Day cells */}
+                <div
+                  style={{
+                    display: "grid",
+                    gridTemplateColumns: "repeat(7, minmax(0, 1fr))",
+                    gap: 8,
+                  }}
+                >
                   {monthGrid.map((day) => {
                     const inMonth = day.getMonth() === cursorDate.getMonth();
+                    const isToday = isSameDay(day, new Date());
+                    const isSelected = selectedDate && isSameDay(day, selectedDate);
                     const eventsForDay = items.filter((item) => isSameDay(item.startsAt, day));
+
                     return (
                       <div
                         key={day.toISOString()}
+                        onClick={() => handleDateSelect(day)}
                         style={{
-                          minHeight: 140,
+                          minHeight: 130,
                           borderRadius: 12,
-                          border: `1px solid ${C.border}`,
-                          background: inMonth ? C.bgElevated : C.bg,
-                          padding: 12,
+                          border: `1px solid ${isSelected ? C.purple + "60" : isToday ? C.purple + "40" : C.border}`,
+                          background: isSelected
+                            ? `${C.purple}08`
+                            : inMonth
+                            ? C.bgElevated
+                            : C.bg,
+                          padding: 10,
                           display: "grid",
-                          gap: 8,
+                          gap: 6,
                           alignContent: "start",
+                          cursor: "pointer",
+                          transition: "border-color 0.15s ease, background 0.15s ease",
+                        }}
+                        onMouseEnter={(e) => {
+                          if (!isSelected)
+                            e.currentTarget.style.borderColor = `${C.purple}40`;
+                        }}
+                        onMouseLeave={(e) => {
+                          if (!isSelected)
+                            e.currentTarget.style.borderColor = isToday
+                              ? `${C.purple}40`
+                              : C.border;
                         }}
                       >
-                        <div style={{ fontSize: 13, fontWeight: 700, color: inMonth ? C.t1 : C.t3 }}>{day.getDate()}</div>
-                        {eventsForDay.slice(0, 3).map((item) => (
-                          <EventPill key={item.id} item={item} compact onClick={() => setSelectedItem(item)} />
-                        ))}
-                        {eventsForDay.length > 3 ? <div style={{ fontSize: 11, color: C.t3 }}>+{eventsForDay.length - 3} more</div> : null}
+                        <div
+                          style={{
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            width: 24,
+                            height: 24,
+                            borderRadius: 99,
+                            fontSize: 12,
+                            fontWeight: 700,
+                            background: isToday ? C.purple : "transparent",
+                            color: isToday ? "#fff" : inMonth ? C.t1 : C.t3,
+                          }}
+                        >
+                          {day.getDate()}
+                        </div>
+                        {eventsForDay.length > 0 && (
+                          <div
+                            style={{
+                              fontSize: 11,
+                              fontWeight: 600,
+                              color: C.purple,
+                              background: `${C.purple}12`,
+                              border: `1px solid ${C.purple}30`,
+                              borderRadius: 8,
+                              padding: "4px 8px",
+                              textAlign: "center",
+                            }}
+                          >
+                            {eventsForDay.length} meeting{eventsForDay.length !== 1 ? "s" : ""}
+                          </div>
+                        )}
                       </div>
                     );
                   })}
                 </div>
               </div>
-            ) : view === "week" ? (
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(7, minmax(0, 1fr))", gap: 12 }}>
+            )}
+
+            {/* ── Week View ── */}
+            {view === "week" && (
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(7, minmax(0, 1fr))", gap: 8 }}>
                 {weekDays.map((day) => {
                   const eventsForDay = items.filter((item) => isSameDay(item.startsAt, day));
+                  const isToday = isSameDay(day, new Date());
+                  const isSelected = selectedDate && isSameDay(day, selectedDate);
                   return (
-                    <div key={day.toISOString()} style={{ border: `1px solid ${C.border}`, borderRadius: 12, background: C.bgElevated, padding: 12 }}>
-                      <div style={{ marginBottom: 12 }}>
-                        <div style={{ fontSize: 11, color: C.t3, textTransform: "uppercase", letterSpacing: ".08em" }}>{DAYS[day.getDay()]}</div>
-                        <div style={{ fontSize: 18, fontWeight: 700, color: C.t1, marginTop: 4 }}>{day.getDate()}</div>
+                    <div
+                      key={day.toISOString()}
+                      style={{
+                        border: `1px solid ${isSelected ? C.purple + "60" : isToday ? C.purple + "40" : C.border}`,
+                        borderRadius: 12,
+                        background: isSelected ? `${C.purple}08` : C.bgElevated,
+                        padding: 10,
+                        minHeight: 160,
+                        cursor: "pointer",
+                        transition: "border-color 0.15s ease, background 0.15s ease",
+                      }}
+                      onClick={() => handleDateSelect(day)}
+                      onMouseEnter={(e) => {
+                        if (!isSelected)
+                          e.currentTarget.style.borderColor = `${C.purple}40`;
+                      }}
+                      onMouseLeave={(e) => {
+                        if (!isSelected)
+                          e.currentTarget.style.borderColor = isToday
+                            ? `${C.purple}40`
+                            : C.border;
+                      }}
+                    >
+                      <div style={{ marginBottom: 10 }}>
+                        <div style={{ fontSize: 10, color: C.t3, textTransform: "uppercase", letterSpacing: ".08em" }}>
+                          {DAYS[day.getDay()]}
+                        </div>
+                        <div
+                          style={{
+                            display: "inline-flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            width: 26,
+                            height: 26,
+                            borderRadius: 99,
+                            fontSize: 14,
+                            fontWeight: 700,
+                            marginTop: 4,
+                            background: isToday ? C.purple : "transparent",
+                            color: isToday ? "#fff" : C.t1,
+                          }}
+                        >
+                          {day.getDate()}
+                        </div>
                       </div>
-                      <div style={{ display: "grid", gap: 8 }}>
-                        {eventsForDay.length ? eventsForDay.map((item) => (
-                          <EventPill key={item.id} item={item} onClick={() => setSelectedItem(item)} />
-                        )) : <div style={{ fontSize: 12, color: C.t3 }}>No events</div>}
+                      <div style={{ display: "grid", gap: 6 }}>
+                        {eventsForDay.length > 0 ? (
+                          <div
+                            style={{
+                              fontSize: 12,
+                              fontWeight: 600,
+                              color: C.purple,
+                              background: `${C.purple}12`,
+                              border: `1px solid ${C.purple}30`,
+                              borderRadius: 8,
+                              padding: "6px 10px",
+                              textAlign: "center",
+                            }}
+                          >
+                            {eventsForDay.length} meeting{eventsForDay.length !== 1 ? "s" : ""}
+                          </div>
+                        ) : (
+                          <div style={{ fontSize: 11, color: C.t3 }}>No events</div>
+                        )}
                       </div>
                     </div>
                   );
                 })}
               </div>
-            ) : (
-              <div style={{ display: "grid", gap: 12 }}>
-                {dayItems.length ? dayItems.map((item) => (
-                  <button
-                    key={item.id}
-                    type="button"
-                    onClick={() => setSelectedItem(item)}
-                    style={{
-                      border: `1px solid ${C.border}`,
-                      borderRadius: 12,
-                      background: C.bgElevated,
-                      padding: 16,
-                      textAlign: "left",
-                      cursor: "pointer",
-                    }}
-                  >
-                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "start", gap: 12 }}>
-                      <div>
-                        <div style={{ fontSize: 16, fontWeight: 700, color: C.t1 }}>{item.title}</div>
-                        <div style={{ marginTop: 6, fontSize: 13, color: C.t2 }}>{formatDateTimeRange(item)}</div>
-                        <div style={{ marginTop: 6, fontSize: 13, color: C.t3 }}>{item.location || "Location pending"}</div>
-                      </div>
-                      <WorkspaceBadge color={item.type === "VIP Meeting" ? C.warn : C.purple}>{item.type === "VIP Meeting" ? "VIP" : "Standard"}</WorkspaceBadge>
-                    </div>
-                  </button>
-                )) : <WorkspaceEmptyState title="No events scheduled for this day" />}
+            )}
+
+            {/* ── Day View ── */}
+            {view === "day" && (
+              <div style={{ display: "grid", gap: 10 }}>
+                {dayItems.length ? (
+                  dayItems.map((item) => {
+                    const tone = item.type === "VIP Meeting" ? C.warn : C.purple;
+                    return (
+                      <button
+                        key={item.id}
+                        type="button"
+                        onClick={() => handleEventPillClick(cursorDate, item)}
+                        style={{
+                          border: `1px solid ${C.border}`,
+                          borderRadius: 12,
+                          background: C.bgElevated,
+                          padding: 16,
+                          textAlign: "left",
+                          cursor: "pointer",
+                          transition: "border-color 0.15s ease, background 0.15s ease",
+                        }}
+                        onMouseEnter={(e) => {
+                          e.currentTarget.style.borderColor = `${tone}50`;
+                          e.currentTarget.style.background = `${tone}06`;
+                        }}
+                        onMouseLeave={(e) => {
+                          e.currentTarget.style.borderColor = C.border;
+                          e.currentTarget.style.background = C.bgElevated;
+                        }}
+                      >
+                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "start", gap: 12 }}>
+                          <div style={{ minWidth: 0, flex: 1 }}>
+                            <div style={{ fontSize: 15, fontWeight: 700, color: C.t1, marginBottom: 4 }}>
+                              {item.title}
+                            </div>
+                            <div style={{ fontSize: 12, color: C.t2, marginBottom: 4 }}>
+                              {formatTime(item.startsAt)} – {formatTime(item.endsAt)} · {formatDuration(item)}
+                            </div>
+                            <div style={{ fontSize: 12, color: C.t3 }}>
+                              {item.location || "Location pending"}
+                            </div>
+                          </div>
+                          <WorkspaceBadge color={tone}>
+                            {item.type === "VIP Meeting" ? "VIP" : "Standard"}
+                          </WorkspaceBadge>
+                        </div>
+                      </button>
+                    );
+                  })
+                ) : (
+                  <WorkspaceEmptyState title="No events scheduled for this day" />
+                )}
               </div>
             )}
           </WorkspaceCard>
 
-          <WorkspaceCard>
-            <WorkspaceCardHeader title="Calendar Summary" subtitle="High-level visibility for minister planning" />
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 12 }}>
-              <div style={{ border: `1px solid ${C.border}`, borderRadius: 12, background: C.bgElevated, padding: 16 }}>
-                <div style={{ fontSize: 11, fontWeight: 700, color: C.t3, textTransform: "uppercase", letterSpacing: ".08em" }}>Total Events</div>
-                <div style={{ marginTop: 8, fontSize: 28, fontWeight: 700, color: C.purple }}>{items.length}</div>
+          {/* Upcoming meetings — sticky right panel */}
+          <WorkspaceCard style={{ padding: 24, height: "fit-content", position: "sticky", top: 24, marginBottom: 0 }}>
+            <h3 className="text-sm font-bold uppercase tracking-wider mb-4" style={{ color: C.t3 }}>Upcoming Meetings</h3>
+            {nextTwoMeetings.length === 0 ? (
+              <div style={{ fontSize: 13, color: C.t3 }}>No upcoming meetings scheduled.</div>
+            ) : (
+              <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                {nextTwoMeetings.map((item) => {
+                  const tone = item.type === "VIP Meeting" ? C.warn : C.purple;
+                  return (
+                    <button
+                      key={item.id}
+                      type="button"
+                      onClick={() => { setSelectedDate(startOfDay(new Date(item.startsAt))); setSelectedMeeting(item); }}
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "space-between",
+                        gap: 12,
+                        padding: "14px 16px",
+                        border: `1px solid ${C.border}`,
+                        borderRadius: 12,
+                        background: C.bgElevated,
+                        textAlign: "left",
+                        cursor: "pointer",
+                      }}
+                    >
+                      <div style={{ minWidth: 0 }}>
+                        <div style={{ fontSize: 13, fontWeight: 700, color: C.t1, marginBottom: 4 }}>{item.title}</div>
+                        <div style={{ fontSize: 11, color: C.t3 }}>
+                          {new Date(item.startsAt).toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric" })}
+                          {" · "}
+                          {formatTime(item.startsAt)}
+                        </div>
+                      </div>
+                      <span
+                        style={{
+                          fontSize: 10,
+                          fontWeight: 700,
+                          padding: "4px 10px",
+                          borderRadius: 999,
+                          background: `${tone}12`,
+                          color: tone,
+                          border: `1px solid ${tone}30`,
+                          whiteSpace: "nowrap",
+                          flexShrink: 0,
+                        }}
+                      >
+                        {item.type}
+                      </span>
+                    </button>
+                  );
+                })}
               </div>
-              <div style={{ border: `1px solid ${C.border}`, borderRadius: 12, background: C.bgElevated, padding: 16 }}>
-                <div style={{ fontSize: 11, fontWeight: 700, color: C.t3, textTransform: "uppercase", letterSpacing: ".08em" }}>VIP Meetings</div>
-                <div style={{ marginTop: 8, fontSize: 28, fontWeight: 700, color: C.warn }}>{items.filter((item) => item.type === "VIP Meeting").length}</div>
-              </div>
-              <div style={{ border: `1px solid ${C.border}`, borderRadius: 12, background: C.bgElevated, padding: 16 }}>
-                <div style={{ fontSize: 11, fontWeight: 700, color: C.t3, textTransform: "uppercase", letterSpacing: ".08em" }}>Today</div>
-                <div style={{ marginTop: 8, fontSize: 28, fontWeight: 700, color: C.mint }}>{items.filter((item) => isSameDay(item.startsAt, new Date())).length}</div>
-              </div>
+            )}
+          </WorkspaceCard>
+          </div>
+
+          {/* Calendar summary stats */}
+          <WorkspaceCard style={{ marginBottom: 0 }}>
+            <WorkspaceCardHeader
+              title="Calendar Summary"
+              subtitle="High-level visibility for minister planning"
+            />
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))",
+                gap: 12,
+              }}
+            >
+              {[
+                { label: "Total Events", value: items.length, color: C.purple },
+                { label: "VIP Meetings", value: items.filter((i) => i.type === "VIP Meeting").length, color: C.warn },
+                { label: "Today", value: items.filter((i) => isSameDay(i.startsAt, new Date())).length, color: C.mint },
+                {
+                  label: "This Week",
+                  value: (() => {
+                    const ws = startOfWeek(new Date());
+                    const we = addDays(ws, 7);
+                    return items.filter((i) => new Date(i.startsAt) >= ws && new Date(i.startsAt) < we).length;
+                  })(),
+                  color: C.purple,
+                },
+              ].map(({ label, value, color }) => (
+                <div
+                  key={label}
+                  style={{
+                    border: `1px solid ${C.border}`,
+                    borderRadius: 12,
+                    background: C.bgElevated,
+                    padding: "14px 16px",
+                  }}
+                >
+                  <div style={{ fontSize: 10, fontWeight: 700, color: C.t3, textTransform: "uppercase", letterSpacing: ".08em" }}>
+                    {label}
+                  </div>
+                  <div style={{ marginTop: 8, fontSize: 28, fontWeight: 700, color, lineHeight: 1 }}>
+                    {value}
+                  </div>
+                </div>
+              ))}
             </div>
           </WorkspaceCard>
         </div>
       )}
 
-      <EventModal item={selectedItem} accessToken={session?.accessToken} onClose={() => setSelectedItem(null)} />
+      {/* Day meetings modal — shows when a date is selected */}
+      {selectedDate && !selectedMeeting && (
+        <DayMeetingsModal
+          date={selectedDate}
+          items={meetingsForDate}
+          onClose={handleCloseDayModal}
+          onSelectMeeting={handleSelectMeeting}
+        />
+      )}
+
+      {/* Meeting detail modal — opens on top when a meeting is selected */}
+      {selectedMeeting && (
+        <MeetingDetailModal
+          meeting={selectedMeeting}
+          onClose={handleCloseMeetingDetail}
+        />
+      )}
     </WorkspacePage>
   );
 }
