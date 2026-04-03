@@ -363,6 +363,9 @@ async function scheduleMeeting(meetingId, adminId, body, reqMeta) {
     throw createHttpError(404, 'Meeting not found');
   }
   assertMeetingAdminAccess(meeting, adminId, { actionLabel: meeting.status === 'scheduled' ? 'reschedule this meeting' : 'schedule this meeting' });
+  if (meeting.status === 'verification_pending') {
+    throw createHttpError(409, 'After verification by DEO only you can schedule meeting');
+  }
   const minister = await adminRepository.findActiveMinisterById(body.ministerId);
   if (!minister) {
     throw createHttpError(404, 'Minister not found');

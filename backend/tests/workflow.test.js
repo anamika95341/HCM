@@ -70,6 +70,34 @@ describe('workflow integrity', () => {
     expect(meetingsRepository.updateMeetingStatus).not.toHaveBeenCalled();
   });
 
+  test('rejects scheduling a meeting while it is pending DEO verification', async () => {
+    meetingsRepository.getMeetingById.mockResolvedValue({
+      id: 'meeting-2',
+      citizen_id: 'citizen-1',
+      status: 'verification_pending',
+      assignedAdminUserId: 'admin-1',
+    });
+
+    await expect(
+      meetingsService.scheduleMeeting(
+        'meeting-2',
+        'admin-1',
+        {
+          ministerId: 'minister-1',
+          startsAt: '2026-04-10T10:00:00.000Z',
+          endsAt: '2026-04-10T11:00:00.000Z',
+          location: 'Secretariat',
+          isVip: false,
+          comments: '',
+        },
+        { ip: '127.0.0.1', userAgent: 'jest' }
+      )
+    ).rejects.toMatchObject({ statusCode: 409, message: 'After verification by DEO only you can schedule meeting' });
+
+    expect(meetingsRepository.createCalendarEvent).not.toHaveBeenCalled();
+    expect(meetingsRepository.updateMeetingStatus).not.toHaveBeenCalled();
+  });
+
   test('rejects complaint workflow actions from an admin who does not own the complaint', async () => {
     complaintsRepository.getComplaintById.mockResolvedValue({
       id: 'complaint-1',

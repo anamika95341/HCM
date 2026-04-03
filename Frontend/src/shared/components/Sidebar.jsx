@@ -39,7 +39,7 @@ function Sidebar({ collapsed, onToggle }) {
         admin: [
             { to: PATHS.admin.workQueue, icon: FiClipboard, label: "Work Queue" },
             { to: PATHS.admin.meetings, icon: RiTeamLine, label: "Meeting Queue" },
-            { to: PATHS.admin.complaints, icon: LuBox, label: "Complaint Queue" },
+            { to: PATHS.admin.complaintQueue, icon: FiClipboard, label: "Complaint Queue" },
             { to: PATHS.admin.calendar, icon: FiCalendar, label: "Calendar" },
             { to: PATHS.settings, icon: BsFillGearFill, label: "Settings" },
         ],

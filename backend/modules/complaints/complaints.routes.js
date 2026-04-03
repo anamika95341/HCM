@@ -7,10 +7,10 @@ const complaintsController = require('./complaints.controller');
 const { complaintSchema } = require('../../validators/citizen.validator');
 const {
   assignComplaintSchema,
-  complaintCallOutcomeSchema,
   complaintCloseSchema,
   complaintDepartmentSchema,
   complaintEscalateSchema,
+  complaintLogSchema,
   complaintResolveSchema,
   complaintReopenSchema,
   complaintScheduleCallSchema,
@@ -28,7 +28,7 @@ router.patch('/:complaintId/reassign', authenticate('admin'), authorize('admin')
 router.patch('/:complaintId/start-review', authenticate('admin'), authorize('admin'), validateRequest(assignComplaintSchema), complaintsController.startComplaintReview);
 router.patch('/:complaintId/department', authenticate('admin'), authorize('admin'), validateRequest(complaintDepartmentSchema), complaintsController.updateComplaintDepartment);
 router.patch('/:complaintId/schedule-call', authenticate('admin'), authorize('admin'), validateRequest(complaintScheduleCallSchema), complaintsController.scheduleComplaintCall);
-router.patch('/:complaintId/log-call', authenticate('admin'), authorize('admin'), validateRequest(complaintCallOutcomeSchema), complaintsController.logComplaintCallOutcome);
+router.patch('/:complaintId/log', authenticate('admin'), authorize('admin'), validateRequest(complaintLogSchema), complaintsController.logComplaintAction);
 router.patch('/:complaintId/resolve', authenticate('admin'), authorize('admin'), validateRequest(complaintResolveSchema), complaintsController.resolveComplaint);
 router.patch('/:complaintId/escalate', authenticate('admin'), authorize('admin'), validateRequest(complaintEscalateSchema), complaintsController.escalateComplaintToMeeting);
 router.patch('/:complaintId/reopen', authenticate('admin'), authorize('admin'), validateRequest(complaintReopenSchema), complaintsController.reopenComplaint);

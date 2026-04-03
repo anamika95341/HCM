@@ -294,6 +294,7 @@ CREATE TABLE IF NOT EXISTS complaints (
   description TEXT NOT NULL,
   complaint_location TEXT,
   complaint_type VARCHAR(120),
+  incident_date DATE,
   department VARCHAR(150),
   officer_name VARCHAR(150),
   officer_contact VARCHAR(255),
@@ -308,6 +309,9 @@ CREATE TABLE IF NOT EXISTS complaints (
   status_reason TEXT,
   reopened_count INTEGER NOT NULL DEFAULT 0,
   related_meeting_id UUID REFERENCES meetings(id) ON DELETE SET NULL,
+  handoff_type VARCHAR(32),
+  handoff_by_admin_id UUID REFERENCES admins(id) ON DELETE SET NULL,
+  handoff_to_admin_id UUID REFERENCES admins(id) ON DELETE SET NULL,
   closed_at TIMESTAMPTZ,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
@@ -328,6 +332,7 @@ CREATE INDEX IF NOT EXISTS idx_complaints_citizen_id ON complaints (citizen_id, 
 CREATE INDEX IF NOT EXISTS idx_complaints_status ON complaints (status, assigned_admin_id, created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_complaints_complaint_id ON complaints (complaint_id);
 CREATE INDEX IF NOT EXISTS idx_complaints_related_meeting ON complaints (related_meeting_id);
+CREATE INDEX IF NOT EXISTS idx_complaints_handoff_tracking ON complaints (handoff_type, handoff_by_admin_id, handoff_to_admin_id, updated_at DESC);
 
 ALTER TABLE meetings
   ADD CONSTRAINT meetings_linked_complaint_fk

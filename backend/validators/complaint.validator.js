@@ -20,7 +20,7 @@ const assignComplaintSchema = z.object({});
 
 const reassignComplaintSchema = z.object({
   adminId: z.string().uuid(),
-  reason: z.string().min(3).max(2000),
+  reason: z.string().trim().min(4).max(500),
 });
 
 const complaintDepartmentSchema = z.object({
@@ -34,19 +34,23 @@ const complaintScheduleCallSchema = z.object({
   callScheduledAt: z.string().datetime(),
 });
 
-const complaintCallOutcomeSchema = z.object({
-  callOutcome: z.string().min(5).max(3000),
+const complaintLogSchema = z.object({
+  logType: z.enum(['phone_call', 'mail', 'letter_summary']),
+  summary: z.string().trim().max(3000).optional().or(z.literal('')),
 });
 
 const complaintResolveSchema = z.object({
-  resolutionSummary: z.string().min(10).max(5000),
+  resolutionSummary: z.string().trim().min(10).refine((value) => {
+    const wordCount = value.split(/\s+/).filter(Boolean).length;
+    return wordCount <= 1000;
+  }, 'Resolution summary must be 1000 words or less'),
   resolutionDocs: z.array(z.object({
     name: z.string().min(1).max(255),
   })).max(10).default([]),
 });
 
 const complaintEscalateSchema = z.object({
-  purpose: z.string().min(10).max(3000),
+  reason: z.string().trim().min(4).max(500),
 });
 
 const complaintReopenSchema = z.object({
@@ -63,7 +67,7 @@ module.exports = {
   reassignComplaintSchema,
   complaintDepartmentSchema,
   complaintScheduleCallSchema,
-  complaintCallOutcomeSchema,
+  complaintLogSchema,
   complaintResolveSchema,
   complaintEscalateSchema,
   complaintReopenSchema,

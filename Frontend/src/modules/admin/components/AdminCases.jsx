@@ -46,6 +46,8 @@ function complaintRow(item) {
     createdAt: item.createdAt || item.created_at,
     status: item.status,
     statusLabel: item.statusLabel || humanizeStatus(item.status),
+    handoffType: item.handoffType || "",
+    handoffByAdminUserId: item.handoffByAdminUserId || null,
     route: `/admin/cases/${item.id}`,
   };
 }
@@ -125,7 +127,7 @@ export default function AdminCases() {
     ...meetings.filter((item) => item.assignedAdminUserId === session?.user?.id && !isResolvedMeeting(item.status)).map(meetingRow),
   ];
   const resolved  = [...complaints.filter((item) => isResolvedComplaint(item.status)).map(complaintRow), ...meetings.filter((item) => isResolvedMeeting(item.status)).map(meetingRow)];
-  const escalated = complaints.filter((item) => item.status === "escalated_to_meeting").map(complaintRow);
+  const escalated = complaints.filter((item) => item.handoffByAdminUserId === session?.user?.id && ["escalated", "reassigned"].includes(item.handoffType) && !isResolvedComplaint(item.status)).map(complaintRow);
 
   const sections = { complaintPool, meetingPool, myCases, resolved, escalated };
 
@@ -148,7 +150,7 @@ export default function AdminCases() {
     { id: "meetingPool",   label: "Meeting Pool",         count: meetingPool.length   },
     { id: "myCases",       label: "My Cases",             count: myCases.length       },
     { id: "resolved",      label: "Resolved / Completed", count: resolved.length      },
-    { id: "escalated",     label: "Escalated Requests",   count: escalated.length     },
+    { id: "escalated",     label: "Escalated / Reassigned Requests", count: escalated.length },
   ];
 
   useEffect(() => {

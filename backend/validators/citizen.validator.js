@@ -65,6 +65,7 @@ const complaintSchema = z.object({
   description: z.string().min(10).max(5000),
   complaintLocation: z.string().max(500).optional().or(z.literal('')),
   complaintType: z.string().max(120).optional().or(z.literal('')),
+  incidentDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
 });
 
 const meetingRequestSchema = z.object({

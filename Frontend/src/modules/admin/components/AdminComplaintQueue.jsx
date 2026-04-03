@@ -12,7 +12,6 @@ import {
   WorkspaceInput,
   WorkspacePage,
   WorkspaceSectionHeader,
-  WorkspaceSelect,
   WorkspaceStatGrid,
 } from "../../../shared/components/WorkspaceUI.jsx";
 import { usePortalTheme } from "../../../shared/theme/portalTheme.jsx";
@@ -25,10 +24,6 @@ function statusLabel(status) {
     .join(" ");
 }
 
-function isActiveComplaint(complaint) {
-  return !["resolved", "completed", "closed", "escalated_to_meeting"].includes(complaint.status);
-}
-
 export default function AdminComplaintQueue() {
   const { C } = usePortalTheme();
   const navigate = useNavigate();
@@ -39,13 +34,14 @@ export default function AdminComplaintQueue() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [query, setQuery] = useState("");
-  const [statusFilter, setStatusFilter] = useState("all");
 
   useEffect(() => {
     let active = true;
 
     async function loadComplaintQueue() {
-      if (!session?.accessToken) return;
+      if (!session?.accessToken) {
+        return;
+      }
       try {
         setLoading(true);
         setError("");
@@ -70,55 +66,50 @@ export default function AdminComplaintQueue() {
   }, [session?.accessToken]);
 
   const personalComplaintQueue = useMemo(
-    () => complaints.filter((complaint) => complaint.assignedAdminUserId === adminId && isActiveComplaint(complaint)),
+    () => complaints.filter(
+      (complaint) => complaint.assignedAdminUserId === adminId && !["completed", "closed", "resolved", "escalated_to_meeting"].includes(complaint.status)
+    ),
     [adminId, complaints]
   );
 
   const filteredComplaintQueue = useMemo(() => {
     const q = query.trim().toLowerCase();
     return personalComplaintQueue.filter((complaint) => {
-      if (statusFilter !== "all" && complaint.status !== statusFilter) return false;
       if (!q) return true;
       return [
         complaint.complaintId,
         complaint.title,
-        complaint.subject,
         complaint.description,
         complaint.citizenSnapshot?.name,
         complaint.citizenSnapshot?.citizenId,
         complaint.citizenSnapshot?.phoneNumbers?.[0],
-        complaint.citizenSnapshot?.email,
-        complaint.department,
+        complaint.complaintLocation,
+        complaint.complaintType,
       ]
         .filter(Boolean)
         .join(" ")
         .toLowerCase()
         .includes(q);
     });
-  }, [personalComplaintQueue, query, statusFilter]);
+  }, [personalComplaintQueue, query]);
 
   const queueStats = useMemo(() => {
     const inReview = personalComplaintQueue.filter((complaint) => complaint.status === "in_review").length;
-    const callsScheduled = personalComplaintQueue.filter((complaint) => complaint.status === "call_scheduled").length;
+    const followup = personalComplaintQueue.filter((complaint) => complaint.status === "followup_in_progress").length;
     return [
       { label: "My Complaint Queue", value: personalComplaintQueue.length },
       { label: "In Review", value: inReview },
-      { label: "Calls Scheduled", value: callsScheduled },
+      { label: "Follow Up", value: followup },
     ];
   }, [personalComplaintQueue]);
 
-  const statusOptions = useMemo(
-    () => Array.from(new Set(personalComplaintQueue.map((complaint) => complaint.status).filter(Boolean))).sort(),
-    [personalComplaintQueue]
-  );
-
   return (
-    <WorkspacePage width={1280}>
+    <WorkspacePage width={1280} contentStyle={{ paddingLeft: 12, paddingRight: 12 }}>
       <div style={{ maxWidth: "1150px", margin: "0 auto", width: "100%" }}>
         <WorkspaceSectionHeader
           eyebrow="Admin Workspace"
           title="Complaint Queue"
-          subtitle="Complaints assigned to you appear here with the same detail workflow used in My Cases."
+          subtitle="Complaints assigned to you appear here for review and resolution actions."
         />
 
         <div style={{ display: "grid", gap: 24 }}>
@@ -126,28 +117,18 @@ export default function AdminComplaintQueue() {
 
           <WorkspaceCard>
             <WorkspaceCardHeader
-              title="Complaint Queue Filters"
-              subtitle="Search and filter the complaints currently assigned to you."
+              title="Complaint Queue Search"
+              subtitle="Search the complaints currently assigned to you."
             />
-            <div style={{ display: "grid", gridTemplateColumns: "minmax(0, 1.6fr) minmax(220px, 0.8fr)", gap: 16 }}>
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2" size={18} style={{ color: C.t3 }} />
-                <WorkspaceInput
-                  type="text"
-                  value={query}
-                  onChange={(event) => setQuery(event.target.value)}
-                  placeholder="Search by complaint ID, title, citizen, contact, or department..."
-                  style={{ paddingLeft: 40 }}
-                />
-              </div>
-              <WorkspaceSelect value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)}>
-                <option value="all">All statuses</option>
-                {statusOptions.map((status) => (
-                  <option key={status} value={status}>
-                    {statusLabel(status)}
-                  </option>
-                ))}
-              </WorkspaceSelect>
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2" size={18} style={{ color: C.t3 }} />
+              <WorkspaceInput
+                type="text"
+                value={query}
+                onChange={(event) => setQuery(event.target.value)}
+                placeholder="Search by complaint ID, title, citizen, category, or location..."
+                style={{ paddingLeft: 40 }}
+              />
             </div>
           </WorkspaceCard>
 
@@ -156,20 +137,20 @@ export default function AdminComplaintQueue() {
           ) : error ? (
             <WorkspaceCard style={{ color: C.danger }}>{error}</WorkspaceCard>
           ) : filteredComplaintQueue.length === 0 ? (
-            <WorkspaceEmptyState title="No assigned complaints found" subtitle="Complaints you assign to yourself from My Cases or Work Queue will appear here." />
+            <WorkspaceEmptyState title="No assigned complaints found" subtitle="Complaints you assign to yourself will appear here." />
           ) : (
             <WorkspaceCard style={{ padding: 0, overflow: "hidden" }}>
               <div
                 style={{
                   display: "grid",
-                  gridTemplateColumns: "1.1fr 1.8fr 1.2fr 1.4fr 1.2fr auto 72px",
+                  gridTemplateColumns: "1.1fr 1.7fr 1.2fr 1.3fr 1.4fr auto 72px",
                   gap: 16,
                   padding: "12px 20px",
                   background: C.bgElevated,
                   borderBottom: `1px solid ${C.border}`,
                 }}
               >
-                {["Complaint ID", "Title", "Citizen", "Contact", "Department", "Status", "Action"].map((column) => (
+                {["Complaint ID", "Complaint Title", "Citizen", "Category", "Location / Date", "Status", "Action"].map((column) => (
                   <div
                     key={column}
                     style={{ fontSize: 10, fontWeight: 700, color: C.t3, textTransform: "uppercase", letterSpacing: ".08em", textAlign: column === "Status" || column === "Action" ? "center" : "left" }}
@@ -184,7 +165,7 @@ export default function AdminComplaintQueue() {
                   key={complaint.id}
                   style={{
                     display: "grid",
-                    gridTemplateColumns: "1.1fr 1.8fr 1.2fr 1.4fr 1.2fr auto 72px",
+                    gridTemplateColumns: "1.1fr 1.7fr 1.2fr 1.3fr 1.4fr auto 72px",
                     gap: 16,
                     padding: "14px 20px",
                     alignItems: "center",
@@ -195,7 +176,7 @@ export default function AdminComplaintQueue() {
                   <div style={{ fontSize: 13, fontWeight: 600, color: C.purple }}>{complaint.complaintId || complaint.id}</div>
                   <div style={{ minWidth: 0 }}>
                     <div style={{ fontSize: 14, fontWeight: 700, color: C.t1, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-                      {complaint.title || complaint.subject || "Untitled Complaint"}
+                      {complaint.title || "Untitled Complaint"}
                     </div>
                     <div style={{ fontSize: 12, color: C.t3, marginTop: 4, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
                       {complaint.description}
@@ -205,9 +186,14 @@ export default function AdminComplaintQueue() {
                     {complaint.citizenSnapshot?.name || "Unknown Citizen"}
                   </div>
                   <div style={{ fontSize: 13, color: C.t2 }}>
-                    {complaint.citizenSnapshot?.phoneNumbers?.[0] || complaint.citizenSnapshot?.email || "No contact"}
+                    {complaint.complaintType || "Not provided"}
                   </div>
-                  <div style={{ fontSize: 13, color: C.t2 }}>{complaint.department || "Pending"}</div>
+                  <div style={{ fontSize: 13, color: C.t2 }}>
+                    <div>{complaint.complaintLocation || "Not provided"}</div>
+                    <div style={{ fontSize: 12, color: C.t3, marginTop: 4 }}>
+                      {complaint.incidentDate ? new Date(complaint.incidentDate).toLocaleDateString("en-IN") : "Date not provided"}
+                    </div>
+                  </div>
                   <div style={{ textAlign: "center" }}>
                     <WorkspaceBadge status={complaint.status}>{statusLabel(complaint.status)}</WorkspaceBadge>
                   </div>
@@ -215,7 +201,7 @@ export default function AdminComplaintQueue() {
                     <button
                       type="button"
                       onClick={() => navigate(`${PATHS.admin.cases}/${complaint.id}?source=complaint-queue`)}
-                      title="Open complaint"
+                      title="View details"
                       style={{
                         color: C.purple,
                         background: `${C.purple}10`,

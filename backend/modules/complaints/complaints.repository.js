@@ -12,6 +12,7 @@ const complaintSelect = `
     c.description,
     c.complaint_location,
     c.complaint_type,
+    c.incident_date,
     c.department,
     c.officer_name,
     c.officer_contact,
@@ -25,6 +26,9 @@ const complaintSelect = `
     c.resolution_document_names,
     c.reopened_count,
     c.related_meeting_id,
+    c.handoff_type,
+    c.handoff_by_admin_id,
+    c.handoff_to_admin_id,
     c.created_at,
     c.updated_at,
     citizen.first_name AS citizen_first_name,
@@ -54,6 +58,7 @@ function mapComplaint(row) {
     details: row.description,
     complaintLocation: row.complaint_location,
     complaintType: row.complaint_type,
+    incidentDate: row.incident_date,
     department: row.department,
     officerName: row.officer_name,
     officerContact: row.officer_contact,
@@ -73,6 +78,9 @@ function mapComplaint(row) {
       ? row.resolution_document_names.map((name) => ({ name }))
       : [],
     reopenedCount: row.reopened_count || 0,
+    handoffType: row.handoff_type || "",
+    handoffByAdminUserId: row.handoff_by_admin_id || null,
+    handoffToAdminUserId: row.handoff_to_admin_id || null,
     createdAt: row.created_at,
     created_at: row.created_at,
     updatedAt: row.updated_at,
@@ -98,6 +106,7 @@ async function createComplaint({
   description,
   complaintLocation,
   complaintType,
+  incidentDate,
   documentFileId,
 }) {
   const client = await pool.connect();
@@ -106,15 +115,16 @@ async function createComplaint({
       citizenId,
       hasDocument: Boolean(documentFileId),
       complaintType: complaintType || null,
+      incidentDate: incidentDate || null,
     });
     await client.query('BEGIN');
     const complaintId = generateCaseCode('COMP');
     const result = await client.query(
       `INSERT INTO complaints
-        (complaint_id, citizen_id, subject, description, complaint_location, complaint_type, document_file_id)
-       VALUES ($1,$2,$3,$4,$5,$6,$7)
-       RETURNING id, complaint_id, citizen_id, subject, description, complaint_location, complaint_type, status, created_at, updated_at`,
-      [complaintId, citizenId, subject, description, complaintLocation || null, complaintType || null, documentFileId || null]
+        (complaint_id, citizen_id, subject, description, complaint_location, complaint_type, incident_date, document_file_id)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8)
+       RETURNING id, complaint_id, citizen_id, subject, description, complaint_location, complaint_type, incident_date, status, created_at, updated_at`,
+      [complaintId, citizenId, subject, description, complaintLocation || null, complaintType || null, incidentDate || null, documentFileId || null]
     );
     const complaint = result.rows[0];
 
