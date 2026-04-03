@@ -1169,6 +1169,7 @@ export default function HCMNewCasePage() {
     details: "",
     complaintLocation: "",
     complaintType: "",
+    incidentDate: "",
     files: [],
   });
 
@@ -1245,6 +1246,7 @@ export default function HCMNewCasePage() {
       payload.append("purpose", meetingForm.purpose);
       payload.append("preferredTime", preferredTimeIso);
       payload.append("adminReferral", referralAdmin ? `${referralAdmin.name} · ${referralAdmin.department}` : "");
+      payload.append("referralAdminUserId", meetingForm.referralAdminUserId || "");
       payload.append(
         "additionalAttendees",
         JSON.stringify(
@@ -1267,7 +1269,9 @@ export default function HCMNewCasePage() {
       setSuccessModal({
         open: true,
         title: "Meeting Submitted",
-        message: "Your meeting request has been submitted to the admin meeting pool.",
+        message: referralAdmin
+          ? "Your meeting request has been submitted directly to the selected admin's meeting queue."
+          : "Your meeting request has been submitted to the admin meeting pool.",
       });
       setMeetingForm({
         title: "",
@@ -1296,6 +1300,7 @@ export default function HCMNewCasePage() {
       payload.append("description", complaintForm.details);
       payload.append("complaintLocation", complaintForm.complaintLocation);
       payload.append("complaintType", complaintForm.complaintType);
+      payload.append("incidentDate", complaintForm.incidentDate);
 
       if (complaintForm.files[0]) {
         payload.append("file", complaintForm.files[0]);
@@ -1318,6 +1323,7 @@ export default function HCMNewCasePage() {
         details: "",
         complaintLocation: "",
         complaintType: "",
+        incidentDate: "",
         files: [],
       });
     } catch (submissionError) {
@@ -1417,7 +1423,7 @@ export default function HCMNewCasePage() {
     meetingForm.companions.some(c => c.phone.length > 0 && (!/^[6-9]/.test(c.phone) || c.phone.length < 10));
 
   return (
-    <WorkspacePage width={1320}>
+    <WorkspacePage width={1150} contentStyle={{ paddingLeft: 12, paddingRight: 12 }}>
       <SuccessModal
         open={successModal.open}
         title={successModal.title}
@@ -1428,11 +1434,11 @@ export default function HCMNewCasePage() {
         }}
       />
 
-      <div className="portal-page-wrap w-full mx-auto px-6 py-2">
+      <div className="portal-page-wrap w-full mx-auto py-2">
 
         {/* HEADER */}
         {activeTab && (
-          <div className="mb-4" style={{ marginLeft: -150, width: "1150px", position: "sticky", top: 0, zIndex: 40, background: C.card, border: `1px solid ${C.border}`, borderRadius: 16, padding: "16px 24px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+          <div className="mb-4" style={{ position: "sticky", top: 0, zIndex: 40, background: C.card, border: `1px solid ${C.border}`, borderRadius: 16, padding: "16px 24px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
             <div style={{ width: 160, flexShrink: 0 }}>
               <button
                 onClick={() => {
@@ -1511,7 +1517,7 @@ export default function HCMNewCasePage() {
           </div>
         ) : activeTab === "meeting" ? (
           // MEETING FORM
-          <WorkspaceCard style={{ marginBottom: 32, width: '1150px', marginLeft: -150 }}>
+          <WorkspaceCard style={{ marginBottom: 32 }}>
             <form onSubmit={submitMeeting} className="space-y-8">
               <WorkspaceCardHeader
                 title="Meeting Request Form"
@@ -1802,11 +1808,11 @@ export default function HCMNewCasePage() {
           </WorkspaceCard>
         ) : (
           // COMPLAINT FORM
-          <WorkspaceCard style={{ marginBottom: 32, width: '1150px', marginLeft: -150 }}>
+          <WorkspaceCard style={{ marginBottom: 32 }}>
             <form onSubmit={submitComplaint} className="space-y-8">
               <WorkspaceCardHeader
                 title="Complaint Form"
-                subtitle="Provide a clear issue summary, category, location, and any supporting documents."
+                subtitle="Provide a clear issue summary, category, location, incident date, and any supporting documents."
               />
               {/* TITLE */}
               <div>
@@ -1865,27 +1871,8 @@ export default function HCMNewCasePage() {
 
               {/* LOCATION */}
               <div style={{ padding: 20, borderRadius: 12, border: `1px solid ${C.border}`, background: C.bgElevated }}>
-                <div className="grid md:grid-cols-2 gap-6">
+                <div className="grid md:grid-cols-3 gap-6">
                   <div>
-                    {/* MODIFIED: Overrode display block to fix icon alignment */}
-                    <label className="flex items-center gap-2" style={{ ...sectionLabelStyle, display: "flex", alignItems: "center" }}>
-                      <MapPin size={16} />
-                      <span>Location <span style={{ color: C.danger }}>*</span></span>
-                    </label>
-                    <WorkspaceInput
-                      required
-                      type="text"
-                      value={complaintForm.complaintLocation}
-                      onChange={(event) =>
-                        setComplaintForm((current) => ({ ...current, complaintLocation: event.target.value }))
-                      }
-                      placeholder="Where did this issue occur?"
-                    />
-                  </div>
-
-                  {/* CATEGORY */}
-                  <div>
-                    {/* MODIFIED: Overrode display block to fix icon alignment */}
                     <label className="flex items-center gap-2" style={{ ...sectionLabelStyle, display: "flex", alignItems: "center" }}>
                       <Briefcase size={16} />
                       <span>Category <span style={{ color: C.danger }}>*</span></span>
@@ -1904,6 +1891,39 @@ export default function HCMNewCasePage() {
                         </option>
                       ))}
                     </WorkspaceSelect>
+                  </div>
+
+                  <div>
+                    <label className="flex items-center gap-2" style={{ ...sectionLabelStyle, display: "flex", alignItems: "center" }}>
+                      <MapPin size={16} />
+                      <span>Location <span style={{ color: C.danger }}>*</span></span>
+                    </label>
+                    <WorkspaceInput
+                      required
+                      type="text"
+                      value={complaintForm.complaintLocation}
+                      onChange={(event) =>
+                        setComplaintForm((current) => ({ ...current, complaintLocation: event.target.value }))
+                      }
+                      placeholder="Where did this issue occur?"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="flex items-center gap-2" style={{ ...sectionLabelStyle, display: "flex", alignItems: "center" }}>
+                      <Calendar size={16} />
+                      <span>Date of Incident <span style={{ color: C.danger }}>*</span></span>
+                    </label>
+                    <WorkspaceInput
+                      required
+                      type="date"
+                      value={complaintForm.incidentDate}
+                      onChange={(event) =>
+                        setComplaintForm((current) => ({ ...current, incidentDate: event.target.value }))
+                      }
+                      max={new Date().toISOString().split("T")[0]}
+                      style={{ minHeight: 42 }}
+                    />
                   </div>
                 </div>
               </div>
@@ -1950,8 +1970,8 @@ export default function HCMNewCasePage() {
               {/* SUBMIT */}
               <WorkspaceButton
                 type="submit"
-                disabled={loading || !complaintForm.title || !complaintForm.details || !complaintForm.complaintLocation || !complaintForm.complaintType}
-                style={{ width: "100%", padding: "16px 24px" }}
+                disabled={loading || !complaintForm.title || !complaintForm.details || !complaintForm.complaintLocation || !complaintForm.complaintType || !complaintForm.incidentDate}
+                style={{ width: "30%", minWidth: 220, padding: "16px 24px", margin: "0 auto", display: "flex", justifyContent: "center" }}
               >
                 {loading ? "Submitting..." : "Submit Complaint"}
               </WorkspaceButton>

@@ -15,6 +15,13 @@ function sanitizeOptional(input) {
   return sanitizeText(input);
 }
 
+function complaintLogTypeLabel(logType) {
+  if (logType === 'phone_call') return 'Phone Call';
+  if (logType === 'mail') return 'Mail';
+  if (logType === 'letter_summary') return 'Letter Summary';
+  return 'Log';
+}
+
 async function submitComplaint({ citizenId, body, file, reqMeta, idempotencyKey }) {
   const claim = await claimIdempotency(redis, {
     scope: 'complaint_submission',
@@ -50,6 +57,7 @@ async function submitComplaint({ citizenId, body, file, reqMeta, idempotencyKey 
       description: sanitizeText(body.description),
       complaintLocation: sanitizeOptional(body.complaintLocation),
       complaintType: sanitizeOptional(body.complaintType),
+      incidentDate: body.incidentDate,
       documentFileId: document?.id,
     });
     const complaint = await complaintsRepository.getComplaintById(createdComplaint.id) || createdComplaint;
@@ -215,6 +223,10 @@ async function reassignComplaint(complaintId, actorId, adminId, reason, reqMeta)
   if (!current) {
     throw createHttpError(404, 'Complaint not found');
   }
+  const targetAdmin = await adminRepository.findActiveAdminById(adminId);
+  if (!targetAdmin) {
+    throw createHttpError(404, 'Selected admin not found');
+  }
   assertComplaintAdminAccess(current, actorId, {
     allowUnassigned: false,
     actionLabel: 'reassign this complaint',
@@ -229,7 +241,6 @@ async function reassignComplaint(complaintId, actorId, adminId, reason, reqMeta)
       'submitted',
       'assigned',
       'in_review',
-      'department_contact_identified',
       'call_scheduled',
       'followup_in_progress',
     ],
@@ -237,6 +248,9 @@ async function reassignComplaint(complaintId, actorId, adminId, reason, reqMeta)
     note: sanitizeText(reason),
     patch: {
       assigned_admin_id: adminId,
+      handoff_type: 'reassigned',
+      handoff_by_admin_id: actorId,
+      handoff_to_admin_id: adminId,
       status_reason: sanitizeText(reason),
     },
   });
@@ -337,6 +351,10 @@ async function scheduleComplaintCall(complaintId, actorId, callScheduledAt, reqM
     throw createHttpError(404, 'Complaint not found');
   }
   assertComplaintAdminAccess(current, actorId, { actionLabel: 'schedule a call for this complaint' });
+  const scheduleAt = new Date(callScheduledAt);
+  if (Number.isNaN(scheduleAt.getTime()) || scheduleAt.getTime() <= Date.now()) {
+    throw createHttpError(400, 'Meeting date and time must be in the future');
+  }
 
   const complaint = await applyComplaintTransition({
     complaintId,
@@ -346,15 +364,14 @@ async function scheduleComplaintCall(complaintId, actorId, callScheduledAt, reqM
     allowedPreviousStatuses: [
       'assigned',
       'in_review',
-      'department_contact_identified',
       'call_scheduled',
       'followup_in_progress',
     ],
     actionLabel: 'schedule a call for this complaint',
-    note: 'Follow-up call scheduled',
+    note: 'Follow-up meeting scheduled',
     patch: {
       call_scheduled_at: callScheduledAt,
-      status_reason: 'Follow-up call scheduled',
+      status_reason: 'Follow-up meeting scheduled',
     },
   });
 
@@ -371,25 +388,26 @@ async function scheduleComplaintCall(complaintId, actorId, callScheduledAt, reqM
   return complaint;
 }
 
-async function logComplaintCallOutcome(complaintId, actorId, callOutcome, reqMeta) {
+async function logComplaintAction(complaintId, actorId, body, reqMeta) {
   const current = await complaintsRepository.getComplaintById(complaintId);
   if (!current) {
     throw createHttpError(404, 'Complaint not found');
   }
-  assertComplaintAdminAccess(current, actorId, { actionLabel: 'log a call outcome for this complaint' });
+  assertComplaintAdminAccess(current, actorId, { actionLabel: 'log this complaint activity' });
+  const summary = sanitizeOptional(body.summary);
+  const note = summary
+    ? `${complaintLogTypeLabel(body.logType)}: ${summary}`
+    : `${complaintLogTypeLabel(body.logType)} logged`;
 
   const complaint = await applyComplaintTransition({
     complaintId,
     actorId,
     actorRole: 'admin',
-    nextStatus: 'followup_in_progress',
-    allowedPreviousStatuses: ['call_scheduled', 'followup_in_progress'],
-    actionLabel: 'log a call outcome for this complaint',
-    note: sanitizeText(callOutcome),
-    patch: {
-      call_outcome: sanitizeText(callOutcome),
-      status_reason: 'Call outcome logged',
-    },
+    nextStatus: current.status === 'assigned' ? 'in_review' : current.status,
+    allowedPreviousStatuses: ['assigned', 'in_review', 'call_scheduled', 'followup_in_progress'],
+    actionLabel: 'log this complaint activity',
+    note,
+    patch: summary ? { call_outcome: summary } : {},
   });
 
   await writeAuditLog({
@@ -397,9 +415,10 @@ async function logComplaintCallOutcome(complaintId, actorId, callOutcome, reqMet
     actorId,
     entityType: 'complaint',
     entityId: complaintId,
-    action: 'complaint_call_logged',
+    action: 'complaint_log_added',
     ipAddress: reqMeta.ip,
     userAgent: reqMeta.userAgent,
+    metadata: { logType: body.logType },
   });
 
   return complaint;
@@ -422,7 +441,6 @@ async function resolveComplaint(complaintId, actorId, body, reqMeta) {
       'submitted',
       'assigned',
       'in_review',
-      'department_contact_identified',
       'call_scheduled',
       'followup_in_progress',
     ],
@@ -454,42 +472,34 @@ async function escalateComplaintToMeeting(complaintId, actorId, body, reqMeta) {
   if (!complaint) {
     throw createHttpError(404, 'Complaint not found');
   }
-  assertComplaintAdminAccess(complaint, actorId, { actionLabel: 'escalate this complaint to a meeting' });
+  assertComplaintAdminAccess(complaint, actorId, { actionLabel: 'escalate this complaint' });
   assertAllowedComplaintTransition(
     complaint.status,
-    ['assigned', 'in_review', 'department_contact_identified', 'call_scheduled', 'followup_in_progress'],
-    'escalate this complaint to a meeting',
+    ['assigned', 'in_review', 'call_scheduled', 'followup_in_progress'],
+    'escalate this complaint',
   );
-
-  const meeting = await meetingsRepository.createMeeting({
-    citizenId: complaint.citizen_id,
-    title: sanitizeText(complaint.title),
-    purpose: sanitizeText(body.purpose),
-    preferredTime: null,
-    adminReferral: complaint.assignedAdminName || complaint.department || 'Admin escalation',
-    documentFileId: null,
-    additionalAttendees: [],
-    linkedComplaintId: complaintId,
-  });
 
   await complaintsRepository.updateComplaintStatus({
     complaintId,
-    status: 'escalated_to_meeting',
+    status: 'submitted',
     previousStatus: complaint.status,
     actorRole: 'admin',
     actorId,
-    note: 'Complaint escalated to meeting',
+    note: sanitizeText(body.reason),
     patch: {
-      related_meeting_id: meeting.id,
-      status_reason: 'Escalated to linked meeting',
+      assigned_admin_id: null,
+      handoff_type: 'escalated',
+      handoff_by_admin_id: actorId,
+      handoff_to_admin_id: null,
+      status_reason: sanitizeText(body.reason),
     },
   });
 
   await publishComplaintStatusUpdate({
     citizenId: complaint.citizen_id,
     complaintId,
-    status: 'escalated_to_meeting',
-    note: 'Complaint escalated to meeting',
+    status: 'submitted',
+    note: sanitizeText(body.reason),
   });
 
   await writeAuditLog({
@@ -497,13 +507,12 @@ async function escalateComplaintToMeeting(complaintId, actorId, body, reqMeta) {
     actorId,
     entityType: 'complaint',
     entityId: complaintId,
-    action: 'complaint_escalated_to_meeting',
+    action: 'complaint_escalated_to_pool',
     ipAddress: reqMeta.ip,
     userAgent: reqMeta.userAgent,
-    metadata: { meetingId: meeting.id },
   });
 
-  return { complaint: await complaintsRepository.getComplaintById(complaintId), meeting };
+  return { complaint: await complaintsRepository.getComplaintById(complaintId) };
 }
 
 async function reopenComplaint(complaintId, actorId, reason, reqMeta) {
@@ -585,7 +594,7 @@ module.exports = {
   startComplaintReview,
   updateComplaintDepartment,
   scheduleComplaintCall,
-  logComplaintCallOutcome,
+  logComplaintAction,
   resolveComplaint,
   escalateComplaintToMeeting,
   reopenComplaint,

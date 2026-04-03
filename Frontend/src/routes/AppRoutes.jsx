@@ -87,6 +87,7 @@ export default function AppRoutes() {
         <Route element={<ProtectedRoute allowedRoles={["admin"]} />}>
           <Route element={<AppLayout />}>
             <Route path={PATHS.admin.workQueue} element={<AdminCases />} />
+            <Route path={PATHS.admin.complaintQueue} element={<AdminComplaintQueue />} />
             <Route path={PATHS.admin.calendar} element={<Calendar />} />
             <Route path={PATHS.admin.legacyCalendar} element={<Calendar />} />
             <Route path={PATHS.admin.pool} element={<AdminCases />} />

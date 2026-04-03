@@ -5,8 +5,10 @@ import Header from "../shared/components/Header.jsx";
 import { usePortalTheme } from "../shared/theme/portalTheme.jsx";
 
 function Layout() {
-    const [collapsed, setCollapsed] = useState(false);
-    const { C } = usePortalTheme();
+  const [collapsed, setCollapsed] = useState(false);
+  const { C } = usePortalTheme();
+  const sidebarWidth = collapsed ? 84 : 280;
+  const modalOffsetLeft = collapsed ? 0 : sidebarWidth;
 
   return (
     <div
@@ -18,11 +20,13 @@ function Layout() {
         overflow: "hidden",
         background: C.bg,
         position: "relative",
+        "--portal-sidebar-width": `${sidebarWidth}px`,
+        "--portal-modal-offset-left": `${modalOffsetLeft}px`,
       }}
     >
       <aside
         style={{
-          width: collapsed ? 84 : 280,
+          width: sidebarWidth,
           borderRight: `1px solid ${C.border}`,
           background: C.bgElevated,
           position: "relative",

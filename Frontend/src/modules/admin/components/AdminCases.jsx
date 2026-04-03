@@ -46,6 +46,8 @@ function complaintRow(item) {
     createdAt: item.createdAt || item.created_at,
     status: item.status,
     statusLabel: item.statusLabel || humanizeStatus(item.status),
+    handoffType: item.handoffType || "",
+    handoffByAdminUserId: item.handoffByAdminUserId || null,
     route: `/admin/cases/${item.id}`,
   };
 }
@@ -65,6 +67,18 @@ function meetingRow(item) {
     statusLabel: humanizeStatus(item.status),
     route: `/admin/meetings/${item.id}`,
   };
+}
+
+function buildItemRoute(item, tab) {
+  const sourceMap = {
+    complaintPool: "work-queue",
+    meetingPool: "work-queue",
+    myCases: "my-cases",
+    resolved: "work-queue",
+    escalated: "work-queue",
+  };
+  const source = sourceMap[tab];
+  return source ? `${item.route}?source=${source}` : item.route;
 }
 
 export default function AdminCases() {
@@ -113,7 +127,7 @@ export default function AdminCases() {
     ...meetings.filter((item) => item.assignedAdminUserId === session?.user?.id && !isResolvedMeeting(item.status)).map(meetingRow),
   ];
   const resolved  = [...complaints.filter((item) => isResolvedComplaint(item.status)).map(complaintRow), ...meetings.filter((item) => isResolvedMeeting(item.status)).map(meetingRow)];
-  const escalated = complaints.filter((item) => item.status === "escalated_to_meeting").map(complaintRow);
+  const escalated = complaints.filter((item) => item.handoffByAdminUserId === session?.user?.id && ["escalated", "reassigned"].includes(item.handoffType) && !isResolvedComplaint(item.status)).map(complaintRow);
 
   const sections = { complaintPool, meetingPool, myCases, resolved, escalated };
 
@@ -136,7 +150,7 @@ export default function AdminCases() {
     { id: "meetingPool",   label: "Meeting Pool",         count: meetingPool.length   },
     { id: "myCases",       label: "My Cases",             count: myCases.length       },
     { id: "resolved",      label: "Resolved / Completed", count: resolved.length      },
-    { id: "escalated",     label: "Escalated Requests",   count: escalated.length     },
+    { id: "escalated",     label: "Escalated / Reassigned Requests", count: escalated.length },
   ];
 
   useEffect(() => {
@@ -289,11 +303,7 @@ export default function AdminCases() {
                       </td>
                       <td style={{ padding: "12px 16px", textAlign: "center", borderBottom: `1px solid ${C.borderLight}` }}>
                         <button
-                          onClick={() => navigate(
-                            item.itemType === "meeting" && tab === "meetingPool"
-                              ? `${item.route}?source=work-queue`
-                              : item.route
-                          )}
+                          onClick={() => navigate(buildItemRoute(item, tab))}
                           className="transition-colors"
                           style={{
                             color: C.purple,

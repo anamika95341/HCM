@@ -26,6 +26,26 @@ function statusLabel(status) {
     .join(" ");
 }
 
+function splitDateTimeParts(value) {
+  if (!value) {
+    return { date: "", time: "" };
+  }
+  const dateValue = new Date(value);
+  if (Number.isNaN(dateValue.getTime())) {
+    return { date: "", time: "" };
+  }
+  const localValue = new Date(dateValue.getTime() - dateValue.getTimezoneOffset() * 60000)
+    .toISOString()
+    .slice(0, 16);
+  const [date, time] = localValue.split("T");
+  return { date: date || "", time: time || "" };
+}
+
+function combineDateAndTime(date, time) {
+  if (!date || !time) return "";
+  return new Date(`${date}T${time}`).toISOString();
+}
+
 function WorkspaceTextArea(props) {
   const { C } = usePortalTheme();
   return (
@@ -33,17 +53,57 @@ function WorkspaceTextArea(props) {
       {...props}
       style={{
         width: "100%",
-        padding: "10px 14px",
+        padding: "8px 12px",
         borderRadius: 10,
         border: `1px solid ${C.border}`,
         background: C.inp,
         color: C.t1,
-        fontSize: 13,
+        fontSize: 12,
         outline: "none",
         resize: "vertical",
         ...(props.style || {}),
       }}
     />
+  );
+}
+
+function ActionModal({ open, title, description, value, onChange, onClose, onConfirm, loading, confirmLabel, confirmVariant = "primary" }) {
+  const { C } = usePortalTheme();
+  if (!open) return null;
+  return (
+    <div className="fixed inset-0 z-[120] flex items-center justify-center bg-black/40 px-4 backdrop-blur-sm">
+      <div
+        className="w-full max-w-lg"
+        style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 16, boxShadow: C.dialogShadow, padding: 24 }}
+      >
+        <div style={{ fontSize: 20, fontWeight: 700, color: C.t1 }}>{title}</div>
+        <p style={{ marginTop: 8, fontSize: 13, color: C.t3 }}>{description}</p>
+        <div style={{ marginTop: 18 }}>
+          <div style={{ fontSize: 11, fontWeight: 700, color: C.t3, textTransform: "uppercase", letterSpacing: ".08em", marginBottom: 10 }}>
+            Comments
+          </div>
+          <WorkspaceTextArea
+            rows={5}
+            value={value}
+            onChange={(event) => onChange(event.target.value)}
+            placeholder="Enter comments"
+          />
+        </div>
+        <div style={{ display: "flex", gap: 12, justifyContent: "flex-end", marginTop: 20 }}>
+          <WorkspaceButton type="button" variant="ghost" onClick={onClose} disabled={loading}>
+            Cancel
+          </WorkspaceButton>
+          <WorkspaceButton
+            type="button"
+            variant={confirmVariant}
+            onClick={onConfirm}
+            disabled={loading || value.trim().length < 3}
+          >
+            {confirmLabel}
+          </WorkspaceButton>
+        </div>
+      </div>
+    </div>
   );
 }
 
@@ -115,10 +175,10 @@ function RejectModal({ open, reason, onReasonChange, onClose, onConfirm, loading
 function InfoCard({ label, value, subValue }) {
   const { C } = usePortalTheme();
   return (
-    <WorkspaceCard style={{ padding: 18, marginBottom: 0 }}>
-      <p style={{ fontSize: 11, fontWeight: 700, color: C.t3, textTransform: "uppercase", letterSpacing: ".08em" }}>{label}</p>
-      <div style={{ marginTop: 10, fontSize: 18, fontWeight: 700, color: C.t1, lineHeight: 1.4 }}>{value}</div>
-      {subValue ? <p style={{ fontSize: 12, color: C.t3, marginTop: 8 }}>{subValue}</p> : null}
+    <WorkspaceCard style={{ padding: "10px 12px", marginBottom: 0, minHeight: 68, display: "grid", alignContent: "start" }}>
+      <p style={{ fontSize: 10, fontWeight: 700, color: C.t3, textTransform: "uppercase", letterSpacing: ".08em" }}>{label}</p>
+      <div style={{ marginTop: 4, fontSize: 14, fontWeight: 700, color: C.t1, lineHeight: 1.25 }}>{value}</div>
+      {subValue ? <p style={{ fontSize: 10, color: C.t3, marginTop: 2, lineHeight: 1.25 }}>{subValue}</p> : null}
     </WorkspaceCard>
   );
 }
@@ -168,8 +228,10 @@ export default function AdminMeeting() {
   const [verificationForm, setVerificationForm] = useState({ deoId: "" });
   const [scheduleForm, setScheduleForm] = useState({
     ministerId: "",
-    startsAt: "",
-    endsAt: "",
+    startDate: "",
+    startTime: "",
+    endDate: "",
+    endTime: "",
     location: "",
     isVip: false,
     comments: "",
@@ -178,7 +240,12 @@ export default function AdminMeeting() {
   const [uploadingFile, setUploadingFile] = useState(false);
   const [rejectReason, setRejectReason] = useState("");
   const [rejectModalOpen, setRejectModalOpen] = useState(false);
-  const [actionNote, setActionNote] = useState("");
+  const [scheduleError, setScheduleError] = useState("");
+  const [rescheduleMode, setRescheduleMode] = useState(false);
+  const [completeModalOpen, setCompleteModalOpen] = useState(false);
+  const [completeNote, setCompleteNote] = useState("");
+  const [scheduledRejectModalOpen, setScheduledRejectModalOpen] = useState(false);
+  const [scheduledRejectNote, setScheduledRejectNote] = useState("");
 
   async function loadMeetingPool() {
     const [queueResponse, directoryResponse] = await Promise.all([
@@ -200,17 +267,23 @@ export default function AdminMeeting() {
         throw detailResult.reason;
       }
       const { data } = detailResult.value;
+      const startParts = splitDateTimeParts(data.meeting?.scheduled_at);
+      const endParts = splitDateTimeParts(data.meeting?.scheduled_end_at);
       setSelectedMeeting(data.meeting || null);
       setHistory(data.history || []);
       setMeetingFiles(filesResult.status === "fulfilled" ? (filesResult.value.data?.files || []) : []);
       setScheduleForm({
         ministerId: data.meeting?.ministerId || "",
-        startsAt: data.meeting?.scheduled_at ? new Date(data.meeting.scheduled_at).toISOString().slice(0, 16) : "",
-        endsAt: data.meeting?.scheduled_end_at ? new Date(data.meeting.scheduled_end_at).toISOString().slice(0, 16) : "",
+        startDate: startParts.date,
+        startTime: startParts.time,
+        endDate: endParts.date,
+        endTime: endParts.time,
         location: data.meeting?.scheduled_location || "",
         isVip: Boolean(data.meeting?.is_vip),
         comments: data.meeting?.admin_comments || "",
       });
+      setScheduleError("");
+      setRescheduleMode(false);
       setVerificationForm({ deoId: data.meeting?.assignedDeoId || "" });
     } catch (detailError) {
       setError(detailError?.response?.data?.error || "Unable to load meeting details");
@@ -308,6 +381,11 @@ export default function AdminMeeting() {
         navigate(source === "work-queue" ? PATHS.admin.workQueue : PATHS.admin.meetings);
         return true;
       }
+      if (options.navigateToMeetingQueue) {
+        await loadMeetingPool();
+        navigate(PATHS.admin.meetings);
+        return true;
+      }
       await refreshAll();
       return true;
     } catch (actionErrorValue) {
@@ -348,14 +426,23 @@ export default function AdminMeeting() {
     const isUnassignedPoolMeeting = selectedMeeting.status === "pending" && !selectedMeeting.assignedAdminUserId;
     const canAccept = isAssignedToCurrentAdmin && ["pending", "not_verified"].includes(selectedMeeting.status);
     const canReject = isAssignedToCurrentAdmin && ["pending", "accepted", "verification_pending", "verified", "not_verified"].includes(selectedMeeting.status);
-    const canSendVerification = isAssignedToCurrentAdmin && ["accepted", "not_verified"].includes(selectedMeeting.status);
-    const canSchedule = isAssignedToCurrentAdmin && ["accepted", "verified", "scheduled"].includes(selectedMeeting.status);
-    const canCompleteOrCancel = isAssignedToCurrentAdmin && selectedMeeting.status === "scheduled";
+    const canSendVerification = isAssignedToCurrentAdmin && ["accepted", "not_verified", "verification_pending", "verified"].includes(selectedMeeting.status);
+    const canSchedule = isAssignedToCurrentAdmin && ["accepted", "verification_pending", "verified", "scheduled"].includes(selectedMeeting.status);
+    const canManageScheduled = isAssignedToCurrentAdmin && selectedMeeting.status === "scheduled";
     const canUploadPhotos = isAssignedToCurrentAdmin && ["scheduled", "completed"].includes(selectedMeeting.status);
+    const verificationPending = selectedMeeting.status === "verification_pending";
+    const verificationDone = selectedMeeting.status === "verified";
+    const scheduleEditable = selectedMeeting.status !== "scheduled" || rescheduleMode;
 
-    const openedFromWorkQueue = source === "work-queue";
+    const backPath = source === "my-cases"
+      ? PATHS.admin.cases
+      : source === "meeting-queue"
+          ? PATHS.admin.meetings
+          : isUnassignedPoolMeeting || source === "work-queue"
+            ? PATHS.admin.workQueue
+            : PATHS.admin.meetings;
     return (
-      <WorkspacePage width={1200}>
+      <WorkspacePage width={1500} contentStyle={{ paddingLeft: 12, paddingRight: 12 }}>
         <SuccessModal open={!!successMessage} message={successMessage} onClose={() => setSuccessMessage("")} />
         <RejectModal
           open={rejectModalOpen}
@@ -377,28 +464,89 @@ export default function AdminMeeting() {
           }}
           loading={actionLoading}
         />
+        <ActionModal
+          open={completeModalOpen}
+          title="Mark Meeting As Completed"
+          description="Write completion comments before confirming."
+          value={completeNote}
+          onChange={setCompleteNote}
+          onClose={() => {
+            setCompleteModalOpen(false);
+            setCompleteNote("");
+          }}
+          onConfirm={async () => {
+            const ok = await runAction(
+              () => apiClient.patch(`/meetings/${meetingId}/complete`, { reason: completeNote.trim() }, authorizedConfig(session.accessToken)),
+              { successMessage: "Meeting marked as completed." }
+            );
+            if (ok) {
+              setCompleteModalOpen(false);
+              setCompleteNote("");
+            }
+          }}
+          loading={actionLoading}
+          confirmLabel="Confirm Completion"
+        />
+        <ActionModal
+          open={scheduledRejectModalOpen}
+          title="Reject Scheduled Meeting"
+          description="Write rejection comments before confirming."
+          value={scheduledRejectNote}
+          onChange={setScheduledRejectNote}
+          onClose={() => {
+            setScheduledRejectModalOpen(false);
+            setScheduledRejectNote("");
+          }}
+          onConfirm={async () => {
+            const ok = await runAction(
+              () => apiClient.patch(`/meetings/${meetingId}/cancel`, { reason: scheduledRejectNote.trim() }, authorizedConfig(session.accessToken)),
+              { successMessage: "Meeting rejected successfully." }
+            );
+            if (ok) {
+              setScheduledRejectModalOpen(false);
+              setScheduledRejectNote("");
+            }
+          }}
+          loading={actionLoading}
+          confirmLabel="Confirm Reject"
+          confirmVariant="danger"
+        />
 
-        <WorkspaceSectionHeader
-          eyebrow="Admin Workspace"
-          title={selectedMeeting.title || "Meeting Details"}
-          subtitle={selectedMeeting.purpose}
-          action={
+        <div style={{ marginBottom: 20 }}>
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "minmax(0, 80%) minmax(0, 15%)",
+              justifyContent: "space-between",
+              alignItems: "start",
+              columnGap: "5%",
+            }}
+          >
+            <div>
+              <div style={{ fontSize: 10, fontWeight: 700, color: C.t3, textTransform: "uppercase", letterSpacing: ".08em", marginBottom: 8 }}>
+                Admin Workspace
+              </div>
+              <h1 style={{ margin: 0, fontSize: 26, fontWeight: 700, lineHeight: 1.2, color: C.t1, whiteSpace: "normal", wordBreak: "break-word" }}>
+                {selectedMeeting.title || "Meeting Details"}
+              </h1>
+            </div>
             <WorkspaceButton
               type="button"
               variant="ghost"
-              onClick={() => navigate(isUnassignedPoolMeeting || openedFromWorkQueue ? PATHS.admin.workQueue : PATHS.admin.meetings)}
+              onClick={() => navigate(backPath)}
+              style={{ width: "100%", justifyContent: "center" }}
             >
               <ChevronLeft size={16} />
-              {isUnassignedPoolMeeting || openedFromWorkQueue ? "Back to Work Queue" : "Back to Meeting Queue"}
+              Back
             </WorkspaceButton>
-          }
-        />
+          </div>
+        </div>
 
         <div style={{ display: "grid", gap: 24 }}>
           {error ? <WorkspaceCard style={{ color: C.danger }}>{error}</WorkspaceCard> : null}
           {actionError ? <WorkspaceCard style={{ color: C.danger }}>{actionError}</WorkspaceCard> : null}
 
-          <div className="grid gap-6 md:grid-cols-3">
+          <div className="grid gap-3 md:grid-cols-3">
             <InfoCard label="Status" value={statusLabel(selectedMeeting.status)} />
             <InfoCard
               label="Citizen"
@@ -411,7 +559,7 @@ export default function AdminMeeting() {
             />
           </div>
 
-          <WorkspaceCard style={{ display: "grid", gap: 18 }}>
+          <WorkspaceCard style={{ display: "grid", gap: 14, padding: 18 }}>
             <WorkspaceCardHeader
               title={isUnassignedPoolMeeting ? "Meeting Assignment" : "Meeting Queue Actions"}
               subtitle={
@@ -431,7 +579,7 @@ export default function AdminMeeting() {
                   () => apiClient.patch(`/meetings/${meetingId}/assign-self`, {}, authorizedConfig(session.accessToken)),
                   {
                     successMessage: "Meeting successfully assigned to you.",
-                    navigateToPool: true,
+                    navigateToMeetingQueue: true,
                   }
                 )}
               >
@@ -440,22 +588,23 @@ export default function AdminMeeting() {
             ) : null}
 
             {canAccept || canReject ? (
-              <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
+              <div style={{ display: "flex", gap: "10%", justifyContent: "flex-start", flexWrap: "wrap" }}>
                 {canAccept ? (
                   <WorkspaceButton
                     type="button"
                     disabled={actionLoading}
+                    style={{ width: "20%", justifyContent: "center", minWidth: 160 }}
                     onClick={() => runAction(
                       () => apiClient.patch(`/meetings/${meetingId}/accept`, {}, authorizedConfig(session.accessToken)),
                       { successMessage: "Meeting accepted successfully." }
                     )}
                   >
-                    Accept
+                    Accept Meeting
                   </WorkspaceButton>
                 ) : null}
                 {canReject ? (
-                  <WorkspaceButton type="button" variant="danger" disabled={actionLoading} onClick={() => setRejectModalOpen(true)}>
-                    Reject
+                  <WorkspaceButton type="button" variant="danger" disabled={actionLoading} onClick={() => setRejectModalOpen(true)} style={{ width: "20%", justifyContent: "center", minWidth: 160 }}>
+                    Reject Meeting
                   </WorkspaceButton>
                 ) : null}
               </div>
@@ -465,8 +614,8 @@ export default function AdminMeeting() {
               <div
                 style={{
                   display: "grid",
-                  gap: 14,
-                  paddingTop: 20,
+                  gap: 12,
+                  paddingTop: 16,
                   borderTop: `1px solid ${C.border}`,
                 }}
               >
@@ -474,24 +623,41 @@ export default function AdminMeeting() {
                   <div style={{ fontSize: 16, fontWeight: 700, color: C.t1 }}>Send for DEO Verification</div>
                   <div style={{ marginTop: 4, fontSize: 12, color: C.t3 }}>Assign a verified DEO to review the accepted meeting.</div>
                 </div>
-                <WorkspaceSelect value={verificationForm.deoId} onChange={(event) => setVerificationForm({ deoId: event.target.value })}>
-                  <option value="">Select DEO</option>
-                  {workflowDirectory.deos.map((deo) => (
-                    <option key={deo.id} value={deo.id}>
-                      {[deo.first_name, deo.last_name].filter(Boolean).join(" ")}{deo.designation ? ` · ${deo.designation}` : ""}
-                    </option>
-                  ))}
-                </WorkspaceSelect>
-                <WorkspaceButton
-                  type="button"
-                  disabled={actionLoading || !verificationForm.deoId}
-                  onClick={() => runAction(
-                    () => apiClient.patch(`/meetings/${meetingId}/assign-verification`, { deoId: verificationForm.deoId }, authorizedConfig(session.accessToken)),
-                    { successMessage: "Meeting sent for verification successfully." }
-                  )}
-                >
-                  Send to Verification
-                </WorkspaceButton>
+                <div className="grid gap-3" style={{ gridTemplateColumns: "minmax(0, 70%) minmax(0, 30%)" }}>
+                  <WorkspaceSelect
+                    value={verificationForm.deoId}
+                    disabled={verificationPending || verificationDone}
+                    onChange={(event) => setVerificationForm({ deoId: event.target.value })}
+                  >
+                    <option value="">Select DEO</option>
+                    {workflowDirectory.deos.map((deo) => (
+                      <option key={deo.id} value={deo.id}>
+                        {[deo.first_name, deo.last_name].filter(Boolean).join(" ")}{deo.designation ? ` · ${deo.designation}` : ""}
+                      </option>
+                    ))}
+                  </WorkspaceSelect>
+                  <WorkspaceButton
+                    type="button"
+                    disabled={actionLoading || !verificationForm.deoId || verificationPending || verificationDone}
+                    onClick={() => runAction(
+                      () => apiClient.patch(`/meetings/${meetingId}/assign-verification`, { deoId: verificationForm.deoId }, authorizedConfig(session.accessToken)),
+                      { successMessage: "Meeting sent for verification successfully." }
+                    )}
+                    style={{ width: "100%", justifyContent: "center" }}
+                  >
+                    Send For Verification
+                  </WorkspaceButton>
+                </div>
+                {verificationPending ? (
+                  <div style={{ fontSize: 13, fontWeight: 700, color: C.danger }}>
+                    Sended for verification
+                  </div>
+                ) : null}
+                {verificationDone ? (
+                  <div style={{ fontSize: 13, fontWeight: 700, color: C.mint }}>
+                    Verified successfully now you can schedule meeting with minister
+                  </div>
+                ) : null}
               </div>
             ) : null}
 
@@ -504,85 +670,121 @@ export default function AdminMeeting() {
                   borderTop: `1px solid ${C.border}`,
                 }}
               >
+                {canManageScheduled && !rescheduleMode ? (
+                  <div style={{ display: "grid", gridTemplateColumns: "repeat(3, minmax(0, 1fr))", gap: 12 }}>
+                    <WorkspaceButton type="button" variant="outline" onClick={() => setRescheduleMode(true)} style={{ width: "100%", justifyContent: "center" }}>
+                      Reschedule
+                    </WorkspaceButton>
+                    <WorkspaceButton type="button" onClick={() => setCompleteModalOpen(true)} style={{ width: "100%", justifyContent: "center", background: C.mint, color: "#fff", border: "none" }}>
+                      Mark As Completed
+                    </WorkspaceButton>
+                    <WorkspaceButton type="button" variant="danger" onClick={() => setScheduledRejectModalOpen(true)} style={{ width: "100%", justifyContent: "center" }}>
+                      Reject
+                    </WorkspaceButton>
+                  </div>
+                ) : null}
                 <div>
                   <div style={{ fontSize: 16, fontWeight: 700, color: C.t1 }}>{selectedMeeting.status === "scheduled" ? "Reschedule Meeting" : "Schedule Meeting"}</div>
-                  <div style={{ marginTop: 4, fontSize: 12, color: C.t3 }}>Scheduled meetings are pushed into the minister calendar automatically.</div>
+                  <div style={{ marginTop: 4, fontSize: 12, color: C.t3 }}>
+                    {selectedMeeting.status === "verification_pending"
+                      ? "This meeting is in DEO verification queue. Schedule it after DEO verifies it."
+                      : selectedMeeting.status === "verified"
+                        ? "Verified by DEO. You can schedule this meeting now."
+                      : ""}
+                  </div>
                 </div>
-                <div className="grid gap-3 md:grid-cols-2">
-                  <WorkspaceSelect value={scheduleForm.ministerId} onChange={(event) => setScheduleForm((current) => ({ ...current, ministerId: event.target.value }))}>
-                    <option value="">Select Minister</option>
-                    {workflowDirectory.ministers.map((minister) => (
-                      <option key={minister.id} value={minister.id}>
-                        {[minister.first_name, minister.last_name].filter(Boolean).join(" ")}
-                      </option>
-                    ))}
-                  </WorkspaceSelect>
-                  <WorkspaceInput value={scheduleForm.location} onChange={(event) => setScheduleForm((current) => ({ ...current, location: event.target.value }))} placeholder="Location" />
-                  <WorkspaceInput type="datetime-local" value={scheduleForm.startsAt} onChange={(event) => setScheduleForm((current) => ({ ...current, startsAt: event.target.value }))} />
-                  <WorkspaceInput type="datetime-local" value={scheduleForm.endsAt} onChange={(event) => setScheduleForm((current) => ({ ...current, endsAt: event.target.value }))} />
-                </div>
-                <label className="flex items-center gap-2" style={{ fontSize: 13, color: C.t2 }}>
-                  <input type="checkbox" checked={scheduleForm.isVip} onChange={(event) => setScheduleForm((current) => ({ ...current, isVip: event.target.checked }))} />
-                  Mark as VIP meeting
-                </label>
-                <WorkspaceTextArea rows={3} value={scheduleForm.comments} onChange={(event) => setScheduleForm((current) => ({ ...current, comments: event.target.value }))} placeholder="Comments" />
-                <WorkspaceButton
-                  type="button"
-                  disabled={actionLoading || !scheduleForm.ministerId || !scheduleForm.startsAt || !scheduleForm.endsAt || !scheduleForm.location.trim()}
-                  onClick={() => runAction(
-                    () => apiClient.patch(`/meetings/${meetingId}/schedule`, {
-                      ministerId: scheduleForm.ministerId,
-                      startsAt: new Date(scheduleForm.startsAt).toISOString(),
-                      endsAt: new Date(scheduleForm.endsAt).toISOString(),
-                      location: scheduleForm.location.trim(),
-                      isVip: scheduleForm.isVip,
-                      comments: scheduleForm.comments,
-                    }, authorizedConfig(session.accessToken)),
-                    { successMessage: "Meeting scheduled successfully." }
-                  )}
-                >
-                  {selectedMeeting.status === "scheduled" ? "Reschedule Meeting" : "Schedule Meeting"}
-                </WorkspaceButton>
-              </div>
-            ) : null}
-
-            {canCompleteOrCancel ? (
-              <div style={{ display: "grid", gap: 14, paddingTop: 20, borderTop: `1px solid ${C.border}` }}>
-                <WorkspaceTextArea
-                  rows={3}
-                  value={actionNote}
-                  onChange={(event) => setActionNote(event.target.value)}
-                  placeholder="Add a completion or cancellation note"
-                />
-                <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
-                <WorkspaceButton
-                  type="button"
-                  disabled={actionLoading || actionNote.trim().length < 3}
-                  style={{ background: C.mint, color: "#ffffff", border: "none" }}
-                  onClick={() => runAction(
-                    () => apiClient.patch(`/meetings/${meetingId}/complete`, { reason: actionNote.trim() }, authorizedConfig(session.accessToken)),
-                    { successMessage: "Meeting marked as completed." }
-                  )}
-                >
-                  Mark Completed
-                </WorkspaceButton>
-                <WorkspaceButton
-                  type="button"
-                  variant="danger"
-                  disabled={actionLoading || actionNote.trim().length < 3}
-                  onClick={() => runAction(
-                    () => apiClient.patch(`/meetings/${meetingId}/cancel`, { reason: actionNote.trim() }, authorizedConfig(session.accessToken)),
-                    { successMessage: "Meeting cancelled successfully." }
-                  )}
-                >
-                  Cancel Meeting
-                </WorkspaceButton>
+                <div style={{ width: "100%", display: "grid", gap: 12 }}>
+                  <label className="flex items-center gap-2" style={{ fontSize: 12, color: C.t2 }}>
+                    <input
+                      type="checkbox"
+                      checked={scheduleForm.isVip}
+                      disabled={!scheduleEditable}
+                      style={{ width: 14, height: 14 }}
+                      onChange={(event) => setScheduleForm((current) => ({ ...current, isVip: event.target.checked }))}
+                    />
+                    Mark as VIP meeting
+                  </label>
+                  <div className="grid gap-3 md:grid-cols-2">
+                    <WorkspaceSelect
+                      value={scheduleForm.ministerId}
+                      disabled={!scheduleEditable}
+                      onChange={(event) => setScheduleForm((current) => ({ ...current, ministerId: event.target.value }))}
+                    >
+                      <option value="">Select Minister</option>
+                      {workflowDirectory.ministers.map((minister) => (
+                        <option key={minister.id} value={minister.id}>
+                          {[minister.first_name, minister.last_name].filter(Boolean).join(" ")}
+                        </option>
+                      ))}
+                    </WorkspaceSelect>
+                    <WorkspaceInput
+                      value={scheduleForm.location}
+                      disabled={!scheduleEditable}
+                      onChange={(event) => setScheduleForm((current) => ({ ...current, location: event.target.value }))}
+                      placeholder="Location"
+                    />
+                  </div>
+                  <div className="grid gap-3 md:grid-cols-2">
+                    <div style={{ display: "grid", gap: 8 }}>
+                      <div style={{ fontSize: 11, fontWeight: 700, color: C.t3, textTransform: "uppercase", letterSpacing: ".08em" }}>Start</div>
+                      <div className="grid gap-3" style={{ gridTemplateColumns: "minmax(0,1fr) minmax(0,1fr)" }}>
+                        <WorkspaceInput type="date" disabled={!scheduleEditable} value={scheduleForm.startDate} onChange={(event) => { setScheduleError(""); setScheduleForm((current) => ({ ...current, startDate: event.target.value })); }} />
+                        <WorkspaceInput type="time" disabled={!scheduleEditable} value={scheduleForm.startTime} onChange={(event) => { setScheduleError(""); setScheduleForm((current) => ({ ...current, startTime: event.target.value })); }} />
+                      </div>
+                    </div>
+                    <div style={{ display: "grid", gap: 8 }}>
+                      <div style={{ fontSize: 11, fontWeight: 700, color: C.t3, textTransform: "uppercase", letterSpacing: ".08em" }}>End</div>
+                      <div className="grid gap-3" style={{ gridTemplateColumns: "minmax(0,1fr) minmax(0,1fr)" }}>
+                        <WorkspaceInput type="date" disabled={!scheduleEditable} value={scheduleForm.endDate} onChange={(event) => { setScheduleError(""); setScheduleForm((current) => ({ ...current, endDate: event.target.value })); }} />
+                        <WorkspaceInput type="time" disabled={!scheduleEditable} value={scheduleForm.endTime} onChange={(event) => { setScheduleError(""); setScheduleForm((current) => ({ ...current, endTime: event.target.value })); }} />
+                      </div>
+                    </div>
+                  </div>
+                  <WorkspaceTextArea rows={3} disabled={!scheduleEditable} value={scheduleForm.comments} onChange={(event) => setScheduleForm((current) => ({ ...current, comments: event.target.value }))} placeholder="Comments" />
+                  {scheduleError ? (
+                    <div style={{ fontSize: 13, color: C.danger, fontWeight: 600 }}>
+                      {scheduleError}
+                    </div>
+                  ) : null}
+                  {scheduleEditable ? (
+                    <div style={{ display: "grid", justifyItems: "center", gap: 8 }}>
+                      <WorkspaceButton
+                        type="button"
+                        disabled={actionLoading || !scheduleForm.ministerId || !scheduleForm.startDate || !scheduleForm.startTime || !scheduleForm.endDate || !scheduleForm.endTime || !scheduleForm.location.trim()}
+                        onClick={() => {
+                          setScheduleError("");
+                          if (selectedMeeting.status === "verification_pending") {
+                            setScheduleError("You can schedule after verification");
+                            return;
+                          }
+                          return runAction(
+                            () => apiClient.patch(`/meetings/${meetingId}/schedule`, {
+                              ministerId: scheduleForm.ministerId,
+                              startsAt: combineDateAndTime(scheduleForm.startDate, scheduleForm.startTime),
+                              endsAt: combineDateAndTime(scheduleForm.endDate, scheduleForm.endTime),
+                              location: scheduleForm.location.trim(),
+                              isVip: scheduleForm.isVip,
+                              comments: scheduleForm.comments,
+                            }, authorizedConfig(session.accessToken)),
+                            { successMessage: "Meeting scheduled successfully." }
+                          ).then((ok) => {
+                            if (ok) {
+                              setRescheduleMode(false);
+                            }
+                          });
+                        }}
+                        style={{ width: "60%", justifyContent: "center" }}
+                      >
+                        {selectedMeeting.status === "scheduled" ? "Update Schedule" : "Schedule Meeting"}
+                      </WorkspaceButton>
+                    </div>
+                  ) : null}
                 </div>
               </div>
             ) : null}
           </WorkspaceCard>
 
-          <WorkspaceCard style={{ display: "grid", gap: 16 }}>
+          <WorkspaceCard style={{ display: "grid", gap: 12, padding: 18 }}>
             <WorkspaceCardHeader
               title="Meeting Files"
               subtitle={canUploadPhotos ? "Meeting photos uploaded here are visible from the minister calendar." : "View the citizen submission files and uploaded meeting artifacts."}
@@ -596,11 +798,11 @@ export default function AdminMeeting() {
               </div>
             ) : null}
             {meetingFiles.length === 0 ? (
-              <div style={{ fontSize: 13, color: C.t3 }}>No files attached to this meeting yet.</div>
+              <div style={{ fontSize: 13, color: C.t3, padding: "2px 0" }}>No files attached to this meeting yet.</div>
             ) : (
               <div style={{ display: "grid", gap: 10 }}>
                 {meetingFiles.map((file) => (
-                  <div key={file.id} style={{ padding: 12, borderRadius: 12, border: `1px solid ${C.border}`, background: C.bgElevated }}>
+                  <div key={file.id} style={{ padding: 10, borderRadius: 12, border: `1px solid ${C.border}`, background: C.bgElevated }}>
                     <div style={{ fontSize: 13, fontWeight: 700, color: C.t1 }}>{file.name}</div>
                     <div style={{ marginTop: 4, fontSize: 12, color: C.t3 }}>{file.mimeType}</div>
                   </div>
@@ -609,64 +811,66 @@ export default function AdminMeeting() {
             )}
           </WorkspaceCard>
 
-          <WorkspaceCard>
-            <WorkspaceCardHeader title="Meeting Information" />
-            <div className="grid gap-8 md:grid-cols-2" style={{ fontSize: 13, color: C.t2 }}>
-              <DetailItem label="Request ID" value={selectedMeeting.requestId || selectedMeeting.id} />
-              <DetailItem label="Citizen ID" value={selectedMeeting.citizen_code || selectedMeeting.citizen_id || "Pending"} />
-              <DetailItem label="Admin Referral" value={selectedMeeting.admin_referral || "Not provided"} />
-              <DetailItem label="Assigned Admin" value={selectedMeeting.assignedAdminName || "Pending"} />
-              <DetailItem label="Assigned DEO" value={selectedMeeting.assignedDeoName || "Pending"} />
-              <DetailItem label="Scheduled At" value={selectedMeeting.scheduled_at ? new Date(selectedMeeting.scheduled_at).toLocaleString("en-IN") : "Pending"} />
-              <DetailItem label="Scheduled Location" value={selectedMeeting.scheduled_location || "Pending"} />
-              <DetailItem label="VIP" value={selectedMeeting.is_vip ? "Yes" : "No"} />
-              <DetailItem label="Visitor ID" value={selectedMeeting.visitorId || "Pending"} />
-              <DetailItem label="Meeting Docket" value={selectedMeeting.meetingDocket || "Pending"} />
-              <DetailItem label="Created At" value={selectedMeeting.created_at ? new Date(selectedMeeting.created_at).toLocaleString("en-IN") : "Pending"} />
-            </div>
-
-            {(selectedMeeting.rejection_reason || selectedMeeting.verification_reason || selectedMeeting.admin_comments || selectedMeeting.completionNote || selectedMeeting.cancellationReason) ? (
-              <div className="mt-6 space-y-3">
-                {selectedMeeting.rejection_reason ? <NoticeBox tone="red" label="Rejection Reason" value={selectedMeeting.rejection_reason} /> : null}
-                {selectedMeeting.verification_reason ? <NoticeBox tone="amber" label="Verification Reason" value={selectedMeeting.verification_reason} /> : null}
-                {selectedMeeting.admin_comments ? <NoticeBox tone="blue" label="Admin Comments" value={selectedMeeting.admin_comments} /> : null}
-                {selectedMeeting.completionNote ? <NoticeBox tone="blue" label="Completion Note" value={selectedMeeting.completionNote} /> : null}
-                {selectedMeeting.cancellationReason ? <NoticeBox tone="red" label="Cancellation Reason" value={selectedMeeting.cancellationReason} /> : null}
+          <div style={{ display: "grid", gridTemplateColumns: "minmax(0, 7fr) minmax(320px, 3fr)", gap: 20, alignItems: "start" }}>
+            <WorkspaceCard style={{ marginBottom: 0 }}>
+              <WorkspaceCardHeader title="Meeting Information" />
+              <div className="grid gap-6 md:grid-cols-2" style={{ fontSize: 13, color: C.t2 }}>
+                <DetailItem label="Request ID" value={selectedMeeting.requestId || selectedMeeting.id} />
+                <DetailItem label="Citizen ID" value={selectedMeeting.citizen_code || selectedMeeting.citizen_id || "Pending"} />
+                <DetailItem label="Admin Referral" value={selectedMeeting.admin_referral || "Not provided"} />
+                <DetailItem label="Assigned Admin" value={selectedMeeting.assignedAdminName || "Pending"} />
+                <DetailItem label="Assigned DEO" value={selectedMeeting.assignedDeoName || "Pending"} />
+                <DetailItem label="Scheduled At" value={selectedMeeting.scheduled_at ? new Date(selectedMeeting.scheduled_at).toLocaleString("en-IN") : "Pending"} />
+                <DetailItem label="Scheduled Location" value={selectedMeeting.scheduled_location || "Pending"} />
+                <DetailItem label="VIP" value={selectedMeeting.is_vip ? "Yes" : "No"} />
+                <DetailItem label="Visitor ID" value={selectedMeeting.visitorId || "Pending"} />
+                <DetailItem label="Meeting Docket" value={selectedMeeting.meetingDocket || "Pending"} />
+                <DetailItem label="Created At" value={selectedMeeting.created_at ? new Date(selectedMeeting.created_at).toLocaleString("en-IN") : "Pending"} />
               </div>
-            ) : null}
-          </WorkspaceCard>
 
-          <WorkspaceCard>
-            <WorkspaceCardHeader title="Activity Timeline" subtitle="Chronological movement of this meeting through the workflow." />
-            <div className="space-y-4">
-              {history.length === 0 ? (
-                <div style={{ fontSize: 13, color: C.t3 }}>No activity recorded yet.</div>
-              ) : (
-                history.map((event, index) => (
-                  <div key={`${event.created_at}-${index}`} className="flex gap-4">
-                    <div className="flex flex-col items-center">
-                      <div className="h-3 w-3 rounded-full" style={{ background: C.purple, border: `2px solid ${C.card}` }} />
-                      {index !== history.length - 1 ? <div className="mt-2 h-12 w-0.5" style={{ background: C.border }} /> : null}
-                    </div>
-                    <div className="flex-1 pb-4">
-                      <div style={{ background: C.bgElevated, border: `1px solid ${C.border}`, borderRadius: 10, padding: 16 }}>
-                        <p style={{ fontWeight: 600, color: C.t1 }}>{statusLabel(event.new_status)}</p>
-                        <p style={{ fontSize: 12, color: C.t3, marginTop: 4 }}>{event.actor_role}</p>
-                        {event.note ? <p style={{ fontSize: 13, color: C.t2, marginTop: 8 }}>{event.note}</p> : null}
+              {(selectedMeeting.rejection_reason || selectedMeeting.verification_reason || selectedMeeting.admin_comments || selectedMeeting.completionNote || selectedMeeting.cancellationReason) ? (
+                <div className="mt-6 space-y-3">
+                  {selectedMeeting.rejection_reason ? <NoticeBox tone="red" label="Rejection Reason" value={selectedMeeting.rejection_reason} /> : null}
+                  {selectedMeeting.verification_reason ? <NoticeBox tone="amber" label="Verification Reason" value={selectedMeeting.verification_reason} /> : null}
+                  {selectedMeeting.admin_comments ? <NoticeBox tone="blue" label="Admin Comments" value={selectedMeeting.admin_comments} /> : null}
+                  {selectedMeeting.completionNote ? <NoticeBox tone="blue" label="Completion Note" value={selectedMeeting.completionNote} /> : null}
+                  {selectedMeeting.cancellationReason ? <NoticeBox tone="red" label="Cancellation Reason" value={selectedMeeting.cancellationReason} /> : null}
+                </div>
+              ) : null}
+            </WorkspaceCard>
+
+            <WorkspaceCard style={{ marginBottom: 0 }}>
+              <WorkspaceCardHeader title="Activity Timeline" subtitle="Chronological movement of this meeting through the workflow." />
+              <div className="space-y-4">
+                {history.length === 0 ? (
+                  <div style={{ fontSize: 13, color: C.t3 }}>No activity recorded yet.</div>
+                ) : (
+                  history.map((event, index) => (
+                    <div key={`${event.created_at}-${index}`} className="flex gap-4">
+                      <div className="flex flex-col items-center">
+                        <div className="h-3 w-3 rounded-full" style={{ background: C.purple, border: `2px solid ${C.card}` }} />
+                        {index !== history.length - 1 ? <div className="mt-2 h-12 w-0.5" style={{ background: C.border }} /> : null}
+                      </div>
+                      <div className="flex-1 pb-4">
+                        <div style={{ background: C.bgElevated, border: `1px solid ${C.border}`, borderRadius: 10, padding: 16 }}>
+                          <p style={{ fontWeight: 600, color: C.t1 }}>{statusLabel(event.new_status)}</p>
+                          <p style={{ fontSize: 12, color: C.t3, marginTop: 4 }}>{event.actor_role}</p>
+                          {event.note ? <p style={{ fontSize: 13, color: C.t2, marginTop: 8 }}>{event.note}</p> : null}
+                        </div>
                       </div>
                     </div>
-                  </div>
-                ))
-              )}
-            </div>
-          </WorkspaceCard>
+                  ))
+                )}
+              </div>
+            </WorkspaceCard>
+          </div>
         </div>
       </WorkspacePage>
     );
   }
 
   return (
-    <WorkspacePage width={1280}>
+    <WorkspacePage width={1280} contentStyle={{ paddingLeft: 12, paddingRight: 12 }}>
       <div style={{ maxWidth: "1150px", margin: "0 auto", width: "100%" }}>
         <WorkspaceSectionHeader
           eyebrow="Admin Workspace"
@@ -757,7 +961,7 @@ export default function AdminMeeting() {
                   <div style={{ textAlign: "center" }}>
                     <button
                       type="button"
-                      onClick={() => navigate(`/admin/meetings/${meeting.id}`)}
+                      onClick={() => navigate(`${PATHS.admin.meetings}/${meeting.id}?source=meeting-queue`)}
                       title="View details"
                       style={{
                         color: C.purple,

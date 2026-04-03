@@ -106,9 +106,9 @@ async function scheduleComplaintCall(req, res, next) {
   }
 }
 
-async function logComplaintCallOutcome(req, res, next) {
+async function logComplaintAction(req, res, next) {
   try {
-    const complaint = await complaintsService.logComplaintCallOutcome(req.params.complaintId, req.user.sub, req.body.callOutcome, reqMeta(req));
+    const complaint = await complaintsService.logComplaintAction(req.params.complaintId, req.user.sub, req.body, reqMeta(req));
     res.json({ complaint });
   } catch (error) {
     next(error);
@@ -161,7 +161,7 @@ module.exports = {
   startComplaintReview,
   updateComplaintDepartment,
   scheduleComplaintCall,
-  logComplaintCallOutcome,
+  logComplaintAction,
   resolveComplaint,
   escalateComplaintToMeeting,
   reopenComplaint,
