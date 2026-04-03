@@ -80,6 +80,19 @@ async function listWorkflowDirectory() {
   };
 }
 
+async function findActiveAdminById(adminId) {
+  const result = await pool.query(
+    `SELECT id, username, first_name, last_name, designation
+       FROM admins
+      WHERE id = $1
+        AND status = 'active'
+        AND is_verified = TRUE
+        AND removed_at IS NULL`,
+    [adminId]
+  );
+  return result.rows[0] || null;
+}
+
 async function findActiveDeoById(deoId) {
   const result = await pool.query(
     `SELECT id, first_name, last_name, designation
@@ -211,6 +224,7 @@ module.exports = {
   createAdmin,
   createDeo,
   deleteDeoById,
+  findActiveAdminById,
   findDeoByIdentityConflict,
   findActiveDeoById,
   findActiveMinisterById,

@@ -55,6 +55,15 @@ async function submitMeetingRequest({ citizenId, body, file, reqMeta, idempotenc
   }
 
   try {
+    let assignedAdminId = null;
+    if (body.referralAdminUserId) {
+      const admin = await adminRepository.findActiveAdminById(body.referralAdminUserId);
+      if (!admin) {
+        throw createHttpError(400, 'Selected admin desk is not available');
+      }
+      assignedAdminId = admin.id;
+    }
+
     let document = null;
     if (file) {
       const storedFile = await persistPrivateUpload(file, 'documents');
@@ -71,6 +80,7 @@ async function submitMeetingRequest({ citizenId, body, file, reqMeta, idempotenc
       purpose: sanitizeText(body.purpose),
       preferredTime: body.preferredTime || null,
       adminReferral: sanitizeText(body.adminReferral || ''),
+      assignedAdminId,
       documentFileId: document?.id,
       additionalAttendees: body.additionalAttendees || [],
     });

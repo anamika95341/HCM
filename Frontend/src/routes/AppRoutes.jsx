@@ -6,6 +6,7 @@ import ProtectedRoute from "../shared/auth/ProtectedRoute.jsx";
 import AdminCases from "../modules/admin/components/AdminCases.jsx";
 import AdminCaseDetail from "../modules/admin/components/AdminCaseDetail.jsx";
 import AdminMeeting from "../modules/admin/components/AdminMeeting.jsx";
+import AdminComplaintQueue from "../modules/admin/components/AdminComplaintQueue.jsx";
 
 const LoginPage = lazy(() => import("../modules/auth/LoginPage.jsx"));
 const NewCasePage = lazy(() => import("../modules/citizen/pages/NewCasePage.jsx"));
@@ -86,6 +87,7 @@ export default function AppRoutes() {
             <Route path={PATHS.admin.pool} element={<AdminCases />} />
             <Route path={PATHS.admin.legacyPool} element={<AdminCases />} />
             <Route path={PATHS.admin.cases} element={<AdminCases />} />
+            <Route path={PATHS.admin.complaints} element={<AdminComplaintQueue />} />
             <Route path={PATHS.admin.legacyCases} element={<AdminCases />} />
             <Route path={PATHS.admin.caseDetail} element={<AdminCaseDetail />} />
             <Route path={PATHS.admin.legacyCaseDetail} element={<AdminCaseDetail />} />

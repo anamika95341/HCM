@@ -1245,6 +1245,7 @@ export default function HCMNewCasePage() {
       payload.append("purpose", meetingForm.purpose);
       payload.append("preferredTime", preferredTimeIso);
       payload.append("adminReferral", referralAdmin ? `${referralAdmin.name} · ${referralAdmin.department}` : "");
+      payload.append("referralAdminUserId", meetingForm.referralAdminUserId || "");
       payload.append(
         "additionalAttendees",
         JSON.stringify(
@@ -1267,7 +1268,9 @@ export default function HCMNewCasePage() {
       setSuccessModal({
         open: true,
         title: "Meeting Submitted",
-        message: "Your meeting request has been submitted to the admin meeting pool.",
+        message: referralAdmin
+          ? "Your meeting request has been submitted directly to the selected admin's meeting queue."
+          : "Your meeting request has been submitted to the admin meeting pool.",
       });
       setMeetingForm({
         title: "",

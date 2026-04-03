@@ -353,7 +353,15 @@ export default function AdminMeeting() {
     const canCompleteOrCancel = isAssignedToCurrentAdmin && selectedMeeting.status === "scheduled";
     const canUploadPhotos = isAssignedToCurrentAdmin && ["scheduled", "completed"].includes(selectedMeeting.status);
 
-    const openedFromWorkQueue = source === "work-queue";
+    const backPath = source === "my-cases"
+      ? PATHS.admin.cases
+      : source === "complaint-queue"
+        ? PATHS.admin.complaints
+        : source === "meeting-queue"
+          ? PATHS.admin.meetings
+          : isUnassignedPoolMeeting || source === "work-queue"
+            ? PATHS.admin.workQueue
+            : PATHS.admin.meetings;
     return (
       <WorkspacePage width={1200}>
         <SuccessModal open={!!successMessage} message={successMessage} onClose={() => setSuccessMessage("")} />
@@ -386,10 +394,16 @@ export default function AdminMeeting() {
             <WorkspaceButton
               type="button"
               variant="ghost"
-              onClick={() => navigate(isUnassignedPoolMeeting || openedFromWorkQueue ? PATHS.admin.workQueue : PATHS.admin.meetings)}
+              onClick={() => navigate(backPath)}
             >
               <ChevronLeft size={16} />
-              {isUnassignedPoolMeeting || openedFromWorkQueue ? "Back to Work Queue" : "Back to Meeting Queue"}
+              {backPath === PATHS.admin.complaints
+                ? "Back to Complaint Queue"
+                : backPath === PATHS.admin.cases
+                  ? "Back to My Cases"
+                  : backPath === PATHS.admin.workQueue
+                    ? "Back to Work Queue"
+                    : "Back to Meeting Queue"}
             </WorkspaceButton>
           }
         />
@@ -757,7 +771,7 @@ export default function AdminMeeting() {
                   <div style={{ textAlign: "center" }}>
                     <button
                       type="button"
-                      onClick={() => navigate(`/admin/meetings/${meeting.id}`)}
+                      onClick={() => navigate(`${PATHS.admin.meetings}/${meeting.id}?source=meeting-queue`)}
                       title="View details"
                       style={{
                         color: C.purple,

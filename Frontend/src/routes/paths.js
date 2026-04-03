@@ -26,6 +26,7 @@ export const PATHS = {
     pool: "/admin/pool",
     legacyPool: "/adminallcases",
     cases: "/admin/cases",
+    complaints: "/admin/complaints",
     legacyCases: "/admincases",
     caseDetail: "/admin/cases/:id",
     legacyCaseDetail: "/admincasedetail",

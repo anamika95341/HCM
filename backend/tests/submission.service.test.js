@@ -21,6 +21,7 @@ jest.mock('../modules/complaints/complaints.repository', () => ({
 
 jest.mock('../modules/admin/admin.repository', () => ({
   listActiveAdminsForCitizenDirectory: jest.fn(),
+  findActiveAdminById: jest.fn(),
   findActiveDeoById: jest.fn(),
   findActiveMinisterById: jest.fn(),
 }));
@@ -49,6 +50,7 @@ const redis = require('../config/redis');
 const pool = require('../config/database');
 const meetingsRepository = require('../modules/meetings/meetings.repository');
 const complaintsRepository = require('../modules/complaints/complaints.repository');
+const adminRepository = require('../modules/admin/admin.repository');
 const meetingsService = require('../modules/meetings/meetings.service');
 const complaintsService = require('../modules/complaints/complaints.service');
 
@@ -90,6 +92,41 @@ describe('submission workflow services', () => {
       expect.stringContaining('INSERT INTO idempotency_requests'),
       expect.arrayContaining(['meeting_submission', 'citizen-1'])
     );
+  });
+
+  test('meeting submission assigns the selected admin desk directly to the meeting queue', async () => {
+    redis.get.mockRejectedValue(new Error('redis down'));
+    pool.query
+      .mockResolvedValueOnce({ rows: [{ id: 'idempo-3' }] })
+      .mockResolvedValueOnce({ rows: [] });
+    adminRepository.findActiveAdminById.mockResolvedValue({ id: 'admin-42' });
+    meetingsRepository.createMeeting.mockResolvedValue({ id: 'meeting-db-2' });
+    meetingsRepository.getMeetingById.mockResolvedValue({ id: 'meeting-db-2', requestId: 'MREQ-2026-000002', status: 'pending', assignedAdminUserId: 'admin-42' });
+
+    const result = await meetingsService.submitMeetingRequest({
+      citizenId: 'citizen-1',
+      body: {
+        title: 'Local road repair',
+        purpose: 'Need to discuss repeated road damage and drainage issues.',
+        preferredTime: '2026-04-06T11:00:00.000Z',
+        adminReferral: 'Admin Name · Roads',
+        referralAdminUserId: 'admin-42',
+        additionalAttendees: [],
+      },
+      file: null,
+      reqMeta: { ip: '127.0.0.1', userAgent: 'jest' },
+      idempotencyKey: '',
+    });
+
+    expect(adminRepository.findActiveAdminById).toHaveBeenCalledWith('admin-42');
+    expect(meetingsRepository.createMeeting).toHaveBeenCalledWith(expect.objectContaining({
+      citizenId: 'citizen-1',
+      assignedAdminId: 'admin-42',
+      adminReferral: 'Admin Name · Roads',
+    }));
+    expect(result).toEqual({
+      meeting: { id: 'meeting-db-2', requestId: 'MREQ-2026-000002', status: 'pending', assignedAdminUserId: 'admin-42' },
+    });
   });
 
   test('complaint submission works without an idempotency header when Redis is unavailable', async () => {

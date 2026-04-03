@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { ChevronLeft, FileText } from "lucide-react";
+import { PATHS } from "../../../routes/paths.js";
 import { apiClient, authorizedConfig } from "../../../shared/api/client.js";
 import { useAuth } from "../../../shared/auth/AuthContext.jsx";
 import {
@@ -112,6 +113,7 @@ export default function AdminCaseDetail() {
   const { id } = useParams();
   const [searchParams] = useSearchParams();
   const { session } = useAuth();
+  const source = searchParams.get("source") || "";
   const [item, setItem] = useState(null);
   const [contacts, setContacts] = useState([]);
   const [admins, setAdmins] = useState([]);
@@ -206,7 +208,8 @@ export default function AdminCaseDetail() {
         setHistory(detail.data.history || []);
       }
       if (data.meeting) {
-        navigate(`/admin/meetings/${data.meeting.id}`);
+        const meetingSource = source === "complaint-queue" ? "complaint-queue" : source || "my-cases";
+        navigate(`${PATHS.admin.meetings}/${data.meeting.id}?source=${meetingSource}`);
         return;
       }
       setSuccessMessage(`${item?.complaintId || "Complaint"} updated successfully.`);
@@ -227,6 +230,16 @@ export default function AdminCaseDetail() {
   }
 
   const matchingAdminOptions = admins.filter((admin) => admin.id !== session?.user?.id);
+  const backPath = source === "complaint-queue"
+    ? PATHS.admin.complaints
+    : source === "work-queue"
+      ? PATHS.admin.workQueue
+      : PATHS.admin.cases;
+  const backLabel = backPath === PATHS.admin.complaints
+    ? "Back to Complaint Queue"
+    : backPath === PATHS.admin.workQueue
+      ? "Back to Work Queue"
+      : "Back to My Cases";
 
   return (
     <WorkspacePage width={1200}>
@@ -235,7 +248,7 @@ export default function AdminCaseDetail() {
         eyebrow="Admin Workspace"
         title={item.complaintId}
         subtitle={item.title}
-        action={<WorkspaceButton type="button" variant="ghost" onClick={() => navigate(-1)}><ChevronLeft size={16} />Back</WorkspaceButton>}
+        action={<WorkspaceButton type="button" variant="ghost" onClick={() => navigate(backPath)}><ChevronLeft size={16} />{backLabel}</WorkspaceButton>}
       />
 
       <div style={{ display: "grid", gap: 24 }}>

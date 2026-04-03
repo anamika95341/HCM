@@ -72,6 +72,7 @@ const meetingRequestSchema = z.object({
   purpose: z.string().min(10).max(3000),
   preferredTime: z.string().datetime().optional().or(z.literal('')),
   adminReferral: z.string().max(255).optional().or(z.literal('')),
+  referralAdminUserId: z.string().uuid().optional().or(z.literal('')),
   additionalAttendees: z.array(attendeeSchema).max(5).default([]),
 });
 

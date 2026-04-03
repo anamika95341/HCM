@@ -67,6 +67,18 @@ function meetingRow(item) {
   };
 }
 
+function buildItemRoute(item, tab) {
+  const sourceMap = {
+    complaintPool: "work-queue",
+    meetingPool: "work-queue",
+    myCases: "my-cases",
+    resolved: "work-queue",
+    escalated: "work-queue",
+  };
+  const source = sourceMap[tab];
+  return source ? `${item.route}?source=${source}` : item.route;
+}
+
 export default function AdminCases() {
   const { C } = usePortalTheme();
   const navigate = useNavigate();
@@ -289,11 +301,7 @@ export default function AdminCases() {
                       </td>
                       <td style={{ padding: "12px 16px", textAlign: "center", borderBottom: `1px solid ${C.borderLight}` }}>
                         <button
-                          onClick={() => navigate(
-                            item.itemType === "meeting" && tab === "meetingPool"
-                              ? `${item.route}?source=work-queue`
-                              : item.route
-                          )}
+                          onClick={() => navigate(buildItemRoute(item, tab))}
                           className="transition-colors"
                           style={{
                             color: C.purple,
