@@ -5,6 +5,7 @@ export const PATHS = {
   masteradminLogin: "/masteradmin",
   ministerLogin: "/Minister",
   deoLogin: "/DEO",
+  operators: "/operators",
   settings: "/settings",
   citizen: {
     home: "/citizen",
@@ -23,6 +24,7 @@ export const PATHS = {
     calendar: "/admin/calendar",
     legacyCalendar: "/calendar",
     workQueue: "/admin/work-queue",
+    complaintQueue: "/admin/complaint-queue",
     pool: "/admin/pool",
     legacyPool: "/adminallcases",
     cases: "/admin/cases",

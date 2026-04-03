@@ -65,6 +65,7 @@ const complaintSchema = z.object({
   description: z.string().min(10).max(5000),
   complaintLocation: z.string().max(500).optional().or(z.literal('')),
   complaintType: z.string().max(120).optional().or(z.literal('')),
+  incidentDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
 });
 
 const meetingRequestSchema = z.object({
@@ -72,6 +73,7 @@ const meetingRequestSchema = z.object({
   purpose: z.string().min(10).max(3000),
   preferredTime: z.string().datetime().optional().or(z.literal('')),
   adminReferral: z.string().max(255).optional().or(z.literal('')),
+  referralAdminUserId: z.string().uuid().optional().or(z.literal('')),
   additionalAttendees: z.array(attendeeSchema).max(5).default([]),
 });
 

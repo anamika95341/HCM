@@ -127,6 +127,7 @@ async function createMeeting({
   purpose,
   preferredTime,
   adminReferral,
+  assignedAdminId = null,
   documentFileId,
   additionalAttendees,
   linkedComplaintId = null,
@@ -142,10 +143,10 @@ async function createMeeting({
     const requestId = generateCaseCode('MREQ');
     const meetingResult = await client.query(
       `INSERT INTO meetings
-        (request_id, citizen_id, title, purpose, preferred_time, admin_referral, document_file_id, linked_complaint_id)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8)
+        (request_id, citizen_id, assigned_admin_id, title, purpose, preferred_time, admin_referral, document_file_id, linked_complaint_id)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)
        RETURNING *`,
-      [requestId, citizenId, title, purpose, preferredTime || null, adminReferral || null, documentFileId || null, linkedComplaintId]
+      [requestId, citizenId, assignedAdminId, title, purpose, preferredTime || null, adminReferral || null, documentFileId || null, linkedComplaintId]
     );
     const meeting = meetingResult.rows[0];
 
