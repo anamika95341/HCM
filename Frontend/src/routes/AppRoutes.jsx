@@ -5,6 +5,7 @@ import { PATHS } from "./paths.js";
 import ProtectedRoute from "../shared/auth/ProtectedRoute.jsx";
 import AdminCases from "../modules/admin/components/AdminCases.jsx";
 import AdminCaseDetail from "../modules/admin/components/AdminCaseDetail.jsx";
+import AdminComplaintQueue from "../modules/admin/components/AdminComplaintQueue.jsx";
 import AdminMeeting from "../modules/admin/components/AdminMeeting.jsx";
 import OperatorsPage from "../modules/operators/OperatorsPage.jsx";
 
