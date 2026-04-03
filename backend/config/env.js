@@ -58,4 +58,11 @@ module.exports = {
   telegramChatId: process.env.TELEGRAM_CHAT_ID,
   clamavEnabled: process.env.CLAMAV_ENABLED === 'true',
   adminManualUnlockEmail: process.env.ADMIN_MANUAL_UNLOCK_EMAIL || '',
+  authStreamBatchSize: Number(process.env.AUTH_STREAM_BATCH_SIZE || 25),
+  authStreamBlockMs: Number(process.env.AUTH_STREAM_BLOCK_MS || 5000),
+  authStreamPollIntervalMs: Number(process.env.AUTH_STREAM_POLL_INTERVAL_MS || 250),
+  authStreamConcurrency: Number(process.env.AUTH_STREAM_CONCURRENCY || 5),
+  authStreamMaxRetries: Number(process.env.AUTH_STREAM_MAX_RETRIES || 5),
+  authStreamClaimIdleMs: Number(process.env.AUTH_STREAM_CLAIM_IDLE_MS || 60000),
+  authStreamReplayBatchSize: Number(process.env.AUTH_STREAM_REPLAY_BATCH_SIZE || 100),
 };

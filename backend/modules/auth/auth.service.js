@@ -12,6 +12,7 @@ const { generateOtp, verifyOtp } = require('../../utils/otpService');
 const { verifyCaptcha } = require('../../utils/captchaVerify');
 const { writeAuditLog } = require('../../utils/audit');
 const logger = require('../../utils/logger');
+const { publishAuthEvent } = require('../../utils/authStream');
 const authRepository = require('./auth.repository');
 const citizenRepository = require('../citizen/citizen.repository');
 const { lookupMp } = require('../../utils/mpLookup');
@@ -118,6 +119,10 @@ async function issueSession(role, user) {
   };
 }
 
+async function emitAuthEvent(payload) {
+  await publishAuthEvent(redis, payload);
+}
+
 async function registerCitizen(payload, reqMeta) {
   let stage = 'start';
   const passwordHash = await bcrypt.hash(payload.password, 12);
@@ -158,6 +163,7 @@ async function registerCitizen(payload, reqMeta) {
         userId: citizen.id,
         purpose: 'registration_verification',
         ip: reqMeta.ip,
+        requestId: reqMeta.requestId,
       });
 
       stage = 'clear-old-verification-records';
@@ -243,6 +249,7 @@ async function verifyCitizenRegistration({ userId, otp, ip }, reqMeta) {
     purpose: 'registration_verification',
     ip,
     otp,
+    requestId: reqMeta.requestId,
   });
   if (!valid) {
     throw createHttpError(400, 'Invalid or expired OTP');
@@ -278,6 +285,7 @@ async function verifyDeoRegistration({ usernameOrEmail, otp }, reqMeta) {
     purpose: 'registration_verification',
     scope: 'email_verification',
     otp,
+    requestId: reqMeta.requestId,
   });
 
   if (!validOtp) {
@@ -318,6 +326,7 @@ async function verifyAdminRegistration({ usernameOrEmail, otp }, reqMeta) {
     purpose: 'registration_verification',
     scope: 'email_verification',
     otp,
+    requestId: reqMeta.requestId,
   });
 
   if (!validOtp) {
@@ -365,6 +374,7 @@ async function resendAdminVerificationCode({ usernameOrEmail }, reqMeta) {
     userId: user.id,
     purpose: 'registration_verification',
     scope: 'email_verification',
+    requestId: reqMeta.requestId,
   });
 
   await authRepository.clearVerificationRecords({
@@ -420,6 +430,7 @@ async function resendDeoVerificationCode({ usernameOrEmail }, reqMeta) {
     userId: user.id,
     purpose: 'registration_verification',
     scope: 'email_verification',
+    requestId: reqMeta.requestId,
   });
 
   await authRepository.clearVerificationRecords({
@@ -536,16 +547,40 @@ async function loginCitizen({ citizenId, password }, reqMeta) {
   const user = await authRepository.findCitizenByCitizenId(citizenId);
   const genericError = createHttpError(401, 'Invalid credentials');
   if (!user) {
+    await emitAuthEvent({
+      event: 'login_failure',
+      role: 'citizen',
+      userId: 'unknown',
+      ip: reqMeta.ip,
+      reason: 'user_not_found',
+      requestId: reqMeta.requestId,
+    });
     throw genericError;
   }
   await checkLockout({ role: 'citizen', userId: user.id, ip: reqMeta.ip, email: user.email });
   const valid = await bcrypt.compare(password, user.password_hash);
   if (!valid || !user.is_verified) {
     await recordLoginFailure({ role: 'citizen', userId: user.id, ip: reqMeta.ip });
+    await emitAuthEvent({
+      event: 'login_failure',
+      role: 'citizen',
+      userId: user.id,
+      ip: reqMeta.ip,
+      reason: !valid ? 'invalid_credentials' : 'account_not_verified',
+      requestId: reqMeta.requestId,
+    });
     throw genericError;
   }
   await clearLoginFailures({ role: 'citizen', userId: user.id, ip: reqMeta.ip });
-  return issueSession('citizen', user);
+  const session = await issueSession('citizen', user);
+  await emitAuthEvent({
+    event: 'login_success',
+    role: 'citizen',
+    userId: user.id,
+    ip: reqMeta.ip,
+    requestId: reqMeta.requestId,
+  });
+  return session;
 }
 
 async function startTwoFactorLogin(role, identifier, password, reqMeta) {
@@ -559,26 +594,66 @@ async function startTwoFactorLogin(role, identifier, password, reqMeta) {
 
   const user = await finder(identifier);
   if (!user) {
+    await emitAuthEvent({
+      event: 'login_failure',
+      role,
+      userId: 'unknown',
+      ip: reqMeta.ip,
+      reason: 'user_not_found',
+      requestId: reqMeta.requestId,
+    });
     throw genericError;
   }
   await checkLockout({ role, userId: user.id, ip: reqMeta.ip, email: user.email });
   const valid = await bcrypt.compare(password, user.password_hash);
   if (!valid) {
     await recordLoginFailure({ role, userId: user.id, ip: reqMeta.ip });
+    await emitAuthEvent({
+      event: 'login_failure',
+      role,
+      userId: user.id,
+      ip: reqMeta.ip,
+      reason: 'invalid_credentials',
+      requestId: reqMeta.requestId,
+    });
     throw genericError;
   }
 
   if ((role === 'admin' || role === 'deo') && !user.is_verified) {
+    await emitAuthEvent({
+      event: 'login_failure',
+      role,
+      userId: user.id,
+      ip: reqMeta.ip,
+      reason: 'account_not_verified',
+      requestId: reqMeta.requestId,
+    });
     throw createHttpError(403, 'Account verification required');
   }
 
   if (user.status !== 'active') {
+    await emitAuthEvent({
+      event: 'login_failure',
+      role,
+      userId: user.id,
+      ip: reqMeta.ip,
+      reason: 'account_not_active',
+      requestId: reqMeta.requestId,
+    });
     throw createHttpError(403, 'Account not active');
   }
 
   if (role === 'minister' || role === 'admin' || role === 'masteradmin' || role === 'deo') {
     await clearLoginFailures({ role, userId: user.id, ip: reqMeta.ip });
-    return issueSession(role, user);
+    const session = await issueSession(role, user);
+    await emitAuthEvent({
+      event: 'login_success',
+      role,
+      userId: user.id,
+      ip: reqMeta.ip,
+      requestId: reqMeta.requestId,
+    });
+    return session;
   }
   throw createHttpError(500, 'Unsupported login flow');
 }
@@ -599,6 +674,7 @@ async function forgotCitizenPassword({ aadhaarNumber, email, captchaToken }, req
     userId: user.id,
     purpose: 'password_reset',
     ip: reqMeta.ip,
+    requestId: reqMeta.requestId,
   });
 
   if (user.email) {
@@ -629,6 +705,7 @@ async function resetCitizenPassword({ citizenId, otp, password }, reqMeta) {
     purpose: 'password_reset',
     ip: reqMeta.ip,
     otp,
+    requestId: reqMeta.requestId,
   });
   if (!valid) {
     throw createHttpError(400, 'Invalid or expired OTP');
@@ -645,6 +722,13 @@ async function resetCitizenPassword({ citizenId, otp, password }, reqMeta) {
       error,
     });
   }
+  await emitAuthEvent({
+    event: 'password_reset',
+    role: 'citizen',
+    userId: user.id,
+    ip: reqMeta.ip,
+    requestId: reqMeta.requestId,
+  });
   return { message: 'Password reset completed if the account exists.' };
 }
 
@@ -677,17 +761,33 @@ async function refreshSession(refreshToken) {
   return session;
 }
 
-async function logout(role, token, refreshToken) {
+async function logout(role, token, refreshToken, reqMeta = {}) {
   const accessPayload = verifyJwtByRole(role, token);
   const ttl = Math.max(accessPayload.exp - Math.floor(Date.now() / 1000), 1);
   try {
     await redis.set(`revoked:jti:${accessPayload.jti}`, '1', 'EX', ttl);
+    await emitAuthEvent({
+      event: 'token_revoked',
+      role,
+      userId: accessPayload.sub,
+      ip: reqMeta.ip || 'logout',
+      reason: 'access_token',
+      requestId: reqMeta.requestId,
+    });
   } catch (error) {
     logger.warn('Logout token revocation cache unavailable; refresh token revocation will still proceed', {
       role,
       userId: accessPayload.sub,
       jti: accessPayload.jti,
       error,
+    });
+    await emitAuthEvent({
+      event: 'token_revoked',
+      role,
+      userId: accessPayload.sub,
+      ip: reqMeta.ip || 'logout',
+      reason: 'access_token_cache_unavailable',
+      requestId: reqMeta.requestId,
     });
   }
 
@@ -698,6 +798,14 @@ async function logout(role, token, refreshToken) {
       await authRepository.revokeRefreshToken(stored.id);
     }
   }
+
+  await emitAuthEvent({
+    event: 'logout',
+    role,
+    userId: accessPayload.sub,
+    ip: reqMeta.ip || 'logout',
+    requestId: reqMeta.requestId,
+  });
 
   return { message: 'Logged out successfully' };
 }

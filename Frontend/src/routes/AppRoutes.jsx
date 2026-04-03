@@ -20,6 +20,9 @@ const MinisterDashboard = lazy(() => import("../modules/minister/MinisterDashboa
 const MinisterCalendar = lazy(() => import("../modules/minister/MinisterCalendar.jsx"));
 const DeoCalendarEvent = lazy(() => import("../modules/deo/DeoCalendarEvent.jsx"));
 const DeoVerifyPage = lazy(() => import("../modules/deo/DeoVerifyPage.jsx"));
+const CreateEvent = lazy(() => import("../modules/deo/components/CreateEvent.jsx"));
+const ManageEvent = lazy(() => import("../modules/deo/components/ManageEvent.jsx"));
+const CitizenMeetingFiles = lazy(() => import("../modules/deo/components/CitizenMeetingFiles.jsx"));
 const AdminVerifyPage = lazy(() => import("../modules/admin/AdminVerifyPage.jsx"));
 const MasterAdminDashboard = lazy(() => import("../modules/masteradmin/MasterAdminDashboard.jsx"));
 const MasterAdminAccessPage = lazy(() => import("../modules/masteradmin/MasterAdminAccessPage.jsx"));
@@ -109,6 +112,9 @@ export default function AppRoutes() {
           <Route element={<AppLayout />}>
             <Route path={PATHS.deo.calendarEvents} element={<DeoCalendarEvent />} />
             <Route path={PATHS.deo.legacyCalendarEvents} element={<DeoCalendarEvent />} />
+            <Route path={PATHS.deo.createEvent} element={<CreateEvent />} />
+            <Route path={PATHS.deo.manageEvent} element={<ManageEvent />} />
+            <Route path={PATHS.deo.citizenMeetingFiles} element={<CitizenMeetingFiles />} />
           </Route>
         </Route>
 
