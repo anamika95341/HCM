@@ -6,6 +6,7 @@ import ProtectedRoute from "../shared/auth/ProtectedRoute.jsx";
 import AdminCases from "../modules/admin/components/AdminCases.jsx";
 import AdminCaseDetail from "../modules/admin/components/AdminCaseDetail.jsx";
 import AdminMeeting from "../modules/admin/components/AdminMeeting.jsx";
+import OperatorsPage from "../modules/operators/OperatorsPage.jsx";
 
 const LoginPage = lazy(() => import("../modules/auth/LoginPage.jsx"));
 const NewCasePage = lazy(() => import("../modules/citizen/pages/NewCasePage.jsx"));
@@ -49,11 +50,13 @@ export default function AppRoutes() {
     <Suspense fallback={<LoadingScreen />}>
       <Routes>
         <Route path={PATHS.login} element={<LoginPage defaultRole="citizen" />} />
-        <Route path={PATHS.adminLogin} element={<LoginPage defaultRole="admin" />} />
+        <Route path={PATHS.operators} element={<OperatorsPage />} />
+        {/* Redirect old role-specific login routes to unified operators page */}
+        <Route path={PATHS.adminLogin} element={<Navigate to={PATHS.operators} replace />} />
         <Route path={PATHS.adminVerify} element={<AdminVerifyPage />} />
         <Route path={PATHS.masteradminLogin} element={<LoginPage defaultRole="masteradmin" />} />
-        <Route path={PATHS.ministerLogin} element={<LoginPage defaultRole="minister" />} />
-        <Route path={PATHS.deoLogin} element={<LoginPage defaultRole="deo" />} />
+        <Route path={PATHS.ministerLogin} element={<Navigate to={PATHS.operators} replace />} />
+        <Route path={PATHS.deoLogin} element={<Navigate to={PATHS.operators} replace />} />
         <Route path={PATHS.deo.verify} element={<DeoVerifyPage />} />
 
         <Route element={<ProtectedRoute allowedRoles={["citizen"]} />}>
