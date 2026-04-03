@@ -6,6 +6,11 @@
   "scripts": {
     "dev": "NODE_ENV=development node server.js",
     "start": "NODE_ENV=production node server.js",
+    "worker:auth-stream": "node workers/authStreamWorker.js",
+    "auth-stream:info": "node scripts/authStreamAdmin.js info",
+    "auth-stream:pending": "node scripts/authStreamAdmin.js pending",
+    "auth-stream:replay": "node scripts/authStreamAdmin.js replay",
+    "auth-stream:requeue-dlq": "node scripts/authStreamAdmin.js requeue-dlq",
     "migrate": "node db/postgres/seeds/seed.js migrate",
     "seed": "node db/postgres/seeds/seed.js seed",
     "test": "jest --runInBand",

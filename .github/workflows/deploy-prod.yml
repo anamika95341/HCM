@@ -69,6 +69,7 @@ jobs:
     env:
       FRONTEND_IMAGE: ghcr.io/${{ github.repository_owner }}/hcm-frontend:${{ needs.gate.outputs.ref }}
       BACKEND_IMAGE: ghcr.io/${{ github.repository_owner }}/hcm-backend:${{ needs.gate.outputs.ref }}
+      AUTH_STREAM_WORKER_IMAGE: ghcr.io/${{ github.repository_owner }}/hcm-auth-stream-worker:${{ needs.gate.outputs.ref }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -92,6 +93,15 @@ jobs:
           target: runner
           push: true
           tags: ${{ env.BACKEND_IMAGE }}
+
+      - name: Build and push auth stream worker image
+        uses: docker/build-push-action@v6
+        with:
+          context: ./backend
+          file: ./backend/Dockerfile
+          target: runner
+          push: true
+          tags: ${{ env.AUTH_STREAM_WORKER_IMAGE }}
 
       - name: Build and push frontend image
         uses: docker/build-push-action@v6
@@ -126,4 +136,4 @@ jobs:
       - name: Deploy production stack
         run: |
           ssh -p "${{ secrets.PROD_SSH_PORT }}" "${{ secrets.PROD_SSH_USER }}@${{ secrets.PROD_SSH_HOST }}" \
-            "cd '${{ secrets.PROD_DEPLOY_PATH }}' && chmod +x scripts/deploy-prod.sh && FRONTEND_IMAGE='${{ env.FRONTEND_IMAGE }}' BACKEND_IMAGE='${{ env.BACKEND_IMAGE }}' ./scripts/deploy-prod.sh '${{ secrets.PROD_DEPLOY_PATH }}'"
+            "cd '${{ secrets.PROD_DEPLOY_PATH }}' && chmod +x scripts/deploy-prod.sh && FRONTEND_IMAGE='${{ env.FRONTEND_IMAGE }}' BACKEND_IMAGE='${{ env.BACKEND_IMAGE }}' AUTH_STREAM_WORKER_IMAGE='${{ env.AUTH_STREAM_WORKER_IMAGE }}' ./scripts/deploy-prod.sh '${{ secrets.PROD_DEPLOY_PATH }}'"

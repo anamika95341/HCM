@@ -13,6 +13,10 @@ function getBearerToken(req) {
   return header.slice(7);
 }
 
+function getRequestId(req) {
+  return req.get?.('x-request-id') || req.headers['x-request-id'];
+}
+
 function authenticate(expectedRole) {
   return async (req, res, next) => {
     try {
@@ -63,6 +67,7 @@ function authenticate(expectedRole) {
           userId: payload.sub,
           ip: req.ip,
           reason: 'redis_down',
+          requestId: getRequestId(req),
         });
       }
 

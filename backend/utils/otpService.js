@@ -4,6 +4,7 @@ const createHttpError = require('http-errors');
 const redis = require('../config/redis');
 const pool = require('../config/database');
 const logger = require('./logger');
+const { publishAuthEvent } = require('./authStream');
 
 function otpKey({ role, userId, purpose, ip, scope }) {
   return `otp:${role}:${userId}:${purpose}:${scope || ip || 'global'}`;
@@ -48,7 +49,7 @@ async function consumeOtpInDatabase(id) {
   );
 }
 
-async function generateOtp({ role, userId, purpose, ip, scope }) {
+async function generateOtp({ role, userId, purpose, ip, scope, requestId }) {
   const otp = crypto.randomInt(100000, 999999).toString();
   const hash = await bcrypt.hash(otp, 10);
   const key = otpKey({ role, userId, purpose, ip, scope });
@@ -64,10 +65,20 @@ async function generateOtp({ role, userId, purpose, ip, scope }) {
       throw createHttpError(503, 'OTP service temporarily unavailable, please try again shortly');
     }
   }
+
+  await publishAuthEvent(redis, {
+    event: 'otp_generated',
+    role,
+    userId,
+    ip: scope || ip || 'global',
+    reason: purpose,
+    requestId,
+  });
+
   return otp;
 }
 
-async function verifyOtp({ role, userId, purpose, ip, scope, otp }) {
+async function verifyOtp({ role, userId, purpose, ip, scope, otp, requestId }) {
   const key = otpKey({ role, userId, purpose, ip, scope });
   const scopeKey = otpScopeKey({ ip, scope });
   let hash;
@@ -88,6 +99,14 @@ async function verifyOtp({ role, userId, purpose, ip, scope, otp }) {
     const validDbOtp = await bcrypt.compare(otp, dbRecord.otp_hash);
     if (validDbOtp) {
       await consumeOtpInDatabase(dbRecord.id);
+      await publishAuthEvent(redis, {
+        event: 'otp_verified',
+        role,
+        userId,
+        ip: scope || ip || 'global',
+        reason: purpose,
+        requestId,
+      });
     }
     return validDbOtp;
   }
@@ -101,6 +120,14 @@ async function verifyOtp({ role, userId, purpose, ip, scope, otp }) {
     } catch (err) {
       logger.warn('otpService: Redis unavailable on delete after successful verification', { role, userId, purpose, scopeKey, error: err });
     }
+    await publishAuthEvent(redis, {
+      event: 'otp_verified',
+      role,
+      userId,
+      ip: scope || ip || 'global',
+      reason: purpose,
+      requestId,
+    });
   }
   return valid;
 }

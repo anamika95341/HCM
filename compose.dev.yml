@@ -33,6 +33,21 @@ services:
       - ./backend:/app
       - backend-node-modules:/app/node_modules
 
+  auth-stream-worker:
+    build:
+      target: dev
+    env_file:
+      - ./backend/.env
+    environment:
+      NODE_ENV: development
+      RUN_MIGRATIONS: "false"
+      DATABASE_URL: postgresql://app_user:${DB_PASSWORD:-change_me}@postgres:5432/citizen_portal
+      REDIS_URL: redis://:${REDIS_PASSWORD:-change_me}@redis:6379
+    command: ["npm", "run", "worker:auth-stream"]
+    volumes:
+      - ./backend:/app
+      - backend-node-modules:/app/node_modules
+
 volumes:
   frontend-node-modules:
   backend-node-modules:

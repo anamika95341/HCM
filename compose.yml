@@ -56,6 +56,29 @@ services:
       - frontend-backend-net
       - backend-data-net
 
+  auth-stream-worker:
+    image: ${AUTH_STREAM_WORKER_IMAGE:-hcm-auth-stream-worker:latest}
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+      target: runner
+    env_file:
+      - ./backend/.env
+    environment:
+      NODE_ENV: production
+      RUN_MIGRATIONS: "false"
+      DATABASE_URL: postgresql://app_user:${DB_PASSWORD:-change_me}@postgres:5432/citizen_portal
+      REDIS_URL: redis://:${REDIS_PASSWORD:-change_me}@redis:6379
+    command: ["npm", "run", "worker:auth-stream"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - backend-data-net
+
   postgres:
     image: postgres:16-alpine
     environment:
