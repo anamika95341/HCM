@@ -5,6 +5,7 @@ export const PATHS = {
   masteradminLogin: "/masteradmin",
   ministerLogin: "/Minister",
   deoLogin: "/DEO",
+  operators: "/operators",
   settings: "/settings",
   citizen: {
     home: "/citizen",

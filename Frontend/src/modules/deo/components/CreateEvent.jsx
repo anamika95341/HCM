@@ -1,151 +1,21 @@
 import { useState } from "react";
+import { usePortalTheme } from "../../../shared/theme/portalTheme.jsx";
 
-const styles = {
-  page: {
-    minHeight: "100vh",
-    backgroundColor: "#f4f4f6",
-    fontFamily: "'Segoe UI', sans-serif",
-    padding: "20px 24px",
-    boxSizing: "border-box",
-    width: "100%",
-  },
-  container: {
-    width: "100%",
-    maxWidth: "100%",
-  },
-  pageTitle: {
-    fontSize: 22,
-    fontWeight: 700,
-    color: "#111827",
-    textAlign: "center",
-    marginBottom: 24,
-    marginTop: 0,
-  },
-  card: {
-    background: "#ffffff",
-    borderRadius: 12,
-    border: "1px solid #e5e7eb",
-    padding: "28px 32px",
-  },
-  cardTitle: {
-    fontSize: 15,
-    fontWeight: 700,
-    color: "#111827",
-    marginBottom: 4,
-  },
-  cardSubtitle: {
-    fontSize: 13,
-    color: "#6b7280",
-    marginBottom: 24,
-  },
-  fieldGroup: {
-    marginBottom: 22,
-  },
-  label: {
-    display: "block",
-    fontSize: 11,
-    fontWeight: 700,
-    letterSpacing: "0.08em",
-    color: "#6b7280",
-    textTransform: "uppercase",
-    marginBottom: 8,
-  },
-  required: {
-    color: "#ef4444",
-    marginLeft: 3,
-  },
-  input: {
-    width: "100%",
-    padding: "10px 14px",
-    fontSize: 14,
-    color: "#111827",
-    background: "#f9fafb",
-    border: "1px solid #e5e7eb",
-    borderRadius: 8,
-    outline: "none",
-    boxSizing: "border-box",
-    transition: "border-color 0.15s, box-shadow 0.15s",
-  },
-  textarea: {
-    width: "100%",
-    padding: "12px 14px",
-    fontSize: 14,
-    color: "#111827",
-    background: "#f9fafb",
-    border: "1px solid #e5e7eb",
-    borderRadius: 8,
-    outline: "none",
-    boxSizing: "border-box",
-    resize: "vertical",
-    minHeight: 130,
-    fontFamily: "inherit",
-    transition: "border-color 0.15s, box-shadow 0.15s",
-  },
-  charCount: {
-    fontSize: 12,
-    color: "#9ca3af",
-    textAlign: "right",
-    marginTop: 4,
-  },
-  row: {
-    display: "grid",
-    gridTemplateColumns: "1fr 1fr",
-    gap: 20,
-  },
-  divider: {
-    borderTop: "1px solid #f0f0f0",
-    margin: "4px 0 22px 0",
-  },
-  sectionLabel: {
-    fontSize: 11,
-    fontWeight: 700,
-    letterSpacing: "0.08em",
-    color: "#6b7280",
-    textTransform: "uppercase",
-    marginBottom: 18,
-  },
-  footer: {
-    display: "flex",
-    justifyContent: "flex-end",
-    gap: 12,
-    marginTop: 8,
-  },
-  btnCancel: {
-    padding: "10px 24px",
-    fontSize: 14,
-    fontWeight: 500,
-    color: "#374151",
-    background: "#ffffff",
-    border: "1.5px solid #d1d5db",
-    borderRadius: 8,
-    cursor: "pointer",
-  },
-  btnSubmit: {
-    padding: "10px 28px",
-    fontSize: 14,
-    fontWeight: 600,
-    color: "#ffffff",
-    background: "#6c4de6",
-    border: "none",
-    borderRadius: 8,
-    cursor: "pointer",
-  },
-};
-
-function Field({ label, required, children, hint }) {
+function Field({ label, required, children, hint, C }) {
   return (
-    <div style={styles.fieldGroup}>
-      <label style={styles.label}>
+    <div style={{ marginBottom: 20 }}>
+      <label style={{ display: "block", fontSize: 12, fontWeight: 500, color: C.t2, marginBottom: 6 }}>
         {label}
-        {required && <span style={styles.required}>*</span>}
+        {required && <span style={{ color: C.danger, marginLeft: 3 }}>*</span>}
       </label>
       {children}
-      {hint && <p style={{ fontSize: 12, color: "#9ca3af", marginTop: 5, marginBottom: 0 }}>{hint}</p>}
+      {hint && <p style={{ fontSize: 11, color: C.t3, marginTop: 4, marginBottom: 0 }}>{hint}</p>}
     </div>
   );
 }
 
 export default function CreateEvent() {
+  const { C } = usePortalTheme();
   const [form, setForm] = useState({
     title: "",
     whoToMeet: "",
@@ -155,42 +25,45 @@ export default function CreateEvent() {
     location: "",
     locationDetail: "",
   });
-
   const [focused, setFocused] = useState(null);
 
-  const set = (key) => (e) =>
-    setForm((f) => ({ ...f, [key]: e.target.value }));
-
-  const inputStyle = (key) => ({
-    ...styles.input,
-    borderColor: focused === key ? "#6c4de6" : "#e5e7eb",
-    boxShadow: focused === key ? "0 0 0 3px rgba(108,77,230,0.1)" : "none",
-  });
-
-  const textareaStyle = (key) => ({
-    ...styles.textarea,
-    borderColor: focused === key ? "#6c4de6" : "#e5e7eb",
-    boxShadow: focused === key ? "0 0 0 3px rgba(108,77,230,0.1)" : "none",
-  });
-
+  const set = (key) => (e) => setForm((f) => ({ ...f, [key]: e.target.value }));
   const focus = (key) => () => setFocused(key);
   const blur = () => setFocused(null);
 
-  return (
-    <div style={styles.page}>
-      <div style={styles.container}>
-        {/* Page Title */}
-        <h1 style={styles.pageTitle}>Create Event</h1>
+  const inputStyle = (key) => ({
+    width: "100%",
+    padding: "10px 14px",
+    fontSize: 14,
+    color: C.t1,
+    background: C.inp,
+    border: `1px solid ${focused === key ? C.purple : C.border}`,
+    borderRadius: 8,
+    outline: "none",
+    boxSizing: "border-box",
+    transition: "border-color 0.15s, box-shadow 0.15s",
+    boxShadow: focused === key ? `0 0 0 3px ${C.purpleDim}` : "none",
+    fontFamily: "inherit",
+  });
 
-        {/* Single Combined Card */}
-        <div style={styles.card}>
-          <div style={styles.cardTitle}>Event Details</div>
-          <div style={styles.cardSubtitle}>
+  const textareaStyle = (key) => ({
+    ...inputStyle(key),
+    resize: "vertical",
+    minHeight: 130,
+  });
+
+  return (
+    <div style={{ minHeight: "100vh", backgroundColor: C.bg, fontFamily: "'Inter', system-ui, sans-serif", padding: "20px 24px", boxSizing: "border-box", width: "100%" }}>
+      <div style={{ width: "100%", maxWidth: "100%" }}>
+        <h1 style={{ fontSize: 20, fontWeight: 600, color: C.t1, textAlign: "center", marginBottom: 24, marginTop: 0 }}>Create Event</h1>
+
+        <div style={{ background: C.card, borderRadius: 12, border: `1px solid ${C.border}`, padding: "28px 32px" }}>
+          <div style={{ fontSize: 14, fontWeight: 600, color: C.t1, marginBottom: 4 }}>Event Details</div>
+          <div style={{ fontSize: 12, color: C.t3, marginBottom: 24 }}>
             Fill in the event information, timing, location, and attendee details.
           </div>
 
-          {/* Event Title */}
-          <Field label="Event Title" required>
+          <Field label="Event Title" required C={C}>
             <input
               style={inputStyle("title")}
               placeholder="Enter event title (e.g. Document Verification)"
@@ -200,11 +73,10 @@ export default function CreateEvent() {
               onBlur={blur}
               maxLength={200}
             />
-            <div style={styles.charCount}>{form.title.length}/200</div>
+            <div style={{ fontSize: 11, color: C.t3, textAlign: "right", marginTop: 4 }}>{form.title.length}/200</div>
           </Field>
 
-          {/* Who to Meet */}
-          <Field label="Whom to Meet" required hint="Name or designation of the person you wish to meet">
+          <Field label="Whom to Meet" required hint="Name or designation of the person you wish to meet" C={C}>
             <input
               style={inputStyle("whoToMeet")}
               placeholder="e.g. District Collector, Revenue Officer"
@@ -216,9 +88,8 @@ export default function CreateEvent() {
             />
           </Field>
 
-          {/* Date & Time Row */}
-          <div style={styles.row}>
-            <Field label="Date" required>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 20 }}>
+            <Field label="Date" required C={C}>
               <input
                 type="date"
                 style={inputStyle("eventDate")}
@@ -228,7 +99,7 @@ export default function CreateEvent() {
                 onBlur={blur}
               />
             </Field>
-            <Field label="Time" required>
+            <Field label="Time" required C={C}>
               <input
                 type="time"
                 style={inputStyle("eventTime")}
@@ -240,8 +111,7 @@ export default function CreateEvent() {
             </Field>
           </div>
 
-          {/* Description */}
-          <Field label="Event Description" required>
+          <Field label="Event Description" required C={C}>
             <textarea
               style={textareaStyle("description")}
               placeholder="Explain the purpose and agenda of this event in detail"
@@ -251,15 +121,15 @@ export default function CreateEvent() {
               onBlur={blur}
               maxLength={1000}
             />
-            <div style={styles.charCount}>{form.description.length}/1000</div>
+            <div style={{ fontSize: 11, color: C.t3, textAlign: "right", marginTop: 4 }}>{form.description.length}/1000</div>
           </Field>
 
-          {/* Divider before Scheduling Preferences */}
-          <div style={styles.divider} />
-          <div style={styles.sectionLabel}>Scheduling Preferences</div>
+          <div style={{ borderTop: `1px solid ${C.borderLight}`, margin: "4px 0 22px 0" }} />
+          <div style={{ fontSize: 12, fontWeight: 600, color: C.t2, marginBottom: 18 }}>
+            Scheduling Preferences
+          </div>
 
-          {/* Location */}
-          <Field label="Location" required hint="Office, building, or venue name">
+          <Field label="Location" required hint="Office, building, or venue name" C={C}>
             <input
               style={inputStyle("location")}
               placeholder="e.g. Collectorate Office, Block B"
@@ -271,8 +141,7 @@ export default function CreateEvent() {
             />
           </Field>
 
-          {/* Location Detail */}
-          <Field label="Additional Location Details">
+          <Field label="Additional Location Details" C={C}>
             <input
               style={inputStyle("locationDetail")}
               placeholder="Room no., floor, landmark, or directions"
@@ -284,10 +153,17 @@ export default function CreateEvent() {
             />
           </Field>
 
-          {/* Footer Actions */}
-          <div style={styles.footer}>
-            <button style={styles.btnCancel}>Cancel</button>
-            <button style={styles.btnSubmit}>Submit Event Request</button>
+          <div style={{ display: "flex", justifyContent: "flex-end", gap: 12, marginTop: 8 }}>
+            <button
+              style={{ padding: "10px 24px", fontSize: 14, fontWeight: 500, color: C.t2, background: C.card, border: `1.5px solid ${C.border}`, borderRadius: 8, cursor: "pointer" }}
+            >
+              Cancel
+            </button>
+            <button
+              style={{ padding: "10px 28px", fontSize: 14, fontWeight: 600, color: "#ffffff", background: C.purple, border: "none", borderRadius: 8, cursor: "pointer" }}
+            >
+              Submit Event Request
+            </button>
           </div>
         </div>
       </div>

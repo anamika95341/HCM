@@ -9,13 +9,15 @@ import {
   MapPin,
   Users,
   X,
+  Calendar, 
+  Star, 
+  TrendingUp, 
 } from "lucide-react";
 import { apiClient, authorizedConfig } from "../../shared/api/client.js";
 import { useAuth } from "../../shared/auth/AuthContext.jsx";
 import { usePortalTheme } from "../../shared/theme/portalTheme.jsx";
 import {
   WorkspaceBadge,
-  WorkspaceButton,
   WorkspaceCard,
   WorkspaceCardHeader,
   WorkspaceEmptyState,
@@ -59,10 +61,6 @@ function isSameDay(a, b) {
 
 function formatTime(dateString) {
   return new Date(dateString).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" });
-}
-
-function formatDateTimeRange(item) {
-  return `${new Date(item.startsAt).toLocaleString("en-IN")} – ${new Date(item.endsAt).toLocaleString("en-IN")}`;
 }
 
 function formatDuration(item) {
@@ -675,10 +673,27 @@ export default function MinisterCalendar() {
     return Array.from({ length: 7 }, (_, i) => addDays(start, i));
   }, [cursorDate]);
 
+  // Updated monthGrid Logic: Generates exactly the number of weeks needed (no redundant bottom rows)
   const monthGrid = useMemo(() => {
     const first = new Date(cursorDate.getFullYear(), cursorDate.getMonth(), 1);
     const start = addDays(first, -first.getDay());
-    return Array.from({ length: 42 }, (_, i) => addDays(start, i));
+    
+    const grid = [];
+    let current = start;
+    
+    // Add days until we finish the current month
+    while (current.getMonth() === cursorDate.getMonth() || current <= first) {
+      grid.push(current);
+      current = addDays(current, 1);
+    }
+    
+    // Keep adding days to complete the last week (until we hit Sunday again)
+    while (current.getDay() !== 0) {
+      grid.push(current);
+      current = addDays(current, 1);
+    }
+    
+    return grid;
   }, [cursorDate]);
 
   const meetingsForDate = useMemo(() => {
@@ -722,144 +737,269 @@ export default function MinisterCalendar() {
     return `${MONTHS[cursorDate.getMonth()]} ${cursorDate.getFullYear()}`;
   }
 
-  // Click a date cell → open DayMeetingsModal
   function handleDateSelect(day) {
     setSelectedDate(day);
     setSelectedMeeting(null);
   }
 
-  // Click an EventPill → open DayMeetingsModal then immediately open detail
   function handleEventPillClick(day, meeting) {
     setSelectedDate(day);
     setSelectedMeeting(meeting);
   }
 
-  // Click a meeting in DayMeetingsModal → open MeetingDetailModal (list stays open behind)
   function handleSelectMeeting(meeting) {
     setSelectedMeeting(meeting);
   }
 
-  // Close MeetingDetailModal → DayMeetingsModal re-surfaces
   function handleCloseMeetingDetail() {
     setSelectedMeeting(null);
   }
 
-  // Close DayMeetingsModal
   function handleCloseDayModal() {
     setSelectedDate(null);
     setSelectedMeeting(null);
   }
 
+  // Calculate dynamic height based on the exact number of weeks needed (monthGrid.length / 7)
+  const rowsCount = monthGrid.length / 7;
+
   // ── Render ─────────────────────────────────────────────────────────────────
 
   return (
-    <WorkspacePage width={900}>
-      <WorkspaceSectionHeader
-        eyebrow="Minister Workspace"
-        title="Minister Calendar"
-        subtitle="Read-only view of scheduled and VIP meetings. Click a date to see meetings."
-        action={
-          <WorkspaceTabs
-            items={VIEW_OPTIONS.map((o) => ({ id: o, label: o.charAt(0).toUpperCase() + o.slice(1) }))}
-            value={view}
-            onChange={(v) => {
-              setView(v);
-              handleCloseDayModal();
-            }}
-          />
-        }
-      />
+    <WorkspacePage width={1400}>
 
       {loading ? (
         <WorkspaceEmptyState title="Loading calendar…" />
       ) : error ? (
         <WorkspaceCard style={{ color: C.danger }}>{error}</WorkspaceCard>
       ) : (
-        <div style={{ display: "grid", gap: 20 }}>
-          <div className="grid grid-cols-1 xl:grid-cols-[1fr_320px] gap-6">
-          {/* Calendar card */}
-          <WorkspaceCard style={{ marginBottom: 0 }}>
-            <WorkspaceCardHeader
-              title={viewLabel()}
-              subtitle={`${filteredItems.length} event${filteredItems.length !== 1 ? "s" : ""} in view`}
-              action={
-                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                  <WorkspaceButton variant="ghost" onClick={() => shiftCursor("prev")} aria-label="Previous">
-                    <ChevronLeft size={16} />
-                  </WorkspaceButton>
-                  <WorkspaceButton variant="ghost" onClick={() => setCursorDate(startOfDay(new Date()))}>
-                    Today
-                  </WorkspaceButton>
-                  <WorkspaceButton variant="ghost" onClick={() => shiftCursor("next")} aria-label="Next">
-                    <ChevronRight size={16} />
-                  </WorkspaceButton>
-                </div>
-              }
-            />
-
-            {/* ── Month View ── */}
-            {view === "month" && (
-              <div>
-                {/* Day labels */}
-                <div
-                  style={{
-                    display: "grid",
-                    gridTemplateColumns: "repeat(7, minmax(0, 1fr))",
-                    gap: 8,
-                    marginBottom: 8,
-                  }}
-                >
-                  {DAYS.map((day) => (
-                    <div
-                      key={day}
+        <div>
+          {/* Main Grid: Calendar & Right Panel */}
+          <div className="grid grid-cols-1 xl:grid-cols-[1fr_300px] gap-6" style={{ alignItems: "start" }}>
+            
+            {/* Left: Calendar Card */}
+            <WorkspaceCard style={{ marginBottom: 0 }}>
+              <WorkspaceCardHeader
+                title={viewLabel()}
+                subtitle={`${filteredItems.length} event${filteredItems.length !== 1 ? "s" : ""} in view`}
+                action={
+                  <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                    {/* View Dropdown */}
+                    <select
+                      value={view}
+                      onChange={(e) => {
+                        setView(e.target.value);
+                        handleCloseDayModal();
+                      }}
                       style={{
-                        fontSize: 11,
-                        fontWeight: 700,
-                        color: C.t3,
-                        textTransform: "uppercase",
-                        letterSpacing: ".08em",
-                        textAlign: "center",
+                        padding: "6px 12px",
+                        borderRadius: 8,
+                        border: `1px solid ${C.border}`,
+                        background: C.bgElevated,
+                        color: C.t1,
+                        fontSize: 13,
+                        fontWeight: 600,
+                        cursor: "pointer",
+                        outline: "none"
                       }}
                     >
-                      {day}
-                    </div>
-                  ))}
-                </div>
+                      {VIEW_OPTIONS.map((o) => (
+                        <option key={o} value={o}>
+                          {o.charAt(0).toUpperCase() + o.slice(1)}
+                        </option>
+                      ))}
+                    </select>
 
-                {/* Day cells */}
-                <div
-                  style={{
-                    display: "grid",
-                    gridTemplateColumns: "repeat(7, minmax(0, 1fr))",
-                    gap: 8,
-                  }}
-                >
-                  {monthGrid.map((day) => {
-                    const inMonth = day.getMonth() === cursorDate.getMonth();
+                    <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                      <button
+                        type="button"
+                        onClick={() => shiftCursor("prev")}
+                        aria-label="Previous"
+                        style={{
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          padding: "6px 10px",
+                          borderRadius: 8,
+                          border: `1px solid ${C.border}`,
+                          background: C.bgElevated,
+                          color: C.t1,
+                          cursor: "pointer"
+                        }}
+                      >
+                        <ChevronLeft size={18} color={C.t1} strokeWidth={2.5} />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setCursorDate(startOfDay(new Date()))}
+                        style={{
+                          padding: "6px 16px",
+                          borderRadius: 8,
+                          border: `1px solid ${C.border}`,
+                          background: C.bgElevated,
+                          color: C.t1,
+                          fontSize: 13,
+                          fontWeight: 600,
+                          cursor: "pointer"
+                        }}
+                      >
+                        Today
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => shiftCursor("next")}
+                        aria-label="Next"
+                        style={{
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          padding: "6px 10px",
+                          borderRadius: 8,
+                          border: `1px solid ${C.border}`,
+                          background: C.bgElevated,
+                          color: C.t1,
+                          cursor: "pointer"
+                        }}
+                      >
+                        <ChevronRight size={18} color={C.t1} strokeWidth={2.5} />
+                      </button>
+                    </div>
+                  </div>
+                }
+              />
+
+              {/* ── Month View ── */}
+              {view === "month" && (
+                <div>
+                  <div
+                    style={{
+                      display: "grid",
+                      gridTemplateColumns: "repeat(7, minmax(0, 1fr))",
+                      gap: 8,
+                      marginBottom: 8,
+                    }}
+                  >
+                    {DAYS.map((day) => (
+                      <div
+                        key={day}
+                        style={{
+                          fontSize: 11,
+                          fontWeight: 700,
+                          color: C.t3,
+                          textTransform: "uppercase",
+                          letterSpacing: ".08em",
+                          textAlign: "center",
+                        }}
+                      >
+                        {day}
+                      </div>
+                    ))}
+                  </div>
+
+                  <div
+                    style={{
+                      display: "grid",
+                      gridTemplateColumns: "repeat(7, minmax(0, 1fr))",
+                      gap: 8,
+                    }}
+                  >
+                    {monthGrid.map((day) => {
+                      const inMonth = day.getMonth() === cursorDate.getMonth();
+                      const isToday = isSameDay(day, new Date());
+                      const isSelected = selectedDate && isSameDay(day, selectedDate);
+                      const eventsForDay = items.filter((item) => isSameDay(item.startsAt, day));
+
+                      return (
+                        <div
+                          key={day.toISOString()}
+                          onClick={() => handleDateSelect(day)}
+                          style={{
+                            height: `calc((100vh - 280px) / ${rowsCount})`,
+                            minHeight: 70,
+                            borderRadius: 12,
+                            border: `1px solid ${isSelected ? C.purple + "60" : isToday ? C.purple + "40" : C.border}`,
+                            background: isSelected
+                              ? `${C.purple}08`
+                              : inMonth
+                              ? C.bgElevated
+                              : C.bg,
+                            padding: 10,
+                            display: "grid",
+                            gap: 6,
+                            alignContent: "start",
+                            cursor: "pointer",
+                            transition: "border-color 0.15s ease, background 0.15s ease",
+                          }}
+                          onMouseEnter={(e) => {
+                            if (!isSelected)
+                              e.currentTarget.style.borderColor = `${C.purple}40`;
+                          }}
+                          onMouseLeave={(e) => {
+                            if (!isSelected)
+                              e.currentTarget.style.borderColor = isToday
+                                ? `${C.purple}40`
+                                : C.border;
+                          }}
+                        >
+                          <div
+                            style={{
+                              display: "flex",
+                              alignItems: "center",
+                              justifyContent: "center",
+                              width: 24,
+                              height: 24,
+                              borderRadius: 99,
+                              fontSize: 12,
+                              fontWeight: 700,
+                              background: isToday ? C.purple : "transparent",
+                              color: isToday ? "#fff" : inMonth ? C.t1 : C.t3,
+                            }}
+                          >
+                            {day.getDate()}
+                          </div>
+                          {eventsForDay.length > 0 && (
+                            <div
+                              style={{
+                                fontSize: 11,
+                                fontWeight: 600,
+                                color: C.purple,
+                                background: `${C.purple}12`,
+                                border: `1px solid ${C.purple}30`,
+                                borderRadius: 8,
+                                padding: "4px 8px",
+                                textAlign: "center",
+                              }}
+                            >
+                              {eventsForDay.length} meeting{eventsForDay.length !== 1 ? "s" : ""}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {/* ── Week View ── */}
+              {view === "week" && (
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(7, minmax(0, 1fr))", gap: 8 }}>
+                  {weekDays.map((day) => {
+                    const eventsForDay = items.filter((item) => isSameDay(item.startsAt, day));
                     const isToday = isSameDay(day, new Date());
                     const isSelected = selectedDate && isSameDay(day, selectedDate);
-                    const eventsForDay = items.filter((item) => isSameDay(item.startsAt, day));
-
                     return (
                       <div
                         key={day.toISOString()}
-                        onClick={() => handleDateSelect(day)}
                         style={{
-                          minHeight: 130,
-                          borderRadius: 12,
                           border: `1px solid ${isSelected ? C.purple + "60" : isToday ? C.purple + "40" : C.border}`,
-                          background: isSelected
-                            ? `${C.purple}08`
-                            : inMonth
-                            ? C.bgElevated
-                            : C.bg,
+                          borderRadius: 12,
+                          background: isSelected ? `${C.purple}08` : C.bgElevated,
                           padding: 10,
-                          display: "grid",
-                          gap: 6,
-                          alignContent: "start",
+                          minHeight: 120,
                           cursor: "pointer",
                           transition: "border-color 0.15s ease, background 0.15s ease",
                         }}
+                        onClick={() => handleDateSelect(day)}
                         onMouseEnter={(e) => {
                           if (!isSelected)
                             e.currentTarget.style.borderColor = `${C.purple}40`;
@@ -871,283 +1011,180 @@ export default function MinisterCalendar() {
                               : C.border;
                         }}
                       >
-                        <div
-                          style={{
-                            display: "flex",
-                            alignItems: "center",
-                            justifyContent: "center",
-                            width: 24,
-                            height: 24,
-                            borderRadius: 99,
-                            fontSize: 12,
-                            fontWeight: 700,
-                            background: isToday ? C.purple : "transparent",
-                            color: isToday ? "#fff" : inMonth ? C.t1 : C.t3,
-                          }}
-                        >
-                          {day.getDate()}
-                        </div>
-                        {eventsForDay.length > 0 && (
+                        <div style={{ marginBottom: 10 }}>
+                          <div style={{ fontSize: 10, color: C.t3, textTransform: "uppercase", letterSpacing: ".08em" }}>
+                            {DAYS[day.getDay()]}
+                          </div>
                           <div
                             style={{
-                              fontSize: 11,
-                              fontWeight: 600,
-                              color: C.purple,
-                              background: `${C.purple}12`,
-                              border: `1px solid ${C.purple}30`,
-                              borderRadius: 8,
-                              padding: "4px 8px",
-                              textAlign: "center",
+                              display: "inline-flex",
+                              alignItems: "center",
+                              justifyContent: "center",
+                              width: 26,
+                              height: 26,
+                              borderRadius: 99,
+                              fontSize: 14,
+                              fontWeight: 700,
+                              marginTop: 4,
+                              background: isToday ? C.purple : "transparent",
+                              color: isToday ? "#fff" : C.t1,
                             }}
                           >
-                            {eventsForDay.length} meeting{eventsForDay.length !== 1 ? "s" : ""}
+                            {day.getDate()}
                           </div>
-                        )}
+                        </div>
+                        <div style={{ display: "grid", gap: 6 }}>
+                          {eventsForDay.length > 0 ? (
+                            <div
+                              style={{
+                                fontSize: 12,
+                                fontWeight: 600,
+                                color: C.purple,
+                                background: `${C.purple}12`,
+                                border: `1px solid ${C.purple}30`,
+                                borderRadius: 8,
+                                padding: "6px 10px",
+                                textAlign: "center",
+                              }}
+                            >
+                              {eventsForDay.length} meeting{eventsForDay.length !== 1 ? "s" : ""}
+                            </div>
+                          ) : (
+                            <div style={{ fontSize: 11, color: C.t3 }}>No events</div>
+                          )}
+                        </div>
                       </div>
                     );
                   })}
                 </div>
-              </div>
-            )}
+              )}
 
-            {/* ── Week View ── */}
-            {view === "week" && (
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(7, minmax(0, 1fr))", gap: 8 }}>
-                {weekDays.map((day) => {
-                  const eventsForDay = items.filter((item) => isSameDay(item.startsAt, day));
-                  const isToday = isSameDay(day, new Date());
-                  const isSelected = selectedDate && isSameDay(day, selectedDate);
-                  return (
-                    <div
-                      key={day.toISOString()}
-                      style={{
-                        border: `1px solid ${isSelected ? C.purple + "60" : isToday ? C.purple + "40" : C.border}`,
-                        borderRadius: 12,
-                        background: isSelected ? `${C.purple}08` : C.bgElevated,
-                        padding: 10,
-                        minHeight: 160,
-                        cursor: "pointer",
-                        transition: "border-color 0.15s ease, background 0.15s ease",
-                      }}
-                      onClick={() => handleDateSelect(day)}
-                      onMouseEnter={(e) => {
-                        if (!isSelected)
-                          e.currentTarget.style.borderColor = `${C.purple}40`;
-                      }}
-                      onMouseLeave={(e) => {
-                        if (!isSelected)
-                          e.currentTarget.style.borderColor = isToday
-                            ? `${C.purple}40`
-                            : C.border;
-                      }}
-                    >
-                      <div style={{ marginBottom: 10 }}>
-                        <div style={{ fontSize: 10, color: C.t3, textTransform: "uppercase", letterSpacing: ".08em" }}>
-                          {DAYS[day.getDay()]}
-                        </div>
-                        <div
+              {/* ── Day View ── */}
+              {view === "day" && (
+                <div style={{ display: "grid", gap: 10 }}>
+                  {dayItems.length ? (
+                    dayItems.map((item) => {
+                      const tone = item.type === "VIP Meeting" ? C.warn : C.purple;
+                      return (
+                        <button
+                          key={item.id}
+                          type="button"
+                          onClick={() => handleEventPillClick(cursorDate, item)}
                           style={{
-                            display: "inline-flex",
-                            alignItems: "center",
-                            justifyContent: "center",
-                            width: 26,
-                            height: 26,
-                            borderRadius: 99,
-                            fontSize: 14,
-                            fontWeight: 700,
-                            marginTop: 4,
-                            background: isToday ? C.purple : "transparent",
-                            color: isToday ? "#fff" : C.t1,
+                            border: `1px solid ${C.border}`,
+                            borderRadius: 12,
+                            background: C.bgElevated,
+                            padding: 16,
+                            textAlign: "left",
+                            cursor: "pointer",
+                            transition: "border-color 0.15s ease, background 0.15s ease",
+                          }}
+                          onMouseEnter={(e) => {
+                            e.currentTarget.style.borderColor = `${tone}50`;
+                            e.currentTarget.style.background = `${tone}06`;
+                          }}
+                          onMouseLeave={(e) => {
+                            e.currentTarget.style.borderColor = C.border;
+                            e.currentTarget.style.background = C.bgElevated;
                           }}
                         >
-                          {day.getDate()}
-                        </div>
-                      </div>
-                      <div style={{ display: "grid", gap: 6 }}>
-                        {eventsForDay.length > 0 ? (
-                          <div
-                            style={{
-                              fontSize: 12,
-                              fontWeight: 600,
-                              color: C.purple,
-                              background: `${C.purple}12`,
-                              border: `1px solid ${C.purple}30`,
-                              borderRadius: 8,
-                              padding: "6px 10px",
-                              textAlign: "center",
-                            }}
-                          >
-                            {eventsForDay.length} meeting{eventsForDay.length !== 1 ? "s" : ""}
+                          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "start", gap: 12 }}>
+                            <div style={{ minWidth: 0, flex: 1 }}>
+                              <div style={{ fontSize: 15, fontWeight: 700, color: C.t1, marginBottom: 4 }}>
+                                {item.title}
+                              </div>
+                              <div style={{ fontSize: 12, color: C.t2, marginBottom: 4 }}>
+                                {formatTime(item.startsAt)} – {formatTime(item.endsAt)} · {formatDuration(item)}
+                              </div>
+                              <div style={{ fontSize: 12, color: C.t3 }}>
+                                {item.location || "Location pending"}
+                              </div>
+                            </div>
+                            <WorkspaceBadge color={tone}>
+                              {item.type === "VIP Meeting" ? "VIP" : "Standard"}
+                            </WorkspaceBadge>
                           </div>
-                        ) : (
-                          <div style={{ fontSize: 11, color: C.t3 }}>No events</div>
-                        )}
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
+                        </button>
+                      );
+                    })
+                  ) : (
+                    <WorkspaceEmptyState title="No events scheduled for this day" />
+                  )}
+                </div>
+              )}
+            </WorkspaceCard>
 
-            {/* ── Day View ── */}
-            {view === "day" && (
-              <div style={{ display: "grid", gap: 10 }}>
-                {dayItems.length ? (
-                  dayItems.map((item) => {
-                    const tone = item.type === "VIP Meeting" ? C.warn : C.purple;
-                    return (
-                      <button
-                        key={item.id}
-                        type="button"
-                        onClick={() => handleEventPillClick(cursorDate, item)}
-                        style={{
-                          border: `1px solid ${C.border}`,
-                          borderRadius: 12,
-                          background: C.bgElevated,
-                          padding: 16,
-                          textAlign: "left",
-                          cursor: "pointer",
-                          transition: "border-color 0.15s ease, background 0.15s ease",
-                        }}
-                        onMouseEnter={(e) => {
-                          e.currentTarget.style.borderColor = `${tone}50`;
-                          e.currentTarget.style.background = `${tone}06`;
-                        }}
-                        onMouseLeave={(e) => {
-                          e.currentTarget.style.borderColor = C.border;
-                          e.currentTarget.style.background = C.bgElevated;
-                        }}
-                      >
-                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "start", gap: 12 }}>
-                          <div style={{ minWidth: 0, flex: 1 }}>
-                            <div style={{ fontSize: 15, fontWeight: 700, color: C.t1, marginBottom: 4 }}>
-                              {item.title}
-                            </div>
-                            <div style={{ fontSize: 12, color: C.t2, marginBottom: 4 }}>
-                              {formatTime(item.startsAt)} – {formatTime(item.endsAt)} · {formatDuration(item)}
-                            </div>
-                            <div style={{ fontSize: 12, color: C.t3 }}>
-                              {item.location || "Location pending"}
-                            </div>
-                          </div>
-                          <WorkspaceBadge color={tone}>
-                            {item.type === "VIP Meeting" ? "VIP" : "Standard"}
-                          </WorkspaceBadge>
-                        </div>
-                      </button>
-                    );
-                  })
-                ) : (
-                  <WorkspaceEmptyState title="No events scheduled for this day" />
-                )}
-              </div>
-            )}
-          </WorkspaceCard>
-
-          {/* Upcoming meetings — sticky right panel */}
-          <WorkspaceCard style={{ padding: 24, height: "fit-content", position: "sticky", top: 24, marginBottom: 0 }}>
-            <h3 className="text-sm font-bold uppercase tracking-wider mb-4" style={{ color: C.t3 }}>Upcoming Meetings</h3>
-            {nextTwoMeetings.length === 0 ? (
-              <div style={{ fontSize: 13, color: C.t3 }}>No upcoming meetings scheduled.</div>
-            ) : (
-              <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-                {nextTwoMeetings.map((item) => {
-                  const tone = item.type === "VIP Meeting" ? C.warn : C.purple;
-                  return (
-                    <button
-                      key={item.id}
-                      type="button"
-                      onClick={() => { setSelectedDate(startOfDay(new Date(item.startsAt))); setSelectedMeeting(item); }}
-                      style={{
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "space-between",
-                        gap: 12,
-                        padding: "14px 16px",
-                        border: `1px solid ${C.border}`,
-                        borderRadius: 12,
-                        background: C.bgElevated,
-                        textAlign: "left",
-                        cursor: "pointer",
-                      }}
-                    >
-                      <div style={{ minWidth: 0 }}>
-                        <div style={{ fontSize: 13, fontWeight: 700, color: C.t1, marginBottom: 4 }}>{item.title}</div>
-                        <div style={{ fontSize: 11, color: C.t3 }}>
-                          {new Date(item.startsAt).toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric" })}
-                          {" · "}
-                          {formatTime(item.startsAt)}
-                        </div>
-                      </div>
-                      <span
-                        style={{
-                          fontSize: 10,
-                          fontWeight: 700,
-                          padding: "4px 10px",
-                          borderRadius: 999,
-                          background: `${tone}12`,
-                          color: tone,
-                          border: `1px solid ${tone}30`,
-                          whiteSpace: "nowrap",
-                          flexShrink: 0,
-                        }}
-                      >
-                        {item.type}
-                      </span>
-                    </button>
-                  );
-                })}
-              </div>
-            )}
-          </WorkspaceCard>
-          </div>
-
-          {/* Calendar summary stats */}
-          <WorkspaceCard style={{ marginBottom: 0 }}>
-            <WorkspaceCardHeader
-              title="Calendar Summary"
-              subtitle="High-level visibility for minister planning"
-            />
-            <div
-              style={{
-                display: "grid",
-                gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))",
-                gap: 12,
-              }}
-            >
-              {[
-                { label: "Total Events", value: items.length, color: C.purple },
-                { label: "VIP Meetings", value: items.filter((i) => i.type === "VIP Meeting").length, color: C.warn },
-                { label: "Today", value: items.filter((i) => isSameDay(i.startsAt, new Date())).length, color: C.mint },
-                {
-                  label: "This Week",
-                  value: (() => {
-                    const ws = startOfWeek(new Date());
-                    const we = addDays(ws, 7);
-                    return items.filter((i) => new Date(i.startsAt) >= ws && new Date(i.startsAt) < we).length;
-                  })(),
-                  color: C.purple,
-                },
-              ].map(({ label, value, color }) => (
-                <div
-                  key={label}
-                  style={{
-                    border: `1px solid ${C.border}`,
-                    borderRadius: 12,
-                    background: C.bgElevated,
-                    padding: "14px 16px",
-                  }}
-                >
-                  <div style={{ fontSize: 10, fontWeight: 700, color: C.t3, textTransform: "uppercase", letterSpacing: ".08em" }}>
-                    {label}
+            {/* Right Panel: Upcoming Meetings */}
+            <div style={{ display: "flex", flexDirection: "column", gap: 24, position: "sticky", top: 24, height: "fit-content" }}>
+              
+              {/* Upcoming Meetings */}
+              <WorkspaceCard style={{ padding: 24, marginBottom: 0 }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
+                  <div>
+                    <div style={{ fontSize: 11, fontWeight: 700, color: C.t3, textTransform: "uppercase", letterSpacing: ".1em", marginBottom: 4 }}>Upcoming</div>
+                    <h3 className="text-lg font-bold" style={{ color: C.t1 }}>Next Meetings</h3>
                   </div>
-                  <div style={{ marginTop: 8, fontSize: 28, fontWeight: 700, color, lineHeight: 1 }}>
-                    {value}
+                  <div style={{ background: `${C.purple}15`, padding: 8, borderRadius: '50%', color: C.purple }}>
+                    <Calendar size={18} />
                   </div>
                 </div>
-              ))}
+
+                {nextTwoMeetings.length === 0 ? (
+                  <div style={{ fontSize: 13, color: C.t3 }}>No upcoming meetings scheduled.</div>
+                ) : (
+                  <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+                    {nextTwoMeetings.map((item) => {
+                      const tone = item.type === "VIP Meeting" ? C.warn : C.purple;
+                      return (
+                        <button
+                          key={item.id}
+                          type="button"
+                          onClick={() => { setSelectedDate(startOfDay(new Date(item.startsAt))); setSelectedMeeting(item); }}
+                          style={{
+                            display: "flex",
+                            alignItems: "stretch",
+                            gap: 12,
+                            padding: "16px",
+                            border: `1px solid ${C.border}`,
+                            borderRadius: 12,
+                            background: C.bgElevated,
+                            textAlign: "left",
+                            cursor: "pointer",
+                            position: "relative",
+                            overflow: "hidden"
+                          }}
+                        >
+                          {/* Colored left bar like in the image */}
+                          <div style={{ position: "absolute", left: 0, top: 12, bottom: 12, width: 3, background: tone, borderRadius: "0 4px 4px 0" }} />
+                          
+                          <div style={{ minWidth: 0, flex: 1, paddingLeft: 6 }}>
+                            <div style={{ fontSize: 14, fontWeight: 700, color: C.t1, marginBottom: 6 }}>{item.title}</div>
+                            <div 
+                              style={{ 
+                                display: "inline-flex", 
+                                alignItems: "center", 
+                                gap: 8,
+                                fontSize: 12, 
+                                fontWeight: 600,
+                                color: tone,
+                                background: `${tone}10`,
+                                padding: "4px 10px",
+                                borderRadius: 6
+                              }}
+                            >
+                              {new Date(item.startsAt).toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric" })}
+                              <span style={{ color: C.t3, fontWeight: 400 }}>{formatTime(item.startsAt)}</span>
+                            </div>
+                          </div>
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+              </WorkspaceCard>
+
             </div>
-          </WorkspaceCard>
+          </div>
         </div>
       )}
 
