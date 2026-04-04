@@ -170,8 +170,8 @@ export default function AdminCases() {
     <WorkspacePage width={1280}>
         {/* HEADER */}
         <WorkspaceSectionHeader
-          eyebrow="Admin Workspace"
-          title="Work Queue"
+          
+          title="WORK  QUEUE"
         />
 
         {/* STAT CARDS — 5 in one row, clickable to switch tab */}
@@ -208,7 +208,7 @@ export default function AdminCases() {
 
         {/* QUEUE FILTERS */}
         <div style={{ marginBottom: 20 }}>
-          <WorkspaceCard>
+          {/* <WorkspaceCard> */}
             <div style={{ display: "grid", gridTemplateColumns: "minmax(0, 1.6fr) minmax(220px, 0.8fr)", gap: 16 }}>
               <div>
                 
@@ -227,7 +227,7 @@ export default function AdminCases() {
                 </WorkspaceSelect>
               </div>
             </div>
-          </WorkspaceCard>
+          {/* </WorkspaceCard> */}
         </div>
 
         {/* TABLE / STATES */}

@@ -37,7 +37,7 @@ import serviceSupportArt from "../../assets/citizen/service-support.svg";
 const ROLE_COPY = {
   citizen: {
     title: "Citizen Portal",
-    subtitle: "Sign in with your Citizen ID and password to manage meeting requests.",
+    subtitle: "",
     identifierLabel: "Citizen ID",
     identifierPlaceholder: "CTZ-2026-00000001",
   },
@@ -73,6 +73,11 @@ const CITIZEN_SECTIONS = [
   { id: "services", label: "Services" },
   { id: "contact", label: "Contact Us" },
 ];
+
+const CITIZEN_LOGIN_ID_MAX_LENGTH = 20;
+const CITIZEN_LOGIN_PASSWORD_MAX_LENGTH = 25;
+const CITIZEN_NAME_MAX_LENGTH = 20;
+const CITIZEN_REGISTER_PASSWORD_MAX_LENGTH = 25;
 
 const ABOUT_CARDS = [
   {
@@ -129,18 +134,19 @@ const SERVICE_SLIDES = [
   ],
 ];
 
-const fieldStyle = (C, hasIcon = true, hasRightAction = false) => ({
+const fieldStyle = (C, hasIcon = true, hasRightAction = false, invalid = false) => ({
   width: "100%",
   minHeight: 42,
   padding: hasIcon ? `10px ${hasRightAction ? "42px" : "14px"} 10px 38px` : "10px 14px",
   borderRadius: 10,
-  border: `1px solid ${C.border}`,
+  border: `1px solid ${invalid ? C.danger : C.border}`,
   background: C.inp,
   color: C.t1,
   fontSize: 13,
   fontWeight: 500,
   lineHeight: 1.5,
   outline: "none",
+  boxShadow: invalid ? `0 0 0 3px ${C.danger}14` : "none",
   transition: "border-color 0.2s ease, box-shadow 0.2s ease",
 });
 
@@ -161,6 +167,10 @@ export default function LoginPage({ defaultRole = "citizen" }) {
   const roleCopy = ROLE_COPY[role];
   const [identifier, setIdentifier] = useState("");
   const [password, setPassword] = useState("");
+  const [citizenLoginErrors, setCitizenLoginErrors] = useState({
+    identifier: "",
+    password: "",
+  });
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -179,7 +189,7 @@ export default function LoginPage({ defaultRole = "citizen" }) {
     email: "",
     aadhaarNumber: "",
     age: "",
-    sex: "male",
+    sex: "",
     mobileNumber: "",
     pincode: "",
     city: "",
@@ -187,6 +197,10 @@ export default function LoginPage({ defaultRole = "citizen" }) {
     password: "",
     confirmPassword: "",
   });
+  const [registerErrors, setRegisterErrors] = useState({});
+  const [registerTouched, setRegisterTouched] = useState({});
+  const [registerSubmitted, setRegisterSubmitted] = useState(false);
+  const [registerSubmitError, setRegisterSubmitError] = useState("");
   const [verificationOtp, setVerificationOtp] = useState("");
   const [forgotForm, setForgotForm] = useState({
     aadhaarNumber: "",
@@ -213,6 +227,11 @@ export default function LoginPage({ defaultRole = "citizen" }) {
   useEffect(() => {
     setIdentifier("");
     setPassword("");
+    setCitizenLoginErrors({ identifier: "", password: "" });
+    setRegisterErrors({});
+    setRegisterTouched({});
+    setRegisterSubmitted(false);
+    setRegisterSubmitError("");
     setError("");
     setSuccess("");
     setCitizenMode("login");
@@ -266,6 +285,13 @@ export default function LoginPage({ defaultRole = "citizen" }) {
 
   async function handlePrimaryLogin(event) {
     event.preventDefault();
+    const nextCitizenLoginErrors = getCitizenLoginErrors(identifier, password);
+    setCitizenLoginErrors(nextCitizenLoginErrors);
+
+    if (role === "citizen" && (nextCitizenLoginErrors.identifier || nextCitizenLoginErrors.password)) {
+      return;
+    }
+
     setLoading(true);
     setError("");
     setSuccess("");
@@ -282,15 +308,33 @@ export default function LoginPage({ defaultRole = "citizen" }) {
 
   async function handleCitizenRegister(event) {
     event.preventDefault();
-    setLoading(true);
+    setRegisterSubmitted(true);
+    const nextRegisterErrors = validateCitizenRegistration(registerForm);
+    const hasRequiredFieldError = Object.values(nextRegisterErrors).some((message) => message === REQUIRED_FIELD_MESSAGE);
+    const hasOtherValidationError = Object.values(nextRegisterErrors).some(Boolean);
+    setRegisterErrors(nextRegisterErrors);
     setError("");
     setSuccess("");
 
+    if (hasRequiredFieldError) {
+      setRegisterSubmitError("Please fill asterisk marked fields.");
+      return;
+    }
+
+    if (nextRegisterErrors.confirmPassword === PASSWORD_MISMATCH_MESSAGE) {
+      setRegisterSubmitError(PASSWORD_MISMATCH_MESSAGE);
+      return;
+    }
+
+    if (hasOtherValidationError) {
+      setRegisterSubmitError("Please correct the highlighted fields.");
+      return;
+    }
+
+    setRegisterSubmitError("");
+    setLoading(true);
+
     try {
-      const validationError = validateCitizenRegistration(registerForm);
-      if (validationError) {
-        throw new Error(validationError);
-      }
 
       const { data } = await apiClient.post("/auth/citizen/register", {
         ...registerForm,
@@ -396,6 +440,82 @@ export default function LoginPage({ defaultRole = "citizen" }) {
     }
   }
 
+  function handleIdentifierChange(event) {
+    const nextIdentifier = normalizeInputText(event.target.value, {
+      maxLength: role === "citizen" ? CITIZEN_LOGIN_ID_MAX_LENGTH : 120,
+      trim: false,
+    });
+    setIdentifier(nextIdentifier);
+
+    if (role === "citizen") {
+      setCitizenLoginErrors((current) => ({
+        ...current,
+        identifier: getCitizenIdLengthError(nextIdentifier),
+      }));
+    }
+  }
+
+  function handlePasswordChange(event) {
+    const nextPassword = role === "citizen" ? event.target.value.slice(0, CITIZEN_LOGIN_PASSWORD_MAX_LENGTH) : event.target.value;
+    setPassword(nextPassword);
+
+    if (role === "citizen") {
+      setCitizenLoginErrors((current) => ({
+        ...current,
+        password: getCitizenPasswordLengthError(nextPassword),
+      }));
+    }
+  }
+
+  function handleRegisterFieldChange(field, rawValue) {
+    let nextValue = rawValue;
+
+    if (field === "firstName" || field === "middleName" || field === "lastName") {
+      nextValue = rawValue.slice(0, CITIZEN_NAME_MAX_LENGTH);
+    } else if (field === "password" || field === "confirmPassword") {
+      nextValue = rawValue.slice(0, CITIZEN_REGISTER_PASSWORD_MAX_LENGTH);
+    } else if (field === "aadhaarNumber") {
+      nextValue = rawValue.replace(/\D/g, "").slice(0, 12);
+    } else if (field === "mobileNumber") {
+      nextValue = rawValue.replace(/\D/g, "").slice(0, 10);
+    } else if (field === "pincode") {
+      nextValue = rawValue.replace(/\D/g, "").slice(0, 6);
+    } else if (field === "age") {
+      nextValue = rawValue.replace(/[^\d]/g, "").slice(0, 3);
+    }
+
+    const nextForm = { ...registerForm, [field]: nextValue };
+    setRegisterForm(nextForm);
+    setRegisterErrors(validateCitizenRegistration(nextForm));
+    setRegisterTouched((current) => ({ ...current, [field]: true }));
+
+    if (registerSubmitError) {
+      setRegisterSubmitError("");
+    }
+  }
+
+  function resetCitizenRegistrationState() {
+    setRegisterForm({
+      firstName: "",
+      middleName: "",
+      lastName: "",
+      email: "",
+      aadhaarNumber: "",
+      age: "",
+      sex: "",
+      mobileNumber: "",
+      pincode: "",
+      city: "",
+      state: "",
+      password: "",
+      confirmPassword: "",
+    });
+    setRegisterErrors({});
+    setRegisterTouched({});
+    setRegisterSubmitted(false);
+    setRegisterSubmitError("");
+  }
+
   function handleCitizenNav(sectionId) {
     navigate(PATHS.login, { replace: false });
     window.requestAnimationFrame(() => scrollToSection(sectionId));
@@ -409,9 +529,15 @@ export default function LoginPage({ defaultRole = "citizen" }) {
     setServiceSlideIndex((current) => (current - 1 + SERVICE_SLIDES.length) % SERVICE_SLIDES.length);
   }
 
+  const isCitizenRegistration = role === "citizen" && citizenMode === "register";
+  const getRegisterFieldError = (field) => ((registerSubmitted || registerTouched[field]) ? registerErrors[field] || "" : "");
+  const shouldHighlightRegisterField = (field) => {
+    const errorMessage = getRegisterFieldError(field);
+    return Boolean(errorMessage) && errorMessage !== REQUIRED_FIELD_MESSAGE;
+  };
   const cardStyle = {
     width: "100%",
-    maxWidth: showCitizenLanding ? (isTablet ? "100%" : 470) : 460,
+    maxWidth: showCitizenLanding ? (isTablet ? "100%" : 470) : isCitizenRegistration ? (isTablet ? "100%" : 760) : 460,
     height: showCitizenLanding && !isTablet ? 580 : undefined,
     minHeight: showCitizenLanding && !isTablet ? 580 : undefined,
     background: C.card,
@@ -797,30 +923,34 @@ export default function LoginPage({ defaultRole = "citizen" }) {
     return (
       <div style={cardStyle}>
         <div style={{ padding: "28px 28px 24px", background: C.bgElevated, borderBottom: `1px solid ${C.border}` }}>
-          <div
-            style={{
-              width: 56,
-              height: 56,
-              borderRadius: 16,
-              background: C.purpleDim,
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              marginBottom: 18,
-            }}
-          >
-            <Shield size={28} color={C.purple} />
-          </div>
+          {!(role === "citizen" && citizenMode === "register") ? (
+            <div
+              style={{
+                width: 56,
+                height: 56,
+                borderRadius: 16,
+                background: C.purpleDim,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                marginBottom: 18,
+              }}
+            >
+              <Shield size={28} color={C.purple} />
+            </div>
+          ) : null}
           <div style={{ fontSize: 11, fontWeight: 700, color: C.t3, textTransform: "uppercase", letterSpacing: ".18em" }}>
             HCM Project
           </div>
           <h2 style={{ margin: "10px 0 6px", fontSize: 24, fontWeight: 700, lineHeight: 1.25, color: C.t1 }}>{roleCopy.title}</h2>
-          <p style={{ margin: 0, color: C.t2, fontSize: 13, fontWeight: 500, lineHeight: 1.6 }}>{roleCopy.subtitle}</p>
+          {roleCopy.subtitle ? <p style={{ margin: 0, color: C.t2, fontSize: 13, fontWeight: 500, lineHeight: 1.6 }}>{roleCopy.subtitle}</p> : null}
         </div>
 
-        <div style={{ padding: 28 }}>
-          {success && <MessageBox color={C.mint} bg={C.mintDim} icon={<CheckCircle size={18} />} message={success} />}
-          {error && <MessageBox color={C.danger} bg={`${C.danger}20`} icon={<AlertCircle size={18} />} message={error} />}
+        <div style={{ padding: 28, display: "grid", alignContent: showCitizenLanding ? "start" : "stretch", rowGap: showCitizenLanding ? 12 : 0 }}>
+          <div style={{ minHeight: showCitizenLanding ? 36 : 0 }}>
+            {success && <MessageBox color={C.mint} bg={C.mintDim} icon={<CheckCircle size={18} />} message={success} />}
+            {error && <MessageBox color={C.danger} bg={`${C.danger}20`} icon={<AlertCircle size={18} />} message={error} />}
+          </div>
 
           {(
             (role === "citizen" && citizenMode === "login") ||
@@ -829,22 +959,24 @@ export default function LoginPage({ defaultRole = "citizen" }) {
             (!showCitizenActions && !showAdminActions)
           ) ? (
             <form onSubmit={handlePrimaryLogin} style={{ display: "grid", gap: 18 }}>
-              <Field label={roleCopy.identifierLabel} icon={<Mail size={16} color={C.t3} />}>
+              <Field label={roleCopy.identifierLabel} icon={<Mail size={16} color={C.t3} />} error={role === "citizen" ? citizenLoginErrors.identifier : ""}>
                 <input
                   type="text"
                   value={identifier}
-                  onChange={(event) => setIdentifier(normalizeInputText(event.target.value, { maxLength: 120, trim: false }))}
+                  onChange={handleIdentifierChange}
+                  maxLength={role === "citizen" ? CITIZEN_LOGIN_ID_MAX_LENGTH : undefined}
                   required
                   placeholder={roleCopy.identifierPlaceholder}
                   style={fieldStyle(C)}
                 />
               </Field>
 
-              <Field label="Password" icon={<Lock size={16} color={C.t3} />}>
+              <Field label="Password" icon={<Lock size={16} color={C.t3} />} error={role === "citizen" ? citizenLoginErrors.password : ""}>
                 <input
                   type={showPassword ? "text" : "password"}
                   value={password}
-                  onChange={(event) => setPassword(event.target.value)}
+                  onChange={handlePasswordChange}
+                  maxLength={role === "citizen" ? CITIZEN_LOGIN_PASSWORD_MAX_LENGTH : undefined}
                   required
                   placeholder="••••••••"
                   style={fieldStyle(C, true, true)}
@@ -906,6 +1038,7 @@ export default function LoginPage({ defaultRole = "citizen" }) {
                   <button
                     type="button"
                     onClick={() => {
+                      resetCitizenRegistrationState();
                       setCitizenMode("register");
                       setError("");
                       setSuccess("");
@@ -979,59 +1112,83 @@ export default function LoginPage({ defaultRole = "citizen" }) {
               )}
             </form>
           ) : role === "citizen" && citizenMode === "register" ? (
-            <form onSubmit={handleCitizenRegister} style={{ display: "grid", gap: 14 }}>
-              <Field label="First Name" icon={<Mail size={16} color={C.t3} />}>
-                <input value={registerForm.firstName} onChange={(event) => setRegisterForm((current) => ({ ...current, firstName: event.target.value }))} required style={fieldStyle(C)} />
-              </Field>
-              <Field label="Middle Name" icon={<Mail size={16} color={C.t3} />}>
-                <input value={registerForm.middleName} onChange={(event) => setRegisterForm((current) => ({ ...current, middleName: event.target.value }))} style={fieldStyle(C)} />
-              </Field>
-              <Field label="Last Name" icon={<Mail size={16} color={C.t3} />}>
-                <input value={registerForm.lastName} onChange={(event) => setRegisterForm((current) => ({ ...current, lastName: event.target.value }))} style={fieldStyle(C)} />
-              </Field>
-              <Field label="Email" icon={<Mail size={16} color={C.t3} />}>
-                <input type="email" value={registerForm.email} onChange={(event) => setRegisterForm((current) => ({ ...current, email: event.target.value }))} required style={fieldStyle(C)} />
-              </Field>
-              <Field label="Aadhaar Number" icon={<Shield size={16} color={C.t3} />}>
-                <input value={registerForm.aadhaarNumber} onChange={(event) => setRegisterForm((current) => ({ ...current, aadhaarNumber: event.target.value.replace(/\D/g, "").slice(0, 12) }))} required style={fieldStyle(C)} />
-              </Field>
-              <div style={{ display: "grid", gridTemplateColumns: viewportWidth < 640 ? "1fr" : "1fr 1fr", gap: 14 }}>
-                <Field label="Age" icon={<Mail size={16} color={C.t3} />}>
-                  <input type="number" min="1" max="120" value={registerForm.age} onChange={(event) => setRegisterForm((current) => ({ ...current, age: event.target.value }))} required style={fieldStyle(C)} />
+            <form onSubmit={handleCitizenRegister} noValidate style={{ display: "grid", gap: 14 }}>
+              <div style={{ display: "grid", gridTemplateColumns: viewportWidth < 640 ? "1fr" : "repeat(3, minmax(0, 1fr))", gap: 14 }}>
+                <Field label="First Name" icon={<Mail size={16} color={C.t3} />} required error={getRegisterFieldError("firstName")}>
+                  <input maxLength={CITIZEN_NAME_MAX_LENGTH} value={registerForm.firstName} onChange={(event) => handleRegisterFieldChange("firstName", event.target.value)} style={fieldStyle(C, true, false, shouldHighlightRegisterField("firstName"))} />
                 </Field>
-                <label style={{ display: "grid", gap: 8 }}>
-                  <span style={{ fontSize: 12, fontWeight: 500, lineHeight: 1.45, color: C.t2 }}>Sex</span>
-                  <select value={registerForm.sex} onChange={(event) => setRegisterForm((current) => ({ ...current, sex: event.target.value }))} style={fieldStyle(C, false)}>
+                <Field label="Middle Name" icon={<Mail size={16} color={C.t3} />} error={getRegisterFieldError("middleName")}>
+                  <input maxLength={CITIZEN_NAME_MAX_LENGTH} value={registerForm.middleName} onChange={(event) => handleRegisterFieldChange("middleName", event.target.value)} style={fieldStyle(C, true, false, shouldHighlightRegisterField("middleName"))} />
+                </Field>
+                <Field label="Last Name" icon={<Mail size={16} color={C.t3} />} required error={getRegisterFieldError("lastName")}>
+                  <input maxLength={CITIZEN_NAME_MAX_LENGTH} value={registerForm.lastName} onChange={(event) => handleRegisterFieldChange("lastName", event.target.value)} style={fieldStyle(C, true, false, shouldHighlightRegisterField("lastName"))} />
+                </Field>
+              </div>
+
+              <div style={{ display: "grid", gridTemplateColumns: viewportWidth < 640 ? "1fr" : "repeat(3, minmax(0, 1fr))", gap: 14 }}>
+                <Field label="Sex" icon={<Users size={16} color={C.t3} />} required error={getRegisterFieldError("sex")}>
+                  <select value={registerForm.sex} onChange={(event) => handleRegisterFieldChange("sex", event.target.value)} style={fieldStyle(C, true, false, shouldHighlightRegisterField("sex"))}>
+                    <option value="">Select sex</option>
                     <option value="male">Male</option>
                     <option value="female">Female</option>
                     <option value="other">Other</option>
                   </select>
-                </label>
+                </Field>
+                <Field label="Age" icon={<Mail size={16} color={C.t3} />} required error={getRegisterFieldError("age")}>
+                  <input value={registerForm.age} onChange={(event) => handleRegisterFieldChange("age", event.target.value)} inputMode="numeric" style={fieldStyle(C, true, false, shouldHighlightRegisterField("age"))} />
+                </Field>
+                <Field label="Email" icon={<Mail size={16} color={C.t3} />} required error={getRegisterFieldError("email")}>
+                  <input type="email" value={registerForm.email} onChange={(event) => handleRegisterFieldChange("email", event.target.value)} style={fieldStyle(C, true, false, shouldHighlightRegisterField("email"))} />
+                </Field>
               </div>
-              <Field label="Mobile Number" icon={<Mail size={16} color={C.t3} />}>
-                <input value={registerForm.mobileNumber} onChange={(event) => setRegisterForm((current) => ({ ...current, mobileNumber: event.target.value.replace(/\D/g, "").slice(0, 10) }))} required style={fieldStyle(C)} />
-              </Field>
-              <Field label="Pincode" icon={<Mail size={16} color={C.t3} />}>
-                <input value={registerForm.pincode} onChange={(event) => setRegisterForm((current) => ({ ...current, pincode: event.target.value.replace(/\D/g, "").slice(0, 6) }))} required style={fieldStyle(C)} />
-              </Field>
-              <Field label="City" icon={<Mail size={16} color={C.t3} />}>
-                <input value={registerForm.city} onChange={(event) => setRegisterForm((current) => ({ ...current, city: event.target.value }))} required style={fieldStyle(C)} />
-              </Field>
-              <Field label="State" icon={<Mail size={16} color={C.t3} />}>
-                <input value={registerForm.state} onChange={(event) => setRegisterForm((current) => ({ ...current, state: event.target.value }))} required style={fieldStyle(C)} />
-              </Field>
-              <Field label="Password" icon={<Lock size={16} color={C.t3} />}>
-                <input type="password" value={registerForm.password} onChange={(event) => setRegisterForm((current) => ({ ...current, password: event.target.value }))} required style={fieldStyle(C)} />
-              </Field>
-              <Field label="Confirm Password" icon={<Lock size={16} color={C.t3} />}>
-                <input type="password" value={registerForm.confirmPassword} onChange={(event) => setRegisterForm((current) => ({ ...current, confirmPassword: event.target.value }))} required style={fieldStyle(C)} />
-              </Field>
-              <button type="submit" disabled={loading} style={primaryButtonStyle(C)}>
-                {loading ? "Submitting..." : "Create Citizen Account"}
-              </button>
-              <button type="button" onClick={() => setCitizenMode("login")} style={secondaryButtonStyle(C)}>
-                Back to Login
-              </button>
+
+              <div style={{ display: "grid", gridTemplateColumns: viewportWidth < 640 ? "1fr" : "repeat(2, minmax(0, 1fr))", gap: 14 }}>
+                <Field label="Aadhaar Number" icon={<Shield size={16} color={C.t3} />} required error={getRegisterFieldError("aadhaarNumber")}>
+                  <input value={registerForm.aadhaarNumber} onChange={(event) => handleRegisterFieldChange("aadhaarNumber", event.target.value)} style={fieldStyle(C, true, false, shouldHighlightRegisterField("aadhaarNumber"))} />
+                </Field>
+                <Field label="Mobile Number" icon={<Phone size={16} color={C.t3} />} required error={getRegisterFieldError("mobileNumber")}>
+                  <input value={registerForm.mobileNumber} onChange={(event) => handleRegisterFieldChange("mobileNumber", event.target.value)} style={fieldStyle(C, true, false, shouldHighlightRegisterField("mobileNumber"))} />
+                </Field>
+              </div>
+
+              <div style={{ display: "grid", gridTemplateColumns: viewportWidth < 640 ? "1fr" : "repeat(3, minmax(0, 1fr))", gap: 14 }}>
+                <Field label="Pincode" icon={<MapPin size={16} color={C.t3} />} required error={getRegisterFieldError("pincode")}>
+                  <input value={registerForm.pincode} onChange={(event) => handleRegisterFieldChange("pincode", event.target.value)} style={fieldStyle(C, true, false, shouldHighlightRegisterField("pincode"))} />
+                </Field>
+                <Field label="City" icon={<Building2 size={16} color={C.t3} />} required error={getRegisterFieldError("city")}>
+                  <input value={registerForm.city} onChange={(event) => handleRegisterFieldChange("city", event.target.value)} style={fieldStyle(C, true, false, shouldHighlightRegisterField("city"))} />
+                </Field>
+                <Field label="State" icon={<Landmark size={16} color={C.t3} />} required error={getRegisterFieldError("state")}>
+                  <input value={registerForm.state} onChange={(event) => handleRegisterFieldChange("state", event.target.value)} style={fieldStyle(C, true, false, shouldHighlightRegisterField("state"))} />
+                </Field>
+              </div>
+
+              <div style={{ display: "grid", gridTemplateColumns: viewportWidth < 640 ? "1fr" : "repeat(2, minmax(0, 1fr))", gap: 14 }}>
+                <Field label="Password" icon={<Lock size={16} color={C.t3} />} required error={getRegisterFieldError("password")}>
+                  <input type="password" maxLength={CITIZEN_REGISTER_PASSWORD_MAX_LENGTH} value={registerForm.password} onChange={(event) => handleRegisterFieldChange("password", event.target.value)} style={fieldStyle(C, true, false, shouldHighlightRegisterField("password"))} />
+                </Field>
+                <Field label="Confirm Password" icon={<Lock size={16} color={C.t3} />} required error={getRegisterFieldError("confirmPassword")}>
+                  <input type="password" maxLength={CITIZEN_REGISTER_PASSWORD_MAX_LENGTH} value={registerForm.confirmPassword} onChange={(event) => handleRegisterFieldChange("confirmPassword", event.target.value)} style={fieldStyle(C, true, false, shouldHighlightRegisterField("confirmPassword"))} />
+                </Field>
+              </div>
+
+              {registerSubmitError ? <MessageBox color={C.danger} bg={`${C.danger}20`} icon={<AlertCircle size={18} />} message={registerSubmitError} /> : null}
+
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: 14 }}>
+                <button type="submit" disabled={loading} style={primaryButtonStyle(C)}>
+                  {loading ? "Submitting..." : "Create Citizen Account"}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    resetCitizenRegistrationState();
+                    setCitizenMode("login");
+                  }}
+                  style={secondaryButtonStyle(C)}
+                >
+                  Back to Login
+                </button>
+              </div>
             </form>
           ) : role === "citizen" && citizenMode === "verify" ? (
             <form onSubmit={handleCitizenVerification} style={{ display: "grid", gap: 18 }}>
@@ -1041,7 +1198,14 @@ export default function LoginPage({ defaultRole = "citizen" }) {
               <button type="submit" disabled={loading} style={primaryButtonStyle(C)}>
                 {loading ? "Verifying..." : "Verify Registration"}
               </button>
-              <button type="button" onClick={() => setCitizenMode("login")} style={secondaryButtonStyle(C)}>
+              <button
+                type="button"
+                onClick={() => {
+                  resetCitizenRegistrationState();
+                  setCitizenMode("login");
+                }}
+                style={secondaryButtonStyle(C)}
+              >
                 Back to Login
               </button>
             </form>
@@ -1432,18 +1596,22 @@ function ContactMiniCard({ C, icon, title, detail, value }) {
   );
 }
 
-function Field({ label, icon, children }) {
+function Field({ label, icon, error = "", required = false, children }) {
   const { C } = usePortalTheme();
 
   return (
     <label style={{ display: "grid", gap: 8 }}>
-      <span style={{ fontSize: 12, fontWeight: 500, lineHeight: 1.45, color: C.t2 }}>{label}</span>
+      <span style={{ fontSize: 12, fontWeight: 500, lineHeight: 1.45, color: C.t2 }}>
+        {label}
+        {required ? <span style={{ color: C.danger, marginLeft: 2 }}>*</span> : null}
+      </span>
       <div style={{ position: "relative" }}>
         <div style={{ position: "absolute", left: 14, top: "50%", transform: "translateY(-50%)", pointerEvents: "none" }}>
           {icon}
         </div>
         {children}
       </div>
+      {error ? <span style={{ fontSize: 12, lineHeight: 1.5, color: C.danger }}>{error}</span> : null}
     </label>
   );
 }
@@ -1535,38 +1703,193 @@ function extractErrorMessage(error, fallback) {
   return toSafeUserMessage(error, fallback);
 }
 
-function validateCitizenRegistration(form) {
-  if (!isTwelveDigitAadhaar(form.aadhaarNumber)) {
-    return "Enter a valid 12-digit Aadhaar number";
-  }
+const REQUIRED_FIELD_MESSAGE = "This field is required";
+const PASSWORD_MISMATCH_MESSAGE = "Both password fields need to be same.";
 
-  return validatePassword(form.password, form.confirmPassword);
+function validateCitizenRegistration(form) {
+  return {
+    firstName: validateCitizenName(form.firstName, true),
+    middleName: validateCitizenName(form.middleName, false),
+    lastName: validateCitizenName(form.lastName, true),
+    sex: form.sex ? "" : REQUIRED_FIELD_MESSAGE,
+    age: validateAge(form.age),
+    email: validateEmail(form.email),
+    aadhaarNumber: validateAadhaar(form.aadhaarNumber),
+    mobileNumber: validateMobileNumber(form.mobileNumber),
+    pincode: validatePincode(form.pincode),
+    city: validateLocationName(form.city),
+    state: validateLocationName(form.state),
+    password: validatePasswordField(form.password),
+    confirmPassword: validateConfirmPassword(form.password, form.confirmPassword),
+  };
 }
 
 function validatePassword(password, confirmPassword) {
-  if (password.length < 12) {
-    return "Password must be at least 12 characters long";
+  const passwordError = validatePasswordField(password);
+  if (passwordError) return passwordError;
+  return validateConfirmPassword(password, confirmPassword);
+}
+
+function getCitizenLoginErrors(identifier, password) {
+  return {
+    identifier: getCitizenIdLengthError(identifier),
+    password: getCitizenPasswordLengthError(password),
+  };
+}
+
+function getCitizenIdLengthError(value) {
+  if (value.length >= CITIZEN_LOGIN_ID_MAX_LENGTH) {
+    return "Maximum length reached";
   }
-  if (!/[A-Z]/.test(password)) {
-    return "Password must include at least one uppercase letter";
+
+  return "";
+}
+
+function getCitizenPasswordLengthError(value) {
+  if (value.length >= CITIZEN_LOGIN_PASSWORD_MAX_LENGTH) {
+    return "Maximum length reached";
   }
-  if (!/[a-z]/.test(password)) {
-    return "Password must include at least one lowercase letter";
-  }
-  if (!/[0-9]/.test(password)) {
-    return "Password must include at least one number";
-  }
-  if (!/[^A-Za-z0-9]/.test(password)) {
-    return "Password must include at least one special character";
-  }
-  if (password !== confirmPassword) {
-    return "Passwords do not match";
-  }
+
   return "";
 }
 
 function isTwelveDigitAadhaar(aadhaarNumber) {
   return /^\d{12}$/.test(aadhaarNumber);
+}
+
+function validateCitizenName(value, required) {
+  const trimmedValue = value.trim();
+
+  if (required && !trimmedValue) {
+    return REQUIRED_FIELD_MESSAGE;
+  }
+
+  if (trimmedValue.length >= CITIZEN_NAME_MAX_LENGTH) {
+    return "Maximum length reached";
+  }
+
+  return "";
+}
+
+function validateAge(value) {
+  if (!value) {
+    return REQUIRED_FIELD_MESSAGE;
+  }
+
+  const numericAge = Number(value);
+  if (!Number.isInteger(numericAge) || numericAge <= 10 || numericAge >= 200) {
+    return "Put valid age";
+  }
+
+  return "";
+}
+
+function validateEmail(value) {
+  const trimmedValue = value.trim();
+
+  if (!trimmedValue) {
+    return REQUIRED_FIELD_MESSAGE;
+  }
+
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmedValue)) {
+    return "Enter a valid email address";
+  }
+
+  return "";
+}
+
+function validateAadhaar(value) {
+  if (!value) {
+    return REQUIRED_FIELD_MESSAGE;
+  }
+
+  if (!isTwelveDigitAadhaar(value)) {
+    return "Enter a valid 12-digit Aadhaar number";
+  }
+
+  return "";
+}
+
+function validateMobileNumber(value) {
+  if (!value) {
+    return REQUIRED_FIELD_MESSAGE;
+  }
+
+  if (!/^\d{10}$/.test(value)) {
+    return "Enter a valid 10-digit mobile number";
+  }
+
+  return "";
+}
+
+function validatePincode(value) {
+  if (!value) {
+    return REQUIRED_FIELD_MESSAGE;
+  }
+
+  if (!/^\d{6}$/.test(value)) {
+    return "Enter a valid 6-digit pincode";
+  }
+
+  return "";
+}
+
+function validateLocationName(value) {
+  const trimmedValue = value.trim();
+
+  if (!trimmedValue) {
+    return REQUIRED_FIELD_MESSAGE;
+  }
+
+  if (!/^[A-Za-z][A-Za-z\s.-]*$/.test(trimmedValue)) {
+    return "Enter a valid value";
+  }
+
+  return "";
+}
+
+function validatePasswordField(password) {
+  if (!password) {
+    return REQUIRED_FIELD_MESSAGE;
+  }
+
+  if (password.length >= CITIZEN_REGISTER_PASSWORD_MAX_LENGTH) {
+    return "Maximum length reached";
+  }
+
+  if (password.length < 12) {
+    return "Password must be at least 12 characters long";
+  }
+
+  if (!/[A-Za-z]/.test(password)) {
+    return "Password must contain at least one alphabet";
+  }
+
+  if (!/[0-9]/.test(password)) {
+    return "Password must contain at least one number";
+  }
+
+  if (!/[^A-Za-z0-9]/.test(password)) {
+    return "Password must contain at least one special character";
+  }
+
+  return "";
+}
+
+function validateConfirmPassword(password, confirmPassword) {
+  if (!confirmPassword) {
+    return REQUIRED_FIELD_MESSAGE;
+  }
+
+  if (confirmPassword.length >= CITIZEN_REGISTER_PASSWORD_MAX_LENGTH) {
+    return "Maximum length reached";
+  }
+
+  if (password !== confirmPassword) {
+    return PASSWORD_MISMATCH_MESSAGE;
+  }
+
+  return "";
 }
 
 async function getCaptchaToken() {

@@ -106,9 +106,9 @@ export default function AdminComplaintQueue() {
   return (
     <WorkspacePage width={1280}>
         <WorkspaceSectionHeader
-          eyebrow="Admin Workspace"
-          title="Complaint Queue"
-          subtitle="Complaints assigned to you appear here for review and resolution actions."
+          
+          title="COMPLAINT QUEUE"
+          
         />
 
         <div style={{ display: "grid", gap: 24 }}>
