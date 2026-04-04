@@ -71,7 +71,7 @@ export default function MinisterDashboard() {
   }, [events]);
 
   return (
-    <WorkspacePage>
+    <WorkspacePage width={1320}>
       <WorkspaceSectionHeader
         eyebrow="Minister Workspace"
         title={`${session?.user?.firstName || "Minister"} Dashboard`}

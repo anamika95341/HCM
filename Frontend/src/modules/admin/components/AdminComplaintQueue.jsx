@@ -104,8 +104,7 @@ export default function AdminComplaintQueue() {
   }, [personalComplaintQueue]);
 
   return (
-    <WorkspacePage width={1280} contentStyle={{ paddingLeft: 12, paddingRight: 12 }}>
-      <div style={{ maxWidth: "1150px", margin: "0 auto", width: "100%" }}>
+    <WorkspacePage width={1280}>
         <WorkspaceSectionHeader
           eyebrow="Admin Workspace"
           title="Complaint Queue"
@@ -223,7 +222,6 @@ export default function AdminComplaintQueue() {
             </WorkspaceCard>
           )}
         </div>
-      </div>
     </WorkspacePage>
   );
 }

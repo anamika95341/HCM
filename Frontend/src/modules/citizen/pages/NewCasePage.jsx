@@ -1423,7 +1423,7 @@ export default function HCMNewCasePage() {
     meetingForm.companions.some(c => c.phone.length > 0 && (!/^[6-9]/.test(c.phone) || c.phone.length < 10));
 
   return (
-    <WorkspacePage width={1150} contentStyle={{ paddingLeft: 12, paddingRight: 12 }}>
+    <WorkspacePage width={1320}>
       <SuccessModal
         open={successModal.open}
         title={successModal.title}
@@ -1434,7 +1434,7 @@ export default function HCMNewCasePage() {
         }}
       />
 
-      <div className="portal-page-wrap w-full mx-auto py-2">
+      <div style={{ width: "100%", paddingTop: 8, paddingBottom: 8 }}>
 
         {/* HEADER */}
         {activeTab && (
@@ -1477,17 +1477,19 @@ export default function HCMNewCasePage() {
             <button
               onClick={() => setActiveTab("meeting")}
               className="group relative rounded-xl border transition-[border-color,opacity] duration-200 overflow-hidden text-left hover:opacity-[0.98]"
-              style={{ background: C.card, borderColor: C.border, boxShadow: "none" }}
+              style={{ background: C.card, borderColor: C.border, boxShadow: "none", minHeight: 340 }}
             >
-              <div className="relative p-8">
-                <div className="h-12 w-12 rounded-xl flex items-center justify-center mb-4" style={{ background: C.purpleDim }}>
-                  <Calendar size={24} style={{ color: C.purple }} />
+              <div className="relative p-10" style={{ minHeight: 340, display: "flex", flexDirection: "column", justifyContent: "space-between" }}>
+                <div className="h-14 w-14 rounded-xl flex items-center justify-center mb-5" style={{ background: C.purpleDim }}>
+                  <Calendar size={26} style={{ color: C.purple }} />
                 </div>
-                <h3 style={{ fontSize: 20, fontWeight: 600, color: C.t1, marginBottom: 8 }}>Request a Meeting</h3>
-                <p style={{ color: C.t2, fontSize: 13, lineHeight: 1.6, marginBottom: 24 }}>
-                  Schedule a meeting with an administration desk. You can specify purpose, add supporting documents, and invite companions.
-                </p>
-                <div className="flex items-center gap-2 font-medium group-hover:gap-3 transition-all duration-300" style={{ color: C.purple }}>
+                <div>
+                  <h3 style={{ fontSize: 22, fontWeight: 600, color: C.t1, marginBottom: 10 }}>Request a Meeting</h3>
+                  <p style={{ color: C.t2, fontSize: 14, lineHeight: 1.7, marginBottom: 28, maxWidth: 520 }}>
+                    Schedule a meeting with an administration desk. You can specify purpose, add supporting documents, and invite companions.
+                  </p>
+                </div>
+                <div className="flex items-center gap-2 font-medium group-hover:gap-3 transition-all duration-300" style={{ color: C.purple, marginTop: 12 }}>
                   Get Started
                   <ArrowRight size={18} />
                 </div>
@@ -1498,17 +1500,19 @@ export default function HCMNewCasePage() {
             <button
               onClick={() => setActiveTab("complaint")}
               className="group relative rounded-xl border transition-[border-color,opacity] duration-200 overflow-hidden text-left hover:opacity-[0.98]"
-              style={{ background: C.card, borderColor: C.border, boxShadow: "none" }}
+              style={{ background: C.card, borderColor: C.border, boxShadow: "none", minHeight: 340 }}
             >
-              <div className="relative p-8">
-                <div className="h-12 w-12 rounded-xl flex items-center justify-center mb-4" style={{ background: `${C.mint}20` }}>
-                  <FileText size={24} style={{ color: C.mint }} />
+              <div className="relative p-10" style={{ minHeight: 340, display: "flex", flexDirection: "column", justifyContent: "space-between" }}>
+                <div className="h-14 w-14 rounded-xl flex items-center justify-center mb-5" style={{ background: `${C.mint}20` }}>
+                  <FileText size={26} style={{ color: C.mint }} />
                 </div>
-                <h3 style={{ fontSize: 20, fontWeight: 600, color: C.t1, marginBottom: 8 }}>Submit a Complaint</h3>
-                <p style={{ color: C.t2, fontSize: 13, lineHeight: 1.6, marginBottom: 24 }}>
-                  File a formal complaint regarding any civic or government issue. Supports multiple document formats and categories.
-                </p>
-                <div className="flex items-center gap-2 font-medium group-hover:gap-3 transition-all duration-300" style={{ color: C.mint }}>
+                <div>
+                  <h3 style={{ fontSize: 22, fontWeight: 600, color: C.t1, marginBottom: 10 }}>Submit a Complaint</h3>
+                  <p style={{ color: C.t2, fontSize: 14, lineHeight: 1.7, marginBottom: 28, maxWidth: 520 }}>
+                    File a formal complaint regarding any civic or government issue. Supports multiple document formats and categories.
+                  </p>
+                </div>
+                <div className="flex items-center gap-2 font-medium group-hover:gap-3 transition-all duration-300" style={{ color: C.mint, marginTop: 12 }}>
                   Get Started
                   <ArrowRight size={18} />
                 </div>
@@ -1810,10 +1814,7 @@ export default function HCMNewCasePage() {
           // COMPLAINT FORM
           <WorkspaceCard style={{ marginBottom: 32 }}>
             <form onSubmit={submitComplaint} className="space-y-8">
-              <WorkspaceCardHeader
-                title="Complaint Form"
-                subtitle="Provide a clear issue summary, category, location, incident date, and any supporting documents."
-              />
+              
               {/* TITLE */}
               <div>
                 <label style={sectionLabelStyle}>

@@ -167,10 +167,7 @@ export default function AdminCases() {
   }, [loading, tab, tabInitialized, tabs]);
 
   return (
-    <WorkspacePage width={99999} style={{ padding: 0 }}>
-      {/* ── Full-width wrapper with tight side padding matching the image ── */}
-      <div style={{ width: "100%", padding: "0 20px", boxSizing: "border-box" }}>
-
+    <WorkspacePage width={1280}>
         {/* HEADER */}
         <WorkspaceSectionHeader
           eyebrow="Admin Workspace"
@@ -354,8 +351,6 @@ export default function AdminCases() {
             )}
           </WorkspaceCard>
         )}
-
-      </div>
     </WorkspacePage>
   );
 }

@@ -87,7 +87,7 @@ export default function DeoCalendarEvent() {
   }, [meetings, searchQuery]);
 
   return (
-    <WorkspacePage width={1120}>
+    <WorkspacePage width={1320}>
       <WorkspaceSectionHeader
         eyebrow="DEO Workspace"
         title="Verification Queue"
