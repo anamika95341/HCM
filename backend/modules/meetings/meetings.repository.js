@@ -75,9 +75,7 @@ function mapMeeting(row) {
     completionNote: row.completion_note,
     cancellationReason: row.cancellation_reason,
     createdAt: row.created_at,
-    created_at: row.created_at,
     updatedAt: row.updated_at,
-    updated_at: row.updated_at,
     first_name: row.first_name,
     last_name: row.last_name,
     citizen_code: row.citizen_code,
@@ -224,22 +222,20 @@ async function getCitizenMeetingById(meetingId, citizenId) {
 async function getMeetingQueue() {
   const result = await pool.query(
     `${meetingSelect}
-     WHERE m.status NOT IN ('completed', 'cancelled')
+     WHERE m.status NOT IN ('completed', 'cancelled', 'rejected')
      ORDER BY m.updated_at DESC, m.created_at DESC`
   );
   return result.rows.map(mapMeeting);
 }
 
-async function getAdminMeetingById(meetingId) {
-  const result = await pool.query(
-    `${meetingSelect}
-     WHERE m.id = $1`,
-    [meetingId]
-  );
-  return result.rows[0] ? mapMeeting(result.rows[0]) : null;
-}
+const ALLOWED_PATCH_COLUMNS = new Set([
+  'assigned_admin_id', 'assigned_deo_id', 'minister_id', 'rejection_reason',
+  'verification_reason', 'verification_notes', 'scheduled_at', 'scheduled_end_at',
+  'scheduled_location', 'is_vip', 'admin_comments', 'visitor_id', 'meeting_docket',
+  'cancellation_reason', 'cancelled_at', 'completion_note', 'completed_at', 'document_file_id',
+]);
 
-async function updateMeetingStatus({ meetingId, status, previousStatus, actorRole, actorId, note, patch = {} }) {
+async function updateMeetingStatus({ meetingId, status, previousStatus, actorRole, actorId, note, patch = {}, calendarEvent = null }) {
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
@@ -247,7 +243,11 @@ async function updateMeetingStatus({ meetingId, status, previousStatus, actorRol
     const sets = ['status = $2', 'updated_at = NOW()'];
     const values = [meetingId, status];
     let index = 3;
+
     for (const [column, value] of Object.entries(patch)) {
+      if (!ALLOWED_PATCH_COLUMNS.has(column)) {
+        throw new Error(`Disallowed patch column: ${column}`);
+      }
       sets.push(`${column} = $${index}`);
       values.push(value);
       index += 1;
@@ -259,6 +259,40 @@ async function updateMeetingStatus({ meetingId, status, previousStatus, actorRol
        VALUES ($1,$2,$3,$4,$5,$6)`,
       [meetingId, previousStatus, status, actorRole, actorId || null, note || null]
     );
+
+    if (calendarEvent) {
+      if (calendarEvent.action === 'upsert') {
+        const existing = await client.query(
+          `SELECT id FROM minister_calendar_events WHERE meeting_id = $1`,
+          [meetingId]
+        );
+        if (existing.rows[0]) {
+          await client.query(
+            `UPDATE minister_calendar_events
+             SET minister_id = $2, title = $3, starts_at = $4, ends_at = $5,
+                 location = $6, is_vip = $7, comments = $8
+             WHERE meeting_id = $1`,
+            [meetingId, calendarEvent.ministerId, calendarEvent.title,
+             calendarEvent.startsAt, calendarEvent.endsAt, calendarEvent.location,
+             calendarEvent.isVip, calendarEvent.comments || null]
+          );
+        } else {
+          await client.query(
+            `INSERT INTO minister_calendar_events
+              (minister_id, meeting_id, title, starts_at, ends_at, location, is_vip, comments, created_by_admin_id)
+             VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)`,
+            [calendarEvent.ministerId, meetingId, calendarEvent.title,
+             calendarEvent.startsAt, calendarEvent.endsAt, calendarEvent.location,
+             calendarEvent.isVip, calendarEvent.comments || null, calendarEvent.createdByAdminId]
+          );
+        }
+      } else if (calendarEvent.action === 'delete') {
+        await client.query(
+          `DELETE FROM minister_calendar_events WHERE meeting_id = $1`,
+          [meetingId]
+        );
+      }
+    }
 
     await client.query('COMMIT');
   } catch (error) {
@@ -324,7 +358,7 @@ async function listMeetingFilesForMinister(meetingId, ministerId) {
        JOIN meetings m ON m.id = mce.meeting_id
        JOIN uploaded_files uf
          ON (
-              (uf.id = m.document_file_id AND uf.mime_type LIKE 'image/%')
+              (uf.id = m.document_file_id)
               OR
               (uf.entity_id = m.id AND uf.entity_type = 'meeting_photo')
             )
@@ -342,7 +376,7 @@ async function listMeetingFilesForAdmin(meetingId, adminId) {
        FROM meetings m
        JOIN uploaded_files uf
          ON (
-              (uf.id = m.document_file_id AND uf.mime_type LIKE 'image/%')
+              (uf.id = m.document_file_id)
               OR
               (uf.entity_id = m.id AND uf.entity_type = 'meeting_photo')
             )
@@ -354,6 +388,38 @@ async function listMeetingFilesForAdmin(meetingId, adminId) {
   return result.rows;
 }
 
+async function atomicClaimMeeting(meetingId, adminId) {
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    const result = await client.query(
+      `UPDATE meetings
+       SET assigned_admin_id = $2, status = 'accepted', updated_at = NOW()
+       WHERE id = $1
+         AND status = 'pending'
+         AND (assigned_admin_id IS NULL OR assigned_admin_id = $2)
+       RETURNING id, citizen_id, status`,
+      [meetingId, adminId]
+    );
+    if (!result.rows[0]) {
+      await client.query('ROLLBACK');
+      return null;
+    }
+    await client.query(
+      `INSERT INTO meeting_status_history (meeting_id, previous_status, new_status, actor_role, actor_id, note)
+       VALUES ($1, 'pending', 'accepted', 'admin', $2, 'Meeting assigned to admin')`,
+      [meetingId, adminId]
+    );
+    await client.query('COMMIT');
+    return result.rows[0];
+  } catch (error) {
+    await client.query('ROLLBACK');
+    throw error;
+  } finally {
+    client.release();
+  }
+}
+
 module.exports = {
   createUploadedFile,
   createMeeting,
@@ -361,11 +427,11 @@ module.exports = {
   getMeetingById,
   getCitizenMeetingById,
   getMeetingQueue,
-  getAdminMeetingById,
   updateMeetingStatus,
   createCalendarEvent,
   updateCalendarEventByMeetingId,
   getMeetingHistory,
   listMeetingFilesForMinister,
   listMeetingFilesForAdmin,
+  atomicClaimMeeting,
 };

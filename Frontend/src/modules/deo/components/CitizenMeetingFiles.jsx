@@ -138,11 +138,10 @@ function UploadModal({ meeting, onClose, onEdit }) {
                       key={section.key}
                       type="button"
                       onClick={() => setActiveType(section.key)}
-                      className={`flex-1 py-2 flex flex-col items-center gap-1 text-[11px] border rounded-xl transition-all ${
-                        activeType === section.key
+                      className={`flex-1 py-2 flex flex-col items-center gap-1 text-[11px] border rounded-xl transition-all ${activeType === section.key
                           ? "border-[var(--portal-purple)] bg-[var(--portal-purple-dim)] text-[var(--portal-purple)]"
                           : "border-[var(--portal-border)] text-[var(--portal-text-muted)] hover:bg-[var(--portal-bg-elevated)]"
-                      }`}
+                        }`}
                     >
                       <SectionIcon size={16} color={activeType === section.key ? "var(--portal-purple)" : "currentColor"} />
                       {section.tabLabel}
@@ -241,11 +240,10 @@ function ManageMediaModal({ meeting, selectedIds, onToggleItem, onToggleAll, onD
                       key={tab.key}
                       type="button"
                       onClick={() => setActiveType(tab.key)}
-                      className={`flex-1 py-2 flex flex-col items-center gap-1 text-[11px] border rounded-xl transition-all ${
-                        activeType === tab.key
+                      className={`flex-1 py-2 flex flex-col items-center gap-1 text-[11px] border rounded-xl transition-all ${activeType === tab.key
                           ? "border-[var(--portal-purple)] bg-[var(--portal-purple-dim)] text-[var(--portal-purple)]"
                           : "border-[var(--portal-border)] text-[var(--portal-text-muted)] hover:bg-[var(--portal-bg-elevated)]"
-                      }`}
+                        }`}
                     >
                       <TabIcon size={16} color={activeType === tab.key ? "var(--portal-purple)" : "currentColor"} />
                       {tab.label}

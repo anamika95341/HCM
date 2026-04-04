@@ -119,7 +119,7 @@ async function getCitizenMeetingDetail(meetingId, citizenId) {
 }
 
 async function getAdminMeetingDetail(meetingId) {
-  const meeting = await meetingsRepository.getAdminMeetingById(meetingId);
+  const meeting = await meetingsRepository.getMeetingById(meetingId);
   if (!meeting) {
     throw createHttpError(404, 'Meeting not found');
   }
@@ -158,6 +158,7 @@ async function changeMeetingStatus({
   patch = {},
   allowedPreviousStatuses,
   actionLabel,
+  calendarEvent = null,
 }) {
   const meeting = await meetingsRepository.getMeetingById(meetingId);
   if (!meeting) {
@@ -175,6 +176,7 @@ async function changeMeetingStatus({
     actorId,
     note,
     patch,
+    calendarEvent,
   });
 
   await publishMeetingStatusUpdate({
@@ -192,19 +194,20 @@ async function assignMeetingToSelf(meetingId, adminId, reqMeta) {
   if (!current) {
     throw createHttpError(404, 'Meeting not found');
   }
-  if (current.assignedAdminUserId && current.assignedAdminUserId !== adminId) {
-    throw createHttpError(403, 'Meeting is already assigned to another admin');
+  if (current.status !== 'pending') {
+    throw createHttpError(409, `Cannot assign this meeting when meeting status is ${current.status}`);
   }
 
-  const updated = await changeMeetingStatus({
+  const claimed = await meetingsRepository.atomicClaimMeeting(meetingId, adminId);
+  if (!claimed) {
+    throw createHttpError(409, 'Meeting has already been claimed by another admin');
+  }
+
+  await publishMeetingStatusUpdate({
+    citizenId: current.citizen_id,
     meetingId,
-    actorRole: 'admin',
-    actorId: adminId,
-    status: current.status,
-    allowedPreviousStatuses: ['pending'],
-    actionLabel: 'assign this meeting',
+    status: 'accepted',
     note: 'Meeting assigned to admin',
-    patch: { assigned_admin_id: adminId },
   });
 
   await writeAuditLog({
@@ -217,7 +220,7 @@ async function assignMeetingToSelf(meetingId, adminId, reqMeta) {
     userAgent: reqMeta.userAgent,
   });
 
-  return updated;
+  return meetingsRepository.getMeetingById(meetingId);
 }
 
 async function rejectMeeting(meetingId, actorId, reason, reqMeta) {
@@ -235,7 +238,7 @@ async function rejectMeeting(meetingId, actorId, reason, reqMeta) {
     actorRole: 'admin',
     actorId,
     status: 'rejected',
-    allowedPreviousStatuses: ['pending', 'accepted', 'verification_pending', 'verified', 'not_verified'],
+    allowedPreviousStatuses: ['pending', 'accepted', 'verified', 'not_verified'],
     actionLabel: 'reject this meeting',
     note: cleanReason,
     patch: {
@@ -371,24 +374,6 @@ async function scheduleMeeting(meetingId, adminId, body, reqMeta) {
     throw createHttpError(404, 'Minister not found');
   }
 
-  const payload = {
-    ministerId: body.ministerId,
-    meetingId,
-    title: meeting.title,
-    startsAt: body.startsAt,
-    endsAt: body.endsAt,
-    location: sanitizeText(body.location),
-    isVip: body.isVip,
-    comments: sanitizeText(body.comments || ''),
-    createdByAdminId: adminId,
-  };
-
-  const existingEvent = meeting.status === 'scheduled'
-    ? await meetingsRepository.updateCalendarEventByMeetingId(meetingId, payload)
-    : null;
-
-  const event = existingEvent || await meetingsRepository.createCalendarEvent(payload);
-
   const updated = await changeMeetingStatus({
     meetingId,
     actorRole: 'admin',
@@ -410,6 +395,17 @@ async function scheduleMeeting(meetingId, adminId, body, reqMeta) {
       cancellation_reason: null,
       cancelled_at: null,
     },
+    calendarEvent: {
+      action: 'upsert',
+      ministerId: body.ministerId,
+      title: meeting.title,
+      startsAt: body.startsAt,
+      endsAt: body.endsAt,
+      location: sanitizeText(body.location),
+      isVip: body.isVip,
+      comments: sanitizeText(body.comments || ''),
+      createdByAdminId: adminId,
+    },
   });
 
   await writeAuditLog({
@@ -420,7 +416,7 @@ async function scheduleMeeting(meetingId, adminId, body, reqMeta) {
     action: meeting.status === 'scheduled' ? 'meeting_rescheduled' : 'meeting_scheduled',
     ipAddress: reqMeta.ip,
     userAgent: reqMeta.userAgent,
-    metadata: { eventId: event.id, ministerId: body.ministerId },
+    metadata: { ministerId: body.ministerId },
   });
   return updated;
 }
@@ -530,6 +526,7 @@ async function cancelMeeting(meetingId, adminId, reason, reqMeta) {
       cancellation_reason: cleanReason,
       cancelled_at: new Date().toISOString(),
     },
+    calendarEvent: { action: 'delete' },
   });
 
   await writeAuditLog({

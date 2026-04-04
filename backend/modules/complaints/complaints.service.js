@@ -353,7 +353,7 @@ async function scheduleComplaintCall(complaintId, actorId, callScheduledAt, reqM
   assertComplaintAdminAccess(current, actorId, { actionLabel: 'schedule a call for this complaint' });
   const scheduleAt = new Date(callScheduledAt);
   if (Number.isNaN(scheduleAt.getTime()) || scheduleAt.getTime() <= Date.now()) {
-    throw createHttpError(400, 'Meeting date and time must be in the future');
+    throw createHttpError(400, 'Call date and time must be in the future');
   }
 
   const complaint = await applyComplaintTransition({
@@ -438,7 +438,6 @@ async function resolveComplaint(complaintId, actorId, body, reqMeta) {
     actorRole: 'admin',
     nextStatus: 'resolved',
     allowedPreviousStatuses: [
-      'submitted',
       'assigned',
       'in_review',
       'call_scheduled',

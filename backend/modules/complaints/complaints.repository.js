@@ -82,9 +82,7 @@ function mapComplaint(row) {
     handoffByAdminUserId: row.handoff_by_admin_id || null,
     handoffToAdminUserId: row.handoff_to_admin_id || null,
     createdAt: row.created_at,
-    created_at: row.created_at,
     updatedAt: row.updated_at,
-    updated_at: row.updated_at,
     citizenSnapshot: {
       name: [row.citizen_first_name, row.citizen_last_name].filter(Boolean).join(' '),
       citizenId: row.citizen_code,
@@ -175,7 +173,7 @@ async function getCitizenComplaintById(id, citizenId) {
 async function getComplaintQueue() {
   const result = await pool.query(
     `${complaintSelect}
-     WHERE c.status != 'completed'
+     WHERE c.status NOT IN ('completed', 'rejected', 'resolved', 'escalated_to_meeting')
      ORDER BY c.updated_at DESC, c.created_at DESC`
   );
   return result.rows.map(mapComplaint);
@@ -201,6 +199,13 @@ async function getComplaintHistory(complaintId) {
   return result.rows;
 }
 
+const ALLOWED_PATCH_COLUMNS = new Set([
+  'assigned_admin_id', 'handoff_type', 'handoff_by_admin_id', 'handoff_to_admin_id',
+  'status_reason', 'department', 'officer_name', 'officer_contact', 'manual_contact',
+  'call_scheduled_at', 'call_outcome', 'resolution_summary', 'resolution_note',
+  'resolution_document_names', 'reopened_count', 'closed_at',
+]);
+
 async function updateComplaintStatus({
   complaintId,
   status,
@@ -218,6 +223,9 @@ async function updateComplaintStatus({
     let index = 3;
 
     for (const [column, value] of Object.entries(patch)) {
+      if (!ALLOWED_PATCH_COLUMNS.has(column)) {
+        throw new Error(`Disallowed patch column: ${column}`);
+      }
       sets.push(`${column} = $${index}`);
       values.push(value);
       index += 1;
