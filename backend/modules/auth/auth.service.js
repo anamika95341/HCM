@@ -255,9 +255,25 @@ async function verifyCitizenRegistration({ userId, otp, ip }, reqMeta) {
     throw createHttpError(400, 'Invalid or expired OTP');
   }
 
-  const sequence = Date.now() % 100000000;
-  const citizenId = generateCitizenId(sequence);
-  await authRepository.updateCitizenVerification(userId, citizenId);
+  let citizenId;
+  let assigned = false;
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    const sequence = crypto.randomInt(0, 100000000);
+    citizenId = generateCitizenId(sequence);
+    try {
+      await authRepository.updateCitizenVerification(userId, citizenId);
+      assigned = true;
+      break;
+    } catch (err) {
+      if (err?.code === '23505') {
+        continue;
+      }
+      throw err;
+    }
+  }
+  if (!assigned) {
+    throw createHttpError(500, 'Failed to generate a unique citizen ID. Please try again.');
+  }
   const user = await authRepository.findUserById('citizen', userId);
 
   await writeAuditLog({
@@ -492,11 +508,20 @@ async function checkLockout({ role, userId, ip, email }) {
   }
   if (Number(userAttempts || 0) >= 5 || Number(ipAttempts || 0) >= 5) {
     if (email) {
-      await sendMail({
-        to: email,
-        subject: 'Account temporarily locked',
-        text: 'Your account has been temporarily locked due to repeated failed login attempts.',
-      });
+      const notifiedKey = `lockout:notified:${role}:${userId}`;
+      try {
+        const alreadyNotified = await redis.get(notifiedKey);
+        if (!alreadyNotified) {
+          await sendMail({
+            to: email,
+            subject: 'Account temporarily locked',
+            text: 'Your account has been temporarily locked due to repeated failed login attempts.',
+          });
+          await redis.set(notifiedKey, '1', 'EX', 900);
+        }
+      } catch (err) {
+        logger.warn('Lockout notification check failed', { role, userId, err });
+      }
     }
     throw createHttpError(423, 'Account temporarily locked');
   }
@@ -559,17 +584,28 @@ async function loginCitizen({ citizenId, password }, reqMeta) {
   }
   await checkLockout({ role: 'citizen', userId: user.id, ip: reqMeta.ip, email: user.email });
   const valid = await bcrypt.compare(password, user.password_hash);
-  if (!valid || !user.is_verified) {
+  if (!valid) {
     await recordLoginFailure({ role: 'citizen', userId: user.id, ip: reqMeta.ip });
     await emitAuthEvent({
       event: 'login_failure',
       role: 'citizen',
       userId: user.id,
       ip: reqMeta.ip,
-      reason: !valid ? 'invalid_credentials' : 'account_not_verified',
+      reason: 'invalid_credentials',
       requestId: reqMeta.requestId,
     });
     throw genericError;
+  }
+  if (!user.is_verified) {
+    await emitAuthEvent({
+      event: 'login_failure',
+      role: 'citizen',
+      userId: user.id,
+      ip: reqMeta.ip,
+      reason: 'account_not_verified',
+      requestId: reqMeta.requestId,
+    });
+    throw createHttpError(403, 'Please verify your account before logging in');
   }
   await clearLoginFailures({ role: 'citizen', userId: user.id, ip: reqMeta.ip });
   const session = await issueSession('citizen', user);
@@ -583,7 +619,7 @@ async function loginCitizen({ citizenId, password }, reqMeta) {
   return session;
 }
 
-async function startTwoFactorLogin(role, identifier, password, reqMeta) {
+async function loginOperator(role, identifier, password, reqMeta) {
   const genericError = createHttpError(401, 'Invalid credentials');
   const finder = {
     admin: authRepository.findAdminByUsernameOrEmail,
@@ -818,7 +854,7 @@ module.exports = {
   resendAdminVerificationCode,
   resendDeoVerificationCode,
   loginCitizen,
-  startTwoFactorLogin,
+  loginOperator,
   forgotCitizenPassword,
   resetCitizenPassword,
   refreshSession,

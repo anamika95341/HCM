@@ -180,20 +180,6 @@ async function createDeo(payload, db = pool) {
   throw new Error('Unable to allocate a DEO username');
 }
 
-async function listDeosWithCreators() {
-  const result = await pool.query(
-    `SELECT d.id, d.username, d.first_name, d.middle_name, d.last_name, d.age, d.sex, d.email, d.phone_number, d.designation,
-            d.status, d.is_verified, d.created_at, d.created_by_admin_id, d.created_by_master_admin_id,
-            a.first_name AS creator_first_name, a.last_name AS creator_last_name, a.username AS creator_username,
-            m.first_name AS creator_master_first_name, m.last_name AS creator_master_last_name, m.username AS creator_master_username
-       FROM deos d
-       LEFT JOIN admins a ON a.id = d.created_by_admin_id
-       LEFT JOIN master_admins m ON m.id = d.created_by_master_admin_id
-      ORDER BY d.created_at DESC`
-  );
-  return result.rows;
-}
-
 async function deleteDeoById(deoId, masterAdminId = null) {
   if (masterAdminId) {
     await pool.query(
@@ -231,6 +217,5 @@ module.exports = {
   getDashboard,
   listActiveAdminsForCitizenDirectory,
   listWorkflowDirectory,
-  listDeosWithCreators,
   purgePendingDeoById,
 };

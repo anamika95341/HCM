@@ -58,7 +58,8 @@ async function deactivateAdmin(adminId, masterAdminId) {
         SET status = 'disabled',
             removed_at = NOW(),
             removed_by_master_admin_id = $2,
-            updated_at = NOW()
+            updated_at = NOW(),
+            password_changed_at = NOW()
       WHERE id = $1
         AND removed_at IS NULL
       RETURNING id, username, email, status`,
@@ -83,7 +84,8 @@ async function deactivateDeo(deoId, masterAdminId) {
         SET status = 'disabled',
             removed_at = NOW(),
             removed_by_master_admin_id = $2,
-            updated_at = NOW()
+            updated_at = NOW(),
+            password_changed_at = NOW()
       WHERE id = $1
         AND removed_at IS NULL
       RETURNING id, username, email, status`,

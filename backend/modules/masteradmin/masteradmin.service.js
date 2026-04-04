@@ -4,6 +4,7 @@ const { encryptAadhaar, sha256 } = require('../../utils/crypto');
 const { writeAuditLog } = require('../../utils/audit');
 const { sendMail } = require('../../utils/mailer');
 const { generateOtp } = require('../../utils/otpService');
+const redis = require('../../config/redis');
 const authRepository = require('../auth/auth.repository');
 const adminRepository = require('../admin/admin.repository');
 const masteradminRepository = require('./masteradmin.repository');
@@ -184,6 +185,13 @@ async function removeAdmin(masterAdminId, adminId, reqMeta) {
     throw createHttpError(404, 'Admin not found');
   }
 
+  try {
+    await redis.set(`password_changed:admin:${adminId}`, String(Date.now()), 'EX', 86400);
+  } catch (err) {
+    // Non-fatal: token will expire naturally within 15 minutes
+  }
+  await authRepository.revokeAllUserRefreshTokens('admin', adminId);
+
   await writeAuditLog({
     actorRole: 'masteradmin',
     actorId: masterAdminId,
@@ -202,6 +210,13 @@ async function removeDeo(masterAdminId, deoId, reqMeta) {
   if (!deo) {
     throw createHttpError(404, 'DEO not found');
   }
+
+  try {
+    await redis.set(`password_changed:deo:${deoId}`, String(Date.now()), 'EX', 86400);
+  } catch (err) {
+    // Non-fatal: token will expire naturally within 15 minutes
+  }
+  await authRepository.revokeAllUserRefreshTokens('deo', deoId);
 
   await writeAuditLog({
     actorRole: 'masteradmin',

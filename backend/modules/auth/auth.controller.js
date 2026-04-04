@@ -77,7 +77,7 @@ async function citizenLogin(req, res, next) {
 
 async function adminLogin(req, res, next) {
   try {
-    const result = await authService.startTwoFactorLogin('admin', req.body.usernameOrEmail, req.body.password, reqMeta(req));
+    const result = await authService.loginOperator('admin', req.body.usernameOrEmail, req.body.password, reqMeta(req));
     res.json(result);
   } catch (error) {
     next(error);
@@ -86,7 +86,7 @@ async function adminLogin(req, res, next) {
 
 async function masteradminLogin(req, res, next) {
   try {
-    const result = await authService.startTwoFactorLogin('masteradmin', req.body.usernameOrEmail, req.body.password, reqMeta(req));
+    const result = await authService.loginOperator('masteradmin', req.body.usernameOrEmail, req.body.password, reqMeta(req));
     res.json(result);
   } catch (error) {
     next(error);
@@ -95,7 +95,7 @@ async function masteradminLogin(req, res, next) {
 
 async function deoLogin(req, res, next) {
   try {
-    const result = await authService.startTwoFactorLogin('deo', req.body.usernameOrEmail, req.body.password, reqMeta(req));
+    const result = await authService.loginOperator('deo', req.body.usernameOrEmail, req.body.password, reqMeta(req));
     res.json(result);
   } catch (error) {
     next(error);
@@ -104,7 +104,7 @@ async function deoLogin(req, res, next) {
 
 async function ministerLogin(req, res, next) {
   try {
-    const result = await authService.startTwoFactorLogin('minister', req.body.usernameOrEmail, req.body.password, reqMeta(req));
+    const result = await authService.loginOperator('minister', req.body.usernameOrEmail, req.body.password, reqMeta(req));
     res.json(result);
   } catch (error) {
     next(error);

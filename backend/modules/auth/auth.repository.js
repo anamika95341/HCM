@@ -237,6 +237,18 @@ async function updateAdminVerification(userId) {
   );
 }
 
+async function revokeAllUserRefreshTokens(userRole, userId) {
+  await pool.query(
+    `UPDATE refresh_tokens
+     SET revoked_at = NOW()
+     WHERE user_role = $1
+       AND user_id = $2
+       AND revoked_at IS NULL
+       AND expires_at > NOW()`,
+    [userRole, userId]
+  );
+}
+
 module.exports = {
   findUserById,
   findActiveUserById,
@@ -257,4 +269,5 @@ module.exports = {
   updateCitizenVerification,
   updateAdminVerification,
   updateDeoVerification,
+  revokeAllUserRefreshTokens,
 };
