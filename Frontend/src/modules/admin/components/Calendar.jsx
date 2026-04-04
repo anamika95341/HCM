@@ -636,7 +636,7 @@ export default function Calendar() {
 
   return (
     <WorkspacePage width={1280}>
-      <WorkspaceSectionHeader eyebrow="Admin Workspace" title="Calendar" subtitle="Scheduled and VIP meetings aligned to the admin workflow." />
+      <WorkspaceSectionHeader  title="CALENDAR" />
 
         {error && (
           <div className="mb-6 p-4 rounded-lg font-medium" style={{ background: `${C.danger}12`, border: `1px solid ${C.danger}33`, color: C.danger }}>

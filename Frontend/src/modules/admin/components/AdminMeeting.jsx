@@ -330,7 +330,7 @@ export default function AdminMeeting() {
         <SuccessModal open={!!successMessage} message={successMessage} onClose={() => setSuccessMessage("")} />
 
         <WorkspaceSectionHeader
-          eyebrow="Admin Workspace"
+          
           title={selectedMeeting.requestId || selectedMeeting.id}
           subtitle={selectedMeeting.title}
           action={
@@ -345,7 +345,7 @@ export default function AdminMeeting() {
           {actionError ? <WorkspaceCard style={{ color: C.danger }}>{actionError}</WorkspaceCard> : null}
 
           <WorkspaceCard>
-            <WorkspaceCardHeader title="Workflow Actions" />
+            {/* <WorkspaceCardHeader title="Workflow Actions" /> */}
             {isUnassignedPoolMeeting ? (
               <WorkspaceButton
                 type="button"
@@ -731,19 +731,14 @@ export default function AdminMeeting() {
     <WorkspacePage width={1280} contentStyle={{ paddingLeft: 12, paddingRight: 12 }}>
       <div style={{ maxWidth: "1150px", margin: "0 auto", width: "100%" }}>
         <WorkspaceSectionHeader
-          eyebrow="Admin Workspace"
-          title="Meeting Queue"
-          subtitle="Meetings assigned to you appear here for accept, reject, and scheduling actions."
+          
+          title="MEETING QUEUE"
+        
         />
 
         <div style={{ display: "grid", gap: 24 }}>
           <WorkspaceStatGrid items={queueStats} />
 
-          <WorkspaceCard>
-            <WorkspaceCardHeader
-              title="Meeting Queue Search"
-              subtitle="Search the meetings currently assigned to you."
-            />
             <div className="relative">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2" size={18} style={{ color: C.t3 }} />
               <WorkspaceInput
@@ -754,7 +749,7 @@ export default function AdminMeeting() {
                 style={{ paddingLeft: 40 }}
               />
             </div>
-          </WorkspaceCard>
+          
 
           {loading ? (
             <WorkspaceEmptyState title="Loading meeting queue..." />

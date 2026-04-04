@@ -372,7 +372,6 @@ export default function AdminCaseDetail() {
     <WorkspacePage width={1200}>
       <SuccessModal open={!!successMessage} message={successMessage} onClose={() => setSuccessMessage("")} />
       <WorkspaceSectionHeader
-        eyebrow="Admin Workspace"
         title={item.complaintId}
         subtitle={item.title}
         action={<WorkspaceButton type="button" variant="ghost" onClick={() => navigate(backPath)}><ChevronLeft size={16} />{backLabel}</WorkspaceButton>}
@@ -382,7 +381,6 @@ export default function AdminCaseDetail() {
         {error ? <WorkspaceCard style={{ color: C.danger }}>{error}</WorkspaceCard> : null}
 
         <WorkspaceCard>
-          <WorkspaceCardHeader title="Workflow Actions" />
           {showAssignToMeOnly ? (
             <WorkspaceButton type="button" disabled={actionLoading} onClick={() => runAction("assign", () => apiClient.patch(`/complaints/${id}/assign-self`, {}, authorizedConfig(session.accessToken)))}>
               Assign to Me
