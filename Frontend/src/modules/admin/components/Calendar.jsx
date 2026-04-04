@@ -1,9 +1,9 @@
 import { useEffect, useMemo, useState } from "react";
-import { ChevronLeft, ChevronRight, X } from "lucide-react";
+import { Calendar as CalendarIcon, ChevronLeft, ChevronRight, X } from "lucide-react";
 import { apiClient, authorizedConfig } from "../../../shared/api/client.js";
 import { useAuth } from "../../../shared/auth/AuthContext.jsx";
 import { usePortalTheme } from "../../../shared/theme/portalTheme.jsx";
-import { WorkspaceButton, WorkspaceCard, WorkspaceCardHeader, WorkspaceEmptyState, WorkspacePage, WorkspaceSectionHeader, WorkspaceTabs } from "../../../shared/components/WorkspaceUI.jsx";
+import { WorkspaceBadge, WorkspaceButton, WorkspaceCard, WorkspaceCardHeader, WorkspaceEmptyState, WorkspacePage, WorkspaceSectionHeader, WorkspaceTabs } from "../../../shared/components/WorkspaceUI.jsx";
 
 const VIEW_OPTIONS = ["month", "week", "day"];
 const DAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
@@ -104,22 +104,6 @@ function getItemTone(item, C) {
   return item.type === "VIP Meeting" ? C.warn : C.purple;
 }
 
-function EventPill({ item, compact = false, onClick }) {
-  const { C } = usePortalTheme();
-  const tone = getItemTone(item, C);
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={`w-full text-left rounded-lg px-3 py-2 transition-[opacity,border-color] duration-200 hover:opacity-90 ${compact ? "text-[10px]" : "text-xs"}`}
-      style={{ border: `1px solid ${tone}33`, background: `${tone}12`, color: tone }}
-    >
-      <div className="font-semibold truncate">{item.title}</div>
-      <div className="opacity-70 mt-0.5">{formatTime(item.startsAt)}</div>
-    </button>
-  );
-}
-
 function DayMeetingsModal({ date, items, onClose, onSelectMeeting }) {
   const { C } = usePortalTheme();
 
@@ -160,7 +144,7 @@ function DayMeetingsModal({ date, items, onClose, onSelectMeeting }) {
             </button>
           </div>
 
-          <div className="p-6 sm:p-8 max-h-[70vh] overflow-y-auto">
+          <div className="p-6 sm:p-8 max-h-[320px] overflow-y-auto">
             {items.length === 0 ? (
               <div style={{ fontSize: 13, color: C.t3, textAlign: "center", padding: "24px 0" }}>No meetings for this date.</div>
             ) : (
@@ -463,16 +447,6 @@ export default function Calendar() {
     [items]
   );
 
-  const monthCells = useMemo(() => {
-    const first = new Date(cursorDate.getFullYear(), cursorDate.getMonth(), 1);
-    const gridStart = addDays(first, -first.getDay());
-    return Array.from({ length: 42 }, (_, index) => {
-      const date = addDays(gridStart, index);
-      const dayItems = normalizedItems.filter((item) => isSameDay(item.startDate, date));
-      return { date, items: dayItems };
-    });
-  }, [cursorDate, normalizedItems]);
-
   const weekDays = useMemo(() => {
     const start = startOfWeek(cursorDate);
     return Array.from({ length: 7 }, (_, index) => {
@@ -488,6 +462,39 @@ export default function Calendar() {
     () => sortByStartTime(normalizedItems.filter((item) => item.startDate >= startOfDay(cursorDate) && item.startDate <= endOfDay(cursorDate))),
     [cursorDate, normalizedItems]
   );
+
+  const filteredItems = useMemo(() => {
+    if (view === "day") return dayItems;
+
+    if (view === "week") {
+      const weekStart = startOfWeek(cursorDate);
+      const weekEnd = addDays(weekStart, 7);
+      return normalizedItems.filter((item) => item.startDate >= weekStart && item.startDate < weekEnd);
+    }
+
+    const monthStart = new Date(cursorDate.getFullYear(), cursorDate.getMonth(), 1);
+    const monthEnd = new Date(cursorDate.getFullYear(), cursorDate.getMonth() + 1, 1);
+    return normalizedItems.filter((item) => item.startDate >= monthStart && item.startDate < monthEnd);
+  }, [cursorDate, dayItems, normalizedItems, view]);
+
+  const monthGrid = useMemo(() => {
+    const first = new Date(cursorDate.getFullYear(), cursorDate.getMonth(), 1);
+    const start = addDays(first, -first.getDay());
+    const grid = [];
+    let current = start;
+
+    while (current.getMonth() === cursorDate.getMonth() || current <= first) {
+      grid.push(current);
+      current = addDays(current, 1);
+    }
+
+    while (current.getDay() !== 0) {
+      grid.push(current);
+      current = addDays(current, 1);
+    }
+
+    return grid;
+  }, [cursorDate]);
 
   const visibleUpcomingItems = useMemo(() => {
     const today = startOfDay(new Date());
@@ -514,6 +521,20 @@ export default function Calendar() {
       },
     ].filter((group) => group.items.length > 0);
   }, [visibleUpcomingItems]);
+
+  const viewLabel = () => {
+    if (view === "day") {
+      return cursorDate.toLocaleDateString(undefined, { day: "numeric", month: "long", year: "numeric" });
+    }
+
+    if (view === "week") {
+      const start = startOfWeek(cursorDate);
+      const end = addDays(start, 6);
+      return `${start.toLocaleDateString(undefined, { day: "numeric", month: "short" })} – ${end.toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" })}`;
+    }
+
+    return `${MONTHS[cursorDate.getMonth()]} ${cursorDate.getFullYear()}`;
+  };
 
   const openItem = (item, mode = "details") => {
     const start = item.startsAt ? new Date(item.startsAt) : null;
@@ -611,38 +632,11 @@ export default function Calendar() {
     }
   };
 
+  const rowsCount = monthGrid.length / 7;
+
   return (
     <WorkspacePage width={1280}>
       <WorkspaceSectionHeader eyebrow="Admin Workspace" title="Calendar" subtitle="Scheduled and VIP meetings aligned to the admin workflow." />
-
-      <div style={{ marginBottom: 20 }}>
-        <WorkspaceCard>
-          <WorkspaceCardHeader
-            title={view === "month"
-              ? `${MONTHS[cursorDate.getMonth()]} ${cursorDate.getFullYear()}`
-              : view === "week"
-              ? `Week of ${startOfWeek(cursorDate).toLocaleDateString()}`
-              : cursorDate.toLocaleDateString(undefined, { weekday: "long", month: "long", day: "numeric", year: "numeric" })}
-            subtitle="Navigate the calendar and switch between month, week, and day views."
-            action={
-              <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 10 }}>
-                <WorkspaceTabs
-                  items={VIEW_OPTIONS.map((option) => ({ id: option, label: option.charAt(0).toUpperCase() + option.slice(1) }))}
-                  value={view}
-                  onChange={setView}
-                />
-                <WorkspaceButton type="button" variant="ghost" onClick={() => shiftCursor(-1)} aria-label="Previous">
-                  <ChevronLeft size={16} />
-                </WorkspaceButton>
-                <WorkspaceButton type="button" variant="ghost" onClick={() => setCursorDate(startOfDay(new Date()))}>Today</WorkspaceButton>
-                <WorkspaceButton type="button" variant="ghost" onClick={() => shiftCursor(1)} aria-label="Next">
-                  <ChevronRight size={16} />
-                </WorkspaceButton>
-              </div>
-            }
-          />
-        </WorkspaceCard>
-      </div>
 
         {error && (
           <div className="mb-6 p-4 rounded-lg font-medium" style={{ background: `${C.danger}12`, border: `1px solid ${C.danger}33`, color: C.danger }}>
@@ -653,68 +647,189 @@ export default function Calendar() {
         {loading ? (
           <WorkspaceEmptyState title="Loading calendar..." />
         ) : (
-          <div className="grid grid-cols-1 xl:grid-cols-[1fr_320px] gap-6">
-            
-            <WorkspaceCard style={{ padding: 0, overflow: "hidden" }}>
+          <div className="grid grid-cols-1 xl:grid-cols-[1fr_300px] gap-6" style={{ alignItems: "start" }}>
+            <WorkspaceCard style={{ marginBottom: 0 }}>
+              <WorkspaceCardHeader
+                title={viewLabel()}
+                subtitle={`${filteredItems.length} event${filteredItems.length !== 1 ? "s" : ""} in view`}
+                action={
+                  <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                    <select
+                      value={view}
+                      onChange={(event) => setView(event.target.value)}
+                      style={{
+                        padding: "6px 12px",
+                        borderRadius: 8,
+                        border: `1px solid ${C.border}`,
+                        background: C.bgElevated,
+                        color: C.t1,
+                        fontSize: 13,
+                        fontWeight: 600,
+                        cursor: "pointer",
+                        outline: "none",
+                      }}
+                    >
+                      {VIEW_OPTIONS.map((option) => (
+                        <option key={option} value={option}>
+                          {option.charAt(0).toUpperCase() + option.slice(1)}
+                        </option>
+                      ))}
+                    </select>
+
+                    <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                      <button
+                        type="button"
+                        onClick={() => shiftCursor(-1)}
+                        aria-label="Previous"
+                        style={{
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          padding: "6px 10px",
+                          borderRadius: 8,
+                          border: `1px solid ${C.border}`,
+                          background: C.bgElevated,
+                          color: C.t1,
+                          cursor: "pointer",
+                        }}
+                      >
+                        <ChevronLeft size={18} color={C.t1} strokeWidth={2.5} />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setCursorDate(startOfDay(new Date()))}
+                        style={{
+                          padding: "6px 16px",
+                          borderRadius: 8,
+                          border: `1px solid ${C.border}`,
+                          background: C.bgElevated,
+                          color: C.t1,
+                          fontSize: 13,
+                          fontWeight: 600,
+                          cursor: "pointer",
+                        }}
+                      >
+                        Today
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => shiftCursor(1)}
+                        aria-label="Next"
+                        style={{
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          padding: "6px 10px",
+                          borderRadius: 8,
+                          border: `1px solid ${C.border}`,
+                          background: C.bgElevated,
+                          color: C.t1,
+                          cursor: "pointer",
+                        }}
+                      >
+                        <ChevronRight size={18} color={C.t1} strokeWidth={2.5} />
+                      </button>
+                    </div>
+                  </div>
+                }
+              />
+
               {view === "month" && (
                 <div>
-                  <div className="grid grid-cols-7 border-b" style={{ background: C.bgElevated, borderColor: C.border }}>
+                  <div
+                    style={{
+                      display: "grid",
+                      gridTemplateColumns: "repeat(7, minmax(0, 1fr))",
+                      gap: 8,
+                      marginBottom: 8,
+                    }}
+                  >
                     {DAYS.map((day) => (
-                      <div key={day} style={{ padding: "12px 16px", fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", color: C.t3, textAlign: "center" }}>
+                      <div
+                        key={day}
+                        style={{
+                          fontSize: 11,
+                          fontWeight: 700,
+                          color: C.t3,
+                          textTransform: "uppercase",
+                          letterSpacing: ".08em",
+                          textAlign: "center",
+                        }}
+                      >
                         {day}
                       </div>
                     ))}
                   </div>
-                  <div className="grid grid-cols-7">
-                    {monthCells.map((cell) => {
-                      const inMonth = cell.date.getMonth() === cursorDate.getMonth();
-                      const isToday = isSameDay(cell.date, new Date());
+
+                  <div
+                    style={{
+                      display: "grid",
+                      gridTemplateColumns: "repeat(7, minmax(0, 1fr))",
+                      gap: 8,
+                    }}
+                  >
+                    {monthGrid.map((day) => {
+                      const inMonth = day.getMonth() === cursorDate.getMonth();
+                      const isToday = isSameDay(day, new Date());
+                      const isSelected = selectedDateItems?.date && isSameDay(day, selectedDateItems.date);
+                      const dayItemsForDate = normalizedItems.filter((item) => isSameDay(item.startDate, day));
+
                       return (
                         <div
-                          key={cell.date.toISOString()}
-                          className="min-h-[140px] p-3 cursor-pointer transition-colors"
-                          style={{ borderRight: `1px solid ${C.border}`, borderBottom: `1px solid ${C.border}`, background: inMonth ? C.card : C.bgElevated }}
-                          onClick={() => setCursorDate(cell.date)}
+                          key={day.toISOString()}
+                          onClick={() => openDateMeetings(day, dayItemsForDate)}
+                          style={{
+                            height: `calc((100vh - 280px) / ${rowsCount})`,
+                            minHeight: 70,
+                            borderRadius: 12,
+                            border: `1px solid ${isSelected ? `${C.purple}60` : isToday ? `${C.purple}40` : C.border}`,
+                            background: isSelected ? `${C.purple}08` : inMonth ? C.bgElevated : C.bg,
+                            padding: 10,
+                            display: "grid",
+                            gap: 6,
+                            alignContent: "start",
+                            cursor: "pointer",
+                            transition: "border-color 0.15s ease, background 0.15s ease",
+                          }}
+                          onMouseEnter={(event) => {
+                            if (!isSelected) event.currentTarget.style.borderColor = `${C.purple}40`;
+                          }}
+                          onMouseLeave={(event) => {
+                            if (!isSelected) event.currentTarget.style.borderColor = isToday ? `${C.purple}40` : C.border;
+                          }}
                         >
-                          <button
-                            type="button"
-                            className="w-8 h-8 rounded-lg text-sm font-semibold transition-colors"
-                            style={isToday ? { background: C.purple, color: "#ffffff" } : { color: inMonth ? C.t1 : C.t3, background: "transparent" }}
+                          <div
+                            style={{
+                              display: "flex",
+                              alignItems: "center",
+                              justifyContent: "center",
+                              width: 24,
+                              height: 24,
+                              borderRadius: 99,
+                              fontSize: 12,
+                              fontWeight: 700,
+                              background: isToday ? C.purple : "transparent",
+                              color: isToday ? "#fff" : inMonth ? C.t1 : C.t3,
+                            }}
                           >
-                            {cell.date.getDate()}
-                          </button>
-                          {cell.items.length === 1 && (
-                            <button
-                              type="button"
-                              onClick={(event) => {
-                                event.stopPropagation();
-                                openItem(cell.items[0]);
+                            {day.getDate()}
+                          </div>
+
+                          {dayItemsForDate.length > 0 && (
+                            <div
+                              style={{
+                                fontSize: 11,
+                                fontWeight: 600,
+                                color: C.purple,
+                                background: `${C.purple}12`,
+                                border: `1px solid ${C.purple}30`,
+                                borderRadius: 8,
+                                padding: "4px 8px",
+                                textAlign: "center",
                               }}
-                              className="mt-2 w-full text-left rounded-lg px-2.5 py-2 transition-colors"
-                              style={{ border: `1px solid ${C.border}`, background: C.bgElevated }}
                             >
-                              <div className="text-[11px] font-semibold truncate" style={{ color: C.t1 }}>
-                                {cell.items[0].title}
-                              </div>
-                            </button>
-                          )}
-                          {cell.items.length > 1 && (
-                            <button
-                              type="button"
-                              onClick={(event) => {
-                                event.stopPropagation();
-                                openDateMeetings(cell.date, cell.items);
-                              }}
-                              className="mt-2 w-full text-left rounded-lg px-2.5 py-2 transition-colors"
-                              style={{ border: `1px solid ${C.border}`, background: C.bgElevated }}
-                            >
-                              <div className="text-[10px] font-semibold uppercase tracking-[0.08em]" style={{ color: C.purple }}>
-                                Meetings
-                              </div>
-                              <div className="mt-1 text-[11px] font-semibold" style={{ color: C.t2 }}>
-                                Total Meetings: {cell.items.length}
-                              </div>
-                            </button>
+                              {dayItemsForDate.length} meeting{dayItemsForDate.length !== 1 ? "s" : ""}
+                            </div>
                           )}
                         </div>
                       );
@@ -724,84 +839,158 @@ export default function Calendar() {
               )}
 
               {view === "week" && (
-                <div>
-                  <div className="grid grid-cols-7 border-b" style={{ background: C.bgElevated, borderColor: C.border }}>
-                    {weekDays.map((day) => (
-                      <div key={day.date.toISOString()} className="px-3 py-4 text-center last:border-r-0" style={{ borderRight: `1px solid ${C.border}` }}>
-                        <div style={{ fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", color: C.t3 }}>{DAYS[day.date.getDay()]}</div>
-                        <div
-                          className="mt-2 inline-flex w-10 h-10 items-center justify-center rounded-lg text-sm font-semibold transition-colors"
-                          style={isSameDay(day.date, new Date()) ? { background: C.purple, color: "#ffffff" } : { color: C.t1 }}
-                        >
-                          {day.date.getDate()}
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(7, minmax(0, 1fr))", gap: 8 }}>
+                  {weekDays.map((day) => {
+                    const isToday = isSameDay(day.date, new Date());
+                    const isSelected = selectedDateItems?.date && isSameDay(day.date, selectedDateItems.date);
+
+                    return (
+                      <div
+                        key={day.date.toISOString()}
+                        style={{
+                          border: `1px solid ${isSelected ? `${C.purple}60` : isToday ? `${C.purple}40` : C.border}`,
+                          borderRadius: 12,
+                          background: isSelected ? `${C.purple}08` : C.bgElevated,
+                          padding: 10,
+                          minHeight: 120,
+                          cursor: "pointer",
+                          transition: "border-color 0.15s ease, background 0.15s ease",
+                        }}
+                        onClick={() => openDateMeetings(day.date, day.items)}
+                        onMouseEnter={(event) => {
+                          if (!isSelected) event.currentTarget.style.borderColor = `${C.purple}40`;
+                        }}
+                        onMouseLeave={(event) => {
+                          if (!isSelected) event.currentTarget.style.borderColor = isToday ? `${C.purple}40` : C.border;
+                        }}
+                      >
+                        <div style={{ marginBottom: 10 }}>
+                          <div style={{ fontSize: 10, color: C.t3, textTransform: "uppercase", letterSpacing: ".08em" }}>
+                            {DAYS[day.date.getDay()]}
+                          </div>
+                          <div
+                            style={{
+                              display: "inline-flex",
+                              alignItems: "center",
+                              justifyContent: "center",
+                              width: 26,
+                              height: 26,
+                              borderRadius: 99,
+                              fontSize: 14,
+                              fontWeight: 700,
+                              marginTop: 4,
+                              background: isToday ? C.purple : "transparent",
+                              color: isToday ? "#fff" : C.t1,
+                            }}
+                          >
+                            {day.date.getDate()}
+                          </div>
+                        </div>
+                        <div style={{ display: "grid", gap: 6 }}>
+                          {day.items.length > 0 ? (
+                            <div
+                              style={{
+                                fontSize: 12,
+                                fontWeight: 600,
+                                color: C.purple,
+                                background: `${C.purple}12`,
+                                border: `1px solid ${C.purple}30`,
+                                borderRadius: 8,
+                                padding: "6px 10px",
+                                textAlign: "center",
+                              }}
+                            >
+                              {day.items.length} meeting{day.items.length !== 1 ? "s" : ""}
+                            </div>
+                          ) : (
+                            <div style={{ fontSize: 11, color: C.t3 }}>No events</div>
+                          )}
                         </div>
                       </div>
-                    ))}
-                  </div>
-                  <div className="grid grid-cols-7 min-h-[520px]">
-                    {weekDays.map((day) => (
-                      <div key={day.date.toISOString()} className="p-3 space-y-2" style={{ borderRight: `1px solid ${C.border}` }}>
-                        {day.items.length === 0 ? (
-                          <div style={{ fontSize: 11, color: C.t3, padding: "16px 0" }}>No meetings</div>
-                        ) : (
-                          day.items.map((item) => <EventPill key={item.id} item={item} onClick={() => openItem(item)} />)
-                        )}
-                      </div>
-                    ))}
-                  </div>
+                    );
+                  })}
                 </div>
               )}
 
               {view === "day" && (
-                <div className="p-6 min-h-[520px]">
-                  <div style={{ fontSize: 16, fontWeight: 700, marginBottom: 24, color: C.t1 }}>
-                    {cursorDate.toLocaleDateString(undefined, { weekday: "long", month: "long", day: "numeric" })}
-                  </div>
-                  <div className="space-y-3">
-                    {dayItems.length === 0 ? (
-                      <div style={{ fontSize: 13, color: C.t3, padding: "32px 0", textAlign: "center" }}>No meetings for this day.</div>
-                    ) : (
-                      dayItems.map((item) => (
+                <div style={{ display: "grid", gap: 10 }}>
+                  {dayItems.length ? (
+                    dayItems.map((item) => {
+                      const tone = getItemTone(item, C);
+
+                      return (
                         <button
                           key={item.id}
                           type="button"
                           onClick={() => openItem(item)}
-                          className="w-full text-left rounded-xl p-4 transition-all"
-                          style={{ border: `1px solid ${C.border}`, background: C.bgElevated }}
+                          style={{
+                            border: `1px solid ${C.border}`,
+                            borderRadius: 12,
+                            background: C.bgElevated,
+                            padding: 16,
+                            textAlign: "left",
+                            cursor: "pointer",
+                            transition: "border-color 0.15s ease, background 0.15s ease",
+                          }}
+                          onMouseEnter={(event) => {
+                            event.currentTarget.style.borderColor = `${tone}50`;
+                            event.currentTarget.style.background = `${tone}06`;
+                          }}
+                          onMouseLeave={(event) => {
+                            event.currentTarget.style.borderColor = C.border;
+                            event.currentTarget.style.background = C.bgElevated;
+                          }}
                         >
-                          <div className="flex items-start justify-between gap-4">
-                            <div>
-                              <div className="inline-flex px-3 py-1 rounded-full text-xs font-semibold border" style={{ borderColor: `${item.type === "VIP Meeting" ? C.warn : C.purple}33`, background: `${item.type === "VIP Meeting" ? C.warn : C.purple}12`, color: item.type === "VIP Meeting" ? C.warn : C.purple }}>
-                              {item.type}
+                          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "start", gap: 12 }}>
+                            <div style={{ minWidth: 0, flex: 1 }}>
+                              <div style={{ fontSize: 15, fontWeight: 700, color: C.t1, marginBottom: 4 }}>
+                                {item.title}
                               </div>
-                              <div style={{ marginTop: 8, fontSize: 13, fontWeight: 700, color: C.t1 }}>{item.title}</div>
-                              <div style={{ fontSize: 11, color: C.t2, marginTop: 4 }}>{item.source} • {item.location || (item.calendarKind === "complaintCall" ? "Contact pending" : "Location pending")}</div>
+                              <div style={{ fontSize: 12, color: C.t2, marginBottom: 4 }}>
+                                {formatTime(item.startsAt)} – {formatTime(item.endsAt)}
+                              </div>
+                              <div style={{ fontSize: 12, color: C.t3 }}>
+                                {item.location || (item.calendarKind === "complaintCall" ? "Contact pending" : "Location pending")}
+                              </div>
                             </div>
-                            <div style={{ fontSize: 11, color: C.t2, whiteSpace: "nowrap" }}>
-                              {formatTime(item.startsAt)} - {formatTime(item.endsAt)}
-                            </div>
+                            <WorkspaceBadge color={tone}>
+                              {item.calendarKind === "complaintCall" ? "Call" : item.type === "VIP Meeting" ? "VIP" : "Standard"}
+                            </WorkspaceBadge>
                           </div>
-                          <div style={{ fontSize: 11, color: C.t2, marginTop: 12 }}>{item.details}</div>
                         </button>
-                      ))
-                    )}
-                  </div>
+                      );
+                    })
+                  ) : (
+                    <WorkspaceEmptyState title="No events scheduled for this day" />
+                  )}
                 </div>
               )}
             </WorkspaceCard>
 
-            <WorkspaceCard style={{ padding: 24, height: "fit-content", position: "sticky", top: 24 }}>
-              <h3 className="text-sm font-bold uppercase tracking-wider mb-4" style={{ color: C.t3 }}>Upcoming Meetings</h3>
-              <div className="space-y-3 max-h-[600px] overflow-y-auto">
+            <div style={{ display: "flex", flexDirection: "column", gap: 24, position: "sticky", top: 24, height: "fit-content" }}>
+              <WorkspaceCard style={{ padding: 24, marginBottom: 0 }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
+                  <div>
+                    <div style={{ fontSize: 11, fontWeight: 700, color: C.t3, textTransform: "uppercase", letterSpacing: ".1em", marginBottom: 4 }}>
+                      Upcoming
+                    </div>
+                    <h3 className="text-lg font-bold" style={{ color: C.t1 }}>Next Meetings</h3>
+                  </div>
+                  <div style={{ background: `${C.purple}15`, padding: 8, borderRadius: "50%", color: C.purple }}>
+                    <CalendarIcon size={18} />
+                  </div>
+                </div>
+
+                <div className="space-y-4 max-h-[600px] overflow-y-auto">
                 {upcomingGroups.length === 0 ? (
                   <div style={{ fontSize: 13, color: C.t3 }}>No meetings scheduled for today or tomorrow.</div>
                 ) : (
                   upcomingGroups.map((group) => (
                     <div key={group.key}>
-                      <div className="text-[11px] font-bold uppercase tracking-[0.08em] mb-2" style={{ color: C.t3 }}>
+                      <div className="text-[11px] font-bold uppercase tracking-[0.08em] mb-3" style={{ color: C.t3 }}>
                         {group.label}
                       </div>
-                      <div className="space-y-3">
+                      <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
                         {group.items.map((item) => (
                           <button
                             key={item.id}
@@ -810,12 +999,40 @@ export default function Calendar() {
                               setCursorDate(startOfDay(item.startDate));
                               openItem(item);
                             }}
-                            className="w-full text-left pb-3 last:border-b-0 transition-colors group"
-                            style={{ borderBottom: `1px solid ${C.border}` }}
+                            style={{
+                              display: "flex",
+                              alignItems: "stretch",
+                              gap: 12,
+                              padding: 16,
+                              border: `1px solid ${C.border}`,
+                              borderRadius: 12,
+                              background: C.bgElevated,
+                              textAlign: "left",
+                              cursor: "pointer",
+                              position: "relative",
+                              overflow: "hidden",
+                            }}
                           >
-                            <div className="font-semibold" style={{ color: C.t1 }}>{item.title}</div>
-                            <div className="text-xs mt-1" style={{ color: C.t3 }}>
-                              {formatTime(item.startsAt)}
+                            <div style={{ position: "absolute", left: 0, top: 12, bottom: 12, width: 3, background: getItemTone(item, C), borderRadius: "0 4px 4px 0" }} />
+
+                            <div style={{ minWidth: 0, flex: 1, paddingLeft: 6 }}>
+                              <div style={{ fontSize: 14, fontWeight: 700, color: C.t1, marginBottom: 6 }}>{item.title}</div>
+                              <div
+                                style={{
+                                  display: "inline-flex",
+                                  alignItems: "center",
+                                  gap: 8,
+                                  fontSize: 12,
+                                  fontWeight: 600,
+                                  color: getItemTone(item, C),
+                                  background: `${getItemTone(item, C)}10`,
+                                  padding: "4px 10px",
+                                  borderRadius: 6,
+                                }}
+                              >
+                                {new Date(item.startsAt).toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric" })}
+                                <span style={{ color: C.t3, fontWeight: 400 }}>{formatTime(item.startsAt)}</span>
+                              </div>
                             </div>
                           </button>
                         ))}
@@ -823,8 +1040,9 @@ export default function Calendar() {
                     </div>
                   ))
                 )}
-              </div>
-            </WorkspaceCard>
+                </div>
+              </WorkspaceCard>
+            </div>
           </div>
         )}
 

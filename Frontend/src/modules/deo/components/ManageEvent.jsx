@@ -1,30 +1,37 @@
 import { useState, useRef, useEffect } from "react";
 import {
-  FiEdit2, FiTrash2, FiSearch, FiChevronDown,
-  FiPaperclip, FiDownload, FiX, FiFilter,
+  FiEdit2, FiSearch, FiChevronDown,
+  FiPaperclip, FiDownload, FiX,
   FiCalendar, FiImage, FiVideo, FiFile, FiUploadCloud,
 } from "react-icons/fi";
-
-// ─── Mock Data ────────────────────────────────────────────────────────────────
-const MOCK_EVENTS = Array.from({ length: 18 }, (_, i) => ({
-  id: i + 1,
-  title: ["Document Verification", "Land Record Review", "Budget Allocation Meeting",
-    "Public Grievance Hearing", "Infrastructure Inspection", "Revenue Assessment"][i % 6],
-  whoToMeet: ["District Collector", "Revenue Officer", "Finance Secretary",
-    "Block Development Officer", "PWD Engineer", "Tehsildar"][i % 6],
-  date: new Date(2025, 3 + Math.floor(i / 3), (i % 28) + 1).toISOString().split("T")[0],
-  time: ["09:00", "10:30", "11:00", "14:00", "15:30", "16:00"][i % 6],
-  description: "Discussion regarding official matters and pending review of relevant documents.",
-  location: ["Collectorate Office, Block A", "Revenue Bhawan", "Secretariat", "Block Office", "PWD Office", "Tehsil Bhawan"][i % 6],
-  locationDetail: "Room 201, Second Floor",
-  status: ["Upcoming", "Completed", "Cancelled", "Upcoming", "Upcoming", "Completed"][i % 6],
-  files: i % 3 === 0 ? [
-    { id: 1, name: "agenda.pdf", type: "document", size: "245 KB" },
-    { id: 2, name: "photo1.jpg", type: "photo", size: "1.2 MB" },
-  ] : [],
-}));
+import { apiClient, authorizedConfig } from "../../../shared/api/client.js";
+import { useAuth } from "../../../shared/auth/AuthContext.jsx";
 
 const PAGE_SIZE = 8;
+
+function getEventStatus(startsAt, endsAt) {
+  const now = Date.now();
+  const end = new Date(endsAt).getTime();
+  const start = new Date(startsAt).getTime();
+  if (Number.isFinite(end) && end < now) return "Completed";
+  if (Number.isFinite(start) && start >= now) return "Upcoming";
+  return "Upcoming";
+}
+
+function formatEventRow(event) {
+  const startsAt = new Date(event.starts_at);
+  return {
+    id: event.id,
+    title: event.title,
+    whoToMeet: event.who_to_meet || "",
+    date: Number.isNaN(startsAt.getTime()) ? "" : startsAt.toISOString().split("T")[0],
+    time: Number.isNaN(startsAt.getTime()) ? "" : startsAt.toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" }),
+    description: event.comments || "",
+    location: event.location || "",
+    status: getEventStatus(event.starts_at, event.ends_at),
+    files: [],
+  };
+}
 
 // ─── Components ─────────────────────────────────────────────────────────────
 
@@ -34,77 +41,190 @@ function FileIcon({ type }) {
   return <FiFile size={15} className="text-amber-500" />;
 }
 
-function FileDeleteModal({ file, onConfirm, onCancel }) {
-  const [reason, setReason] = useState("");
+function EventUploadModal({ event, onClose, onEdit }) {
+  const [activeType, setActiveType] = useState("photo");
+  const [selectedFiles, setSelectedFiles] = useState({
+    photo: "",
+    video: "",
+    document: "",
+  });
+  const photoRef = useRef(null);
+  const videoRef = useRef(null);
+  const documentRef = useRef(null);
+
+  if (!event) return null;
+
+  const uploadSections = [
+    {
+      key: "photo",
+      tabLabel: "Photos",
+      label: "Upload Photos",
+      hint: "Photos, JPG, PNG, HEIC",
+      icon: FiImage,
+      accept: "image/*",
+    },
+    {
+      key: "video",
+      tabLabel: "Videos",
+      label: "Upload Videos",
+      hint: "Videos, MP4, MOV",
+      icon: FiVideo,
+      accept: "video/*",
+    },
+    {
+      key: "document",
+      tabLabel: "Documents",
+      label: "Upload Documents",
+      hint: "Documents, PDF, DOC, XLS",
+      icon: FiFile,
+      accept: ".pdf,.doc,.docx,.xls,.xlsx",
+    },
+  ];
+  const activeSection = uploadSections.find((section) => section.key === activeType) || uploadSections[0];
+  const ActiveSectionIcon = activeSection.icon;
+  const activeInputRef = activeType === "photo" ? photoRef : activeType === "video" ? videoRef : documentRef;
+
   return (
-    <div className="fixed inset-0 bg-black/45 z-[1100] flex items-center justify-center p-4" onClick={onCancel}>
-      <div className="bg-[var(--portal-card)] rounded-xl w-full max-w-md shadow-2xl flex flex-col" onClick={e => e.stopPropagation()}>
-        <div className="p-5 border-b border-[var(--portal-border-light)] flex items-center justify-between">
-          <div className="text-base font-bold text-red-500 flex items-center gap-2"><FiTrash2 size={15} /> Remove File</div>
-          <button className="flex items-center justify-center w-8 h-8 bg-[var(--portal-bg-elevated)] rounded-lg text-[var(--portal-text-muted)] hover:bg-[var(--portal-border)]" onClick={onCancel}><FiX size={14} /></button>
+    <div className="fixed inset-0 bg-black/45 z-[1000] flex items-center justify-center p-4 sm:p-6" onClick={onClose}>
+      <div className="bg-[var(--portal-card)] rounded-xl w-full max-w-3xl max-h-[90vh] shadow-2xl flex flex-col" onClick={e => e.stopPropagation()}>
+        <div className="px-6 py-5 border-b border-[var(--portal-border-light)] flex items-center justify-between shrink-0">
+          <div className="text-lg font-bold text-[var(--portal-text-strong)] flex items-center gap-2">
+            <FiUploadCloud size={18} color="var(--portal-purple)" /> Upload Files
+          </div>
+          <div className="flex items-center gap-2">
+            <button
+              className="px-4 py-2 text-sm font-medium text-[var(--portal-text)] bg-[var(--portal-card)] border-2 border-[var(--portal-border)] rounded-lg hover:bg-[var(--portal-bg-elevated)] transition-colors"
+              onClick={onEdit}
+            >
+              Edit
+            </button>
+            <button className="flex items-center justify-center w-8 h-8 bg-[var(--portal-bg-elevated)] rounded-lg text-[var(--portal-text-muted)] hover:bg-[var(--portal-border)] transition-colors" onClick={onClose}>
+              <FiX size={16} />
+            </button>
+          </div>
         </div>
-        <div className="p-6">
-          <p className="text-sm text-[var(--portal-text)] mb-4">Remove <strong>{file?.name}</strong>?</p>
-          <div className="mb-4">
-            <label className="block text-[12px] font-medium text-[var(--portal-text)] mb-1.5">Reason <span className="text-red-500">*</span></label>
-            <textarea className="w-full p-3 text-sm bg-[var(--portal-bg-elevated)] border border-[var(--portal-border)] rounded-lg outline-none focus:border-[var(--portal-purple)] focus:ring-2 focus:ring-[var(--portal-purple-dim)] resize-y min-h-[80px] text-[var(--portal-text)]" placeholder="Why are you removing this file?" value={reason} onChange={e => setReason(e.target.value)} />
+
+        <div className="p-6 overflow-y-auto flex-1">
+          <div className="space-y-5">
+            <div>
+              <label className="block text-[12px] font-medium text-[var(--portal-text)] mb-1.5">Event Title</label>
+              <input
+                className="w-full p-2.5 text-sm bg-[var(--portal-bg-elevated)] border border-[var(--portal-border)] rounded-lg outline-none text-[var(--portal-text-strong)]"
+                value={event.title}
+                readOnly
+              />
+            </div>
+
+            <div>
+              <label className="block text-[12px] font-medium text-[var(--portal-text)] mb-1.5">Whom to Meet</label>
+              <input
+                className="w-full p-2.5 text-sm bg-[var(--portal-bg-elevated)] border border-[var(--portal-border)] rounded-lg outline-none text-[var(--portal-text-strong)]"
+                value={event.whoToMeet}
+                readOnly
+              />
+            </div>
+
+            <div>
+              <label className="block text-[12px] font-medium text-[var(--portal-text)] mb-1.5">Media Type</label>
+              <div className="flex gap-1.5">
+                {uploadSections.map((section) => {
+                  const SectionIcon = section.icon;
+                  return (
+                    <button
+                      key={section.key}
+                      type="button"
+                      onClick={() => setActiveType(section.key)}
+                      className={`flex-1 py-2 flex flex-col items-center gap-1 text-[11px] border rounded-xl transition-all ${
+                        activeType === section.key
+                          ? "border-[var(--portal-purple)] bg-[var(--portal-purple-dim)] text-[var(--portal-purple)]"
+                          : "border-[var(--portal-border)] text-[var(--portal-text-muted)] hover:bg-[var(--portal-bg-elevated)]"
+                      }`}
+                    >
+                      <SectionIcon size={16} color={activeType === section.key ? "var(--portal-purple)" : "currentColor"} />
+                      {section.tabLabel}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-[12px] font-medium text-[var(--portal-text)] mb-1.5">{activeSection.label}</label>
+              <div
+                className="border-2 border-dashed border-[var(--portal-border)] rounded-xl p-6 text-center cursor-pointer bg-[var(--portal-bg-elevated)] hover:bg-[var(--portal-card-hover)]"
+                onClick={() => activeInputRef.current?.click()}
+              >
+                <input
+                  ref={activeInputRef}
+                  type="file"
+                  accept={activeSection.accept}
+                  className="hidden"
+                  onChange={(e) => setSelectedFiles((current) => ({ ...current, [activeSection.key]: e.target.files?.[0]?.name || "" }))}
+                />
+                <div className="flex justify-center mb-2">
+                  <ActiveSectionIcon size={26} color="var(--portal-purple)" />
+                </div>
+                <div className="text-sm font-semibold text-[var(--portal-text)] mb-1">
+                  {selectedFiles[activeSection.key] || activeSection.label}
+                </div>
+                <div className="text-xs text-[var(--portal-text-muted)]">{activeSection.hint}</div>
+              </div>
+            </div>
           </div>
-          <div className="flex justify-end gap-3 mt-5">
-            <button className="px-5 py-2 text-sm font-medium text-[var(--portal-text)] bg-[var(--portal-card)] border-2 border-[var(--portal-border)] rounded-lg hover:bg-[var(--portal-bg-elevated)]" onClick={onCancel}>Cancel</button>
-            <button className={`px-6 py-2 text-sm font-semibold text-white bg-red-500 rounded-lg transition-opacity ${reason.trim() ? "hover:bg-red-600 cursor-pointer" : "opacity-50 cursor-not-allowed"}`} onClick={() => reason.trim() && onConfirm()}>Remove</button>
-          </div>
+        </div>
+
+        <div className="px-6 py-4 border-t border-[var(--portal-border-light)] flex justify-end gap-3 shrink-0 bg-[var(--portal-bg-elevated)] rounded-b-xl">
+          <button className="px-5 py-2 text-sm font-medium text-[var(--portal-text)] bg-[var(--portal-card)] border-2 border-[var(--portal-border)] rounded-lg hover:bg-[var(--portal-card-hover)] transition-colors" onClick={onClose}>Cancel</button>
+          <button className="px-6 py-2 text-sm font-semibold text-white bg-[var(--portal-purple)] hover:opacity-90 border-none rounded-lg transition-opacity" onClick={onClose}>Done</button>
         </div>
       </div>
     </div>
   );
 }
 
-function DeleteModal({ event, onConfirm, onCancel }) {
-  const [reason, setReason] = useState("");
-  return (
-    <div className="fixed inset-0 bg-black/45 z-[1000] flex items-center justify-center p-4" onClick={onCancel}>
-      <div className="bg-[var(--portal-card)] rounded-xl w-full max-w-lg shadow-2xl flex flex-col" onClick={e => e.stopPropagation()}>
-        <div className="p-5 border-b border-[var(--portal-border-light)] flex items-center justify-between">
-          <div className="text-base font-bold text-red-500 flex items-center gap-2"><FiTrash2 size={15} /> Delete Event</div>
-          <button className="flex items-center justify-center w-8 h-8 bg-[var(--portal-bg-elevated)] rounded-lg text-[var(--portal-text-muted)] hover:bg-[var(--portal-border)]" onClick={onCancel}><FiX size={14} /></button>
-        </div>
-        <div className="p-6">
-          <p className="text-sm text-[var(--portal-text)] mb-4">Delete <strong>"{event?.title}"</strong>? This will also remove it from the <strong>Minister's portal</strong>.</p>
-          <div className="mb-4">
-            <label className="block text-[12px] font-medium text-[var(--portal-text)] mb-1.5">Reason for Deletion <span className="text-red-500">*</span></label>
-            <textarea className="w-full p-3 text-sm bg-[var(--portal-bg-elevated)] border border-[var(--portal-border)] rounded-lg outline-none focus:border-[var(--portal-purple)] focus:ring-2 focus:ring-[var(--portal-purple-dim)] resize-y min-h-[80px] text-[var(--portal-text)]" placeholder="Provide a reason..." value={reason} onChange={e => setReason(e.target.value)} />
-          </div>
-          <div className="flex justify-end gap-3 mt-5">
-            <button className="px-5 py-2 text-sm font-medium text-[var(--portal-text)] bg-[var(--portal-card)] border-2 border-[var(--portal-border)] rounded-lg hover:bg-[var(--portal-bg-elevated)]" onClick={onCancel}>Cancel</button>
-            <button className={`px-6 py-2 text-sm font-semibold text-white bg-red-500 rounded-lg transition-opacity ${reason.trim() ? "hover:bg-red-600 cursor-pointer" : "opacity-50 cursor-not-allowed"}`} onClick={() => reason.trim() && onConfirm()}>Delete Event</button>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function EditModal({ event, onSave, onClose }) {
-  const [form, setForm] = useState({ ...event });
+function ManageEventMediaModal({ event, onSave, onClose, onBack }) {
+  const [activeType, setActiveType] = useState("photo");
   const [files, setFiles] = useState(event?.files || []);
-  const [fileToDelete, setFileToDelete] = useState(null);
-  const [drag, setDrag] = useState(false);
-  const fileRef = useRef();
+  const [selectedIds, setSelectedIds] = useState([]);
+  const mediaTabs = [
+    { key: "photo", label: "Photos", icon: FiImage },
+    { key: "video", label: "Videos", icon: FiVideo },
+    { key: "document", label: "Documents", icon: FiFile },
+  ];
+  const visibleFiles = files.filter((file) => file.type === activeType || (activeType === "document" && file.type === "document"));
+  const allSelected = visibleFiles.length > 0 && visibleFiles.every((file) => selectedIds.includes(file.id));
 
-  const set = k => e => setForm(f => ({ ...f, [k]: e.target.value }));
+  const toggleFile = (id) => {
+    setSelectedIds((current) => (
+      current.includes(id) ? current.filter((item) => item !== id) : [...current, id]
+    ));
+  };
 
-  const addFiles = raw => {
-    const arr = Array.from(raw).map((f, i) => ({ id: Date.now() + i, name: f.name, size: f.size > 1048576 ? (f.size / 1048576).toFixed(1) + " MB" : Math.round(f.size / 1024) + " KB", type: f.type.startsWith("image") ? "photo" : f.type.startsWith("video") ? "video" : "document" }));
-    setFiles(p => [...p, ...arr]);
+  const toggleAll = () => {
+    const ids = visibleFiles.map((file) => file.id);
+    setSelectedIds((current) => (current.length === ids.length ? [] : ids));
+  };
+
+  const deleteSelected = () => {
+    if (!selectedIds.length) return;
+    const nextFiles = files.filter((file) => !selectedIds.includes(file.id));
+    setFiles(nextFiles);
+    setSelectedIds([]);
+    onSave({ ...event, files: nextFiles });
   };
 
   return (
     <div className="fixed inset-0 bg-black/45 z-[1000] flex items-center justify-center p-4 sm:p-6" onClick={onClose}>
       <div className="bg-[var(--portal-card)] rounded-xl w-full max-w-3xl max-h-[90vh] shadow-2xl flex flex-col" onClick={e => e.stopPropagation()}>
-
         <div className="px-6 py-5 border-b border-[var(--portal-border-light)] flex items-center justify-between shrink-0">
+          <button
+            className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-[var(--portal-text)] bg-[var(--portal-card)] border-2 border-[var(--portal-border)] rounded-lg hover:bg-[var(--portal-bg-elevated)] transition-colors"
+            onClick={onBack}
+          >
+            ← Back
+          </button>
           <div className="text-lg font-bold text-[var(--portal-text-strong)] flex items-center gap-2">
-            <FiEdit2 size={18} color="var(--portal-purple)" /> Edit Event
+            <FiEdit2 size={18} color="var(--portal-purple)" /> Edit Media
           </div>
           <button className="flex items-center justify-center w-8 h-8 bg-[var(--portal-bg-elevated)] rounded-lg text-[var(--portal-text-muted)] hover:bg-[var(--portal-border)] transition-colors" onClick={onClose}>
             <FiX size={16} />
@@ -114,107 +234,102 @@ function EditModal({ event, onSave, onClose }) {
         <div className="p-6 overflow-y-auto flex-1">
           <div className="space-y-5">
             <div>
-              <label className="block text-[12px] font-medium text-[var(--portal-text)] mb-1.5">Event Title <span className="text-red-500">*</span></label>
-              <input className="w-full p-2.5 text-sm bg-[var(--portal-bg-elevated)] border border-[var(--portal-border)] rounded-lg outline-none focus:border-[var(--portal-purple)] focus:ring-2 focus:ring-[var(--portal-purple-dim)] transition-all text-[var(--portal-text-strong)]" value={form.title || ""} onChange={set("title")} placeholder="Enter event title" />
+              <label className="block text-[12px] font-medium text-[var(--portal-text)] mb-1.5">Event Title</label>
+              <input className="w-full p-2.5 text-sm bg-[var(--portal-bg-elevated)] border border-[var(--portal-border)] rounded-lg outline-none text-[var(--portal-text-strong)]" value={event.title || ""} readOnly />
             </div>
 
             <div>
-              <label className="block text-[12px] font-medium text-[var(--portal-text)] mb-1.5">Whom to Meet <span className="text-red-500">*</span></label>
-              <input className="w-full p-2.5 text-sm bg-[var(--portal-bg-elevated)] border border-[var(--portal-border)] rounded-lg outline-none focus:border-[var(--portal-purple)] focus:ring-2 focus:ring-[var(--portal-purple-dim)] transition-all text-[var(--portal-text-strong)]" value={form.whoToMeet || ""} onChange={set("whoToMeet")} placeholder="e.g. District Collector" />
-              <p className="text-[11px] text-[var(--portal-text-muted)] mt-1">Name or designation</p>
+              <label className="block text-[12px] font-medium text-[var(--portal-text)] mb-1.5">Whom to Meet</label>
+              <input className="w-full p-2.5 text-sm bg-[var(--portal-bg-elevated)] border border-[var(--portal-border)] rounded-lg outline-none text-[var(--portal-text-strong)]" value={event.whoToMeet || ""} readOnly />
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-[12px] font-medium text-[var(--portal-text)] mb-1.5">Date <span className="text-red-500">*</span></label>
-                <input type="date" className="w-full p-2.5 text-sm bg-[var(--portal-bg-elevated)] border border-[var(--portal-border)] rounded-lg outline-none focus:border-[var(--portal-purple)] focus:ring-2 focus:ring-[var(--portal-purple-dim)] transition-all text-[var(--portal-text-strong)]" value={form.date || ""} onChange={set("date")} />
+            <div>
+              <label className="block text-[12px] font-medium text-[var(--portal-text)] mb-1.5">Media Type</label>
+              <div className="flex gap-1.5">
+                {mediaTabs.map((tab) => {
+                  const TabIcon = tab.icon;
+                  return (
+                    <button
+                      key={tab.key}
+                      type="button"
+                      onClick={() => { setActiveType(tab.key); setSelectedIds([]); }}
+                      className={`flex-1 py-2 flex flex-col items-center gap-1 text-[11px] border rounded-xl transition-all ${
+                        activeType === tab.key
+                          ? "border-[var(--portal-purple)] bg-[var(--portal-purple-dim)] text-[var(--portal-purple)]"
+                          : "border-[var(--portal-border)] text-[var(--portal-text-muted)] hover:bg-[var(--portal-bg-elevated)]"
+                      }`}
+                    >
+                      <TabIcon size={16} color={activeType === tab.key ? "var(--portal-purple)" : "currentColor"} />
+                      {tab.label}
+                    </button>
+                  );
+                })}
               </div>
-              <div>
-                <label className="block text-[12px] font-medium text-[var(--portal-text)] mb-1.5">Time <span className="text-red-500">*</span></label>
-                <input type="time" className="w-full p-2.5 text-sm bg-[var(--portal-bg-elevated)] border border-[var(--portal-border)] rounded-lg outline-none focus:border-[var(--portal-purple)] focus:ring-2 focus:ring-[var(--portal-purple-dim)] transition-all text-[var(--portal-text-strong)]" value={form.time || ""} onChange={set("time")} />
+            </div>
+
+            {visibleFiles.length > 0 ? (
+              <div className="space-y-4">
+                <div className="flex items-center justify-between gap-3">
+                  <button className="px-5 py-2 text-sm font-medium text-[var(--portal-text)] bg-[var(--portal-card)] border-2 border-[var(--portal-border)] rounded-lg hover:bg-[var(--portal-bg-elevated)] transition-colors" onClick={toggleAll}>
+                    {allSelected ? "Clear Selection" : "Select All"}
+                  </button>
+                  <button
+                    className={`px-6 py-2 text-sm font-semibold text-white rounded-lg transition-opacity ${selectedIds.length ? "bg-red-500 hover:bg-red-600" : "bg-red-500 opacity-50 cursor-not-allowed"}`}
+                    onClick={deleteSelected}
+                    disabled={!selectedIds.length}
+                  >
+                    Delete
+                  </button>
+                </div>
+
+                <div className="mt-3 space-y-2">
+                  {visibleFiles.map((file) => (
+                    <div key={file.id} className="flex items-center gap-3 p-2.5 border border-[var(--portal-border)] rounded-lg bg-[var(--portal-bg-elevated)]">
+                      <input
+                        type="checkbox"
+                        checked={selectedIds.includes(file.id)}
+                        onChange={() => toggleFile(file.id)}
+                        className="w-4 h-4"
+                      />
+                      <FileIcon type={file.type} />
+                      <span className="flex-1 text-sm font-medium text-[var(--portal-text)] truncate">{file.name}</span>
+                      <span className="text-xs text-[var(--portal-text-muted)] mr-1">{file.size}</span>
+                      <span className="text-xs font-medium text-[var(--portal-text-muted)] capitalize">{file.type}</span>
+                    </div>
+                  ))}
+                </div>
               </div>
-            </div>
-
-            <div>
-              <label className="block text-[12px] font-medium text-[var(--portal-text)] mb-1.5">Status</label>
-              <select className="w-full p-2.5 text-sm bg-[var(--portal-bg-elevated)] border border-[var(--portal-border)] rounded-lg outline-none focus:border-[var(--portal-purple)] focus:ring-2 focus:ring-[var(--portal-purple-dim)] transition-all text-[var(--portal-text-strong)]" value={form.status} onChange={set("status")}>
-                <option>Upcoming</option><option>Completed</option><option>Cancelled</option>
-              </select>
-            </div>
-
-            <div>
-              <label className="block text-[12px] font-medium text-[var(--portal-text)] mb-1.5">Event Description <span className="text-red-500">*</span></label>
-              <textarea className="w-full p-3 text-sm bg-[var(--portal-bg-elevated)] border border-[var(--portal-border)] rounded-lg outline-none focus:border-[var(--portal-purple)] focus:ring-2 focus:ring-[var(--portal-purple-dim)] transition-all resize-y min-h-[90px] text-[var(--portal-text-strong)]" value={form.description || ""} onChange={set("description")} placeholder="Describe purpose and agenda" maxLength={1000} />
-              <div className="text-[11px] text-[var(--portal-text-muted)] text-right mt-1">{(form.description || "").length}/1000</div>
-            </div>
-
-            <hr className="border-[var(--portal-border-light)] my-2" />
-            <div className="text-[12px] font-semibold text-[var(--portal-text)] mb-1.5">Location</div>
-
-            <div>
-              <label className="block text-[12px] font-medium text-[var(--portal-text)] mb-1.5">Location <span className="text-red-500">*</span></label>
-              <input className="w-full p-2.5 text-sm bg-[var(--portal-bg-elevated)] border border-[var(--portal-border)] rounded-lg outline-none focus:border-[var(--portal-purple)] focus:ring-2 focus:ring-[var(--portal-purple-dim)] transition-all text-[var(--portal-text-strong)]" value={form.location || ""} onChange={set("location")} placeholder="e.g. Collectorate Office" />
-            </div>
-
-            <div>
-              <label className="block text-[12px] font-medium text-[var(--portal-text)] mb-1.5">Additional Details</label>
-              <input className="w-full p-2.5 text-sm bg-[var(--portal-bg-elevated)] border border-[var(--portal-border)] rounded-lg outline-none focus:border-[var(--portal-purple)] focus:ring-2 focus:ring-[var(--portal-purple-dim)] transition-all text-[var(--portal-text-strong)]" value={form.locationDetail || ""} onChange={set("locationDetail")} placeholder="Room no., floor, landmark" />
-            </div>
-
-            <hr className="border-[var(--portal-border-light)] my-2" />
-            <div className="text-[12px] font-semibold text-[var(--portal-text)] mb-1.5">Event Files</div>
-
-            <div
-              className={`border-2 border-dashed rounded-xl p-6 text-center cursor-pointer transition-colors ${drag ? "border-[var(--portal-purple)] bg-[var(--portal-purple-dim)]" : "border-[var(--portal-border)] bg-[var(--portal-bg-elevated)] hover:bg-[var(--portal-card-hover)]"}`}
-              onDragOver={e => { e.preventDefault(); setDrag(true); }}
-              onDragLeave={() => setDrag(false)}
-              onDrop={e => { e.preventDefault(); setDrag(false); addFiles(e.dataTransfer.files); }}
-              onClick={() => fileRef.current?.click()}
-            >
-              <input ref={fileRef} type="file" multiple accept="image/*,video/*,.pdf,.doc,.docx,.xls,.xlsx" className="hidden" onChange={e => addFiles(e.target.files)} />
-              <div className="flex justify-center mb-2">
-                <FiUploadCloud size={26} color={drag ? "var(--portal-purple)" : "var(--portal-text-muted)"} />
-              </div>
-              <div className="text-sm font-semibold text-[var(--portal-text)] mb-1">Click or drag & drop</div>
-              <div className="text-xs text-[var(--portal-text-muted)]">Photos, Videos, Documents (PDF, DOC, XLS)</div>
-            </div>
-
-            {files.length > 0 && (
-              <div className="mt-3 space-y-2">
-                {files.map(f => (
-                  <div key={f.id} className="flex items-center gap-3 p-2.5 border border-[var(--portal-border)] rounded-lg bg-[var(--portal-bg-elevated)]">
-                    <FileIcon type={f.type} />
-                    <span className="flex-1 text-sm font-medium text-[var(--portal-text)] truncate">{f.name}</span>
-                    <span className="text-xs text-[var(--portal-text-muted)] mr-1">{f.size}</span>
-                    <button className="flex items-center justify-center w-7 h-7 rounded border border-red-200 bg-red-50 text-red-500 hover:bg-red-100 transition-colors" onClick={() => setFileToDelete(f)}><FiTrash2 size={12} /></button>
-                  </div>
-                ))}
+            ) : (
+              <div className="py-12 px-6 text-center">
+                <FiPaperclip size={36} className="text-[var(--portal-border)] mx-auto mb-3" />
+                <div className="text-sm font-semibold text-[var(--portal-text)] mb-1">No files found</div>
+                <div className="text-xs text-[var(--portal-text-muted)]">There are no uploaded files in this section.</div>
               </div>
             )}
           </div>
         </div>
 
         <div className="px-6 py-4 border-t border-[var(--portal-border-light)] flex justify-end gap-3 shrink-0 bg-[var(--portal-bg-elevated)] rounded-b-xl">
-          <button className="px-5 py-2 text-sm font-medium text-[var(--portal-text)] bg-[var(--portal-card)] border-2 border-[var(--portal-border)] rounded-lg hover:bg-[var(--portal-card-hover)] transition-colors" onClick={onClose}>Cancel</button>
-          <button className="px-6 py-2 text-sm font-semibold text-white bg-[var(--portal-purple)] hover:opacity-90 border-none rounded-lg transition-opacity" onClick={() => onSave({ ...form, files })}>Save Changes</button>
+          <button className="px-5 py-2 text-sm font-medium text-[var(--portal-text)] bg-[var(--portal-card)] border-2 border-[var(--portal-border)] rounded-lg hover:bg-[var(--portal-card-hover)] transition-colors" onClick={onClose}>Close</button>
         </div>
       </div>
-
-      {fileToDelete && <FileDeleteModal file={fileToDelete} onConfirm={() => { setFiles(p => p.filter(f => f.id !== fileToDelete.id)); setFileToDelete(null); }} onCancel={() => setFileToDelete(null)} />}
     </div>
   );
 }
 
 export default function ManageEvent() {
-  const [events, setEvents] = useState(MOCK_EVENTS);
+  const { session } = useAuth();
+  const [events, setEvents] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
   const [search, setSearch] = useState("");
   const [activeTab, setActiveTab] = useState("All");
   const [statusFilter, setStatusFilter] = useState("");
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
   const [page, setPage] = useState(1);
-  const [editEvent, setEditEvent] = useState(null);
-  const [deleteEvent, setDeleteEvent] = useState(null);
+  const [uploadEvent, setUploadEvent] = useState(null);
+  const [manageUploadEvent, setManageUploadEvent] = useState(null);
   const [toast, setToast] = useState(null);
 
   const [showExportMenu, setShowExportMenu] = useState(false);
@@ -229,6 +344,39 @@ export default function ManageEvent() {
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
+
+  useEffect(() => {
+    let mounted = true;
+
+    async function loadEvents() {
+      try {
+        setLoading(true);
+        setError("");
+        const { data } = await apiClient.get("/deo/calendar-events", authorizedConfig(session.accessToken));
+        if (mounted) {
+          setEvents((data.events || []).map(formatEventRow));
+        }
+      } catch (loadError) {
+        if (mounted) {
+          setError(loadError?.response?.data?.error || "Unable to load events");
+        }
+      } finally {
+        if (mounted) {
+          setLoading(false);
+        }
+      }
+    }
+
+    if (session?.accessToken) {
+      loadEvents();
+    } else {
+      setLoading(false);
+    }
+
+    return () => {
+      mounted = false;
+    };
+  }, [session?.accessToken]);
 
   const showToast = (msg, type = "success") => { setToast({ msg, type }); setTimeout(() => setToast(null), 3000); };
 
@@ -379,8 +527,8 @@ export default function ManageEvent() {
                     <td colSpan={8}>
                       <div className="py-12 px-6 text-center">
                         <FiCalendar size={36} className="text-[var(--portal-border)] mx-auto mb-3" />
-                        <div className="text-sm font-semibold text-[var(--portal-text)] mb-1">No events found</div>
-                        <div className="text-xs text-[var(--portal-text-muted)]">Try adjusting your filters</div>
+                        <div className="text-sm font-semibold text-[var(--portal-text)] mb-1">{loading ? "Loading events..." : error ? "Unable to load events" : "No events found"}</div>
+                        <div className="text-xs text-[var(--portal-text-muted)]">{loading ? "Fetching your created events" : error || "Try adjusting your filters"}</div>
                       </div>
                     </td>
                   </tr>
@@ -409,11 +557,8 @@ export default function ManageEvent() {
                     </td>
                     <td className="px-4 py-3.5 align-middle text-center">
                       <div className="flex gap-1.5 justify-center">
-                        <button className="flex items-center justify-center w-8 h-8 rounded-lg border border-[var(--portal-purple-dim)] bg-[var(--portal-purple-dim)] text-[var(--portal-purple)] hover:opacity-80 transition-opacity" onClick={() => setEditEvent(ev)} title="Edit">
-                          <FiEdit2 size={13} />
-                        </button>
-                        <button className="flex items-center justify-center w-8 h-8 rounded-lg border border-red-500/30 bg-red-500/10 text-red-500 hover:bg-red-500/20 transition-colors" onClick={() => setDeleteEvent(ev)} title="Delete">
-                          <FiTrash2 size={13} />
+                        <button className="flex items-center justify-center w-8 h-8 rounded-lg border border-[var(--portal-purple-dim)] bg-[var(--portal-purple-dim)] text-[var(--portal-purple)] hover:opacity-80 transition-opacity" onClick={() => setUploadEvent(ev)} title="Upload">
+                          <FiUploadCloud size={13} />
                         </button>
                       </div>
                     </td>
@@ -443,8 +588,8 @@ export default function ManageEvent() {
       </div>
 
       {/* Modals */}
-      {editEvent && <EditModal event={editEvent} onSave={upd => { setEvents(p => p.map(e => e.id === upd.id ? upd : e)); setEditEvent(null); showToast("Event updated successfully."); }} onClose={() => setEditEvent(null)} />}
-      {deleteEvent && <DeleteModal event={deleteEvent} onConfirm={() => { setEvents(p => p.filter(e => e.id !== deleteEvent.id)); setDeleteEvent(null); showToast("Event deleted from DEO & Minister portal.", "danger"); }} onCancel={() => setDeleteEvent(null)} />}
+      {uploadEvent && <EventUploadModal event={uploadEvent} onClose={() => setUploadEvent(null)} onEdit={() => { setManageUploadEvent(uploadEvent); setUploadEvent(null); }} />}
+      {manageUploadEvent && <ManageEventMediaModal event={manageUploadEvent} onSave={upd => { setEvents(p => p.map(e => e.id === upd.id ? upd : e)); setManageUploadEvent(upd); }} onClose={() => setManageUploadEvent(null)} onBack={() => { setUploadEvent(manageUploadEvent); setManageUploadEvent(null); }} />}
     </div>
   );
 }
