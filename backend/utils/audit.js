@@ -1,6 +1,18 @@
 const pool = require('../config/database');
+const logger = require('./logger');
 
 async function writeAuditLog({ actorRole, actorId, entityType, entityId, action, ipAddress, userAgent, metadata = {} }) {
+  if (!entityId) {
+    logger.warn('Skipping audit log because entity_id is missing', {
+      actorRole,
+      actorId,
+      entityType,
+      action,
+      ipAddress: ipAddress || null,
+    });
+    return;
+  }
+
   await pool.query(
     `INSERT INTO audit_logs (actor_role, actor_id, entity_type, entity_id, action, ip_address, user_agent, metadata)
      VALUES ($1,$2,$3,$4,$5,$6,$7,$8)`,

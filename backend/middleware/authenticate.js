@@ -32,12 +32,29 @@ function authenticate(expectedRole) {
         return res.status(401).json({ error: 'Unauthorized' });
       }
 
-      const config = getRoleConfig(expectedRole);
-      const payload = jwt.verify(token, config.publicKey, {
-        algorithms: ['RS256'],
-        audience: expectedRole,
-        issuer: config.issuer,
-      });
+      const expectedRoles = Array.isArray(expectedRole) ? expectedRole : [expectedRole];
+      let payload = null;
+      let matchedRole = null;
+      let lastError = null;
+
+      for (const role of expectedRoles) {
+        try {
+          const config = getRoleConfig(role);
+          payload = jwt.verify(token, config.publicKey, {
+            algorithms: ['RS256'],
+            audience: role,
+            issuer: config.issuer,
+          });
+          matchedRole = role;
+          break;
+        } catch (error) {
+          lastError = error;
+        }
+      }
+
+      if (!payload || !matchedRole) {
+        throw lastError || new Error('Unable to verify token');
+      }
 
       // JTI revocation check — fail-open on Redis error
       try {
@@ -45,7 +62,7 @@ function authenticate(expectedRole) {
         if (revoked) {
           logger.warn('Authentication failed', {
             reason: 'revoked_token',
-            expectedRole,
+            expectedRole: matchedRole,
             tokenSub: payload.sub,
             tokenAud: payload.aud,
             tokenRole: payload.role,
@@ -58,12 +75,12 @@ function authenticate(expectedRole) {
       } catch (err) {
         logger.warn('authenticate: Redis JTI check unavailable, continuing (fail-open)', {
           jti: payload.jti,
-          expectedRole,
+          expectedRole: matchedRole,
           error: err.message,
         });
         await publishAuthEvent(redis, {
           event: 'token_revoke_check_bypassed',
-          role: expectedRole,
+          role: matchedRole,
           userId: payload.sub,
           ip: req.ip,
           reason: 'redis_down',
@@ -77,7 +94,7 @@ function authenticate(expectedRole) {
         if (changedAt && Number(changedAt) > payload.iat * 1000) {
           logger.warn('Authentication failed', {
             reason: 'password_changed_after_token_issued',
-            expectedRole,
+            expectedRole: matchedRole,
             tokenSub: payload.sub,
             path: req.originalUrl,
             method: req.method,
@@ -88,16 +105,16 @@ function authenticate(expectedRole) {
       } catch (err) {
         logger.warn('authenticate: Redis password-changed check unavailable, continuing (fail-open)', {
           userId: payload.sub,
-          expectedRole,
+          expectedRole: matchedRole,
           error: err.message,
         });
       }
 
-      const user = await authRepository.findActiveUserById(expectedRole, payload.sub);
+      const user = await authRepository.findActiveUserById(matchedRole, payload.sub);
       if (!user) {
         logger.warn('Authentication failed', {
           reason: 'inactive_or_removed_account',
-          expectedRole,
+          expectedRole: matchedRole,
           tokenSub: payload.sub,
           path: req.originalUrl,
           method: req.method,
@@ -112,7 +129,7 @@ function authenticate(expectedRole) {
       if (passwordChangedAt && passwordChangedAt > payload.iat * 1000) {
         logger.warn('Authentication failed', {
           reason: 'password_changed_after_token_issued_db',
-          expectedRole,
+          expectedRole: matchedRole,
           tokenSub: payload.sub,
           path: req.originalUrl,
           method: req.method,

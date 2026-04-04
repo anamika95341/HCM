@@ -14,6 +14,7 @@ import {
   TrendingUp, 
 } from "lucide-react";
 import { apiClient, authorizedConfig } from "../../shared/api/client.js";
+import { getDownloadUrl, listVisibleFiles } from "../../shared/api/privateFiles.js";
 import { useAuth } from "../../shared/auth/AuthContext.jsx";
 import { usePortalTheme } from "../../shared/theme/portalTheme.jsx";
 import {
@@ -100,26 +101,6 @@ function getItemTypeLabel(item) {
   return item.isVip ? "VIP Meeting" : "Scheduled Meeting";
 }
 
-// Mock files — UI scaffolding only, no backend integration
-const MOCK_FILES = {
-  photos: [
-    { id: "ph1", name: "Venue setup.jpg", size: 2.4 * 1024 * 1024 },
-    { id: "ph2", name: "Attendees group photo.jpg", size: 1.8 * 1024 * 1024 },
-    { id: "ph3", name: "Agenda board.jpg", size: 3.1 * 1024 * 1024 },
-    { id: "ph4", name: "Signing ceremony.jpg", size: 2.9 * 1024 * 1024 },
-  ],
-  videos: [
-    { id: "vi1", name: "Opening remarks.mp4", size: 45 * 1024 * 1024, duration: "12:34" },
-    { id: "vi2", name: "Discussion highlights.mp4", size: 82 * 1024 * 1024, duration: "28:15" },
-  ],
-  documents: [
-    { id: "do1", name: "Meeting Agenda.pdf", size: 450 * 1024 },
-    { id: "do2", name: "Presentation Slides.pptx", size: 8.2 * 1024 * 1024 },
-    { id: "do3", name: "Minutes of Meeting.docx", size: 230 * 1024 },
-    { id: "do4", name: "Action Items.xlsx", size: 120 * 1024 },
-  ],
-};
-
 // ── EventPill ────────────────────────────────────────────────────────────────
 
 function EventPill({ item, compact = false, onClick }) {
@@ -138,7 +119,7 @@ function EventPill({ item, compact = false, onClick }) {
   );
 }
 
-// ── FilesSection (UI only — no API calls, no upload logic) ───────────────────
+// ── FilesSection ──────────────────────────────────────────────────────────────
 
 const FILE_TABS = [
   { id: "photos", label: "Photos", icon: ImageIcon },
@@ -169,9 +150,67 @@ function FilePlaceholderIcon({ type, tone }) {
   );
 }
 
-function FilesSection({ C, tone }) {
+function FilesSection({ accessToken, item, C, tone }) {
   const [activeTab, setActiveTab] = useState("photos");
-  const files = MOCK_FILES[activeTab] || [];
+  const [files, setFiles] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    let mounted = true;
+
+    async function loadFiles() {
+      try {
+        setLoading(true);
+        setError("");
+        const result = await listVisibleFiles({
+          accessToken,
+          contextType: getItemKind(item),
+          contextId: item.sourceId,
+        });
+        if (mounted) {
+          setFiles(result);
+        }
+      } catch (loadError) {
+        if (mounted) {
+          setFiles([]);
+          setError(loadError?.response?.data?.error || loadError.message || "Unable to load files");
+        }
+      } finally {
+        if (mounted) {
+          setLoading(false);
+        }
+      }
+    }
+
+    if (accessToken && item?.sourceId) {
+      loadFiles();
+    } else {
+      setFiles([]);
+      setLoading(false);
+    }
+
+    return () => {
+      mounted = false;
+    };
+  }, [accessToken, item]);
+
+  const filesByTab = useMemo(() => ({
+    photos: files.filter((file) => file.fileCategory === "image"),
+    videos: files.filter((file) => file.fileCategory === "video"),
+    documents: files.filter((file) => file.fileCategory === "document"),
+  }), [files]);
+
+  async function handleDownload(fileId) {
+    try {
+      const url = await getDownloadUrl({ accessToken, fileId });
+      window.open(url, "_blank", "noopener,noreferrer");
+    } catch (downloadError) {
+      setError(downloadError?.response?.data?.error || downloadError.message || "Unable to download file");
+    }
+  }
+
+  const filesForTab = filesByTab[activeTab] || [];
 
   return (
     <div>
@@ -179,7 +218,7 @@ function FilesSection({ C, tone }) {
       <div style={{ display: "flex", gap: 4, marginBottom: 16, borderBottom: `1px solid ${C.border}`, paddingBottom: 12 }}>
         {FILE_TABS.map(({ id, label }) => {
           const active = activeTab === id;
-          const count = MOCK_FILES[id].length;
+          const count = filesByTab[id]?.length || 0;
           return (
             <button
               key={id}
@@ -220,9 +259,13 @@ function FilesSection({ C, tone }) {
       </div>
 
       {/* File grid */}
-      {files.length === 0 ? (
+      {loading ? (
         <div style={{ color: C.t3, fontSize: 13, textAlign: "center", padding: "16px 0" }}>
-          No {activeTab} attached to this meeting.
+          Loading files...
+        </div>
+      ) : filesForTab.length === 0 ? (
+        <div style={{ color: C.t3, fontSize: 13, textAlign: "center", padding: "16px 0" }}>
+          No {activeTab} attached to this {getItemKind(item)}.
         </div>
       ) : (
         <div
@@ -232,16 +275,19 @@ function FilesSection({ C, tone }) {
             gap: 12,
           }}
         >
-          {files.map((file) => (
-            <div
+          {filesForTab.map((file) => (
+            <button
               key={file.id}
+              type="button"
+              onClick={() => handleDownload(file.id)}
               style={{
                 border: `1px solid ${C.border}`,
                 borderRadius: 10,
                 padding: 10,
                 background: C.bgElevated,
-                cursor: "default",
+                cursor: "pointer",
                 transition: "border-color 0.15s ease",
+                textAlign: "left",
               }}
               onMouseEnter={(e) => (e.currentTarget.style.borderColor = `${tone}40`)}
               onMouseLeave={(e) => (e.currentTarget.style.borderColor = C.border)}
@@ -264,26 +310,27 @@ function FilesSection({ C, tone }) {
                 {file.name}
               </div>
               <div style={{ marginTop: 4, fontSize: 10, color: C.t3 }}>
-                {file.duration ? `Video · ${file.duration}` : formatFileSize(file.size)}
+                {formatFileSize(file.size)}
               </div>
-            </div>
+            </button>
           ))}
         </div>
       )}
 
-      <div
-        style={{
-          marginTop: 14,
-          padding: "8px 12px",
-          borderRadius: 8,
-          background: `${C.t3}10`,
-          fontSize: 11,
-          color: C.t3,
-          fontStyle: "italic",
-        }}
-      >
-        File preview — backend integration pending.
-      </div>
+      {error ? (
+        <div
+          style={{
+            marginTop: 14,
+            padding: "8px 12px",
+            borderRadius: 8,
+            background: `${C.danger}12`,
+            fontSize: 11,
+            color: C.danger,
+          }}
+        >
+          {error}
+        </div>
+      ) : null}
     </div>
   );
 }
@@ -383,7 +430,7 @@ function DayMeetingsModal({ date, items, onClose, onSelectMeeting }) {
 
 // ── MeetingDetailModal ────────────────────────────────────────────────────────
 
-function MeetingDetailModal({ meeting, onClose }) {
+function MeetingDetailModal({ meeting, accessToken, onClose }) {
   const { C } = usePortalTheme();
   if (!meeting) return null;
   const tone = meeting.isVip ? C.warn : C.purple;
@@ -513,7 +560,7 @@ function MeetingDetailModal({ meeting, onClose }) {
                 <p style={{ fontSize: 11, fontWeight: 700, color: C.t3, textTransform: "uppercase", letterSpacing: ".1em", marginBottom: 16 }}>
                   Files
                 </p>
-                <FilesSection C={C} tone={tone} />
+                <FilesSection accessToken={accessToken} item={meeting} C={C} tone={tone} />
               </div>
             </div>
           </div>
@@ -1141,6 +1188,7 @@ export default function MinisterCalendar() {
       {selectedMeeting && (
         <MeetingDetailModal
           meeting={selectedMeeting}
+          accessToken={session?.accessToken}
           onClose={handleCloseMeetingDetail}
         />
       )}

@@ -8,6 +8,7 @@ const redis = require('./config/redis');
 const logger = require('./utils/logger');
 const { setupGracefulShutdown } = require('./utils/gracefulShutdown');
 const { initializeWebSocket } = require('./realtime/wsServer');
+const storageService = require('./services/storageService');
 
 if (cluster.isPrimary) {
   const workers = Math.max(1, os.cpus().length);
@@ -32,19 +33,32 @@ if (cluster.isPrimary) {
     Object.values(cluster.workers).forEach((worker) => worker.send({ type: 'shutdown' }));
   });
 } else {
-  const app = createApp();
-  const server = http.createServer(app);
-  const wsHandle = initializeWebSocket(server);
+  async function startWorker() {
+    await storageService.ensureBucket();
 
-  server.listen(env.port, () => {
-    logger.info('Worker listening', { pid: process.pid, port: env.port });
+    const app = createApp();
+    const server = http.createServer(app);
+    const wsHandle = initializeWebSocket(server);
+
+    server.listen(env.port, () => {
+      logger.info('Worker listening', {
+        pid: process.pid,
+        port: env.port,
+        storageMode: storageService.getConfig().storageMode,
+      });
+    });
+
+    process.on('message', (message) => {
+      if (message?.type === 'shutdown') {
+        process.kill(process.pid, 'SIGTERM');
+      }
+    });
+
+    setupGracefulShutdown(server, pool, redis, [wsHandle.shutdown]);
+  }
+
+  startWorker().catch((error) => {
+    logger.error('Worker failed to start', { error });
+    process.exit(1);
   });
-
-  process.on('message', (message) => {
-    if (message?.type === 'shutdown') {
-      process.kill(process.pid, 'SIGTERM');
-    }
-  });
-
-  setupGracefulShutdown(server, pool, redis, [wsHandle.shutdown]);
 }

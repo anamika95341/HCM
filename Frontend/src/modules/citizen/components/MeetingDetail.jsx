@@ -1,13 +1,18 @@
-import { useLocation, useNavigate } from "react-router-dom";
+import { useEffect, useRef, useState } from "react";
+import { useLocation, useNavigate, useParams } from "react-router-dom";
 import {
   ChevronRight, Calendar, Clock, MapPin, Users, FileText,
-  MessageSquare, ShieldCheck, User, Phone, Hash
+  MessageSquare, ShieldCheck, User, Phone, Hash, UploadCloud, Image as ImageIcon
 } from "lucide-react";
+import { apiClient, authorizedConfig } from "../../../shared/api/client.js";
+import { CITIZEN_ACCEPT, uploadPrivateFile } from "../../../shared/api/privateFiles.js";
+import { useAuth } from "../../../shared/auth/AuthContext.jsx";
 import { usePortalTheme } from "../../../shared/theme/portalTheme.jsx";
 import {
   WorkspaceBadge,
   WorkspaceCard,
   WorkspaceCardHeader,
+  WorkspaceEmptyState,
   WorkspacePage,
 } from "../../../shared/components/WorkspaceUI.jsx";
 
@@ -45,8 +50,92 @@ function InfoRow({ label, value, icon }) {
 export default function MeetingDetail() {
   const { C } = usePortalTheme();
   const navigate = useNavigate();
+  const { id } = useParams();
   const { state } = useLocation();
-  const item = state?.meetingData;
+  const { session } = useAuth();
+  const [item, setItem] = useState(state?.meetingData || null);
+  const [loading, setLoading] = useState(!state?.meetingData);
+  const [error, setError] = useState("");
+  const [selectedFile, setSelectedFile] = useState(null);
+  const [uploading, setUploading] = useState(false);
+  const [uploadError, setUploadError] = useState("");
+  const [uploadSuccess, setUploadSuccess] = useState("");
+  const inputRef = useRef(null);
+
+  useEffect(() => {
+    let mounted = true;
+
+    async function loadMeeting() {
+      try {
+        setLoading(true);
+        setError("");
+        const { data } = await apiClient.get(`/meetings/my/${id}`, authorizedConfig(session?.accessToken));
+        if (mounted) {
+          setItem(data.meeting || null);
+        }
+      } catch (loadError) {
+        if (mounted) {
+          setError(loadError?.response?.data?.error || "Unable to load meeting");
+        }
+      } finally {
+        if (mounted) {
+          setLoading(false);
+        }
+      }
+    }
+
+    if (session?.accessToken && id) {
+      loadMeeting();
+    }
+
+    return () => {
+      mounted = false;
+    };
+  }, [id, session?.accessToken]);
+
+  async function handleUpload() {
+    if (!selectedFile || uploading || !session?.accessToken || !item?.id) {
+      return;
+    }
+
+    try {
+      setUploading(true);
+      setUploadError("");
+      setUploadSuccess("");
+      await uploadPrivateFile({
+        accessToken: session.accessToken,
+        file: selectedFile,
+        contextType: "meeting",
+        contextId: item.id,
+        role: "citizen",
+      });
+      setSelectedFile(null);
+      if (inputRef.current) {
+        inputRef.current.value = "";
+      }
+      setUploadSuccess("File uploaded successfully. It is now visible to admin.");
+    } catch (submitError) {
+      setUploadError(submitError?.response?.data?.error || submitError.message || "Unable to upload file");
+    } finally {
+      setUploading(false);
+    }
+  }
+
+  if (loading) {
+    return (
+      <WorkspacePage width={1320}>
+        <WorkspaceEmptyState title="Loading meeting..." />
+      </WorkspacePage>
+    );
+  }
+
+  if (error) {
+    return (
+      <WorkspacePage width={1320}>
+        <WorkspaceCard style={{ color: C.danger }}>{error}</WorkspaceCard>
+      </WorkspacePage>
+    );
+  }
 
   if (!item) {
     return (
@@ -207,6 +296,72 @@ export default function MeetingDetail() {
           </div>
         </WorkspaceCard>
       )}
+
+      <WorkspaceCard style={{ marginBottom: 16 }}>
+        <WorkspaceCardHeader
+          title="Upload Supporting Files"
+          subtitle="Upload PDFs or images for this meeting. These files are visible only to admin."
+        />
+        <div style={{ marginTop: 16, display: "flex", flexDirection: "column", gap: 12 }}>
+          <button
+            type="button"
+            onClick={() => inputRef.current?.click()}
+            style={{
+              width: "100%",
+              border: `1px dashed ${C.border}`,
+              borderRadius: 12,
+              padding: 18,
+              background: C.bgElevated,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              gap: 10,
+              cursor: "pointer",
+              color: C.t2,
+              fontWeight: 600,
+            }}
+          >
+            <UploadCloud size={18} />
+            <span>{selectedFile?.name || "Select PDF, JPG, or PNG"}</span>
+          </button>
+          <input
+            ref={inputRef}
+            type="file"
+            accept={CITIZEN_ACCEPT}
+            style={{ display: "none" }}
+            onChange={(event) => {
+              setSelectedFile(event.target.files?.[0] || null);
+              setUploadError("");
+              setUploadSuccess("");
+            }}
+          />
+          <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, color: C.t3 }}>
+            <ImageIcon size={14} />
+            PDF and image files up to 5MB are allowed. Video upload is not available for citizens.
+          </div>
+          {uploadError ? <div style={{ fontSize: 13, color: C.danger }}>{uploadError}</div> : null}
+          {uploadSuccess ? <div style={{ fontSize: 13, color: C.success }}>{uploadSuccess}</div> : null}
+          <div>
+            <button
+              type="button"
+              onClick={handleUpload}
+              disabled={!selectedFile || uploading}
+              style={{
+                border: "none",
+                borderRadius: 10,
+                padding: "10px 16px",
+                background: C.purple,
+                color: "#fff",
+                fontWeight: 700,
+                opacity: !selectedFile || uploading ? 0.55 : 1,
+                cursor: !selectedFile || uploading ? "not-allowed" : "pointer",
+              }}
+            >
+              {uploading ? "Uploading..." : "Upload File"}
+            </button>
+          </div>
+        </div>
+      </WorkspaceCard>
 
       {/* FOOTER - REQUESTED ON */}
       {createdAtLabel && (

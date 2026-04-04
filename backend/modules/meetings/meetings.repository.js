@@ -353,18 +353,28 @@ async function getMeetingHistory(meetingId) {
 
 async function listMeetingFilesForMinister(meetingId, ministerId) {
   const result = await pool.query(
-    `SELECT uf.id, uf.entity_type, uf.original_name, uf.mime_type, uf.file_size, uf.created_at, uf.storage_path
-       FROM minister_calendar_events mce
-       JOIN meetings m ON m.id = mce.meeting_id
-       JOIN uploaded_files uf
-         ON (
-              (uf.id = m.document_file_id)
-              OR
-              (uf.entity_id = m.id AND uf.entity_type = 'meeting_photo')
-            )
-      WHERE mce.meeting_id = $1
-        AND mce.minister_id = $2
-      ORDER BY uf.created_at ASC`,
+    `SELECT file_id AS id, entity_type, original_name, mime_type, file_size, created_at, storage_path
+       FROM (
+         SELECT uf.id AS file_id, uf.entity_type, uf.original_name, uf.mime_type, uf.file_size, uf.created_at, uf.storage_path
+           FROM minister_calendar_events mce
+           JOIN meetings m ON m.id = mce.meeting_id
+           JOIN uploaded_files uf
+             ON (
+                  (uf.id = m.document_file_id)
+                  OR
+                  (uf.entity_id = m.id AND uf.entity_type = 'meeting_photo')
+                )
+          WHERE mce.meeting_id = $1
+            AND mce.minister_id = $2
+         UNION ALL
+         SELECT f.id AS file_id, f.file_category AS entity_type, f.original_name, f.mime_type, f.size AS file_size, f.created_at, f.s3_key AS storage_path
+           FROM minister_calendar_events mce
+           JOIN files f ON f.context_type = 'meeting' AND f.context_id = mce.meeting_id
+          WHERE mce.meeting_id = $1
+            AND mce.minister_id = $2
+            AND f.visible_to_role = 'minister'
+       ) combined
+      ORDER BY created_at ASC`,
     [meetingId, ministerId]
   );
   return result.rows;
@@ -372,17 +382,27 @@ async function listMeetingFilesForMinister(meetingId, ministerId) {
 
 async function listMeetingFilesForAdmin(meetingId, adminId) {
   const result = await pool.query(
-    `SELECT uf.id, uf.entity_type, uf.original_name, uf.mime_type, uf.file_size, uf.created_at, uf.storage_path
-       FROM meetings m
-       JOIN uploaded_files uf
-         ON (
-              (uf.id = m.document_file_id)
-              OR
-              (uf.entity_id = m.id AND uf.entity_type = 'meeting_photo')
-            )
-      WHERE m.id = $1
-        AND m.assigned_admin_id = $2
-      ORDER BY uf.created_at ASC`,
+    `SELECT file_id AS id, entity_type, original_name, mime_type, file_size, created_at, storage_path
+       FROM (
+         SELECT uf.id AS file_id, uf.entity_type, uf.original_name, uf.mime_type, uf.file_size, uf.created_at, uf.storage_path
+           FROM meetings m
+           JOIN uploaded_files uf
+             ON (
+                  (uf.id = m.document_file_id)
+                  OR
+                  (uf.entity_id = m.id AND uf.entity_type = 'meeting_photo')
+                )
+          WHERE m.id = $1
+            AND m.assigned_admin_id = $2
+         UNION ALL
+         SELECT f.id AS file_id, f.file_category AS entity_type, f.original_name, f.mime_type, f.size AS file_size, f.created_at, f.s3_key AS storage_path
+           FROM meetings m
+           JOIN files f ON f.context_type = 'meeting' AND f.context_id = m.id
+          WHERE m.id = $1
+            AND m.assigned_admin_id = $2
+            AND f.visible_to_role = 'admin'
+       ) combined
+      ORDER BY created_at ASC`,
     [meetingId, adminId]
   );
   return result.rows;

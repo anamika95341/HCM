@@ -52,6 +52,19 @@ module.exports = {
   },
   uploadDir: process.env.UPLOAD_DIR || './uploads',
   privateFileBaseUrl: process.env.PRIVATE_FILE_BASE_URL || '',
+  storageMode: process.env.STORAGE_MODE || 'aws',
+  s3Bucket: process.env.S3_BUCKET || '',
+  s3Region: process.env.AWS_REGION || 'us-east-1',
+  s3Endpoint: process.env.S3_ENDPOINT || '',
+  s3PublicEndpoint: process.env.S3_PUBLIC_ENDPOINT || process.env.S3_ENDPOINT || '',
+  s3AccessKeyId: process.env.STORAGE_MODE === 'local'
+    ? (process.env.MINIO_ROOT_USER || process.env.AWS_ACCESS_KEY_ID || '')
+    : (process.env.AWS_ACCESS_KEY_ID || ''),
+  s3SecretAccessKey: process.env.STORAGE_MODE === 'local'
+    ? (process.env.MINIO_ROOT_PASSWORD || process.env.AWS_SECRET_ACCESS_KEY || '')
+    : (process.env.AWS_SECRET_ACCESS_KEY || ''),
+  s3ForcePathStyle: process.env.S3_FORCE_PATH_STYLE === 'true' || process.env.STORAGE_MODE === 'local',
+  s3SignedUrlExpirySeconds: Number(process.env.S3_SIGNED_URL_EXPIRY_SECONDS || 90),
   redisMetricsTtlSeconds: Number(process.env.REDIS_METRICS_TTL_SECONDS || 300),
   alertEmailTo: process.env.ALERT_EMAIL_TO,
   telegramBotToken: process.env.TELEGRAM_BOT_TOKEN,

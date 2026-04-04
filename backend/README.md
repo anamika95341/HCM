@@ -19,6 +19,32 @@ npm test
 npm run dev
 ```
 
+## Local object storage with MinIO
+
+Start MinIO:
+
+```bash
+docker run -d \
+  -p 9000:9000 -p 9001:9001 \
+  -e "MINIO_ROOT_USER=admin" \
+  -e "MINIO_ROOT_PASSWORD=password" \
+  quay.io/minio/minio server /data --console-address ":9001"
+```
+
+Then use `backend/.env.localhost` with:
+
+- `STORAGE_MODE=local`
+- `S3_BUCKET=portal-private-files`
+- `S3_ENDPOINT=http://localhost:9000`
+- `AWS_REGION=us-east-1`
+- `S3_FORCE_PATH_STYLE=true`
+- `MINIO_ROOT_USER=admin`
+- `MINIO_ROOT_PASSWORD=password`
+
+Console: `http://localhost:9001`
+
+In local mode the backend checks whether the configured bucket exists on startup and creates it if missing. In `STORAGE_MODE=aws`, bucket creation is skipped and the AWS SDK uses the normal credential chain, including the EC2 IAM role when present.
+
 ## Security highlights
 
 - Password hashing with `bcryptjs` cost factor `12`

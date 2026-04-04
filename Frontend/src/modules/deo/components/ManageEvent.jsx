@@ -5,6 +5,7 @@ import {
   FiCalendar, FiImage, FiVideo, FiFile, FiUploadCloud,
 } from "react-icons/fi";
 import { apiClient, authorizedConfig } from "../../../shared/api/client.js";
+import { DEO_ACCEPT, getFileUiType, uploadPrivateFile } from "../../../shared/api/privateFiles.js";
 import { useAuth } from "../../../shared/auth/AuthContext.jsx";
 
 const PAGE_SIZE = 8;
@@ -29,7 +30,16 @@ function formatEventRow(event) {
     description: event.comments || "",
     location: event.location || "",
     status: getEventStatus(event.starts_at, event.ends_at),
-    files: [],
+    files: Array.isArray(event.files)
+      ? event.files.map((file) => ({
+          id: file.id,
+          name: file.name,
+          type: file.type || getFileUiType(file.mimeType),
+          size: file.size || "",
+          mimeType: file.mimeType,
+          createdAt: file.createdAt,
+        }))
+      : [],
   };
 }
 
@@ -41,48 +51,33 @@ function FileIcon({ type }) {
   return <FiFile size={15} className="text-amber-500" />;
 }
 
-function EventUploadModal({ event, onClose, onEdit }) {
-  const [activeType, setActiveType] = useState("photo");
-  const [selectedFiles, setSelectedFiles] = useState({
-    photo: "",
-    video: "",
-    document: "",
-  });
-  const photoRef = useRef(null);
-  const videoRef = useRef(null);
-  const documentRef = useRef(null);
+function EventUploadModal({ accessToken, event, onClose, onEdit, onUploaded }) {
+  const [selectedFile, setSelectedFile] = useState(null);
+  const [error, setError] = useState("");
+  const [uploading, setUploading] = useState(false);
+  const inputRef = useRef(null);
 
   if (!event) return null;
 
-  const uploadSections = [
-    {
-      key: "photo",
-      tabLabel: "Photos",
-      label: "Upload Photos",
-      hint: "Photos, JPG, PNG, HEIC",
-      icon: FiImage,
-      accept: "image/*",
-    },
-    {
-      key: "video",
-      tabLabel: "Videos",
-      label: "Upload Videos",
-      hint: "Videos, MP4, MOV",
-      icon: FiVideo,
-      accept: "video/*",
-    },
-    {
-      key: "document",
-      tabLabel: "Documents",
-      label: "Upload Documents",
-      hint: "Documents, PDF, DOC, XLS",
-      icon: FiFile,
-      accept: ".pdf,.doc,.docx,.xls,.xlsx",
-    },
-  ];
-  const activeSection = uploadSections.find((section) => section.key === activeType) || uploadSections[0];
-  const ActiveSectionIcon = activeSection.icon;
-  const activeInputRef = activeType === "photo" ? photoRef : activeType === "video" ? videoRef : documentRef;
+  async function handleUpload() {
+    if (!selectedFile || uploading) return;
+    try {
+      setUploading(true);
+      setError("");
+      await uploadPrivateFile({
+        accessToken,
+        file: selectedFile,
+        contextType: "event",
+        contextId: event.id,
+      });
+      await onUploaded?.();
+      onClose();
+    } catch (uploadError) {
+      setError(uploadError?.response?.data?.error || uploadError.message || "Unable to upload file");
+    } finally {
+      setUploading(false);
+    }
+  }
 
   return (
     <div className="fixed inset-0 bg-black/45 z-[1000] flex items-center justify-center p-4 sm:p-6" onClick={onClose}>
@@ -125,57 +120,44 @@ function EventUploadModal({ event, onClose, onEdit }) {
             </div>
 
             <div>
-              <label className="block text-[12px] font-medium text-[var(--portal-text)] mb-1.5">Media Type</label>
-              <div className="flex gap-1.5">
-                {uploadSections.map((section) => {
-                  const SectionIcon = section.icon;
-                  return (
-                    <button
-                      key={section.key}
-                      type="button"
-                      onClick={() => setActiveType(section.key)}
-                      className={`flex-1 py-2 flex flex-col items-center gap-1 text-[11px] border rounded-xl transition-all ${
-                        activeType === section.key
-                          ? "border-[var(--portal-purple)] bg-[var(--portal-purple-dim)] text-[var(--portal-purple)]"
-                          : "border-[var(--portal-border)] text-[var(--portal-text-muted)] hover:bg-[var(--portal-bg-elevated)]"
-                      }`}
-                    >
-                      <SectionIcon size={16} color={activeType === section.key ? "var(--portal-purple)" : "currentColor"} />
-                      {section.tabLabel}
-                    </button>
-                  );
-                })}
+              <label className="block text-[12px] font-medium text-[var(--portal-text)] mb-1.5">Upload File</label>
+              <div
+                className="border-2 border-dashed border-[var(--portal-border)] rounded-xl p-6 text-center cursor-pointer bg-[var(--portal-bg-elevated)] hover:bg-[var(--portal-card-hover)]"
+                onClick={() => inputRef.current?.click()}
+              >
+                <input
+                  ref={inputRef}
+                  type="file"
+                  accept={DEO_ACCEPT}
+                  className="hidden"
+                  onChange={(e) => {
+                    setSelectedFile(e.target.files?.[0] || null);
+                    setError("");
+                  }}
+                />
+                <div className="flex justify-center mb-2">
+                  <FiUploadCloud size={26} color="var(--portal-purple)" />
+                </div>
+                <div className="text-sm font-semibold text-[var(--portal-text)] mb-1">
+                  {selectedFile?.name || "Select PDF, JPG, PNG, MP4, MPEG, or WEBM"}
+                </div>
+                <div className="text-xs text-[var(--portal-text-muted)]">PDF up to 5MB, images up to 20MB, video up to 100MB</div>
               </div>
             </div>
 
-            <div>
-              <label className="block text-[12px] font-medium text-[var(--portal-text)] mb-1.5">{activeSection.label}</label>
-              <div
-                className="border-2 border-dashed border-[var(--portal-border)] rounded-xl p-6 text-center cursor-pointer bg-[var(--portal-bg-elevated)] hover:bg-[var(--portal-card-hover)]"
-                onClick={() => activeInputRef.current?.click()}
-              >
-                <input
-                  ref={activeInputRef}
-                  type="file"
-                  accept={activeSection.accept}
-                  className="hidden"
-                  onChange={(e) => setSelectedFiles((current) => ({ ...current, [activeSection.key]: e.target.files?.[0]?.name || "" }))}
-                />
-                <div className="flex justify-center mb-2">
-                  <ActiveSectionIcon size={26} color="var(--portal-purple)" />
-                </div>
-                <div className="text-sm font-semibold text-[var(--portal-text)] mb-1">
-                  {selectedFiles[activeSection.key] || activeSection.label}
-                </div>
-                <div className="text-xs text-[var(--portal-text-muted)]">{activeSection.hint}</div>
-              </div>
-            </div>
+            {error ? <div className="text-sm text-red-500">{error}</div> : null}
           </div>
         </div>
 
         <div className="px-6 py-4 border-t border-[var(--portal-border-light)] flex justify-end gap-3 shrink-0 bg-[var(--portal-bg-elevated)] rounded-b-xl">
           <button className="px-5 py-2 text-sm font-medium text-[var(--portal-text)] bg-[var(--portal-card)] border-2 border-[var(--portal-border)] rounded-lg hover:bg-[var(--portal-card-hover)] transition-colors" onClick={onClose}>Cancel</button>
-          <button className="px-6 py-2 text-sm font-semibold text-white bg-[var(--portal-purple)] hover:opacity-90 border-none rounded-lg transition-opacity" onClick={onClose}>Done</button>
+          <button
+            className={`px-6 py-2 text-sm font-semibold text-white border-none rounded-lg transition-opacity ${uploading || !selectedFile ? "bg-[var(--portal-purple)] opacity-50 cursor-not-allowed" : "bg-[var(--portal-purple)] hover:opacity-90"}`}
+            onClick={handleUpload}
+            disabled={uploading || !selectedFile}
+          >
+            {uploading ? "Uploading..." : "Upload"}
+          </button>
         </div>
       </div>
     </div>
@@ -274,9 +256,10 @@ function ManageEventMediaModal({ event, onSave, onClose, onBack }) {
                     {allSelected ? "Clear Selection" : "Select All"}
                   </button>
                   <button
-                    className={`px-6 py-2 text-sm font-semibold text-white rounded-lg transition-opacity ${selectedIds.length ? "bg-red-500 hover:bg-red-600" : "bg-red-500 opacity-50 cursor-not-allowed"}`}
-                    onClick={deleteSelected}
-                    disabled={!selectedIds.length}
+                    className="px-6 py-2 text-sm font-semibold text-white rounded-lg transition-opacity bg-red-500 opacity-50 cursor-not-allowed"
+                    onClick={(event) => event.preventDefault()}
+                    disabled
+                    title="Delete is not available yet for event files"
                   >
                     Delete
                   </button>
@@ -377,6 +360,11 @@ export default function ManageEvent() {
       mounted = false;
     };
   }, [session?.accessToken]);
+
+  async function reloadEvents() {
+    const { data } = await apiClient.get("/deo/calendar-events", authorizedConfig(session.accessToken));
+    setEvents((data.events || []).map(formatEventRow));
+  }
 
   const showToast = (msg, type = "success") => { setToast({ msg, type }); setTimeout(() => setToast(null), 3000); };
 
@@ -588,7 +576,7 @@ export default function ManageEvent() {
       </div>
 
       {/* Modals */}
-      {uploadEvent && <EventUploadModal event={uploadEvent} onClose={() => setUploadEvent(null)} onEdit={() => { setManageUploadEvent(uploadEvent); setUploadEvent(null); }} />}
+      {uploadEvent && <EventUploadModal accessToken={session?.accessToken} event={uploadEvent} onUploaded={reloadEvents} onClose={() => setUploadEvent(null)} onEdit={() => { setManageUploadEvent(uploadEvent); setUploadEvent(null); }} />}
       {manageUploadEvent && <ManageEventMediaModal event={manageUploadEvent} onSave={upd => { setEvents(p => p.map(e => e.id === upd.id ? upd : e)); setManageUploadEvent(upd); }} onClose={() => setManageUploadEvent(null)} onBack={() => { setUploadEvent(manageUploadEvent); setManageUploadEvent(null); }} />}
     </div>
   );
