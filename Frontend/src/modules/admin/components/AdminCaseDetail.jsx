@@ -56,7 +56,7 @@ function buildFutureIso(date, time) {
   return localDate.toISOString();
 }
 
-function CenteredOverlay({ children }) {
+export function CenteredOverlay({ children }) {
   return (
     <div
       style={{
@@ -79,7 +79,7 @@ function CenteredOverlay({ children }) {
   );
 }
 
-function ModalShell({ title, subtitle, children, onClose }) {
+export function ModalShell({ title, subtitle, children, onClose }) {
   const { C } = usePortalTheme();
   return (
     <CenteredOverlay>
@@ -112,7 +112,7 @@ function ModalShell({ title, subtitle, children, onClose }) {
   );
 }
 
-function ErrorText({ children }) {
+export function ErrorText({ children }) {
   const { C } = usePortalTheme();
   if (!children) return null;
   return <div style={{ marginTop: 8, fontSize: 12, color: C.danger }}>{children}</div>;
@@ -147,7 +147,7 @@ function Timeline({ items = [] }) {
   );
 }
 
-function SuccessModal({ open, message, onClose }) {
+export function SuccessModal({ open, message, onClose }) {
   const { C } = usePortalTheme();
   if (!open) return null;
   return (
@@ -179,7 +179,7 @@ function SuccessModal({ open, message, onClose }) {
   );
 }
 
-function WorkspaceTextArea(props) {
+export function WorkspaceTextArea(props) {
   const { C } = usePortalTheme();
   return (
     <textarea

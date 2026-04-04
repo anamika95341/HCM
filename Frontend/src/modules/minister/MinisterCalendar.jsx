@@ -80,93 +80,25 @@ function formatFileSize(size = 0) {
   return `${size} B`;
 }
 
-// ── Mock data (UI scaffolding — replace with API response when available) ────
+function getItemKind(item) {
+  return item.kind === "event" ? "event" : "meeting";
+}
 
-const _t = new Date();
-const _y = _t.getFullYear();
-const _m = _t.getMonth();
-const _d = _t.getDate();
+function getItemSummary(items) {
+  const meetings = items.filter((item) => getItemKind(item) === "meeting").length;
+  const events = items.filter((item) => getItemKind(item) === "event").length;
+  const parts = [];
+  if (meetings) parts.push(`${meetings} meeting${meetings !== 1 ? "s" : ""}`);
+  if (events) parts.push(`${events} event${events !== 1 ? "s" : ""}`);
+  return parts.join(" ");
+}
 
-const MOCK_ITEMS = [
-  {
-    id: "mock-1",
-    sourceId: "meeting-001",
-    title: "Budget Review Meeting",
-    details:
-      "Quarterly review of departmental budgets with the finance team. Key focus areas include infrastructure spending, pending allocations, and upcoming project financing.",
-    startsAt: new Date(_y, _m, _d, 10, 0).toISOString(),
-    endsAt: new Date(_y, _m, _d, 11, 30).toISOString(),
-    location: "Conference Room A, Main Building",
-    type: "Scheduled Meeting",
-    source: "Minister Calendar",
-    participants: ["Finance Director", "Deputy Minister", "Budget Officer"],
-  },
-  {
-    id: "mock-2",
-    sourceId: "meeting-002",
-    title: "State Infrastructure Summit",
-    details:
-      "High-priority summit with state governors to discuss infrastructure development plans, fund allocation, and timelines for regional projects slated for Q3.",
-    startsAt: new Date(_y, _m, _d, 14, 0).toISOString(),
-    endsAt: new Date(_y, _m, _d, 16, 0).toISOString(),
-    location: "Main Hall, State Secretariat",
-    type: "VIP Meeting",
-    source: "Minister Priority",
-    participants: ["State Governors", "Infrastructure Secretary", "Planning Commission Head"],
-  },
-  {
-    id: "mock-3",
-    sourceId: "meeting-003",
-    title: "Citizen Grievance Hearing",
-    details:
-      "Monthly public grievance hearing to address pending complaints and concerns raised by citizens across various districts.",
-    startsAt: new Date(_y, _m, _d + 1, 9, 0).toISOString(),
-    endsAt: new Date(_y, _m, _d + 1, 12, 0).toISOString(),
-    location: "Public Hall, District Office",
-    type: "Scheduled Meeting",
-    source: "Minister Calendar",
-    participants: ["District Collectors", "Citizens Representatives", "Grievance Officer"],
-  },
-  {
-    id: "mock-4",
-    sourceId: "meeting-004",
-    title: "Policy Review with PM Office",
-    details:
-      "Urgent policy review meeting regarding new agricultural reforms, implementation timeline, and cross-ministry coordination requirements.",
-    startsAt: new Date(_y, _m, _d + 2, 11, 0).toISOString(),
-    endsAt: new Date(_y, _m, _d + 2, 13, 0).toISOString(),
-    location: "PM Office, New Delhi",
-    type: "VIP Meeting",
-    source: "Minister Priority",
-    participants: ["PM's Principal Secretary", "Cabinet Secretary", "Policy Advisors"],
-  },
-  {
-    id: "mock-5",
-    sourceId: "meeting-005",
-    title: "Press Conference — Development Projects",
-    details:
-      "Press conference to announce the completion of key development projects and upcoming public-sector initiatives for the current fiscal year.",
-    startsAt: new Date(_y, _m, _d - 1, 15, 0).toISOString(),
-    endsAt: new Date(_y, _m, _d - 1, 16, 0).toISOString(),
-    location: "Media Centre, Secretariat",
-    type: "Scheduled Meeting",
-    source: "Minister Calendar",
-    participants: ["Press Corps", "PR Team", "Development Secretary"],
-  },
-  {
-    id: "mock-6",
-    sourceId: "meeting-006",
-    title: "Bilateral Trade Discussion",
-    details:
-      "Confidential bilateral trade discussion with foreign delegation regarding trade agreements, tariff schedules, and long-term economic collaboration.",
-    startsAt: new Date(_y, _m, _d + 4, 10, 30).toISOString(),
-    endsAt: new Date(_y, _m, _d + 4, 12, 30).toISOString(),
-    location: "Ministry Conference Suite",
-    type: "VIP Meeting",
-    source: "Minister Priority",
-    participants: ["Foreign Trade Delegation", "Commerce Secretary", "Economic Advisors"],
-  },
-];
+function getItemTypeLabel(item) {
+  if (getItemKind(item) === "event") {
+    return item.isVip ? "VIP Event" : "Scheduled Event";
+  }
+  return item.isVip ? "VIP Meeting" : "Scheduled Meeting";
+}
 
 // Mock files — UI scaffolding only, no backend integration
 const MOCK_FILES = {
@@ -192,7 +124,7 @@ const MOCK_FILES = {
 
 function EventPill({ item, compact = false, onClick }) {
   const { C } = usePortalTheme();
-  const tone = item.type === "VIP Meeting" ? C.warn : C.purple;
+  const tone = item.isVip ? C.warn : C.purple;
   return (
     <button
       type="button"
@@ -245,7 +177,7 @@ function FilesSection({ C, tone }) {
     <div>
       {/* Tab bar */}
       <div style={{ display: "flex", gap: 4, marginBottom: 16, borderBottom: `1px solid ${C.border}`, paddingBottom: 12 }}>
-        {FILE_TABS.map(({ id, label, icon: Icon }) => {
+        {FILE_TABS.map(({ id, label }) => {
           const active = activeTab === id;
           const count = MOCK_FILES[id].length;
           return (
@@ -268,7 +200,7 @@ function FilesSection({ C, tone }) {
                 transition: "all 0.15s ease",
               }}
             >
-              <Icon size={13} />
+              {id === "photos" ? <ImageIcon size={13} /> : id === "videos" ? <Film size={13} /> : <FileText size={13} />}
               {label}
               <span
                 style={{
@@ -381,13 +313,13 @@ function DayMeetingsModal({ date, items, onClose, onSelectMeeting }) {
           >
             <div className="min-w-0">
               <div style={{ fontSize: 11, fontWeight: 700, color: C.t3, textTransform: "uppercase", letterSpacing: ".1em" }}>
-                Meeting Schedule
+                Schedule
               </div>
               <h3 className="mt-3 text-2xl font-bold break-words" style={{ color: C.t1 }}>
                 {date.toLocaleDateString(undefined, { weekday: "long", month: "long", day: "numeric", year: "numeric" })}
               </h3>
               <div className="mt-2 text-sm" style={{ color: C.t2 }}>
-                Total Meetings: {items.length}
+                {getItemSummary(items) || "No schedule"}
               </div>
             </div>
             <button
@@ -404,12 +336,12 @@ function DayMeetingsModal({ date, items, onClose, onSelectMeeting }) {
           <div className="p-6 sm:p-8 max-h-[320px] overflow-y-auto">
             {items.length === 0 ? (
               <div style={{ fontSize: 13, color: C.t3, textAlign: "center", padding: "24px 0" }}>
-                No meetings for this date.
+                No schedule for this date.
               </div>
             ) : (
               <div className="space-y-3">
                 {items.map((item) => {
-                  const tone = item.type === "VIP Meeting" ? C.warn : C.purple;
+                  const tone = item.isVip ? C.warn : C.purple;
                   return (
                     <button
                       key={item.id}
@@ -424,7 +356,7 @@ function DayMeetingsModal({ date, items, onClose, onSelectMeeting }) {
                             className="inline-flex px-3 py-1 rounded-full text-xs font-semibold border"
                             style={{ borderColor: `${tone}33`, background: `${tone}12`, color: tone }}
                           >
-                            {item.type}
+                            {getItemTypeLabel(item)}
                           </div>
                           <div style={{ marginTop: 10, fontSize: 14, fontWeight: 700, color: C.t1 }} className="break-words">
                             {item.title}
@@ -454,7 +386,7 @@ function DayMeetingsModal({ date, items, onClose, onSelectMeeting }) {
 function MeetingDetailModal({ meeting, onClose }) {
   const { C } = usePortalTheme();
   if (!meeting) return null;
-  const tone = meeting.type === "VIP Meeting" ? C.warn : C.purple;
+  const tone = meeting.isVip ? C.warn : C.purple;
 
   return (
     <>
@@ -487,7 +419,7 @@ function MeetingDetailModal({ meeting, onClose }) {
                 className="inline-flex px-3 py-1 rounded-full text-xs font-semibold border"
                 style={{ borderColor: `${tone}33`, background: `${tone}12`, color: tone }}
               >
-                {meeting.type}
+                {getItemTypeLabel(meeting)}
               </div>
               <h3 className="mt-4 text-2xl sm:text-3xl font-bold break-words" style={{ color: C.t1 }}>
                 {meeting.title}
@@ -598,7 +530,7 @@ export default function MinisterCalendar() {
   const { session } = useAuth();
 
   // Data
-  const [items, setItems] = useState(MOCK_ITEMS);
+  const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
@@ -610,7 +542,6 @@ export default function MinisterCalendar() {
   const [selectedDate, setSelectedDate] = useState(null);   // controls DayMeetingsModal
   const [selectedMeeting, setSelectedMeeting] = useState(null); // controls MeetingDetailModal
 
-  // Load from API; fall back silently to mock data
   useEffect(() => {
     let mounted = true;
 
@@ -625,15 +556,21 @@ export default function MinisterCalendar() {
           startsAt: event.starts_at,
           endsAt: event.ends_at,
           location: event.location,
-          type: event.is_vip ? "VIP Meeting" : "Scheduled Meeting",
-          source: event.is_vip ? "Minister Priority" : "Minister Calendar",
+          source: event.meeting_id ? (event.is_vip ? "Minister Priority" : "Minister Calendar") : "DEO Event",
           participants: event.participants || [],
+          kind: event.meeting_id ? "meeting" : "event",
+          isVip: Boolean(event.is_vip),
+          whoToMeet: event.who_to_meet || "",
         }));
         if (mounted) {
-          setItems(mapped.length > 0 ? mapped : MOCK_ITEMS);
+          setItems(mapped);
+          setError("");
         }
-      } catch {
-        if (mounted) setItems(MOCK_ITEMS);
+      } catch (loadError) {
+        if (mounted) {
+          setItems([]);
+          setError(loadError?.response?.data?.error || "Unable to load calendar");
+        }
       } finally {
         if (mounted) setLoading(false);
       }
@@ -908,6 +845,7 @@ export default function MinisterCalendar() {
                       const isToday = isSameDay(day, new Date());
                       const isSelected = selectedDate && isSameDay(day, selectedDate);
                       const eventsForDay = items.filter((item) => isSameDay(item.startsAt, day));
+                      const daySummary = getItemSummary(eventsForDay);
 
                       return (
                         <div
@@ -970,7 +908,7 @@ export default function MinisterCalendar() {
                                 textAlign: "center",
                               }}
                             >
-                              {eventsForDay.length} meeting{eventsForDay.length !== 1 ? "s" : ""}
+                              {daySummary}
                             </div>
                           )}
                         </div>
@@ -985,6 +923,7 @@ export default function MinisterCalendar() {
                 <div style={{ display: "grid", gridTemplateColumns: "repeat(7, minmax(0, 1fr))", gap: 8 }}>
                   {weekDays.map((day) => {
                     const eventsForDay = items.filter((item) => isSameDay(item.startsAt, day));
+                    const daySummary = getItemSummary(eventsForDay);
                     const isToday = isSameDay(day, new Date());
                     const isSelected = selectedDate && isSameDay(day, selectedDate);
                     return (
@@ -1047,7 +986,7 @@ export default function MinisterCalendar() {
                                 textAlign: "center",
                               }}
                             >
-                              {eventsForDay.length} meeting{eventsForDay.length !== 1 ? "s" : ""}
+                              {daySummary}
                             </div>
                           ) : (
                             <div style={{ fontSize: 11, color: C.t3 }}>No events</div>
@@ -1064,7 +1003,7 @@ export default function MinisterCalendar() {
                 <div style={{ display: "grid", gap: 10 }}>
                   {dayItems.length ? (
                     dayItems.map((item) => {
-                      const tone = item.type === "VIP Meeting" ? C.warn : C.purple;
+                      const tone = item.isVip ? C.warn : C.purple;
                       return (
                         <button
                           key={item.id}
@@ -1101,7 +1040,7 @@ export default function MinisterCalendar() {
                               </div>
                             </div>
                             <WorkspaceBadge color={tone}>
-                              {item.type === "VIP Meeting" ? "VIP" : "Standard"}
+                              {getItemKind(item) === "event" ? "Event" : item.isVip ? "VIP" : "Standard"}
                             </WorkspaceBadge>
                           </div>
                         </button>
@@ -1122,7 +1061,7 @@ export default function MinisterCalendar() {
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
                   <div>
                     <div style={{ fontSize: 11, fontWeight: 700, color: C.t3, textTransform: "uppercase", letterSpacing: ".1em", marginBottom: 4 }}>Upcoming</div>
-                    <h3 className="text-lg font-bold" style={{ color: C.t1 }}>Next Meetings</h3>
+                    <h3 className="text-lg font-bold" style={{ color: C.t1 }}>Next Schedule</h3>
                   </div>
                   <div style={{ background: `${C.purple}15`, padding: 8, borderRadius: '50%', color: C.purple }}>
                     <Calendar size={18} />
@@ -1130,11 +1069,11 @@ export default function MinisterCalendar() {
                 </div>
 
                 {nextTwoMeetings.length === 0 ? (
-                  <div style={{ fontSize: 13, color: C.t3 }}>No upcoming meetings scheduled.</div>
+                  <div style={{ fontSize: 13, color: C.t3 }}>No upcoming meetings or events scheduled.</div>
                 ) : (
                   <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
                     {nextTwoMeetings.map((item) => {
-                      const tone = item.type === "VIP Meeting" ? C.warn : C.purple;
+                      const tone = item.isVip ? C.warn : C.purple;
                       return (
                         <button
                           key={item.id}

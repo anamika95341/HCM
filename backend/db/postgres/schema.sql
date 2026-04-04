@@ -147,17 +147,20 @@ CREATE TABLE IF NOT EXISTS minister_calendar_events (
   minister_id UUID NOT NULL REFERENCES ministers(id) ON DELETE CASCADE,
   meeting_id UUID UNIQUE,
   title VARCHAR(255) NOT NULL,
+  who_to_meet VARCHAR(255),
   starts_at TIMESTAMPTZ NOT NULL,
   ends_at TIMESTAMPTZ NOT NULL,
   location TEXT NOT NULL,
   is_vip BOOLEAN NOT NULL DEFAULT FALSE,
   comments TEXT,
   created_by_admin_id UUID REFERENCES admins(id) ON DELETE SET NULL,
+  created_by_deo_id UUID REFERENCES deos(id) ON DELETE SET NULL,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
 CREATE INDEX IF NOT EXISTS idx_minister_calendar_minister_id ON minister_calendar_events (minister_id, starts_at);
+CREATE INDEX IF NOT EXISTS idx_minister_calendar_created_by_deo_id ON minister_calendar_events (created_by_deo_id, starts_at DESC);
 
 
 -- 004_create_deo.sql

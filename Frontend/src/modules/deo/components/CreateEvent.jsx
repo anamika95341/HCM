@@ -1,5 +1,9 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
+import { apiClient, authorizedConfig } from "../../../shared/api/client.js";
+import { useAuth } from "../../../shared/auth/AuthContext.jsx";
 import { usePortalTheme } from "../../../shared/theme/portalTheme.jsx";
+import { PATHS } from "../../../routes/paths.js";
 
 function Field({ label, required, children, hint, C }) {
   return (
@@ -15,8 +19,11 @@ function Field({ label, required, children, hint, C }) {
 }
 
 export default function CreateEvent() {
+  const { session } = useAuth();
   const { C } = usePortalTheme();
+  const navigate = useNavigate();
   const [form, setForm] = useState({
+    ministerId: "",
     title: "",
     whoToMeet: "",
     eventDate: "",
@@ -26,10 +33,88 @@ export default function CreateEvent() {
     locationDetail: "",
   });
   const [focused, setFocused] = useState(null);
+  const [ministers, setMinisters] = useState([]);
+  const [loadingMinisters, setLoadingMinisters] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
 
   const set = (key) => (e) => setForm((f) => ({ ...f, [key]: e.target.value }));
   const focus = (key) => () => setFocused(key);
   const blur = () => setFocused(null);
+
+  useEffect(() => {
+    let mounted = true;
+
+    async function loadMinisters() {
+      try {
+        setLoadingMinisters(true);
+        const { data } = await apiClient.get("/deo/ministers", authorizedConfig(session.accessToken));
+        if (mounted) {
+          setMinisters(data.ministers || []);
+          if ((data.ministers || []).length === 1) {
+            setForm((current) => ({ ...current, ministerId: current.ministerId || data.ministers[0].id }));
+          }
+        }
+      } catch (loadError) {
+        if (mounted) {
+          setError(loadError?.response?.data?.error || "Unable to load ministers");
+        }
+      } finally {
+        if (mounted) {
+          setLoadingMinisters(false);
+        }
+      }
+    }
+
+    if (session?.accessToken) {
+      loadMinisters();
+    } else {
+      setLoadingMinisters(false);
+    }
+
+    return () => {
+      mounted = false;
+    };
+  }, [session?.accessToken]);
+
+  async function handleSubmit(event) {
+    event.preventDefault();
+    setError("");
+
+    if (!form.ministerId || !form.title || !form.whoToMeet || !form.eventDate || !form.eventTime || !form.description || !form.location) {
+      setError("Please complete all required fields.");
+      return;
+    }
+
+    const startsAtDate = new Date(`${form.eventDate}T${form.eventTime}`);
+    if (Number.isNaN(startsAtDate.getTime())) {
+      setError("Invalid event date or time.");
+      return;
+    }
+    const endsAtDate = new Date(startsAtDate.getTime() + 60 * 60 * 1000);
+
+    try {
+      setSaving(true);
+      await apiClient.post(
+        "/deo/calendar-events",
+        {
+          ministerId: form.ministerId,
+          title: form.title.trim(),
+          whoToMeet: form.whoToMeet.trim(),
+          startsAt: startsAtDate.toISOString(),
+          endsAt: endsAtDate.toISOString(),
+          location: [form.location.trim(), form.locationDetail.trim()].filter(Boolean).join(", "),
+          description: form.description.trim(),
+        },
+        authorizedConfig(session.accessToken)
+      );
+      navigate(PATHS.deo.manageEvent);
+    } catch (submitError) {
+      setError(submitError?.response?.data?.error || "Unable to create event");
+    } finally {
+      setSaving(false);
+    }
+  }
 
   const inputStyle = (key) => ({
     width: "100%",
@@ -57,11 +142,35 @@ export default function CreateEvent() {
       <div style={{ width: "100%", maxWidth: "100%" }}>
         <h1 style={{ fontSize: 20, fontWeight: 600, color: C.t1, textAlign: "center", marginBottom: 24, marginTop: 0 }}>Create Event</h1>
 
-        <div style={{ background: C.card, borderRadius: 12, border: `1px solid ${C.border}`, padding: "28px 32px" }}>
+        <form onSubmit={handleSubmit} style={{ background: C.card, borderRadius: 12, border: `1px solid ${C.border}`, padding: "28px 32px" }}>
           <div style={{ fontSize: 14, fontWeight: 600, color: C.t1, marginBottom: 4 }}>Event Details</div>
           <div style={{ fontSize: 12, color: C.t3, marginBottom: 24 }}>
             Fill in the event information, timing, location, and attendee details.
           </div>
+
+          {error && (
+            <div style={{ marginBottom: 20, fontSize: 12, color: C.danger }}>
+              {error}
+            </div>
+          )}
+
+          <Field label="Minister" required C={C}>
+            <select
+              style={inputStyle("ministerId")}
+              value={form.ministerId}
+              onChange={set("ministerId")}
+              onFocus={focus("ministerId")}
+              onBlur={blur}
+              disabled={loadingMinisters || ministers.length === 0}
+            >
+              <option value="">{loadingMinisters ? "Loading ministers..." : "Select minister"}</option>
+              {ministers.map((minister) => (
+                <option key={minister.id} value={minister.id}>
+                  {[minister.first_name, minister.last_name].filter(Boolean).join(" ")}
+                </option>
+              ))}
+            </select>
+          </Field>
 
           <Field label="Event Title" required C={C}>
             <input
@@ -155,17 +264,21 @@ export default function CreateEvent() {
 
           <div style={{ display: "flex", justifyContent: "flex-end", gap: 12, marginTop: 8 }}>
             <button
+              type="button"
+              onClick={() => navigate(PATHS.deo.manageEvent)}
               style={{ padding: "10px 24px", fontSize: 14, fontWeight: 500, color: C.t2, background: C.card, border: `1.5px solid ${C.border}`, borderRadius: 8, cursor: "pointer" }}
             >
               Cancel
             </button>
             <button
+              type="submit"
+              disabled={saving || loadingMinisters}
               style={{ padding: "10px 28px", fontSize: 14, fontWeight: 600, color: "#ffffff", background: C.purple, border: "none", borderRadius: 8, cursor: "pointer" }}
             >
-              Submit Event Request
+              {saving ? "Submitting..." : "Submit Event Request"}
             </button>
           </div>
-        </div>
+        </form>
       </div>
     </div>
   );
