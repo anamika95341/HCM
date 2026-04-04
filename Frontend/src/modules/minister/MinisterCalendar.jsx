@@ -766,7 +766,7 @@ export default function MinisterCalendar() {
   // ── Render ─────────────────────────────────────────────────────────────────
 
   return (
-    <WorkspacePage width={1400}>
+    <WorkspacePage width={1320}>
 
       {loading ? (
         <WorkspaceEmptyState title="Loading calendar…" />

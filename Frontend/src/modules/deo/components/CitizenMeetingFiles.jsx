@@ -226,7 +226,16 @@ export default function CitizenMeetingFiles() {
   };
 
   return (
-    <div className="w-full px-6 py-6 pb-12" style={{ fontFamily: "'Inter', system-ui, sans-serif" }}>
+    <div
+      style={{
+        width: "100%",
+        maxWidth: 1320,
+        margin: "0 auto",
+        padding: "32px 28px 48px",
+        boxSizing: "border-box",
+        fontFamily: "'Inter', system-ui, sans-serif",
+      }}
+    >
       {/* Header */}
       <p className="text-[11px] font-semibold uppercase tracking-widest text-[var(--portal-purple)] mb-1">DEO Workspace</p>
       <h1 className="text-xl font-semibold text-[var(--portal-text-strong)]" style={{ marginTop: 4 }}>Citizen Meeting Files</h1>

@@ -442,7 +442,7 @@ export default function AdminMeeting() {
             ? PATHS.admin.workQueue
             : PATHS.admin.meetings;
     return (
-      <WorkspacePage width={1500} contentStyle={{ paddingLeft: 12, paddingRight: 12 }}>
+      <WorkspacePage width={1500}>
         <SuccessModal open={!!successMessage} message={successMessage} onClose={() => setSuccessMessage("")} />
         <RejectModal
           open={rejectModalOpen}
@@ -870,8 +870,7 @@ export default function AdminMeeting() {
   }
 
   return (
-    <WorkspacePage width={1280} contentStyle={{ paddingLeft: 12, paddingRight: 12 }}>
-      <div style={{ maxWidth: "1150px", margin: "0 auto", width: "100%" }}>
+    <WorkspacePage width={1280}>
         <WorkspaceSectionHeader
           eyebrow="Admin Workspace"
           title="Meeting Queue"
@@ -984,7 +983,6 @@ export default function AdminMeeting() {
             </WorkspaceCard>
           )}
         </div>
-      </div>
     </WorkspacePage>
   );
 }

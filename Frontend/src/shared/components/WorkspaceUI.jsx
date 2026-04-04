@@ -16,13 +16,19 @@ export function WorkspacePage({ children, width = 900, outerStyle, contentStyle 
     <div className="portal-page" style={{ minHeight: "100%", background: "transparent", ...(outerStyle || {}) }}>
       <div
         style={{
-          maxWidth: width,
-          margin: "0 auto",
-          padding: "var(--portal-space-13) var(--portal-space-14) var(--portal-space-14)",
-          ...(contentStyle || {}),
+          padding: "var(--portal-space-13) var(--portal-space-12) var(--portal-space-14)",
         }}
       >
-        {children}
+        <div
+          style={{
+            width: "100%",
+            maxWidth: width,
+            margin: "0 auto",
+            ...(contentStyle || {}),
+          }}
+        >
+          {children}
+        </div>
       </div>
     </div>
   );
