@@ -20,7 +20,8 @@ export const PATHS = {
     legacyCaseDetail: "/case/:id",
   },
   admin: {
-    home: "/admin/work-queue",
+    home: "/admin/dashboard",
+    dashboard: "/admin/dashboard",
     calendar: "/admin/calendar",
     legacyCalendar: "/calendar",
     workQueue: "/admin/work-queue",
@@ -70,7 +71,7 @@ export function getLoginPathForRole(role) {
 
 export function getHomePathForRole(role) {
   if (role === "masteradmin") return PATHS.masteradmin.dashboard;
-  if (role === "admin") return PATHS.admin.workQueue;
+  if (role === "admin") return PATHS.admin.dashboard;
   if (role === "minister") return PATHS.minister.dashboard;
   if (role === "deo") return PATHS.deo.calendarEvents;
   return PATHS.citizen.newCase;

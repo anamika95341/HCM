@@ -4,6 +4,7 @@ import AppLayout from "../layouts/AppLayout.jsx";
 import { PATHS } from "./paths.js";
 import ProtectedRoute from "../shared/auth/ProtectedRoute.jsx";
 import AdminCases from "../modules/admin/components/AdminCases.jsx";
+import AdminDashboard from "../modules/admin/AdminDashboard.jsx";
 import AdminCaseDetail from "../modules/admin/components/AdminCaseDetail.jsx";
 import AdminComplaintQueue from "../modules/admin/components/AdminComplaintQueue.jsx";
 import AdminMeeting from "../modules/admin/components/AdminMeeting.jsx";
@@ -87,6 +88,7 @@ export default function AppRoutes() {
 
         <Route element={<ProtectedRoute allowedRoles={["admin"]} />}>
           <Route element={<AppLayout />}>
+            <Route path={PATHS.admin.dashboard} element={<AdminDashboard />} />
             <Route path={PATHS.admin.workQueue} element={<AdminCases />} />
             <Route path={PATHS.admin.complaintQueue} element={<AdminComplaintQueue />} />
             <Route path={PATHS.admin.calendar} element={<Calendar />} />

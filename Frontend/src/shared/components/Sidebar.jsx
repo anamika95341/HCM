@@ -37,6 +37,7 @@ function Sidebar({ collapsed, onToggle }) {
             { to: PATHS.settings, icon: BsFillGearFill, label: "Settings" },
         ],
         admin: [
+            { to: PATHS.admin.dashboard, icon: FiHome, label: "Dashboard" },
             { to: PATHS.admin.workQueue, icon: FiClipboard, label: "Work Queue" },
             { to: PATHS.admin.meetings, icon: RiTeamLine, label: "Meeting Queue" },
             { to: PATHS.admin.complaintQueue, icon: FiClipboard, label: "Complaint Queue" },
