@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Eye, Clock, CheckCircle2, AlertCircle, FileText, Search, Filter, ChevronLeft, ChevronRight } from "lucide-react";
+import { Eye, Clock, CheckCircle2, AlertCircle, Calendar, Search, Filter, ChevronLeft, ChevronRight } from "lucide-react";
 import { apiClient, authorizedConfig } from "../../../shared/api/client.js";
 import { useAuth } from "../../../shared/auth/AuthContext.jsx";
 import {
@@ -9,21 +9,12 @@ import {
   WorkspaceCard,
   WorkspaceEmptyState,
   WorkspaceInput,
-  WorkspacePage,
-  WorkspaceSectionHeader,
   WorkspaceSelect,
 } from "../../../shared/components/WorkspaceUI.jsx";
 import { usePortalTheme } from "../../../shared/theme/portalTheme.jsx";
 
-// Standardized status mapping to match the UI behavior of the cases page
 function meetingStatus(item) {
   const status = item.status || "pending";
-  if (["pending", "accepted", "verification_pending", "verified"].includes(status)) {
-    return { value: status, label: "Under Review" };
-  }
-  if (status === "not_verified") {
-    return { value: status, label: "Verification Failed" };
-  }
   const label = String(status)
     .split("_")
     .filter(Boolean)
@@ -36,15 +27,20 @@ export default function MeetingList() {
   const { C } = usePortalTheme();
   const navigate = useNavigate();
   const { session } = useAuth();
+  const tableHeaderBackground = C.purple;
+  const tableHeaderText = "#FFFFFF";
+  const alternateRowBackground = C.name === "dark" ? C.card : "#F7F1FF";
+  const pageHeight = "calc(100vh - 73px)";
   
   const [meetings, setMeetings] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [hoveredActionId, setHoveredActionId] = useState(null);
   
   // Pagination and Filter State
   const [filters, setFilters] = useState({ q: "", status: "all" });
   const [currentPage, setCurrentPage] = useState(1);
-  const itemsPerPage = 10;
+  const itemsPerPage = 7;
 
   useEffect(() => {
     let mounted = true;
@@ -107,21 +103,26 @@ export default function MeetingList() {
 
   // Dynamic Status Options for the dropdown
   const statusOptions = useMemo(() => {
-    return Array.from(new Set(items.map((item) => meetingStatus(item).value))).filter(Boolean).sort();
-  }, [items]);
+    return Array.from(new Set(meetings.map((item) => item.status).filter(Boolean))).sort();
+  }, [meetings]);
 
   return (
-    <WorkspacePage width={1320}>
-      <WorkspaceSectionHeader
-        eyebrow="Citizen Workspace"
-        title="My Meetings"
-        subtitle="Track meeting requests submitted through the backend workflow."
-        icon={<FileText size={20} />}
-      />
+    <div
+      style={{
+        height: pageHeight,
+        overflow: "hidden",
+        padding: "16px 20px 12px",
+        display: "flex",
+        flexDirection: "column",
+      }}
+    >
+        <div style={{ width: "100%", maxWidth: 1320, margin: "0 auto", display: "flex", flexDirection: "column", flex: 1, minHeight: 0 }}>
+        <div style={{ marginBottom: 22, display: "flex", alignItems: "center", gap: 10 }}>
+          <Calendar size={20} style={{ color: C.purple, flexShrink: 0 }} />
+          <h1 style={{ margin: 0, fontSize: 20, lineHeight: 1.3, fontWeight: 600, color: C.t1 }}>MY MEETINGS</h1>
+        </div>
 
-      {/* FILTER SECTION */}
-      <div style={{ marginBottom: 20 }}>
-        <WorkspaceCard>
+        <div style={{ marginBottom: 22 }}>
           <div className="grid md:grid-cols-2 gap-3">
             <div className="relative">
               <Search className="absolute left-3 top-3" size={18} style={{ color: C.t3 }} />
@@ -154,137 +155,142 @@ export default function MeetingList() {
               </WorkspaceSelect>
             </div>
           </div>
-        </WorkspaceCard>
-      </div>
+        </div>
 
-      {/* LIST SECTION */}
-      <div className="flex-1 overflow-y-auto min-h-0 custom-scrollbar rounded-xl">
-        {loading && (
-          <WorkspaceEmptyState title="Loading your meetings..." />
-        )}
+        <div style={{ marginBottom: 22, minHeight: 0 }}>
+          {loading && <WorkspaceEmptyState title="Loading your meetings..." />}
+          {error && <div style={{ color: C.danger, padding: "12px 0" }}>{error}</div>}
 
-        {error && <WorkspaceCard style={{ color: C.danger }}>{error}</WorkspaceCard>}
+          {!loading && !error && (
+            <>
+              {items.length === 0 ? (
+                <WorkspaceEmptyState title="No meeting requests found" subtitle="Try adjusting your filters." />
+              ) : (
+                <>
+                  <div className="hidden lg:block" style={{ border: `1px solid ${C.border}`, borderRadius: 12, overflow: "hidden" }}>
+                    <table className="w-full text-sm" style={{ borderCollapse: "collapse" }}>
+                          <thead>
+                            <tr>
+                              <th style={{ padding: "13px 16px", fontSize: 10, fontWeight: 600, color: tableHeaderText, textTransform: "uppercase", letterSpacing: "0.06em", textAlign: "left", whiteSpace: "nowrap", background: tableHeaderBackground, borderBottom: `1px solid ${C.border}`, verticalAlign: "middle" }}>Meeting ID</th>
+                              <th style={{ padding: "13px 16px", fontSize: 10, fontWeight: 600, color: tableHeaderText, textTransform: "uppercase", letterSpacing: "0.06em", textAlign: "left", whiteSpace: "nowrap", background: tableHeaderBackground, borderBottom: `1px solid ${C.border}`, verticalAlign: "middle" }}>Meeting Title</th>
+                              <th style={{ padding: "13px 16px", fontSize: 10, fontWeight: 600, color: tableHeaderText, textTransform: "uppercase", letterSpacing: "0.06em", textAlign: "left", whiteSpace: "nowrap", background: tableHeaderBackground, borderBottom: `1px solid ${C.border}`, verticalAlign: "middle" }}>Created At</th>
+                              <th style={{ padding: "13px 16px", fontSize: 10, fontWeight: 600, color: tableHeaderText, textTransform: "uppercase", letterSpacing: "0.06em", textAlign: "left", whiteSpace: "nowrap", background: tableHeaderBackground, borderBottom: `1px solid ${C.border}`, verticalAlign: "middle" }}>Scheduled Time</th>
+                              <th style={{ padding: "13px 16px", fontSize: 10, fontWeight: 600, color: tableHeaderText, textTransform: "uppercase", letterSpacing: "0.06em", textAlign: "left", whiteSpace: "nowrap", background: tableHeaderBackground, borderBottom: `1px solid ${C.border}`, verticalAlign: "middle" }}>Location</th>
+                              <th style={{ padding: "13px 16px", fontSize: 10, fontWeight: 600, color: tableHeaderText, textTransform: "uppercase", letterSpacing: "0.06em", textAlign: "left", whiteSpace: "nowrap", background: tableHeaderBackground, borderBottom: `1px solid ${C.border}`, verticalAlign: "middle" }}>Status</th>
+                              <th style={{ padding: "13px 16px", fontSize: 10, fontWeight: 600, color: tableHeaderText, textTransform: "uppercase", letterSpacing: "0.06em", textAlign: "center", whiteSpace: "nowrap", background: tableHeaderBackground, borderBottom: `1px solid ${C.border}`, verticalAlign: "middle" }}>Action</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {paginatedItems.map((item, index) => {
+                              const statusObj = meetingStatus(item);
+                              const scheduledTimeLabel = item.scheduled_at ? new Date(item.scheduled_at).toLocaleString("en-IN", { dateStyle: "medium", timeStyle: "short" }) : "-";
+                              const createdAtLabel = item.created_at ? new Date(item.created_at).toLocaleDateString("en-IN", { dateStyle: "medium" }) : "--";
+                              const locationLabel = item.scheduled_location || "-";
+                              const isActionHovered = hoveredActionId === item.id;
 
-        {!loading && !error && (
-          <>
-            {items.length === 0 ? (
-              <WorkspaceEmptyState title="No meeting requests found" subtitle="Try adjusting your filters." />
-            ) : (
-              <>
-                {/* DESKTOP TABLE */}
-                <WorkspaceCard style={{ padding: 0, overflow: "hidden" }} className="hidden lg:block">
-                  <table className="w-full text-sm">
-                    <thead style={{ background: C.bgElevated, borderBottom: `1px solid ${C.border}` }}>
-                      <tr>
-                        <th style={{ padding: "12px 16px", fontSize: 10, fontWeight: 600, color: C.t3, textTransform: "uppercase", letterSpacing: "0.06em", textAlign: "left", whiteSpace: "nowrap" }}>Meeting Title</th>
-                        <th style={{ padding: "12px 16px", fontSize: 10, fontWeight: 600, color: C.t3, textTransform: "uppercase", letterSpacing: "0.06em", textAlign: "left", whiteSpace: "nowrap" }}>Preferred Time</th>
-                        <th style={{ padding: "12px 16px", fontSize: 10, fontWeight: 600, color: C.t3, textTransform: "uppercase", letterSpacing: "0.06em", textAlign: "left", whiteSpace: "nowrap" }}>Scheduled Time</th>
-                        <th style={{ padding: "12px 16px", fontSize: 10, fontWeight: 600, color: C.t3, textTransform: "uppercase", letterSpacing: "0.06em", textAlign: "left", whiteSpace: "nowrap" }}>Status</th>
-                        <th style={{ padding: "12px 16px", fontSize: 10, fontWeight: 600, color: C.t3, textTransform: "uppercase", letterSpacing: "0.06em", textAlign: "left", whiteSpace: "nowrap" }}>Created At</th>
-                        <th style={{ padding: "12px 16px", fontSize: 10, fontWeight: 600, color: C.t3, textTransform: "uppercase", letterSpacing: "0.06em", textAlign: "left", whiteSpace: "nowrap" }}>Location</th>
-                        <th style={{ padding: "12px 16px", fontSize: 10, fontWeight: 600, color: C.t3, textTransform: "uppercase", letterSpacing: "0.06em", textAlign: "center", whiteSpace: "nowrap" }}>Action</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {paginatedItems.map((item) => {
-                        const statusObj = meetingStatus(item);
-                        const preferredTimeLabel = item.preferred_time ? new Date(item.preferred_time).toLocaleString("en-IN", { dateStyle: "medium", timeStyle: "short" }) : "Not provided";
-                        const scheduledTimeLabel = item.scheduled_at ? new Date(item.scheduled_at).toLocaleString("en-IN", { dateStyle: "medium", timeStyle: "short" }) : "Pending";
-                        const createdAtLabel = item.created_at ? new Date(item.created_at).toLocaleDateString("en-IN", { dateStyle: "medium" }) : "--";
-                        const locationLabel = item.scheduled_location || "Pending";
+                              const rowBackground = index % 2 === 0 ? C.card : alternateRowBackground;
 
-                        return (
-                          <tr key={`${item.itemType}-${item.id}`} style={{ borderBottom: `1px solid ${C.borderLight}` }}>
-                            <td style={{ padding: "12px 16px" }}>
-                              <span style={{ fontSize: 13, fontWeight: 600, color: C.t1 }}>{item.primaryTitle}</span>
-                            </td>
-                            <td style={{ padding: "12px 16px", fontSize: 13, color: C.t2 }}>{preferredTimeLabel}</td>
-                            <td style={{ padding: "12px 16px", fontSize: 13, color: C.t2 }}>{scheduledTimeLabel}</td>
-                            <td style={{ padding: "12px 16px" }}>
+                              return (
+                                <tr key={`${item.itemType}-${item.id}`} style={{ borderBottom: `1px solid ${C.borderLight}`, background: rowBackground, verticalAlign: "middle" }}>
+                                  <td style={{ padding: "10px 16px", fontSize: 13, color: C.t2, whiteSpace: "nowrap", verticalAlign: "middle" }}>{item.primaryId || "-"}</td>
+                                  <td style={{ padding: "10px 16px", verticalAlign: "middle", whiteSpace: "normal", wordBreak: "break-word", lineHeight: 1.35, minWidth: 260, maxWidth: 320 }}>
+                                    <span style={{ fontSize: 13, fontWeight: 600, color: C.t1 }}>{item.primaryTitle}</span>
+                                  </td>
+                                  <td style={{ padding: "10px 16px", fontSize: 13, color: C.t2, whiteSpace: "nowrap", verticalAlign: "middle" }}>{createdAtLabel}</td>
+                                  <td style={{ padding: "10px 16px", fontSize: 13, color: C.t2, whiteSpace: "nowrap", verticalAlign: "middle" }}>{scheduledTimeLabel}</td>
+                                  <td style={{ padding: "10px 16px", fontSize: 13, color: C.t2, verticalAlign: "middle" }}>{locationLabel}</td>
+                                  <td style={{ padding: "10px 16px", verticalAlign: "middle" }}>
+                                    <WorkspaceBadge status={statusObj.value}>{statusObj.label}</WorkspaceBadge>
+                                  </td>
+                                  <td style={{ padding: "10px 16px", textAlign: "center", verticalAlign: "middle" }}>
+                                    <button
+                                      type="button"
+                                      onMouseEnter={() => setHoveredActionId(item.id)}
+                                      onMouseLeave={() => setHoveredActionId(null)}
+                                      onClick={() => navigate(`/citizen/meetings/${item.id}`, { state: { meetingData: item, itemType: item.itemType } })}
+                                      title="View details"
+                                      style={{
+                                        minWidth: 0,
+                                        padding: 7,
+                                        borderRadius: 10,
+                                        border: `1px solid ${C.purple}`,
+                                        background: isActionHovered ? C.purple : "transparent",
+                                        color: isActionHovered ? "#ffffff" : C.purple,
+                                        display: "inline-flex",
+                                        alignItems: "center",
+                                        justifyContent: "center",
+                                        cursor: "pointer",
+                                        transition: "background var(--portal-duration-fast) ease, color var(--portal-duration-fast) ease, border-color var(--portal-duration-fast) ease",
+                                      }}
+                                    >
+                                      <Eye size={18} />
+                                    </button>
+                                  </td>
+                                </tr>
+                              );
+                            })}
+                          </tbody>
+                        </table>
+                  </div>
+
+                  <div className="lg:hidden space-y-3">
+                    {paginatedItems.map((item) => {
+                      const statusObj = meetingStatus(item);
+                      const scheduledTimeLabel = item.scheduled_at ? new Date(item.scheduled_at).toLocaleString("en-IN", { dateStyle: "medium", timeStyle: "short" }) : "-";
+                      const locationLabel = item.scheduled_location || "-";
+                      const createdAtLabel = item.created_at ? new Date(item.created_at).toLocaleDateString("en-IN", { dateStyle: "medium" }) : "--";
+
+                      return (
+                        <div key={`${item.itemType}-${item.id}`} style={{ border: `1px solid ${C.border}`, borderRadius: 12, padding: 16, background: C.card }}>
+                          <div className="flex items-start justify-between gap-3 mb-3">
+                            <div className="flex-1">
+                              <div style={{ fontSize: 11, color: C.t3, marginBottom: 6, fontWeight: 600 }}>
+                                Meeting ID: {item.primaryId || "-"}
+                              </div>
+                              <h3 style={{ margin: 0, fontWeight: 700, color: C.t1, lineHeight: 1.5, wordBreak: "break-word" }}>{item.primaryTitle}</h3>
+                            </div>
+                            <div className="flex items-center gap-2">
                               <WorkspaceBadge status={statusObj.value}>{statusObj.label}</WorkspaceBadge>
-                            </td>
-                            <td style={{ padding: "12px 16px", fontSize: 13, color: C.t2 }}>{createdAtLabel}</td>
-                            <td style={{ padding: "12px 16px", fontSize: 13, color: C.t2 }}>{locationLabel}</td>
-                            <td style={{ padding: "12px 16px", textAlign: "center" }}>
-                              <WorkspaceButton
-                                type="button"
-                                onClick={() => navigate(`/citizen/meetings/${item.id}`, { state: { meetingData: item, itemType: item.itemType } })}
-                                variant="ghost"
-                                style={{ minWidth: 0, padding: 10 }}
-                                title="View details"
-                              >
-                                <Eye size={18} />
-                              </WorkspaceButton>
-                            </td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
-                </WorkspaceCard>
-
-                {/* MOBILE CARDS */}
-                <div className="lg:hidden space-y-3 pb-2">
-                  {paginatedItems.map((item) => {
-                    const statusObj = meetingStatus(item);
-                    const preferredTimeLabel = item.preferred_time ? new Date(item.preferred_time).toLocaleString("en-IN", { dateStyle: "medium", timeStyle: "short" }) : "Not provided";
-                    const scheduledTimeLabel = item.scheduled_at ? new Date(item.scheduled_at).toLocaleString("en-IN", { dateStyle: "medium", timeStyle: "short" }) : "Pending";
-                    const locationLabel = item.scheduled_location || "Pending";
-                    const createdAtLabel = item.created_at ? new Date(item.created_at).toLocaleDateString("en-IN", { dateStyle: "medium" }) : "--";
-
-                    return (
-                      <WorkspaceCard key={`${item.itemType}-${item.id}`} style={{ padding: 16 }}>
-                        <div className="flex items-start justify-between gap-3 mb-3">
-                          <div className="flex-1">
-                            <h3 style={{ fontWeight: 700, color: C.t1 }}>{item.primaryTitle}</h3>
-                            <div className="flex items-center gap-1 mt-1" style={{ fontSize: 11, color: C.t3 }}>
-                                <Clock size={12} /> Created: {createdAtLabel}
                             </div>
                           </div>
-                          <div className="flex items-center gap-2">
-                            <WorkspaceBadge status={statusObj.value}>{statusObj.label}</WorkspaceBadge>
+
+                          <div className="grid grid-cols-2 gap-3 mb-3 text-xs">
+                            <div style={{ background: C.bgElevated, border: `1px solid ${C.border}`, borderRadius: 10, padding: 12 }}>
+                              <p style={{ margin: "0 0 4px", textTransform: "uppercase", letterSpacing: ".08em", color: C.t3, fontWeight: 600 }}>Created At</p>
+                              <p style={{ margin: 0, color: C.t2, fontWeight: 600 }}>{createdAtLabel}</p>
+                            </div>
+                            <div style={{ background: C.bgElevated, border: `1px solid ${C.border}`, borderRadius: 10, padding: 12 }}>
+                              <p style={{ margin: "0 0 4px", textTransform: "uppercase", letterSpacing: ".08em", color: C.t3, fontWeight: 600 }}>Scheduled Time</p>
+                              <p style={{ margin: 0, color: C.t2, fontWeight: 600 }}>{scheduledTimeLabel}</p>
+                            </div>
+                            <div className="col-span-2" style={{ background: C.bgElevated, border: `1px solid ${C.border}`, borderRadius: 10, padding: 12 }}>
+                              <p style={{ margin: "0 0 4px", textTransform: "uppercase", letterSpacing: ".08em", color: C.t3, fontWeight: 600 }}>Location</p>
+                              <p style={{ margin: 0, color: C.t2, fontWeight: 600 }}>{locationLabel}</p>
+                            </div>
                           </div>
+
+                          <WorkspaceButton
+                            type="button"
+                            onClick={() => navigate(`/citizen/meetings/${item.id}`, { state: { meetingData: item, itemType: item.itemType } })}
+                            variant="outline"
+                            style={{ width: "100%" }}
+                          >
+                            <Eye size={16} /> View Details
+                          </WorkspaceButton>
                         </div>
+                      );
+                    })}
+                  </div>
+                </>
+              )}
+            </>
+          )}
+        </div>
 
-                        <div className="grid grid-cols-2 gap-3 mb-3 text-xs">
-                          <div style={{ background: C.bgElevated, border: `1px solid ${C.border}`, borderRadius: 10, padding: 12 }}>
-                            <p style={{ textTransform: "uppercase", letterSpacing: ".08em", color: C.t3, marginBottom: 4, fontWeight: 600 }}>Preferred Time</p>
-                            <p style={{ color: C.t2, fontWeight: 600 }}>{preferredTimeLabel}</p>
-                          </div>
-                          <div style={{ background: C.bgElevated, border: `1px solid ${C.border}`, borderRadius: 10, padding: 12 }}>
-                            <p style={{ textTransform: "uppercase", letterSpacing: ".08em", color: C.t3, marginBottom: 4, fontWeight: 600 }}>Scheduled Time</p>
-                            <p style={{ color: C.t2, fontWeight: 600 }}>{scheduledTimeLabel}</p>
-                          </div>
-                          <div className="col-span-2" style={{ background: C.bgElevated, border: `1px solid ${C.border}`, borderRadius: 10, padding: 12 }}>
-                            <p style={{ textTransform: "uppercase", letterSpacing: ".08em", color: C.t3, marginBottom: 4, fontWeight: 600 }}>Location</p>
-                            <p style={{ color: C.t2, fontWeight: 600 }}>{locationLabel}</p>
-                          </div>
-                        </div>
-
-                        <WorkspaceButton
-                          type="button"
-                          onClick={() => navigate(`/citizen/meetings/${item.id}`, { state: { meetingData: item, itemType: item.itemType } })}
-                          variant="outline"
-                          style={{ width: "100%" }}
-                        >
-                          <Eye size={16} /> View Details
-                        </WorkspaceButton>
-                      </WorkspaceCard>
-                    );
-                  })}
-                </div>
-              </>
-            )}
-          </>
-        )}
-      </div>
-
-      {/* PAGINATION */}
-      {!loading && !error && items.length > 0 && (
-        <div className="flex-shrink-0 pt-4 mt-auto">
-          <WorkspaceCard style={{ padding: 16 }}>
-            <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-              <p style={{ fontSize: 13, color: C.t2 }}>
+        <div style={{ width: "100%", maxWidth: 1320, margin: "0 auto" }}>
+          <div style={{ border: `1px solid ${C.border}`, borderRadius: 12, padding: 10, background: C.card }}>
+            <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+              <p style={{ fontSize: 12, color: C.t2, margin: 0 }}>
                 Showing <span className="font-semibold">{(currentPage - 1) * itemsPerPage + 1}</span> to{" "}
                 <span className="font-semibold">{Math.min(currentPage * itemsPerPage, items.length)}</span> of{" "}
                 <span className="font-semibold">{items.length}</span> requests
@@ -295,11 +301,12 @@ export default function MeetingList() {
                   onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
                   disabled={currentPage === 1}
                   variant="ghost"
+                  style={{ minHeight: 34, padding: "8px 12px" }}
                 >
                   <ChevronLeft size={16} /> Previous
                 </WorkspaceButton>
 
-                <span style={{ padding: "8px 12px", fontSize: 12, color: C.t3 }}>
+                <span style={{ padding: "6px 10px", fontSize: 12, color: C.t3 }}>
                   Page <span className="font-semibold">{currentPage}</span> of <span className="font-semibold">{totalPages}</span>
                 </span>
 
@@ -307,14 +314,15 @@ export default function MeetingList() {
                   onClick={() => setCurrentPage(Math.min(totalPages, currentPage + 1))}
                   disabled={currentPage === totalPages}
                   variant="ghost"
+                  style={{ minHeight: 34, padding: "8px 12px" }}
                 >
                   Next <ChevronRight size={16} />
                 </WorkspaceButton>
               </div>
             </div>
-          </WorkspaceCard>
+          </div>
         </div>
-      )}
-    </WorkspacePage>
+      </div>
+    </div>
   );
 }
