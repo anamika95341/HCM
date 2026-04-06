@@ -33,4 +33,22 @@ async function publishComplaintStatusUpdate({ citizenId, complaintId, status, no
   );
 }
 
-module.exports = { publishMeetingStatusUpdate, publishComplaintStatusUpdate };
+async function publishNotificationCreated({ citizenId, notification, unreadCount }) {
+  await redis.publish(
+    `citizen:${citizenId}`,
+    JSON.stringify({
+      event: events.NOTIFICATION_CREATED,
+      payload: {
+        notification,
+        unreadCount,
+        timestamp: new Date().toISOString(),
+      },
+    })
+  );
+}
+
+module.exports = {
+  publishMeetingStatusUpdate,
+  publishComplaintStatusUpdate,
+  publishNotificationCreated,
+};

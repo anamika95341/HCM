@@ -10,11 +10,13 @@ import {
 } from "lucide-react";
 import { apiClient, authorizedConfig } from "../../../shared/api/client.js";
 import { useAuth } from "../../../shared/auth/AuthContext.jsx";
+import { useNotifications } from "../../../shared/notifications/NotificationContext.jsx";
 import { usePortalTheme } from "../../../shared/theme/portalTheme.jsx";
 import {
   WorkspaceBadge,
   WorkspaceCard,
   WorkspaceEmptyState,
+  WorkspacePage,
 } from "../../../shared/components/WorkspaceUI.jsx";
 
 function formatStatus(status) {
@@ -92,14 +94,13 @@ export default function MeetingDetail() {
   const { id } = useParams();
   const { state } = useLocation();
   const { session } = useAuth();
-  const [item, setItem] = useState(state?.meetingData || null);
-  const [loading, setLoading] = useState(!state?.meetingData);
+  const { eventVersion } = useNotifications();
+  const [meeting, setMeeting] = useState(state?.meetingData || null);
+  const [history, setHistory] = useState([]);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-  const [selectedFile, setSelectedFile] = useState(null);
-  const [uploading, setUploading] = useState(false);
-  const [uploadError, setUploadError] = useState("");
-  const [uploadSuccess, setUploadSuccess] = useState("");
-  const inputRef = useRef(null);
+  const [isBackHovered, setIsBackHovered] = useState(false);
+  const pageHeight = "calc(100vh - 73px)";
 
   useEffect(() => {
     let mounted = true;
@@ -110,11 +111,12 @@ export default function MeetingDetail() {
         setError("");
         const { data } = await apiClient.get(`/meetings/my/${id}`, authorizedConfig(session?.accessToken));
         if (mounted) {
-          setItem(data.meeting || null);
+          setMeeting(data.meeting || null);
+          setHistory(data.history || []);
         }
       } catch (loadError) {
         if (mounted) {
-          setError(loadError?.response?.data?.error || "Unable to load meeting");
+          setError(loadError?.response?.data?.error || "Unable to load meeting details");
         }
       } finally {
         if (mounted) {
@@ -130,35 +132,7 @@ export default function MeetingDetail() {
     return () => {
       mounted = false;
     };
-  }, [id, session?.accessToken]);
-
-  async function handleUpload() {
-    if (!selectedFile || uploading || !session?.accessToken || !item?.id) {
-      return;
-    }
-
-    try {
-      setUploading(true);
-      setUploadError("");
-      setUploadSuccess("");
-      await uploadPrivateFile({
-        accessToken: session.accessToken,
-        file: selectedFile,
-        contextType: "meeting",
-        contextId: item.id,
-        role: "citizen",
-      });
-      setSelectedFile(null);
-      if (inputRef.current) {
-        inputRef.current.value = "";
-      }
-      setUploadSuccess("File uploaded successfully. It is now visible to admin.");
-    } catch (submitError) {
-      setUploadError(submitError?.response?.data?.error || submitError.message || "Unable to upload file");
-    } finally {
-      setUploading(false);
-    }
-  }
+  }, [id, session?.accessToken, eventVersion]);
 
   if (loading) {
     return (
@@ -175,41 +149,6 @@ export default function MeetingDetail() {
       </WorkspacePage>
     );
   }
-
-  const [meeting, setMeeting] = useState(state?.meetingData || null);
-  const [history, setHistory] = useState([]);
-  // const [loading, setLoading] = useState(true);
-  // const [error, setError] = useState("");
-  const [isBackHovered, setIsBackHovered] = useState(false);
-  const pageHeight = "calc(100vh - 73px)";
-
-  useEffect(() => {
-    let mounted = true;
-
-    async function loadMeeting() {
-      try {
-        const { data } = await apiClient.get(`/meetings/my/${id}`, authorizedConfig(session.accessToken));
-        if (!mounted) return;
-        setMeeting(data.meeting || null);
-        setHistory(data.history || []);
-      } catch (loadError) {
-        if (!mounted) return;
-        setError(loadError?.response?.data?.error || "Unable to load meeting details");
-      } finally {
-        if (mounted) {
-          setLoading(false);
-        }
-      }
-    }
-
-    if (session?.accessToken && id) {
-      loadMeeting();
-    }
-
-    return () => {
-      mounted = false;
-    };
-  }, [id, session?.accessToken]);
 
   if (loading) {
     return (

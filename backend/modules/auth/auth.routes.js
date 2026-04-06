@@ -5,6 +5,8 @@ const rateLimiter = require('../../middleware/rateLimiter');
 const authController = require('./auth.controller');
 const { citizenRegistrationSchema, citizenLoginSchema, citizenForgotPasswordSchema, citizenResetPasswordSchema } = require('../../validators/citizen.validator');
 const { adminLoginSchema, adminVerificationStartSchema, adminVerificationCompleteSchema, deoVerificationStartSchema, deoVerificationCompleteSchema } = require('../../validators/admin.validator');
+const { changePasswordSchema } = require('../../validators/settings.validator');
+const settingsController = require('../settings/settings.controller');
 const { z } = require('zod');
 
 const router = express.Router();
@@ -28,6 +30,11 @@ router.post('/deo/resend-verification-code', rateLimiter.auth, validateRequest(d
 router.post('/minister/login', rateLimiter.auth, validateRequest(adminLoginSchema), authController.ministerLogin);
 
 router.post('/token/refresh', rateLimiter.auth, validateRequest(z.object({ refreshToken: z.string().min(20) })), authController.refresh);
+router.post('/citizen/change-password', authenticate('citizen'), validateRequest(changePasswordSchema), settingsController.changePassword);
+router.post('/admin/change-password', authenticate('admin'), validateRequest(changePasswordSchema), settingsController.changePassword);
+router.post('/masteradmin/change-password', authenticate('masteradmin'), validateRequest(changePasswordSchema), settingsController.changePassword);
+router.post('/deo/change-password', authenticate('deo'), validateRequest(changePasswordSchema), settingsController.changePassword);
+router.post('/minister/change-password', authenticate('minister'), validateRequest(changePasswordSchema), settingsController.changePassword);
 router.post('/citizen/logout', authenticate('citizen'), authController.logout);
 router.post('/admin/logout', authenticate('admin'), authController.logout);
 router.post('/masteradmin/logout', authenticate('masteradmin'), authController.logout);

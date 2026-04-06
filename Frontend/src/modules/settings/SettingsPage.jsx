@@ -1,6 +1,9 @@
-import React, { useState } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { usePortalTheme, PORTAL_THEME_PREVIEW_LIGHT, PORTAL_THEME_PREVIEW_DARK } from "../../shared/theme/portalTheme.jsx";
 import { useAuth } from "../../shared/auth/AuthContext.jsx";
+import { useNotifications } from "../../shared/notifications/NotificationContext.jsx";
+import { getRoleSettings } from "./roleSettingsConfig.js";
+import { changePassword, fetchProfile, updateProfile } from "./settingsApi.js";
 
 const useTheme = usePortalTheme;
 
@@ -208,92 +211,379 @@ const SH = ({ icon, title, sub }) => {
 // ═══════════════════════════════════════════
 //  SECTION 1 — PROFILE & ACCOUNT
 // ═══════════════════════════════════════════
-const ProfileSection = () => {
+const ProfileSection = ({ permissions, profile, role, accessToken, onProfileSaved }) => {
   const { C } = useTheme();
-  const [name, setName] = useState('Shri Gajendra Singh Shekhawat');
-  const [contact, setContact] = useState('+91 98100 00000');
-  const [email, setEmail] = useState('minister.culture@gov.in');
+
+  const buildName = (p) =>
+    [p?.first_name, p?.middle_name, p?.last_name].filter(Boolean).join(' ').trim();
+
+  const [name, setName] = useState('');
+  const [designation, setDesignation] = useState('');
+  const [contact, setContact] = useState('');
+  const [email, setEmail] = useState('');
+  const [identifier, setIdentifier] = useState('');
+  const [createdBy, setCreatedBy] = useState('');
+  const [verificationStatus, setVerificationStatus] = useState('');
   const [delegate, setDelegate] = useState(false);
   const [delegateTo, setDelegateTo] = useState('');
   const [fromDate, setFromDate] = useState('');
   const [toDate, setToDate] = useState('');
   const [twoFA, setTwoFA] = useState(true);
   const [smsOTP, setSmsOTP] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState(null);
+  const [passwordOpen, setPasswordOpen] = useState(false);
+  const [currentPassword, setCurrentPassword] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [passwordSaving, setPasswordSaving] = useState(false);
+  const [passwordError, setPasswordError] = useState(null);
+  const [passwordSuccess, setPasswordSuccess] = useState(null);
+
+  useEffect(() => {
+    if (!profile) return;
+    setName(buildName(profile));
+    setDesignation(profile.designation ?? '');
+    setContact(profile.mobile_number ?? profile.phone_number ?? '');
+    setEmail(profile.email ?? '');
+    setIdentifier(profile.citizen_id ?? profile.username ?? '');
+    setCreatedBy(profile.created_by_name ?? '');
+    setVerificationStatus(profile.is_verified ? 'Verified' : 'Pending Verification');
+  }, [profile]);
+
+  function handleDiscard() {
+    if (profile) {
+      setName(buildName(profile));
+      setDesignation(profile.designation ?? '');
+      setContact(profile.mobile_number ?? profile.phone_number ?? '');
+      setEmail(profile.email ?? '');
+      setIdentifier(profile.citizen_id ?? profile.username ?? '');
+      setCreatedBy(profile.created_by_name ?? '');
+      setVerificationStatus(profile.is_verified ? 'Verified' : 'Pending Verification');
+    } else {
+      setName('');
+      setDesignation('');
+      setContact('');
+      setEmail('');
+      setIdentifier('');
+      setCreatedBy('');
+      setVerificationStatus('');
+    }
+    setSaveError(null);
+  }
+
+  function resetPasswordForm() {
+    setCurrentPassword('');
+    setNewPassword('');
+    setConfirmPassword('');
+    setPasswordError(null);
+    setPasswordSuccess(null);
+  }
+
+  async function handleSave() {
+    setSaving(true);
+    setSaveError(null);
+    try {
+      const payload = {};
+      if (!permissions.nameReadOnly) payload.name = name.trim();
+      if (!permissions.phoneReadOnly) payload.contact = contact.trim();
+      if (!permissions.emailReadOnly) payload.email = email.trim();
+      const result = await updateProfile(role, payload, accessToken);
+      const nextProfile = result?.profile ?? null;
+      if (nextProfile) {
+        onProfileSaved?.(nextProfile);
+      }
+    } catch (err) {
+      const msg =
+        err?.response?.data?.message ??
+        err?.response?.data?.error ??
+        'Failed to save changes. Please try again.';
+      setSaveError(msg);
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function handlePasswordSave() {
+    setPasswordSaving(true);
+    setPasswordError(null);
+    setPasswordSuccess(null);
+
+    if (!currentPassword || !newPassword || !confirmPassword) {
+      setPasswordSaving(false);
+      setPasswordError('All password fields are required.');
+      return;
+    }
+
+    if (newPassword !== confirmPassword) {
+      setPasswordSaving(false);
+      setPasswordError('New password and confirmation do not match.');
+      return;
+    }
+
+    try {
+      const result = await changePassword(
+        role,
+        {
+          currentPassword,
+          newPassword,
+          confirmPassword,
+        },
+        accessToken,
+      );
+      setPasswordSuccess(result?.message ?? 'Password updated successfully.');
+      setCurrentPassword('');
+      setNewPassword('');
+      setConfirmPassword('');
+    } catch (err) {
+      const msg =
+        err?.response?.data?.message ??
+        err?.response?.data?.error ??
+        'Failed to update password. Please try again.';
+      setPasswordError(msg);
+    } finally {
+      setPasswordSaving(false);
+    }
+  }
+
   return (
     <div style={{ animation: 'fadeIn 0.3s ease' }}>
-      <SH icon="person" title="Profile & Account Settings" sub="Manage your personal information, digital signature, and delegation of authority." />
+      <SH icon="person" title="Profile & Account Settings" sub="Manage your personal information and account security." />
+
+      {/* Personal Information */}
       <Card>
         <CH title="Personal Information" />
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0 24px' }}>
-          <Inp label="Full Name" value={name} set={setName} icon="person" />
-          <Inp label="Official Designation" value="Union Minister of Culture" readOnly />
-          <Inp label="Contact Number" value={contact} set={setContact} icon="phone" type="tel" />
-          <Inp label="Official Email ID" value={email} set={setEmail} icon="mail" type="email" />
+          <Inp
+            label="Full Name"
+            value={name}
+            set={permissions.nameReadOnly ? undefined : setName}
+            readOnly={permissions.nameReadOnly}
+            icon="person"
+          />
+          {permissions.showDesignation && (
+            <Inp
+              label="Designation"
+              value={designation}
+              set={permissions.designationReadOnly ? undefined : setDesignation}
+              readOnly={permissions.designationReadOnly}
+            />
+          )}
+          <Inp
+            label="Contact Number"
+            value={contact}
+            set={permissions.phoneReadOnly ? undefined : setContact}
+            readOnly={permissions.phoneReadOnly}
+            icon="phone"
+            type="tel"
+          />
+          <Inp
+            label="Official Email"
+            value={email}
+            set={permissions.emailReadOnly ? undefined : setEmail}
+            readOnly={permissions.emailReadOnly}
+            icon="mail"
+            type="email"
+          />
+          {permissions.showIdentifier && (
+            <Inp
+              label={permissions.identifierLabel}
+              value={identifier}
+              readOnly
+              icon="person"
+            />
+          )}
+          {permissions.showCreatedBy && (
+            <Inp
+              label={permissions.createdByLabel || 'Created By'}
+              value={createdBy}
+              readOnly
+            />
+          )}
+          {permissions.showVerificationStatus && (
+            <Inp
+              label="Verification Status"
+              value={verificationStatus}
+              readOnly
+            />
+          )}
         </div>
-        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 12, paddingTop: 8 }}>
-          <Btn label="Discard" variant="ghost" />
-          <Btn label="Save Changes" variant="primary" icon="check" />
-        </div>
-      </Card>
-      <Card>
-        <CH title="Digital Signature & e-Sign Integration" sub="Configure your digital signature for one-click task approvals." />
-        <div style={{ display: 'flex', gap: 24 }}>
-          <div style={{ flex: 1, border: `2px dashed ${C.border}`, borderRadius: 12, padding: 28, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12, textAlign: 'center', cursor: 'pointer', background: C.bgElevated, transition: 'all 0.2s ease' }}>
-            <Ico n="upload" s={28} c={C.t3} />
-            <div style={{ fontSize: 13, fontWeight: 600, color: C.t2 }}>Upload Digital Signature</div>
-            <div style={{ fontSize: 11, color: C.t3 }}>Accepted: .p12 · .pfx · .cer · Max 5 MB</div>
-            <Btn label="Browse File" variant="outline" sm />
-          </div>
-          <div style={{ flex: 1 }}>
-            <div style={{ background: C.mintDim, border: `1px solid ${C.mint}4D`, borderRadius: 10, padding: 16, marginBottom: 14 }}>
-              <div style={{ fontSize: 10, fontWeight: 700, color: C.mint, textTransform: 'uppercase', letterSpacing: '.06em', marginBottom: 6 }}>Current Status</div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                <div className="portal-status-dot" style={{ color: C.mint }} />
-                <span style={{ fontSize: 13, fontWeight: 700, color: C.mint }}>e-Sign Active</span>
-              </div>
-              <div style={{ fontSize: 12, color: C.t2, marginTop: 8 }}>Valid until: 31 March 2026</div>
-              <div style={{ fontSize: 11, color: C.t3, marginTop: 2 }}>NIC e-Sign Gateway · Last used: 15 Mar 2026</div>
-            </div>
-            <div style={{ fontSize: 12, color: C.t3, lineHeight: 1.65 }}>Integrated with NIC e-Sign Gateway for one-click approvals.</div>
-          </div>
-        </div>
-      </Card>
-      <Card>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 20, paddingBottom: 16, borderBottom: `1px solid ${C.border}` }}>
-          <div>
-            <div style={{ fontSize: 14, fontWeight: 600, color: C.t1 }}>Delegation of Authority</div>
-            <div style={{ fontSize: 12, color: C.t3, marginTop: 4 }}>Temporarily delegate approval rights when travelling or on leave.</div>
-          </div>
-          <Toggle on={delegate} set={setDelegate} />
-        </div>
-        {delegate ? (
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '0 20px' }}>
-            <Sel label="Delegate To (OSD / Officer)" value={delegateTo} onChange={setDelegateTo}>
-              <option value="">Select Officer...</option>
-              <option>Shri Rajeev Mehta, OSD</option>
-              <option>Ms. Priya Sharma, PA to Minister</option>
-            </Sel>
-            <Inp label="From Date" type="date" value={fromDate} set={setFromDate} />
-            <Inp label="To Date" type="date" value={toDate} set={setToDate} />
-          </div>
-        ) : (
-          <div style={{ padding: 16, background: C.bgElevated, borderRadius: 10, border: `1px solid ${C.border}` }}>
-            <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
-              <Ico n="info" s={14} c={C.t3} />
-              <span style={{ fontSize: 12, color: C.t3 }}>Enable to temporarily assign approval rights to an OSD or subordinate officer during absence.</span>
-            </div>
+        {saveError && (
+          <div style={{ fontSize: 12, color: C.danger, textAlign: 'right', marginBottom: 4 }}>
+            {saveError}
           </div>
         )}
-      </Card>
-      <Card>
-        <CH title="Security Settings" />
-        <TR label="Two-Factor Authentication (2FA)" note="Require OTP verification at every login session" on={twoFA} set={setTwoFA} />
-        <TR label="SMS OTP Configuration" note="Receive one-time passwords via registered mobile (+91 98100 XXXXX)" on={smsOTP} set={setSmsOTP} />
-        <div style={{ display: 'flex', gap: 12, marginTop: 20 }}>
-          <Btn label="Change Password" variant="outline" icon="lock" />
-          <Btn label="View Active Sessions" variant="ghost" icon="monitor" />
+        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 12, paddingTop: 8 }}>
+          <Btn label="Discard" variant="ghost" onClick={handleDiscard} />
+          <Btn
+            label={saving ? 'Saving…' : 'Save Changes'}
+            variant="primary"
+            icon="check"
+            onClick={handleSave}
+          />
         </div>
       </Card>
+
+      {/* Digital Signature — minister only */}
+      {permissions.showDigitalSignature && (
+        <Card>
+          <CH title="Digital Signature & e-Sign Integration" sub="Configure your digital signature for one-click task approvals." />
+          <div style={{ display: 'flex', gap: 24 }}>
+            <div style={{ flex: 1, border: `2px dashed ${C.border}`, borderRadius: 12, padding: 28, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12, textAlign: 'center', cursor: 'pointer', background: C.bgElevated, transition: 'all 0.2s ease' }}>
+              <Ico n="upload" s={28} c={C.t3} />
+              <div style={{ fontSize: 13, fontWeight: 600, color: C.t2 }}>Upload Digital Signature</div>
+              <div style={{ fontSize: 11, color: C.t3 }}>Accepted: .p12 · .pfx · .cer · Max 5 MB</div>
+              <Btn label="Browse File" variant="outline" sm />
+            </div>
+            <div style={{ flex: 1 }}>
+              <div style={{ background: C.mintDim, border: `1px solid ${C.mint}4D`, borderRadius: 10, padding: 16, marginBottom: 14 }}>
+                <div style={{ fontSize: 10, fontWeight: 700, color: C.mint, textTransform: 'uppercase', letterSpacing: '.06em', marginBottom: 6 }}>Current Status</div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <div className="portal-status-dot" style={{ color: C.mint }} />
+                  <span style={{ fontSize: 13, fontWeight: 700, color: C.mint }}>e-Sign Active</span>
+                </div>
+                <div style={{ fontSize: 12, color: C.t2, marginTop: 8 }}>Valid until: 31 March 2026</div>
+                <div style={{ fontSize: 11, color: C.t3, marginTop: 2 }}>NIC e-Sign Gateway · Last used: 15 Mar 2026</div>
+              </div>
+              <div style={{ fontSize: 12, color: C.t3, lineHeight: 1.65 }}>Integrated with NIC e-Sign Gateway for one-click approvals.</div>
+            </div>
+          </div>
+        </Card>
+      )}
+
+      {/* Delegation of Authority — minister only */}
+      {permissions.showDelegation && (
+        <Card>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 20, paddingBottom: 16, borderBottom: `1px solid ${C.border}` }}>
+            <div>
+              <div style={{ fontSize: 14, fontWeight: 600, color: C.t1 }}>Delegation of Authority</div>
+              <div style={{ fontSize: 12, color: C.t3, marginTop: 4 }}>Temporarily delegate approval rights when travelling or on leave.</div>
+            </div>
+            <Toggle on={delegate} set={setDelegate} />
+          </div>
+          {delegate ? (
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '0 20px' }}>
+              <Sel label="Delegate To (OSD / Officer)" value={delegateTo} onChange={setDelegateTo}>
+                <option value="">Select Officer...</option>
+                <option>Shri Rajeev Mehta, OSD</option>
+                <option>Ms. Priya Sharma, PA to Minister</option>
+              </Sel>
+              <Inp label="From Date" type="date" value={fromDate} set={setFromDate} />
+              <Inp label="To Date" type="date" value={toDate} set={setToDate} />
+            </div>
+          ) : (
+            <div style={{ padding: 16, background: C.bgElevated, borderRadius: 10, border: `1px solid ${C.border}` }}>
+              <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+                <Ico n="info" s={14} c={C.t3} />
+                <span style={{ fontSize: 12, color: C.t3 }}>Enable to temporarily assign approval rights to an OSD or subordinate officer during absence.</span>
+              </div>
+            </div>
+          )}
+        </Card>
+      )}
+
+      {/* Security Settings */}
+      {(permissions.show2FA || permissions.showSmsOtp || permissions.showChangePassword) && (
+        <Card>
+          <CH title="Security Settings" />
+          {permissions.show2FA && (
+            <TR
+              label="Two-Factor Authentication (2FA)"
+              note="Require OTP verification at every login session"
+              on={twoFA}
+              set={setTwoFA}
+            />
+          )}
+          {permissions.showSmsOtp && (
+            <TR
+              label="SMS OTP Configuration"
+              note="Receive one-time passwords via registered mobile number"
+              on={smsOTP}
+              set={setSmsOTP}
+            />
+          )}
+          {permissions.showChangePassword && (
+            <>
+              <div style={{ display: 'flex', gap: 12, marginTop: 20 }}>
+                <Btn
+                  label={passwordOpen ? "Hide Password Form" : "Change Password"}
+                  variant="outline"
+                  icon="lock"
+                  onClick={() => {
+                    setPasswordOpen((current) => {
+                      const next = !current;
+                      if (!next) {
+                        resetPasswordForm();
+                      }
+                      return next;
+                    });
+                  }}
+                />
+              </div>
+              {passwordOpen && (
+                <div style={{ marginTop: 20, paddingTop: 20, borderTop: `1px solid ${C.border}` }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0 24px' }}>
+                    <Inp
+                      label="Current Password"
+                      value={currentPassword}
+                      set={setCurrentPassword}
+                      type="password"
+                      icon="lock"
+                      placeholder="Enter current password"
+                    />
+                    <div />
+                    <Inp
+                      label="New Password"
+                      value={newPassword}
+                      set={setNewPassword}
+                      type="password"
+                      icon="lock"
+                      placeholder="Enter new password"
+                    />
+                    <Inp
+                      label="Confirm New Password"
+                      value={confirmPassword}
+                      set={setConfirmPassword}
+                      type="password"
+                      icon="lock"
+                      placeholder="Confirm new password"
+                    />
+                  </div>
+                  <div style={{ fontSize: 11, color: C.t3, marginTop: 2, lineHeight: 1.6 }}>
+                    Password must be 12-128 characters and include uppercase, lowercase, number, and special character.
+                  </div>
+                  {passwordError && (
+                    <div style={{ fontSize: 12, color: C.danger, marginTop: 14 }}>
+                      {passwordError}
+                    </div>
+                  )}
+                  {passwordSuccess && (
+                    <div style={{ fontSize: 12, color: C.mint, marginTop: 14 }}>
+                      {passwordSuccess}
+                    </div>
+                  )}
+                  <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 12, marginTop: 18 }}>
+                    <Btn
+                      label="Discard"
+                      variant="ghost"
+                      onClick={() => {
+                        resetPasswordForm();
+                        setPasswordOpen(false);
+                      }}
+                    />
+                    <Btn
+                      label={passwordSaving ? 'Updating…' : 'Update Password'}
+                      variant="primary"
+                      icon="check"
+                      onClick={handlePasswordSave}
+                    />
+                  </div>
+                </div>
+              )}
+            </>
+          )}
+        </Card>
+      )}
     </div>
   );
 };
@@ -301,23 +591,83 @@ const ProfileSection = () => {
 // ═══════════════════════════════════════════
 //  SECTION 2 — NOTIFICATIONS
 // ═══════════════════════════════════════════
-const NotificationsSection = () => {
+const NotificationsSection = ({ permissions }) => {
   const { C } = useTheme();
+  const { preferences, savePreferences } = useNotifications();
+  const syncingRef = useRef(false);
+
   const [ch, setCh] = useState({ app: true, email: true, sms: false });
-  const [tr, setTr] = useState({ newTask: true, moved: true, deadline: true, escalation: true, approval: true });
+
+  const initialTriggers = Object.fromEntries(
+    permissions.triggers.map(t => [t.k, true])
+  );
+  const [tr, setTr] = useState(initialTriggers);
   const [days, setDays] = useState(3);
-  const [digest, setDigest] = useState('daily');
+
+  const allDigestOptions = [
+    { id: 'realtime', label: 'Real-Time', icon: 'bell' },
+    { id: 'daily', label: 'Daily Digest', icon: 'clock' },
+    { id: 'weekly', label: 'Weekly Summary', icon: 'calendar' },
+  ];
+  const digestOptions = allDigestOptions.filter(o =>
+    permissions.digestOptions.includes(o.id)
+  );
+  const [digest, setDigest] = useState(permissions.digestOptions[0] ?? 'daily');
+
+  const hasDeadlineTrigger = permissions.triggers.some(t => t.deadline);
+  const deadlineTriggerKey = permissions.triggers.find(t => t.deadline)?.k;
+
+  useEffect(() => {
+    syncingRef.current = true;
+    setCh({
+      app: preferences?.channels?.app ?? true,
+      email: preferences?.channels?.email ?? true,
+      sms: preferences?.channels?.sms ?? false,
+    });
+    setTr((current) => {
+      const next = {};
+      for (const trigger of permissions.triggers) {
+        next[trigger.k] = preferences?.triggers?.[trigger.k] ?? current[trigger.k] ?? true;
+      }
+      return next;
+    });
+    setDigest(preferences?.digestFrequency ?? permissions.digestOptions[0] ?? 'daily');
+    setDays(preferences?.deadlineDays ?? 3);
+  }, [permissions, preferences]);
+
+  useEffect(() => {
+    if (syncingRef.current) {
+      syncingRef.current = false;
+      return undefined;
+    }
+
+    const timer = window.setTimeout(() => {
+      savePreferences({
+        channels: ch,
+        triggers: tr,
+        digestFrequency: digest,
+        deadlineDays: days,
+      }).catch(() => {});
+    }, 300);
+
+    return () => window.clearTimeout(timer);
+  }, [ch, tr, digest, days, savePreferences]);
+
   return (
     <div style={{ animation: 'fadeIn 0.3s ease' }}>
-      <SH icon="bell" title="Notification & Alert Preferences" sub="Control how and when you receive updates from the E-Parinam system." />
+      <SH icon="bell" title="Notification & Alert Preferences" sub="Control how and when you receive updates from the system." />
+
+      {/* Notification Channels */}
       <Card>
         <CH title="Notification Channels" sub="Toggle which delivery channels are active for your account." />
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 16 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: permissions.showSmsChannel ? '1fr 1fr 1fr' : '1fr 1fr', gap: 16 }}>
           {[
             { k: 'app', icon: 'bell', label: 'In-App Notifications', sub: 'Bell icon in the top navigation bar', color: C.purple },
-            { k: 'email', icon: 'mail', label: 'Email Alerts', sub: 'minister.culture@gov.in', color: C.purple },
-            { k: 'sms', icon: 'phone', label: 'SMS Alerts', sub: '+91 98100 XXXXX (registered)', color: C.mint },
-          ].map(item => (
+            { k: 'email', icon: 'mail', label: 'Email Alerts', sub: 'Sent to your registered email address', color: C.purple },
+            permissions.showSmsChannel
+              ? { k: 'sms', icon: 'phone', label: 'SMS Alerts', sub: 'Sent to your registered mobile number', color: C.mint }
+              : null,
+          ].filter(Boolean).map(item => (
             <div key={item.k} style={{ border: `1px solid ${ch[item.k] ? item.color + '40' : C.border}`, borderRadius: 12, padding: 18, background: ch[item.k] ? item.color + '0a' : C.bgElevated, transition: 'all 0.2s ease' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 14 }}>
                 <div style={{ width: 38, height: 38, borderRadius: 10, background: item.color + '20', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -331,36 +681,49 @@ const NotificationsSection = () => {
           ))}
         </div>
       </Card>
+
+      {/* Trigger Configurations */}
       <Card>
         <CH title="Trigger Configurations" sub="Select which events generate a notification for your account." />
-        {[
-          { k: 'newTask', label: 'New task assigned or received in the pipeline' },
-          { k: 'moved', label: 'Task progressed to next stage (JS → Secretary → Minister)' },
-          { k: 'deadline', label: 'Task approaching its due date' },
-          { k: 'escalation', label: 'Automatic escalation triggered for overdue task', badge: 'Critical', bc: C.danger },
-          { k: 'approval', label: 'Task is awaiting your approval or action', badge: 'Action Required', bc: C.warn },
-        ].map(item => (
-          <TR key={item.k}
-            label={<span style={{ display: 'inline-flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>{item.label}{item.badge && <Badge label={item.badge} color={item.bc} />}</span>}
-            on={tr[item.k]} set={v => setTr(p => ({ ...p, [item.k]: v }))} />
+        {permissions.triggers.map(item => (
+          <TR
+            key={item.k}
+            label={
+              <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                {item.label}
+                {item.badge && (
+                  <Badge
+                    label={item.badge}
+                    color={item.badgeType === 'danger' ? C.danger : C.warn}
+                  />
+                )}
+              </span>
+            }
+            on={tr[item.k] ?? true}
+            set={v => setTr(p => ({ ...p, [item.k]: v }))}
+          />
         ))}
-        {tr.deadline && (
+        {hasDeadlineTrigger && tr[deadlineTriggerKey] && (
           <div style={{ marginTop: 16, padding: 16, background: C.purpleDim, border: `1px solid ${C.purple}4D`, borderRadius: 10, display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
             <span style={{ fontSize: 13, color: C.t2 }}>Alert me</span>
-            <input type="number" value={days} min={1} max={14} onChange={e => setDays(+e.target.value)}
-              style={{ width: 60, padding: '8px 12px', border: `1px solid ${C.border}`, borderRadius: 8, fontSize: 14, color: C.purple, fontWeight: 700, textAlign: 'center', background: C.inp }} />
+            <input
+              type="number"
+              value={days}
+              min={1}
+              max={14}
+              onChange={e => setDays(+e.target.value)}
+              style={{ width: 60, padding: '8px 12px', border: `1px solid ${C.border}`, borderRadius: 8, fontSize: 14, color: C.purple, fontWeight: 700, textAlign: 'center', background: C.inp }}
+            />
             <span style={{ fontSize: 13, color: C.t2 }}>days before the due date</span>
           </div>
         )}
       </Card>
+
+      {/* Email Digest Frequency */}
       <Card>
         <CH title="Email Digest Frequency" sub="Choose how often email summaries are delivered to your inbox." />
         <PillSegmented
-          options={[
-            { id: 'realtime', label: 'Real-Time', icon: 'bell' },
-            { id: 'daily', label: 'Daily Digest', icon: 'clock' },
-            { id: 'weekly', label: 'Weekly Summary', icon: 'calendar' },
-          ]}
+          options={digestOptions}
           value={digest}
           onChange={setDigest}
         />
@@ -374,19 +737,33 @@ const NotificationsSection = () => {
   );
 };
 
-
 // ═══════════════════════════════════════════
-//  MAIN APP (Kangaroo-style layout)
+//  SETTINGS PORTAL CONTENT
 // ═══════════════════════════════════════════
 function SettingsPortalContent() {
   const { C } = useTheme();
   const { session } = useAuth();
+  const { unreadCount } = useNotifications();
+
+  const role = session?.role ?? 'citizen';
+  const { profile: profilePermissions, notifications: notifPermissions } = getRoleSettings(role);
+
   const [activeTab, setActiveTab] = useState('profile');
   const [search, setSearch] = useState('');
+  const [profile, setProfile] = useState(null);
+
+  useEffect(() => {
+    if (!session?.accessToken) return;
+    let cancelled = false;
+    fetchProfile(role, session.accessToken)
+      .then(data => { if (!cancelled) setProfile(data); })
+      .catch(() => { if (!cancelled) setProfile(null); });
+    return () => { cancelled = true; };
+  }, [role, session?.accessToken]);
 
   const tabs = [
     { id: 'profile', icon: 'person', label: 'Profile & Account' },
-    { id: 'notifications', icon: 'bell', label: 'Notifications', badge: '3' },
+    { id: 'notifications', icon: 'bell', label: 'Notifications', badge: unreadCount > 0 ? String(unreadCount) : null },
   ];
 
   return (
@@ -434,8 +811,22 @@ function SettingsPortalContent() {
         {/* MAIN CONTENT */}
         <div style={{ flex: 1, overflowY: 'auto', padding: '32px 40px', background: C.bg }}>
           <div style={{ maxWidth: 900, margin: '0 auto' }}>
-            {activeTab === 'profile' && <ProfileSection />}
-            {activeTab === 'notifications' && <NotificationsSection />}
+            {activeTab === 'profile' && (
+              <ProfileSection
+                permissions={profilePermissions}
+                profile={profile}
+                role={role}
+                accessToken={session?.accessToken}
+                onProfileSaved={setProfile}
+              />
+            )}
+            {activeTab === 'notifications' && (
+              <NotificationsSection
+                permissions={notifPermissions}
+                role={role}
+                accessToken={session?.accessToken}
+              />
+            )}
           </div>
         </div>
       </div>

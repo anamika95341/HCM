@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { Eye, Clock, CheckCircle2, AlertCircle, FileText, Search, Filter, ChevronLeft, ChevronRight } from "lucide-react";
 import { apiClient, authorizedConfig } from "../../../shared/api/client.js";
 import { useAuth } from "../../../shared/auth/AuthContext.jsx";
+import { useNotifications } from "../../../shared/notifications/NotificationContext.jsx";
 import {
   WorkspaceBadge,
   WorkspaceButton,
@@ -27,6 +28,7 @@ export default function MyCases() {
   const { C } = usePortalTheme();
   const navigate = useNavigate();
   const { session } = useAuth();
+  const { eventVersion } = useNotifications();
   const tableHeaderBackground = C.purple;
   const tableHeaderText = "#FFFFFF";
   const alternateRowBackground = C.name === "dark" ? C.card : "#F7F1FF";
@@ -66,7 +68,7 @@ export default function MyCases() {
     return () => {
       mounted = false;
     };
-  }, [session?.accessToken]);
+  }, [session?.accessToken, eventVersion]);
 
   const items = useMemo(() => {
     const complaintItems = complaints.map((item) => ({

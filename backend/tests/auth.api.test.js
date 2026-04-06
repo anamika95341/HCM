@@ -3,6 +3,21 @@ jest.mock('../middleware/rateLimiter', () => ({
   general: (req, res, next) => next(),
   auth: (req, res, next) => next(),
 }));
+jest.mock('../config/redis', () => ({
+  get: jest.fn(),
+  set: jest.fn(),
+  del: jest.fn(),
+  incr: jest.fn(),
+  expire: jest.fn(),
+  publish: jest.fn(),
+  duplicate: jest.fn(() => ({
+    connect: jest.fn(),
+    subscribe: jest.fn(),
+    on: jest.fn(),
+    quit: jest.fn(),
+  })),
+  on: jest.fn(),
+}));
 jest.mock('../middleware/authenticate', () => jest.fn(() => (req, res, next) => {
   req.user = { role: 'citizen' };
   req.token = 'access-token';

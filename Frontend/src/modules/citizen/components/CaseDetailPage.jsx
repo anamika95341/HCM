@@ -3,6 +3,7 @@ import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { ChevronRight, MapPin, Calendar, FileText, Hash, Briefcase } from "lucide-react";
 import { apiClient, authorizedConfig } from "../../../shared/api/client.js";
 import { useAuth } from "../../../shared/auth/AuthContext.jsx";
+import { useNotifications } from "../../../shared/notifications/NotificationContext.jsx";
 import { usePortalTheme } from "../../../shared/theme/portalTheme.jsx";
 import { WorkspaceBadge, WorkspaceCard, WorkspaceEmptyState } from "../../../shared/components/WorkspaceUI.jsx";
 
@@ -68,6 +69,7 @@ export default function CaseDetailsPage() {
   const navigate = useNavigate();
   const { id } = useParams();
   const { session } = useAuth();
+  const { eventVersion } = useNotifications();
   const [caseData, setCaseData] = useState(location.state?.caseData || null);
   const [itemType, setItemType] = useState(location.state?.itemType || location.state?.caseData?.itemType || "");
   const [history, setHistory] = useState([]);
@@ -103,7 +105,7 @@ export default function CaseDetailsPage() {
     return () => {
       mounted = false;
     };
-  }, [id, session?.accessToken]);
+  }, [id, session?.accessToken, eventVersion]);
 
   if (loading) {
     return (

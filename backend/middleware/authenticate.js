@@ -139,6 +139,7 @@ function authenticate(expectedRole) {
       }
 
       req.user = payload;
+      req.authRole = matchedRole;
       req.token = token;
       return next();
     } catch (error) {

@@ -5,6 +5,7 @@ import { usePortalTheme } from "../theme/portalTheme.jsx";
 import { getHomePathForRole, PATHS } from "../../routes/paths.js";
 import { sanitizeImageSrc } from "../security/url.js";
 import { useAuth } from "../auth/AuthContext.jsx";
+import { useNotifications } from "../notifications/NotificationContext.jsx";
 
 const WORKSPACE_TITLES = [
   { match: "/citizen/", title: "Citizen Services" },
@@ -23,8 +24,10 @@ const Header = () => {
   const location = useLocation();
   const { C, theme, toggleTheme } = usePortalTheme();
   const { session, logout } = useAuth();
+  const { notifications, unreadCount, markRead, markAllRead } = useNotifications();
 
   const [open, setOpen] = useState(false);
+  const [notificationsOpen, setNotificationsOpen] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
 
   const currentUser = {
@@ -51,6 +54,7 @@ const Header = () => {
     const handler = (event) => {
       if (ref.current && !ref.current.contains(event.target)) {
         setOpen(false);
+        setNotificationsOpen(false);
       }
     };
 
@@ -97,7 +101,16 @@ const Header = () => {
           title={theme === "dark" ? "Switch to Light Mode" : "Switch to Dark Mode"}
         />
         <HeaderIcon icon={isFullscreen ? FiMinimize : FiMaximize} onClick={toggleFullscreen} title="Toggle Fullscreen" />
-        <HeaderIcon icon={FiBell} dot={false} onClick={() => setOpen(false)} title="Notifications" />
+        <HeaderIcon
+          icon={FiBell}
+          badge={unreadCount > 0 ? unreadCount : null}
+          dot={unreadCount > 0}
+          onClick={() => {
+            setOpen(false);
+            setNotificationsOpen((value) => !value);
+          }}
+          title="Notifications"
+        />
 
         <button
           type="button"
@@ -139,6 +152,101 @@ const Header = () => {
             </div>
           )}
         </button>
+
+        {notificationsOpen && (
+          <div
+            className="portal-floating portal-fade-slide"
+            style={{
+              position: "absolute",
+              top: "calc(100% + 10px)",
+              right: 48,
+              width: 340,
+              borderRadius: 12,
+              zIndex: 50,
+              overflow: "hidden",
+              background: C.card,
+              border: `1px solid ${C.border}`,
+            }}
+          >
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+                gap: 12,
+                padding: 16,
+                borderBottom: `1px solid ${C.border}`,
+                background: C.bgElevated,
+              }}
+            >
+              <div>
+                <p style={{ color: C.t1, fontWeight: 700, fontSize: 13 }}>Notifications</p>
+                <p style={{ color: C.t3, fontSize: 11, marginTop: 2 }}>
+                  {unreadCount > 0 ? `${unreadCount} unread` : "All caught up"}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  markAllRead();
+                }}
+                style={{
+                  border: "none",
+                  background: "transparent",
+                  color: C.purple,
+                  fontSize: 12,
+                  fontWeight: 600,
+                  cursor: "pointer",
+                }}
+              >
+                Mark all read
+              </button>
+            </div>
+
+            <div style={{ maxHeight: 360, overflowY: "auto", padding: 8 }}>
+              {notifications.length === 0 ? (
+                <div style={{ padding: 16, color: C.t3, fontSize: 12, textAlign: "center" }}>
+                  No notifications yet.
+                </div>
+              ) : (
+                notifications.slice(0, 8).map((item) => (
+                  <button
+                    key={item.id}
+                    type="button"
+                    onClick={() => {
+                      if (!item.isRead) {
+                        markRead(item.id);
+                      }
+                    }}
+                    style={{
+                      width: "100%",
+                      textAlign: "left",
+                      border: `1px solid ${item.isRead ? C.border : `${C.purple}30`}`,
+                      background: item.isRead ? "transparent" : C.purpleDim,
+                      borderRadius: 10,
+                      padding: 12,
+                      marginBottom: 8,
+                      cursor: "pointer",
+                    }}
+                  >
+                    <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 12 }}>
+                      <div>
+                        <p style={{ color: C.t1, fontWeight: 700, fontSize: 12 }}>{item.title}</p>
+                        <p style={{ color: C.t2, fontSize: 11, marginTop: 4, lineHeight: 1.5 }}>{item.body}</p>
+                      </div>
+                      {!item.isRead && (
+                        <span style={{ width: 8, height: 8, borderRadius: 999, background: C.danger, flexShrink: 0, marginTop: 4 }} />
+                      )}
+                    </div>
+                    <p style={{ color: C.t3, fontSize: 10, marginTop: 8 }}>
+                      {item.createdAt ? new Date(item.createdAt).toLocaleString("en-IN", { dateStyle: "medium", timeStyle: "short" }) : ""}
+                    </p>
+                  </button>
+                ))
+              )}
+            </div>
+          </div>
+        )}
 
         {open && (
           <div

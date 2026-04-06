@@ -6,7 +6,7 @@ const adminRepository = require('../admin/admin.repository');
 const { persistPrivateUpload } = require('../../middleware/uploadHandler');
 const { sanitizeText } = require('../../utils/sanitize');
 const { writeAuditLog } = require('../../utils/audit');
-const { publishComplaintStatusUpdate } = require('../../realtime/wsPublisher');
+const { notifyCitizenComplaintStatusUpdate } = require('../notifications/notifications.service');
 const logger = require('../../utils/logger');
 const { claimIdempotency, storeIdempotencyResult, clearIdempotency } = require('../../utils/idempotency');
 
@@ -176,7 +176,7 @@ async function applyComplaintTransition({
   });
 
   const updated = await complaintsRepository.getComplaintById(complaintId);
-  await publishComplaintStatusUpdate({
+  await notifyCitizenComplaintStatusUpdate({
     citizenId: complaint.citizen_id,
     complaintId,
     status: nextStatus,
@@ -494,7 +494,7 @@ async function escalateComplaintToMeeting(complaintId, actorId, body, reqMeta) {
     },
   });
 
-  await publishComplaintStatusUpdate({
+  await notifyCitizenComplaintStatusUpdate({
     citizenId: complaint.citizen_id,
     complaintId,
     status: 'submitted',

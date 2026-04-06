@@ -5,7 +5,7 @@ const adminRepository = require('../admin/admin.repository');
 const { sanitizeText } = require('../../utils/sanitize');
 const { persistPrivateUpload, PHOTO_ALLOWED } = require('../../middleware/uploadHandler');
 const { writeAuditLog } = require('../../utils/audit');
-const { publishMeetingStatusUpdate } = require('../../realtime/wsPublisher');
+const { notifyCitizenMeetingStatusUpdate } = require('../notifications/notifications.service');
 const { generateCaseCode } = require('../../utils/generateCaseCode');
 const logger = require('../../utils/logger');
 const { claimIdempotency, storeIdempotencyResult, clearIdempotency } = require('../../utils/idempotency');
@@ -179,7 +179,7 @@ async function changeMeetingStatus({
     calendarEvent,
   });
 
-  await publishMeetingStatusUpdate({
+  await notifyCitizenMeetingStatusUpdate({
     citizenId: meeting.citizen_id,
     meetingId,
     status,
@@ -203,7 +203,7 @@ async function assignMeetingToSelf(meetingId, adminId, reqMeta) {
     throw createHttpError(409, 'Meeting has already been claimed by another admin');
   }
 
-  await publishMeetingStatusUpdate({
+  await notifyCitizenMeetingStatusUpdate({
     citizenId: current.citizen_id,
     meetingId,
     status: 'accepted',
