@@ -1,9 +1,13 @@
 const redis = require('../config/redis');
 const events = require('./wsEvents');
 
+function buildChannel(recipientRole, recipientId) {
+  return `${recipientRole}:${recipientId}`;
+}
+
 async function publishMeetingStatusUpdate({ citizenId, meetingId, status, note }) {
   await redis.publish(
-    `citizen:${citizenId}`,
+    buildChannel('citizen', citizenId),
     JSON.stringify({
       event: events.MEETING_STATUS_UPDATED,
       payload: {
@@ -19,7 +23,7 @@ async function publishMeetingStatusUpdate({ citizenId, meetingId, status, note }
 
 async function publishComplaintStatusUpdate({ citizenId, complaintId, status, note }) {
   await redis.publish(
-    `citizen:${citizenId}`,
+    buildChannel('citizen', citizenId),
     JSON.stringify({
       event: events.COMPLAINT_STATUS_UPDATED,
       payload: {
@@ -33,9 +37,9 @@ async function publishComplaintStatusUpdate({ citizenId, complaintId, status, no
   );
 }
 
-async function publishNotificationCreated({ citizenId, notification, unreadCount }) {
+async function publishNotificationCreated({ recipientRole, recipientId, notification, unreadCount }) {
   await redis.publish(
-    `citizen:${citizenId}`,
+    buildChannel(recipientRole, recipientId),
     JSON.stringify({
       event: events.NOTIFICATION_CREATED,
       payload: {
@@ -48,6 +52,7 @@ async function publishNotificationCreated({ citizenId, notification, unreadCount
 }
 
 module.exports = {
+  buildChannel,
   publishMeetingStatusUpdate,
   publishComplaintStatusUpdate,
   publishNotificationCreated,

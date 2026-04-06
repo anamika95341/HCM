@@ -5,7 +5,17 @@ const adminRepository = require('../admin/admin.repository');
 const { sanitizeText } = require('../../utils/sanitize');
 const { persistPrivateUpload, PHOTO_ALLOWED } = require('../../middleware/uploadHandler');
 const { writeAuditLog } = require('../../utils/audit');
-const { notifyCitizenMeetingStatusUpdate } = require('../notifications/notifications.service');
+const filesService = require('../files/files.service');
+const {
+  notifyCitizenMeetingStatusUpdate,
+  notifyDeoVerificationAssigned,
+  notifyAdminMeetingVerified,
+  notifyAdminPoolMeetingSubmitted,
+  notifyMinisterMeetingScheduled,
+  notifyMinisterMeetingChanged,
+  notifyAdminScheduledMeetingUpcoming,
+  notifyAdminScheduledMeetingCompleted,
+} = require('../notifications/notifications.service');
 const { generateCaseCode } = require('../../utils/generateCaseCode');
 const logger = require('../../utils/logger');
 const { claimIdempotency, storeIdempotencyResult, clearIdempotency } = require('../../utils/idempotency');
@@ -96,6 +106,13 @@ async function submitMeetingRequest({ citizenId, body, file, reqMeta, idempotenc
       userAgent: reqMeta.userAgent,
     });
 
+    await notifyAdminPoolMeetingSubmitted({
+      meetingId: meeting.id,
+      meetingTitle: meeting.title || meeting.requestId,
+      citizenId,
+      assignedAdminId,
+    });
+
     const result = { meeting };
     await storeIdempotencyResult(redis, claim, result);
     return result;
@@ -115,6 +132,29 @@ async function getCitizenMeetingDetail(meetingId, citizenId) {
     throw createHttpError(404, 'Meeting not found');
   }
   const history = await meetingsRepository.getMeetingHistory(meetingId);
+  const files = [];
+  if (meeting.document_file_id) {
+    const document = await filesService.createLegacyDownloadAccess({
+      fileId: meeting.document_file_id,
+      actorRole: 'citizen',
+      actorId: citizenId,
+      scope: { entityType: 'meeting', entityId: meetingId },
+    });
+    meeting.document = document.file;
+    meeting.document.downloadUrl = document.downloadUrl;
+    files.push({
+      ...document.file,
+      fileCategory: 'document',
+      downloadUrl: document.downloadUrl,
+    });
+  }
+  const managedFiles = await filesService.listOwnedFiles({
+    actorRole: 'citizen',
+    actorId: citizenId,
+    contextType: 'meeting',
+    contextId: meetingId,
+  });
+  meeting.files = [...files, ...managedFiles];
   return { meeting, history };
 }
 
@@ -127,7 +167,7 @@ async function getAdminMeetingDetail(meetingId) {
   return { meeting, history };
 }
 
-async function getAdminMeetingFiles(meetingId, adminId) {
+async function getAdminMeetingFiles(meetingId, adminId, reqMeta) {
   const meeting = await meetingsRepository.getMeetingById(meetingId);
   if (!meeting) {
     throw createHttpError(404, 'Meeting not found');
@@ -138,13 +178,41 @@ async function getAdminMeetingFiles(meetingId, adminId) {
   });
   const files = await meetingsRepository.listMeetingFilesForAdmin(meetingId, adminId);
   return {
-    files: files.map((f) => ({
-      id: f.id,
-      name: f.original_name,
-      mimeType: f.mime_type,
-      size: f.file_size,
-      kind: f.entity_type,
-      createdAt: f.created_at,
+    files: await Promise.all(files.map(async (f) => {
+      if (f.source_kind === 'managed') {
+        const download = await filesService.createDownloadUrl({
+          fileId: f.id,
+          actorRole: 'admin',
+          actorId: adminId,
+          reqMeta,
+        });
+        return {
+          id: f.id,
+          name: f.original_name,
+          mimeType: f.mime_type,
+          size: f.file_size,
+          kind: f.entity_type,
+          createdAt: f.created_at,
+          downloadUrl: download.downloadUrl,
+        };
+      }
+
+      const download = await filesService.createLegacyDownloadAccess({
+        fileId: f.id,
+        actorRole: 'admin',
+        actorId: adminId,
+        reqMeta,
+        scope: { entityType: 'meeting', entityId: meetingId },
+      });
+      return {
+        id: f.id,
+        name: f.original_name,
+        mimeType: f.mime_type,
+        size: f.file_size,
+        kind: f.entity_type,
+        createdAt: f.created_at,
+        downloadUrl: download.downloadUrl,
+      };
     })),
   };
 }
@@ -324,6 +392,13 @@ async function assignVerification(meetingId, actorId, deoId, reqMeta) {
     userAgent: reqMeta.userAgent,
     metadata: { deoId },
   });
+
+  await notifyDeoVerificationAssigned({
+    deoId,
+    meetingId,
+    adminId: actorId,
+    meetingTitle: updated.title || updated.requestId,
+  });
   return updated;
 }
 
@@ -357,6 +432,15 @@ async function submitVerification(meetingId, deoId, verified, reason, notes, req
     ipAddress: reqMeta.ip,
     userAgent: reqMeta.userAgent,
   });
+
+  if (verified && current.assignedAdminUserId) {
+    await notifyAdminMeetingVerified({
+      adminId: current.assignedAdminUserId,
+      meetingId,
+      deoId,
+      meetingTitle: updated.title || updated.requestId,
+    });
+  }
   return updated;
 }
 
@@ -418,6 +502,25 @@ async function scheduleMeeting(meetingId, adminId, body, reqMeta) {
     userAgent: reqMeta.userAgent,
     metadata: { ministerId: body.ministerId },
   });
+
+  await notifyMinisterMeetingScheduled({
+    ministerId: body.ministerId,
+    meetingId,
+    meetingTitle: updated.title || updated.requestId,
+    scheduledAt: body.startsAt,
+    location: sanitizeText(body.location),
+    adminId,
+    isRescheduled: meeting.status === 'scheduled',
+  });
+
+  await notifyAdminScheduledMeetingUpcoming({
+    adminId,
+    entityType: 'meeting',
+    entityId: meetingId,
+    title: updated.title || updated.requestId,
+    scheduledAt: body.startsAt,
+  });
+
   return updated;
 }
 
@@ -499,6 +602,14 @@ async function completeMeeting(meetingId, adminId, reason, reqMeta) {
     userAgent: reqMeta.userAgent,
   });
 
+  await notifyAdminScheduledMeetingCompleted({
+    adminId,
+    entityType: 'meeting',
+    entityId: meetingId,
+    title: updated.title || updated.requestId,
+    completedByRole: 'admin',
+  });
+
   return updated;
 }
 
@@ -538,6 +649,18 @@ async function cancelMeeting(meetingId, adminId, reason, reqMeta) {
     ipAddress: reqMeta.ip,
     userAgent: reqMeta.userAgent,
   });
+
+  if (current.ministerId) {
+    await notifyMinisterMeetingChanged({
+      ministerId: current.ministerId,
+      meetingId,
+      meetingTitle: updated.title || updated.requestId,
+      changeType: 'cancelled',
+      location: updated.scheduled_location,
+      scheduledAt: updated.scheduled_at,
+      actorRole: 'admin',
+    });
+  }
 
   return updated;
 }

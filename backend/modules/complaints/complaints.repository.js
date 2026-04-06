@@ -128,6 +128,15 @@ async function createComplaint({
     );
     const complaint = result.rows[0];
 
+    if (documentFileId) {
+      await client.query(
+        `UPDATE uploaded_files
+            SET entity_id = $2
+          WHERE id = $1`,
+        [documentFileId, complaint.id]
+      );
+    }
+
     await client.query(
       `INSERT INTO complaint_status_history (complaint_id, new_status, actor_role, actor_id, note)
        VALUES ($1,'submitted','citizen',$2,'Complaint submitted')`,

@@ -31,7 +31,7 @@ const ROLE_UPLOAD_LIMITS = Object.freeze({
   }),
 });
 
-const CONTEXT_TYPES = Object.freeze(['meeting', 'event', 'general']);
+const CONTEXT_TYPES = Object.freeze(['meeting', 'complaint', 'event', 'general']);
 const VIEWER_ROLES = Object.freeze(['admin', 'minister']);
 const UPLOADER_ROLES = Object.freeze(['citizen', 'deo']);
 

@@ -57,7 +57,7 @@ async function getAdminMeetingDetail(req, res, next) {
 
 async function getAdminMeetingFiles(req, res, next) {
   try {
-    const result = await meetingsService.getAdminMeetingFiles(req.params.meetingId, req.user.sub);
+    const result = await meetingsService.getAdminMeetingFiles(req.params.meetingId, req.user.sub, reqMeta(req));
     res.json(result);
   } catch (error) {
     next(error);

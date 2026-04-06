@@ -1,7 +1,8 @@
 {
   "permissions": {
     "allow": [
-      "Bash(find /mnt/d/hcmproject/HCM/backend/validators -type f -name *.js)"
+      "Bash(find /mnt/d/hcmproject/HCM/backend/validators -type f -name *.js)",
+      "Bash(grep:*)"
     ]
   }
 }

@@ -131,6 +131,69 @@ async function upsertPreferences({ userRole, userId, channels, triggers, digestF
   return mapPreferences(result.rows[0]);
 }
 
+async function listActiveAdmins({ excludeUserId = null } = {}) {
+  const values = [];
+  let where = `
+      WHERE status = 'active'
+        AND is_verified = TRUE
+        AND removed_at IS NULL`;
+
+  if (excludeUserId) {
+    values.push(excludeUserId);
+    where += ` AND id <> $${values.length}`;
+  }
+
+  const result = await pool.query(
+    `SELECT id
+       FROM admins
+      ${where}
+      ORDER BY created_at DESC`,
+    values
+  );
+  return result.rows.map((row) => row.id);
+}
+
+async function listActiveMasterAdmins({ excludeUserId = null } = {}) {
+  const values = [];
+  let where = `WHERE status = 'active'`;
+
+  if (excludeUserId) {
+    values.push(excludeUserId);
+    where += ` AND id <> $${values.length}`;
+  }
+
+  const result = await pool.query(
+    `SELECT id
+       FROM master_admins
+      ${where}
+      ORDER BY created_at DESC`,
+    values
+  );
+  return result.rows.map((row) => row.id);
+}
+
+async function listActiveDeos({ excludeUserId = null } = {}) {
+  const values = [];
+  let where = `
+      WHERE status = 'active'
+        AND is_verified = TRUE
+        AND removed_at IS NULL`;
+
+  if (excludeUserId) {
+    values.push(excludeUserId);
+    where += ` AND id <> $${values.length}`;
+  }
+
+  const result = await pool.query(
+    `SELECT id
+       FROM deos
+      ${where}
+      ORDER BY created_at DESC`,
+    values
+  );
+  return result.rows.map((row) => row.id);
+}
+
 module.exports = {
   createNotification,
   listNotifications,
@@ -139,4 +202,7 @@ module.exports = {
   markAllNotificationsRead,
   getPreferences,
   upsertPreferences,
+  listActiveAdmins,
+  listActiveMasterAdmins,
+  listActiveDeos,
 };

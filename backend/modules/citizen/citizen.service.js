@@ -2,6 +2,7 @@ const citizenRepository = require('./citizen.repository');
 const complaintsRepository = require('../complaints/complaints.repository');
 const meetingsRepository = require('../meetings/meetings.repository');
 const adminRepository = require('../admin/admin.repository');
+const filesService = require('../files/files.service');
 
 async function getProfile(citizenId) {
   return citizenRepository.findCitizenById(citizenId);
@@ -46,11 +47,69 @@ async function getCaseDetail(citizenId, caseId) {
 
   if (meeting) {
     const history = await meetingsRepository.getMeetingHistory(caseId);
+    const files = [];
+    try {
+      if (meeting.document_file_id) {
+        const document = await filesService.createLegacyDownloadAccess({
+          fileId: meeting.document_file_id,
+          actorRole: 'citizen',
+          actorId: citizenId,
+          scope: { entityType: 'meeting', entityId: caseId },
+        });
+        meeting.document = {
+          ...document.file,
+          downloadUrl: document.downloadUrl,
+        };
+        files.push({
+          ...document.file,
+          fileCategory: 'document',
+          downloadUrl: document.downloadUrl,
+        });
+      }
+      const managedFiles = await filesService.listOwnedFiles({
+        actorRole: 'citizen',
+        actorId: citizenId,
+        contextType: 'meeting',
+        contextId: caseId,
+      });
+      meeting.files = [...files, ...managedFiles];
+    } catch (_) {
+      meeting.files = files;
+    }
     return { itemType: 'meeting', caseData: meeting, history };
   }
 
   if (complaint) {
     const history = await complaintsRepository.getComplaintHistory(caseId);
+    const files = [];
+    try {
+      if (complaint.document_file_id) {
+        const document = await filesService.createLegacyDownloadAccess({
+          fileId: complaint.document_file_id,
+          actorRole: 'citizen',
+          actorId: citizenId,
+          scope: { entityType: 'complaint', entityId: caseId },
+        });
+        complaint.document = {
+          ...document.file,
+          downloadUrl: document.downloadUrl,
+        };
+        files.push({
+          ...document.file,
+          fileCategory: 'document',
+          downloadUrl: document.downloadUrl,
+        });
+      }
+      const managedFiles = await filesService.listOwnedFiles({
+        actorRole: 'citizen',
+        actorId: citizenId,
+        contextType: 'complaint',
+        contextId: caseId,
+      });
+      complaint.files = [...files, ...managedFiles];
+    } catch (_) {
+      complaint.files = files;
+    }
     return { itemType: 'complaint', caseData: complaint, history };
   }
 

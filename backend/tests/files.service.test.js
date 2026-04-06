@@ -19,6 +19,16 @@ jest.mock('../modules/files/files.repository', () => ({
   hasMinisterEventAccess: jest.fn(),
 }));
 
+jest.mock('../modules/complaints/complaints.repository', () => ({
+  getCitizenComplaintById: jest.fn(),
+  getComplaintById: jest.fn(),
+}));
+
+jest.mock('../modules/meetings/meetings.repository', () => ({
+  getCitizenMeetingById: jest.fn(),
+  getMeetingById: jest.fn(),
+}));
+
 jest.mock('../services/storageService', () => ({
   generateUploadUrl: jest.fn(),
   generateDownloadUrl: jest.fn(),
@@ -37,6 +47,7 @@ jest.mock('../utils/logger', () => ({
 
 const redis = require('../config/redis');
 const filesRepository = require('../modules/files/files.repository');
+const complaintsRepository = require('../modules/complaints/complaints.repository');
 const storageService = require('../services/storageService');
 const filesService = require('../modules/files/files.service');
 
@@ -217,6 +228,58 @@ describe('files service', () => {
     ).rejects.toMatchObject({ statusCode: 409 });
 
     expect(storageService.generateUploadUrl).not.toHaveBeenCalled();
+  });
+
+  test('creates signed legacy access for a citizen-owned complaint document', async () => {
+    filesRepository.findUploadedFileById.mockResolvedValue({
+      id: '11111111-1111-1111-1111-111111111111',
+      entity_type: 'complaint_document',
+      entity_id: 'complaint-1',
+      original_name: 'evidence.pdf',
+      mime_type: 'application/pdf',
+      file_size: 2048,
+      storage_path: '/tmp/evidence.pdf',
+      created_at: '2026-04-06T10:00:00.000Z',
+    });
+    complaintsRepository.getCitizenComplaintById.mockResolvedValue({ id: 'complaint-1' });
+
+    const result = await filesService.createLegacyDownloadAccess({
+      fileId: '11111111-1111-1111-1111-111111111111',
+      actorRole: 'citizen',
+      actorId: 'citizen-1',
+      reqMeta: { ip: '127.0.0.1', userAgent: 'jest' },
+    });
+
+    expect(result.file.name).toBe('evidence.pdf');
+    expect(result.downloadUrl).toMatch(/^\/api\/v1\/files\/access\//);
+    expect(redis.set).toHaveBeenCalled();
+  });
+
+  test('rejects legacy complaint download for an unrelated admin', async () => {
+    filesRepository.findUploadedFileById.mockResolvedValue({
+      id: '11111111-1111-1111-1111-111111111111',
+      entity_type: 'complaint_document',
+      entity_id: 'complaint-1',
+      original_name: 'evidence.pdf',
+      mime_type: 'application/pdf',
+      file_size: 2048,
+      storage_path: '/tmp/evidence.pdf',
+      created_at: '2026-04-06T10:00:00.000Z',
+    });
+    complaintsRepository.getComplaintById.mockResolvedValue({
+      id: 'complaint-1',
+      assignedAdminUserId: 'admin-2',
+      status: 'assigned',
+    });
+
+    await expect(
+      filesService.createLegacyDownloadAccess({
+        fileId: '11111111-1111-1111-1111-111111111111',
+        actorRole: 'admin',
+        actorId: 'admin-1',
+        reqMeta: { ip: '127.0.0.1', userAgent: 'jest' },
+      }),
+    ).rejects.toMatchObject({ statusCode: 404 });
   });
 
   test('persists metadata after confirming an uploaded object', async () => {

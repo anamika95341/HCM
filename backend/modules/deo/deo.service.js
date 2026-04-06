@@ -4,6 +4,7 @@ const createHttpError = require('http-errors');
 const { sanitizeText } = require('../../utils/sanitize');
 const { writeAuditLog } = require('../../utils/audit');
 const filesRepository = require('../files/files.repository');
+const { notifyMinisterMeetingScheduled } = require('../notifications/notifications.service');
 
 async function getAssignedMeetings(deoId) {
   return deoRepository.getAssignedMeetings(deoId);
@@ -88,6 +89,18 @@ async function createCalendarEvent(deoId, body, reqMeta) {
     ipAddress: reqMeta.ip,
     userAgent: reqMeta.userAgent,
     metadata: { ministerId: body.ministerId },
+  });
+
+  await notifyMinisterMeetingScheduled({
+    ministerId: body.ministerId,
+    meetingId: event.id,
+    meetingTitle: event.title,
+    scheduledAt: body.startsAt,
+    location: sanitizeText(body.location),
+    adminId: null,
+    isRescheduled: false,
+    source: 'deo_calendar_event',
+    entityType: 'minister_calendar_event',
   });
 
   return event;

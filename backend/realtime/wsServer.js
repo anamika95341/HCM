@@ -2,6 +2,7 @@ const { WebSocketServer } = require('ws');
 const jwt = require('jsonwebtoken');
 const redis = require('../config/redis');
 const { getRoleConfig } = require('../config/jwt');
+const { buildChannel } = require('./wsPublisher');
 const logger = require('../utils/logger');
 
 function extractToken(req) {
@@ -17,12 +18,12 @@ function extractToken(req) {
 function initializeWebSocket(server) {
   const wss = new WebSocketServer({ server, path: '/ws' });
   const subscriber = redis.duplicate();
-  const socketsByCitizenId = new Map();
+  const socketsByChannel = new Map();
   const subscribedChannels = new Set();
+  const supportedRoles = new Set(['citizen', 'admin', 'masteradmin', 'minister', 'deo']);
 
   subscriber.on('message', (channel, rawMessage) => {
-    const citizenId = channel.split(':')[1];
-    const sockets = socketsByCitizenId.get(citizenId) || new Set();
+    const sockets = socketsByChannel.get(channel) || new Set();
     for (const socket of sockets) {
       if (socket.readyState === socket.OPEN) {
         socket.send(rawMessage);
@@ -38,33 +39,40 @@ function initializeWebSocket(server) {
         return;
       }
 
-      const config = getRoleConfig('citizen');
+      const decoded = jwt.decode(token);
+      const role = decoded?.role;
+      if (!supportedRoles.has(role)) {
+        ws.close(4001, 'Unauthorized');
+        return;
+      }
+
+      const config = getRoleConfig(role);
       const payload = jwt.verify(token, config.publicKey, {
         algorithms: ['RS256'],
-        audience: 'citizen',
+        audience: config.audience,
         issuer: config.issuer,
       });
 
-      const citizenId = payload.sub;
-      const channel = `citizen:${citizenId}`;
+      const recipientId = payload.sub;
+      const channel = buildChannel(role, recipientId);
 
       if (!subscribedChannels.has(channel)) {
         await subscriber.subscribe(channel);
         subscribedChannels.add(channel);
       }
 
-      if (!socketsByCitizenId.has(citizenId)) {
-        socketsByCitizenId.set(citizenId, new Set());
+      if (!socketsByChannel.has(channel)) {
+        socketsByChannel.set(channel, new Set());
       }
-      socketsByCitizenId.get(citizenId).add(ws);
+      socketsByChannel.get(channel).add(ws);
       redis.incr('metrics:ws:active').catch(() => {});
 
       ws.on('close', async () => {
-        const sockets = socketsByCitizenId.get(citizenId);
+        const sockets = socketsByChannel.get(channel);
         if (sockets) {
           sockets.delete(ws);
           if (sockets.size === 0) {
-            socketsByCitizenId.delete(citizenId);
+            socketsByChannel.delete(channel);
             await subscriber.unsubscribe(channel);
             subscribedChannels.delete(channel);
           }

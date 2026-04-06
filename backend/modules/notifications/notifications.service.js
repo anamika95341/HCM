@@ -201,13 +201,14 @@ async function createNotification({
 
   await deliverOutOfBandChannels(recipientRole, recipientId, preferences, notification);
 
-  if (recipientRole === 'citizen' && preferences.channels.app) {
+  if (preferences.channels.app) {
     const unreadCount = await notificationsRepository.countUnreadNotifications({
       recipientRole,
       recipientId,
     });
     await publishNotificationCreated({
-      citizenId: recipientId,
+      recipientRole,
+      recipientId,
       notification,
       unreadCount,
     });
@@ -284,6 +285,334 @@ async function notifyCitizenComplaintStatusUpdate({ citizenId, complaintId, stat
   }
 }
 
+async function notifyRecipients(recipientRole, recipientIds, buildNotification) {
+  if (!Array.isArray(recipientIds) || recipientIds.length === 0) {
+    return [];
+  }
+
+  const uniqueIds = [...new Set(recipientIds.filter(Boolean))];
+  const results = await Promise.all(uniqueIds.map(async (recipientId) => {
+    try {
+      const payload = await buildNotification(recipientId);
+      if (!payload) return null;
+      return createNotification({
+        recipientRole,
+        recipientId,
+        ...payload,
+      });
+    } catch (error) {
+      logger.error('Recipient notification dispatch failed', {
+        recipientRole,
+        recipientId,
+        error,
+      });
+      return null;
+    }
+  }));
+
+  return results.filter(Boolean);
+}
+
+async function notifyActiveAdmins({ excludeAdminId = null, buildNotification }) {
+  const adminIds = await notificationsRepository.listActiveAdmins({ excludeUserId: excludeAdminId });
+  return notifyRecipients('admin', adminIds, buildNotification);
+}
+
+async function notifyAdmin(adminId, notification) {
+  if (!adminId) return null;
+  try {
+    return await createNotification({
+      recipientRole: 'admin',
+      recipientId: adminId,
+      ...notification,
+    });
+  } catch (error) {
+    logger.error('Admin notification dispatch failed', {
+      adminId,
+      error,
+    });
+    return null;
+  }
+}
+
+async function notifyActiveMasterAdmins({ excludeMasterAdminId = null, buildNotification }) {
+  const recipientIds = await notificationsRepository.listActiveMasterAdmins({ excludeUserId: excludeMasterAdminId });
+  return notifyRecipients('masteradmin', recipientIds, buildNotification);
+}
+
+async function notifyMasterAdminAccountCreated({ accountRole, accountId, createdByMasterAdminId, username, email }) {
+  const triggerKey = accountRole === 'admin' ? 'adminCreated' : 'deoCreated';
+  const roleLabel = accountRole === 'admin' ? 'Admin' : 'DEO';
+
+  return notifyActiveMasterAdmins({
+    buildNotification: async () => ({
+      eventType: `${accountRole}.account.created`,
+      triggerKey,
+      entityType: accountRole,
+      entityId: accountId,
+      title: `New ${roleLabel} Account Created`,
+      body: `${roleLabel} account ${username || email || accountId} was created successfully.`,
+      metadata: {
+        accountRole,
+        accountId,
+        createdByMasterAdminId,
+        username: username || null,
+        email: email || null,
+      },
+    }),
+  });
+}
+
+async function notifyMasterAdminAccountVerified({ accountRole, accountId, usernameOrEmail }) {
+  const roleLabel = accountRole === 'admin' ? 'Admin' : 'DEO';
+
+  return notifyActiveMasterAdmins({
+    buildNotification: async () => ({
+      eventType: `${accountRole}.account.verified`,
+      triggerKey: 'accountVerified',
+      entityType: accountRole,
+      entityId: accountId,
+      title: `${roleLabel} Account Verified`,
+      body: `${roleLabel} account ${usernameOrEmail || accountId} completed verification.`,
+      metadata: {
+        accountRole,
+        accountId,
+        usernameOrEmail: usernameOrEmail || null,
+      },
+    }),
+  });
+}
+
+async function notifyMasterAdminSecurityAlert({ affectedRole, affectedUserId, severity, email = null }) {
+  const severityLabel = severity === 'manual_unlock_required' ? 'Manual Unlock Required' : 'Temporary Lockout';
+  const body = email
+    ? `${affectedRole} account ${email} entered ${severity === 'manual_unlock_required' ? 'manual unlock required' : 'temporary lockout'} state after repeated login failures.`
+    : `${affectedRole} account ${affectedUserId} entered ${severity === 'manual_unlock_required' ? 'manual unlock required' : 'temporary lockout'} state after repeated login failures.`;
+
+  return notifyActiveMasterAdmins({
+    buildNotification: async () => ({
+      eventType: 'security.lockout',
+      triggerKey: 'escalation',
+      entityType: affectedRole,
+      entityId: affectedUserId,
+      title: `Security Alert: ${severityLabel}`,
+      body,
+      metadata: {
+        affectedRole,
+        affectedUserId,
+        severity,
+        email,
+      },
+    }),
+  });
+}
+
+async function notifyDeoVerificationAssigned({ deoId, meetingId, adminId, meetingTitle }) {
+  return notifyRecipients('deo', [deoId], async () => ({
+    eventType: 'meeting.verification.assigned',
+    triggerKey: 'newTask',
+    entityType: 'meeting',
+    entityId: meetingId,
+    title: 'New Verification Task Assigned',
+    body: `Meeting ${meetingTitle || meetingId} has been assigned to you for verification.`,
+    metadata: {
+      meetingId,
+      assignedByAdminId: adminId,
+      deoId,
+    },
+  }));
+}
+
+async function notifyAdminMeetingVerified({ adminId, meetingId, deoId, meetingTitle }) {
+  return notifyAdmin(adminId, {
+    eventType: 'meeting.verified.by_deo',
+    triggerKey: 'approval',
+    entityType: 'meeting',
+    entityId: meetingId,
+    title: 'Meeting Verified by DEO',
+    body: `Meeting ${meetingTitle || meetingId} has been verified by the assigned DEO and is ready for scheduling.`,
+    metadata: {
+      meetingId,
+      deoId,
+      adminId,
+    },
+  });
+}
+
+async function notifyAdminPoolMeetingSubmitted({ meetingId, meetingTitle, citizenId, assignedAdminId = null }) {
+  if (assignedAdminId) {
+    return notifyAdmin(assignedAdminId, {
+      eventType: 'meeting.submitted',
+      triggerKey: 'newTask',
+      entityType: 'meeting',
+      entityId: meetingId,
+      title: 'New Meeting Request Submitted',
+      body: `Meeting ${meetingTitle || meetingId} has been submitted and routed to your desk.`,
+      metadata: {
+        meetingId,
+        citizenId,
+        assignedAdminId,
+      },
+    });
+  }
+
+  return notifyActiveAdmins({
+    buildNotification: async () => ({
+      eventType: 'meeting.submitted',
+      triggerKey: 'newTask',
+      entityType: 'meeting',
+      entityId: meetingId,
+      title: 'New Meeting Request in Meeting Pool',
+      body: `Meeting ${meetingTitle || meetingId} has been submitted by a citizen and is now available in the meeting pool.`,
+      metadata: {
+        meetingId,
+        citizenId,
+      },
+    }),
+  });
+}
+
+async function notifyAdminPoolComplaintSubmitted({ complaintId, complaintTitle, citizenId }) {
+  return notifyActiveAdmins({
+    buildNotification: async () => ({
+      eventType: 'complaint.submitted',
+      triggerKey: 'newTask',
+      entityType: 'complaint',
+      entityId: complaintId,
+      title: 'New Complaint in Complaint Pool',
+      body: `Complaint ${complaintTitle || complaintId} has been submitted by a citizen and is now available in the complaint pool.`,
+      metadata: {
+        complaintId,
+        citizenId,
+      },
+    }),
+  });
+}
+
+async function notifyAdminComplaintEscalatedToPool({ complaintId, complaintTitle, actorAdminId, note }) {
+  return notifyActiveAdmins({
+    excludeAdminId: actorAdminId,
+    buildNotification: async () => ({
+      eventType: 'complaint.escalated.to_pool',
+      triggerKey: 'escalation',
+      entityType: 'complaint',
+      entityId: complaintId,
+      title: 'Complaint Escalated to Pool',
+      body: note
+        ? `Complaint ${complaintTitle || complaintId} was escalated back to the complaint pool. ${note}`
+        : `Complaint ${complaintTitle || complaintId} was escalated back to the complaint pool.`,
+      metadata: {
+        complaintId,
+        actorAdminId,
+        note: note || null,
+      },
+    }),
+  });
+}
+
+async function notifyAdminComplaintReassigned({ complaintId, complaintTitle, actorAdminId, targetAdminId, reason }) {
+  return notifyAdmin(targetAdminId, {
+    eventType: 'complaint.reassigned',
+    triggerKey: 'newTask',
+    entityType: 'complaint',
+    entityId: complaintId,
+    title: 'Complaint Reassigned to You',
+    body: reason
+      ? `Complaint ${complaintTitle || complaintId} was reassigned to your queue. ${reason}`
+      : `Complaint ${complaintTitle || complaintId} was reassigned to your queue.`,
+    metadata: {
+      complaintId,
+      actorAdminId,
+      targetAdminId,
+      reason: reason || null,
+    },
+  });
+}
+
+async function notifyMinisterMeetingScheduled({
+  ministerId,
+  meetingId,
+  meetingTitle,
+  scheduledAt,
+  location,
+  adminId,
+  isRescheduled = false,
+  source = 'admin_schedule',
+  entityType = 'meeting',
+}) {
+  return notifyRecipients('minister', [ministerId], async () => ({
+    eventType: isRescheduled ? 'meeting.rescheduled' : 'meeting.scheduled',
+    triggerKey: 'newMeeting',
+    entityType,
+    entityId: meetingId,
+    title: isRescheduled ? 'Meeting Rescheduled on Your Calendar' : 'New Meeting Scheduled on Your Calendar',
+    body: `${meetingTitle || meetingId} is ${isRescheduled ? 'rescheduled' : 'scheduled'} for ${scheduledAt}${location ? ` at ${location}` : ''}.`,
+    metadata: {
+      meetingId,
+      ministerId,
+      adminId: adminId || null,
+      scheduledAt,
+      location: location || null,
+      source,
+    },
+  }));
+}
+
+async function notifyMinisterMeetingChanged({ ministerId, meetingId, meetingTitle, changeType, location, scheduledAt, actorRole }) {
+  return notifyRecipients('minister', [ministerId], async () => ({
+    eventType: `meeting.${changeType}`,
+    triggerKey: 'meetingChange',
+    entityType: 'meeting',
+    entityId: meetingId,
+    title: changeType === 'cancelled' ? 'Meeting Cancelled' : 'Meeting Updated',
+    body: changeType === 'cancelled'
+      ? `${meetingTitle || meetingId} has been cancelled.`
+      : `${meetingTitle || meetingId} has been updated${scheduledAt ? ` for ${scheduledAt}` : ''}${location ? ` at ${location}` : ''}.`,
+    metadata: {
+      meetingId,
+      ministerId,
+      changeType,
+      location: location || null,
+      scheduledAt: scheduledAt || null,
+      actorRole: actorRole || null,
+    },
+  }));
+}
+
+async function notifyAdminScheduledMeetingUpcoming({ adminId, entityType, entityId, title, scheduledAt }) {
+  return notifyAdmin(adminId, {
+    eventType: `${entityType}.scheduled.upcoming`,
+    triggerKey: 'deadline',
+    entityType,
+    entityId,
+    title: 'Upcoming Scheduled Meeting',
+    body: `${title || entityId} is scheduled for ${scheduledAt}.`,
+    metadata: {
+      entityType,
+      entityId,
+      adminId,
+      scheduledAt,
+    },
+  });
+}
+
+async function notifyAdminScheduledMeetingCompleted({ adminId, entityType, entityId, title, completedByRole }) {
+  return notifyAdmin(adminId, {
+    eventType: `${entityType}.scheduled.completed`,
+    triggerKey: 'moved',
+    entityType,
+    entityId,
+    title: 'Scheduled Meeting Completed',
+    body: `${title || entityId} has been completed${completedByRole ? ` by ${completedByRole}` : ''}.`,
+    metadata: {
+      entityType,
+      entityId,
+      adminId,
+      completedByRole: completedByRole || null,
+    },
+  });
+}
+
 module.exports = {
   getNotificationPreferences,
   updateNotificationPreferences,
@@ -292,4 +621,20 @@ module.exports = {
   markAllNotificationsRead,
   notifyCitizenMeetingStatusUpdate,
   notifyCitizenComplaintStatusUpdate,
+  notifyAdmin,
+  notifyActiveAdmins,
+  notifyActiveMasterAdmins,
+  notifyMasterAdminAccountCreated,
+  notifyMasterAdminAccountVerified,
+  notifyMasterAdminSecurityAlert,
+  notifyDeoVerificationAssigned,
+  notifyAdminMeetingVerified,
+  notifyAdminPoolMeetingSubmitted,
+  notifyAdminPoolComplaintSubmitted,
+  notifyAdminComplaintEscalatedToPool,
+  notifyAdminComplaintReassigned,
+  notifyMinisterMeetingScheduled,
+  notifyMinisterMeetingChanged,
+  notifyAdminScheduledMeetingUpcoming,
+  notifyAdminScheduledMeetingCompleted,
 };

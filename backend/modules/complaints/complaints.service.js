@@ -3,10 +3,18 @@ const redis = require('../../config/redis');
 const complaintsRepository = require('./complaints.repository');
 const meetingsRepository = require('../meetings/meetings.repository');
 const adminRepository = require('../admin/admin.repository');
+const filesService = require('../files/files.service');
 const { persistPrivateUpload } = require('../../middleware/uploadHandler');
 const { sanitizeText } = require('../../utils/sanitize');
 const { writeAuditLog } = require('../../utils/audit');
-const { notifyCitizenComplaintStatusUpdate } = require('../notifications/notifications.service');
+const {
+  notifyCitizenComplaintStatusUpdate,
+  notifyAdminPoolComplaintSubmitted,
+  notifyAdminComplaintEscalatedToPool,
+  notifyAdminComplaintReassigned,
+  notifyAdminScheduledMeetingUpcoming,
+  notifyAdminScheduledMeetingCompleted,
+} = require('../notifications/notifications.service');
 const logger = require('../../utils/logger');
 const { claimIdempotency, storeIdempotencyResult, clearIdempotency } = require('../../utils/idempotency');
 
@@ -72,6 +80,12 @@ async function submitComplaint({ citizenId, body, file, reqMeta, idempotencyKey 
       userAgent: reqMeta.userAgent,
     });
 
+    await notifyAdminPoolComplaintSubmitted({
+      complaintId: complaint.id,
+      complaintTitle: complaint.subject || complaint.complaintId,
+      citizenId,
+    });
+
     const result = { complaint };
     await storeIdempotencyResult(redis, claim, result);
     return result;
@@ -91,10 +105,39 @@ async function getCitizenComplaintDetail(complaintId, citizenId) {
     throw createHttpError(404, 'Complaint not found');
   }
   const history = await complaintsRepository.getComplaintHistory(complaintId);
+  const files = [];
+  try {
+    if (complaint.document_file_id) {
+      const document = await filesService.createLegacyDownloadAccess({
+        fileId: complaint.document_file_id,
+        actorRole: 'citizen',
+        actorId: citizenId,
+        scope: { entityType: 'complaint', entityId: complaintId },
+      });
+      complaint.document = {
+        ...document.file,
+        downloadUrl: document.downloadUrl,
+      };
+      files.push({
+        ...document.file,
+        fileCategory: 'document',
+        downloadUrl: document.downloadUrl,
+      });
+    }
+    const managedFiles = await filesService.listOwnedFiles({
+      actorRole: 'citizen',
+      actorId: citizenId,
+      contextType: 'complaint',
+      contextId: complaintId,
+    });
+    complaint.files = [...files, ...managedFiles];
+  } catch (_) {
+    complaint.files = files;
+  }
   return { complaint, history };
 }
 
-async function getAdminComplaintDetail(complaintId) {
+async function getAdminComplaintDetail(complaintId, adminId, reqMeta) {
   const complaint = await complaintsRepository.getComplaintById(complaintId);
   if (!complaint) {
     throw createHttpError(404, 'Complaint not found');
@@ -112,6 +155,53 @@ async function getAdminComplaintDetail(complaintId) {
       phone: complaint.manualContact || complaint.officerContact || '',
     }]
     : [];
+
+  const files = [];
+  try {
+    if (complaint.document_file_id && complaint.assignedAdminUserId === adminId) {
+      const document = await filesService.createLegacyDownloadAccess({
+        fileId: complaint.document_file_id,
+        actorRole: 'admin',
+        actorId: adminId,
+        scope: { entityType: 'complaint', entityId: complaintId },
+      });
+      complaint.document = {
+        ...document.file,
+        downloadUrl: document.downloadUrl,
+      };
+      files.push({
+        ...document.file,
+        fileCategory: 'document',
+        downloadUrl: document.downloadUrl,
+      });
+    }
+
+    const managedFiles = await filesService.listFiles({
+      actorRole: 'admin',
+      actorId: adminId,
+      query: {
+        contextType: 'complaint',
+        contextId: complaintId,
+      },
+    });
+    const hydratedManagedFiles = await Promise.all(
+      managedFiles.files.map(async (file) => {
+        const download = await filesService.createDownloadUrl({
+          fileId: file.id,
+          actorRole: 'admin',
+          actorId: adminId,
+          reqMeta,
+        });
+        return {
+          ...file,
+          downloadUrl: download.downloadUrl,
+        };
+      })
+    );
+    complaint.files = [...files, ...hydratedManagedFiles];
+  } catch (_) {
+    complaint.files = files;
+  }
 
   return {
     complaint,
@@ -266,6 +356,14 @@ async function reassignComplaint(complaintId, actorId, adminId, reason, reqMeta)
     metadata: { adminId },
   });
 
+  await notifyAdminComplaintReassigned({
+    complaintId,
+    complaintTitle: complaint.subject || complaint.complaintId,
+    actorAdminId: actorId,
+    targetAdminId: adminId,
+    reason: sanitizeText(reason),
+  });
+
   return complaint;
 }
 
@@ -383,6 +481,14 @@ async function scheduleComplaintCall(complaintId, actorId, callScheduledAt, reqM
     action: 'complaint_call_scheduled',
     ipAddress: reqMeta.ip,
     userAgent: reqMeta.userAgent,
+  });
+
+  await notifyAdminScheduledMeetingUpcoming({
+    adminId: actorId,
+    entityType: 'complaint',
+    entityId: complaintId,
+    title: complaint.subject || complaint.complaintId,
+    scheduledAt: callScheduledAt,
   });
 
   return complaint;
@@ -511,6 +617,13 @@ async function escalateComplaintToMeeting(complaintId, actorId, body, reqMeta) {
     userAgent: reqMeta.userAgent,
   });
 
+  await notifyAdminComplaintEscalatedToPool({
+    complaintId,
+    complaintTitle: complaint.subject || complaint.complaintId,
+    actorAdminId: actorId,
+    note: sanitizeText(body.reason),
+  });
+
   return { complaint: await complaintsRepository.getComplaintById(complaintId) };
 }
 
@@ -546,6 +659,16 @@ async function reopenComplaint(complaintId, actorId, reason, reqMeta) {
     userAgent: reqMeta.userAgent,
   });
 
+  if (current.callScheduledAt) {
+    await notifyAdminScheduledMeetingCompleted({
+      adminId: actorId,
+      entityType: 'complaint',
+      entityId: complaintId,
+      title: complaint.subject || complaint.complaintId,
+      completedByRole: 'admin',
+    });
+  }
+
   return complaint;
 }
 
@@ -579,6 +702,16 @@ async function closeComplaint(complaintId, actorId, note, reqMeta) {
     ipAddress: reqMeta.ip,
     userAgent: reqMeta.userAgent,
   });
+
+  if (current.callScheduledAt) {
+    await notifyAdminScheduledMeetingCompleted({
+      adminId: actorId,
+      entityType: 'complaint',
+      entityId: complaintId,
+      title: complaint.subject || complaint.complaintId,
+      completedByRole: 'admin',
+    });
+  }
 
   return complaint;
 }

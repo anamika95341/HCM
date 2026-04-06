@@ -3,6 +3,7 @@ import { ChevronLeft, Eye, FileText, Search } from "lucide-react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { PATHS } from "../../../routes/paths.js";
 import { apiClient, authorizedConfig } from "../../../shared/api/client.js";
+import { openDownloadUrl } from "../../../shared/api/downloads.js";
 import { useAuth } from "../../../shared/auth/AuthContext.jsx";
 import {
   WorkspaceBadge,
@@ -457,8 +458,19 @@ export default function AdminMeeting() {
               <div style={{ display: "grid", gap: 10 }}>
                 {meetingFiles.map((file) => (
                   <div key={file.id} style={{ padding: 10, borderRadius: 12, border: `1px solid ${C.border}`, background: C.bgElevated }}>
-                    <div style={{ fontSize: 13, fontWeight: 700, color: C.t1 }}>{file.name}</div>
-                    <div style={{ marginTop: 4, fontSize: 12, color: C.t3 }}>{file.mimeType}</div>
+                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
+                      <div>
+                        <div style={{ fontSize: 13, fontWeight: 700, color: C.t1 }}>{file.name}</div>
+                        <div style={{ marginTop: 4, fontSize: 12, color: C.t3 }}>{file.mimeType}</div>
+                      </div>
+                      <WorkspaceButton
+                        type="button"
+                        variant="outline"
+                        onClick={() => openDownloadUrl(file.downloadUrl)}
+                      >
+                        Download
+                      </WorkspaceButton>
+                    </div>
                   </div>
                 ))}
               </div>

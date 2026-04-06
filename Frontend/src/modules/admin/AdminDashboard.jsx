@@ -218,7 +218,7 @@ function TrendChart({ data, C }) {
         />
       </div>
 
-      <div style={{ flex: 1, minHeight: 0 }}>
+      <div style={{ flex: 1, minHeight: 200 }}>
         {!hasData ? (
           <div style={{ height: "100%", display: "flex", alignItems: "center", justifyContent: "center" }}>
             <span style={{ fontSize: 13, color: C.t3 }}>No activity in the last 6 months</span>

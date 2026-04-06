@@ -103,6 +103,18 @@ async function getCitizenMeetingById(meetingId, citizenId) {
   return result.rows[0] || null;
 }
 
+async function getCitizenComplaintById(complaintId, citizenId) {
+  const result = await pool.query(
+    `SELECT id
+       FROM complaints
+      WHERE id = $1
+        AND citizen_id = $2
+      LIMIT 1`,
+    [complaintId, citizenId]
+  );
+  return result.rows[0] || null;
+}
+
 async function getAssignedMeetingForDeo(meetingId, deoId) {
   const result = await pool.query(
     `SELECT id, minister_id
@@ -187,6 +199,7 @@ module.exports = {
   findFileRecordById,
   listFilesVisibleToRole,
   getCitizenMeetingById,
+  getCitizenComplaintById,
   getAssignedMeetingForDeo,
   getDeoCalendarEventById,
   hasMinisterMeetingAccess,

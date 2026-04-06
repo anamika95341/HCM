@@ -975,6 +975,7 @@ import { FaFilePdf } from "react-icons/fa";
 import { sanitizeSelectedFiles as sanitizeUploadedFiles } from "../../../shared/security/files.js";
 import { PATHS } from "../../../routes/paths.js";
 import { apiClient, authorizedConfig } from "../../../shared/api/client.js";
+import { uploadPrivateFile } from "../../../shared/api/privateFiles.js";
 import { useAuth } from "../../../shared/auth/AuthContext.jsx";
 import { usePortalTheme } from "../../../shared/theme/portalTheme.jsx";
 import { WorkspaceButton, WorkspaceCard, WorkspaceCardHeader, WorkspaceInput, WorkspacePage, WorkspaceSectionHeader, WorkspaceSelect } from "../../../shared/components/WorkspaceUI.jsx";
@@ -1602,6 +1603,18 @@ export default function HCMNewCasePage() {
   };
   const backButtonAccent = C.purple;
 
+  const uploadSelectedFiles = async ({ files, contextType, contextId }) => {
+    for (const file of files) {
+      await uploadPrivateFile({
+        accessToken: session.accessToken,
+        file,
+        contextType,
+        contextId,
+        role: "citizen",
+      });
+    }
+  };
+
   const submitMeeting = async (event) => {
     event.preventDefault();
     setLoading(true);
@@ -1625,16 +1638,38 @@ export default function HCMNewCasePage() {
             .map((entry) => ({ attendeeName: entry.name.trim(), attendeePhone: entry.phone.trim() }))
         )
       );
-      if (meetingForm.files[0]) {
-        payload.append("file", meetingForm.files[0]);
-      }
-
-      await apiClient.post("/meetings/request", payload, authorizedConfig(session.accessToken, {
+      const { data } = await apiClient.post("/meetings/request", payload, authorizedConfig(session.accessToken, {
         headers: {
           "Content-Type": "multipart/form-data",
           "Idempotency-Key": crypto.randomUUID(),
         },
       }));
+
+      if (meetingForm.files.length > 0 && data?.meeting?.id) {
+        try {
+          await uploadSelectedFiles({
+            files: meetingForm.files,
+            contextType: "meeting",
+            contextId: data.meeting.id,
+          });
+        } catch (uploadError) {
+          setSuccessModal({
+            open: true,
+            title: "Meeting Submitted",
+            message: "Your meeting request was submitted, but one or more documents could not be uploaded. Open the meeting details and verify the attached files.",
+          });
+          setMeetingForm({
+            title: "",
+            purpose: "",
+            referralAdminUserId: "",
+            preferredDate: "",
+            preferredTime: "",
+            files: [],
+            companions: [{ name: "", phone: "" }],
+          });
+          return;
+        }
+      }
 
       setSuccessModal({
         open: true,
@@ -1672,16 +1707,37 @@ export default function HCMNewCasePage() {
       payload.append("complaintType", complaintForm.complaintType);
       payload.append("incidentDate", complaintForm.incidentDate);
 
-      if (complaintForm.files[0]) {
-        payload.append("file", complaintForm.files[0]);
-      }
-
-      await apiClient.post("/complaints", payload, authorizedConfig(session.accessToken, {
+      const { data } = await apiClient.post("/complaints", payload, authorizedConfig(session.accessToken, {
         headers: {
           "Content-Type": "multipart/form-data",
           "Idempotency-Key": crypto.randomUUID(),
         },
       }));
+
+      if (complaintForm.files.length > 0 && data?.complaint?.id) {
+        try {
+          await uploadSelectedFiles({
+            files: complaintForm.files,
+            contextType: "complaint",
+            contextId: data.complaint.id,
+          });
+        } catch (uploadError) {
+          setSuccessModal({
+            open: true,
+            title: "Complaint Submitted",
+            message: "Your complaint was submitted, but one or more documents could not be uploaded. Open the complaint details and verify the attached files.",
+          });
+          setComplaintForm({
+            title: "",
+            details: "",
+            complaintLocation: "",
+            complaintType: "",
+            incidentDate: "",
+            files: [],
+          });
+          return;
+        }
+      }
 
       setSuccessModal({
         open: true,

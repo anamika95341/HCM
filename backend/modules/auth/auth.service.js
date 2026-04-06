@@ -15,6 +15,10 @@ const logger = require('../../utils/logger');
 const { publishAuthEvent } = require('../../utils/authStream');
 const authRepository = require('./auth.repository');
 const citizenRepository = require('../citizen/citizen.repository');
+const {
+  notifyMasterAdminAccountVerified,
+  notifyMasterAdminSecurityAlert,
+} = require('../notifications/notifications.service');
 const { lookupMp } = require('../../utils/mpLookup');
 
 function publicUser(user, role) {
@@ -327,6 +331,12 @@ async function verifyDeoRegistration({ usernameOrEmail, otp }, reqMeta) {
     userAgent: reqMeta.userAgent,
   });
 
+  await notifyMasterAdminAccountVerified({
+    accountRole: 'deo',
+    accountId: user.id,
+    usernameOrEmail: user.username || user.email || usernameOrEmail,
+  });
+
   return { message: 'DEO account verified successfully. You can now log in.' };
 }
 
@@ -366,6 +376,12 @@ async function verifyAdminRegistration({ usernameOrEmail, otp }, reqMeta) {
     action: 'admin_verified',
     ipAddress: reqMeta.ip,
     userAgent: reqMeta.userAgent,
+  });
+
+  await notifyMasterAdminAccountVerified({
+    accountRole: 'admin',
+    accountId: user.id,
+    usernameOrEmail: user.username || user.email || usernameOrEmail,
   });
 
   return { message: 'Admin account verified successfully. You can now log in.' };
@@ -504,6 +520,21 @@ async function checkLockout({ role, userId, ip, email }) {
   }
 
   if (Number(userAttempts || 0) >= 10) {
+    const alertKey = `lockout:masteradmin_alert:${role}:${userId}:manual_unlock_required`;
+    try {
+      const alreadyAlerted = await redis.get(alertKey);
+      if (!alreadyAlerted) {
+        await notifyMasterAdminSecurityAlert({
+          affectedRole: role,
+          affectedUserId: userId,
+          severity: 'manual_unlock_required',
+          email: email || null,
+        });
+        await redis.set(alertKey, '1', 'EX', 86400);
+      }
+    } catch (error) {
+      logger.warn('Masteradmin security alert dispatch failed', { role, userId, error });
+    }
     throw createHttpError(423, 'Account requires manual unlock');
   }
   if (Number(userAttempts || 0) >= 5 || Number(ipAttempts || 0) >= 5) {
@@ -522,6 +553,21 @@ async function checkLockout({ role, userId, ip, email }) {
       } catch (err) {
         logger.warn('Lockout notification check failed', { role, userId, err });
       }
+    }
+    const alertKey = `lockout:masteradmin_alert:${role}:${userId}:temporary_lockout`;
+    try {
+      const alreadyAlerted = await redis.get(alertKey);
+      if (!alreadyAlerted) {
+        await notifyMasterAdminSecurityAlert({
+          affectedRole: role,
+          affectedUserId: userId,
+          severity: 'temporary_lockout',
+          email: email || null,
+        });
+        await redis.set(alertKey, '1', 'EX', 900);
+      }
+    } catch (error) {
+      logger.warn('Masteradmin security alert dispatch failed', { role, userId, error });
     }
     throw createHttpError(423, 'Account temporarily locked');
   }

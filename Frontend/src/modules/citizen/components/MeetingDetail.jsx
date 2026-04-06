@@ -9,11 +9,13 @@ import {
   Hash,
 } from "lucide-react";
 import { apiClient, authorizedConfig } from "../../../shared/api/client.js";
+import { openDownloadUrl } from "../../../shared/api/downloads.js";
 import { useAuth } from "../../../shared/auth/AuthContext.jsx";
 import { useNotifications } from "../../../shared/notifications/NotificationContext.jsx";
 import { usePortalTheme } from "../../../shared/theme/portalTheme.jsx";
 import {
   WorkspaceBadge,
+  WorkspaceButton,
   WorkspaceCard,
   WorkspaceEmptyState,
   WorkspacePage,
@@ -86,6 +88,13 @@ function DetailBlock({ icon, label, value, multiline = false, compact = false, v
       </div>
     </div>
   );
+}
+
+function getAttachedFiles(item) {
+  if (Array.isArray(item?.files) && item.files.length > 0) {
+    return item.files;
+  }
+  return item?.document ? [item.document] : [];
 }
 
 export default function MeetingDetail() {
@@ -190,7 +199,8 @@ export default function MeetingDetail() {
   const scheduledTimeLabel = meeting.scheduled_at
     ? new Date(meeting.scheduled_at).toLocaleString("en-IN", { dateStyle: "long", timeStyle: "short" })
     : "Pending";
-  const hasUploadedDocument = Boolean(meeting.document_file_id);
+  const attachedFiles = getAttachedFiles(meeting);
+  const hasUploadedDocument = attachedFiles.length > 0;
   const statusLabel = formatStatus(meeting.status);
   const locationLabel = meeting.scheduled_location || "Pending";
   const pageOverflow = hasUploadedDocument ? "auto" : "hidden";
@@ -386,9 +396,32 @@ export default function MeetingDetail() {
                       background: C.bgElevated,
                     }}
                   >
-                    <div style={{ fontSize: 14, color: C.t1, fontWeight: 500, lineHeight: 1.5 }}>
-                      {hasUploadedDocument ? "Document uploaded with this meeting request" : "No documents uploaded"}
-                    </div>
+                    {hasUploadedDocument ? (
+                      <div style={{ display: "grid", gap: 10 }}>
+                        {attachedFiles.map((file) => (
+                          <div
+                            key={file.id || file.downloadUrl || file.name}
+                            style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}
+                          >
+                            <div>
+                              <div style={{ fontSize: 14, color: C.t1, fontWeight: 600, lineHeight: 1.5 }}>{file.name}</div>
+                              <div style={{ marginTop: 4, fontSize: 12, color: C.t3 }}>{file.mimeType || "Document"}</div>
+                            </div>
+                            <WorkspaceButton
+                              type="button"
+                              variant="outline"
+                              onClick={() => openDownloadUrl(file.downloadUrl)}
+                            >
+                              Download
+                            </WorkspaceButton>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <div style={{ fontSize: 14, color: C.t1, fontWeight: 500, lineHeight: 1.5 }}>
+                        No documents uploaded
+                      </div>
+                    )}
                   </div>
                 </div>
               </WorkspaceCard>

@@ -8,6 +8,9 @@ const redis = require('../../config/redis');
 const authRepository = require('../auth/auth.repository');
 const adminRepository = require('../admin/admin.repository');
 const masteradminRepository = require('./masteradmin.repository');
+const {
+  notifyMasterAdminAccountCreated,
+} = require('../notifications/notifications.service');
 
 async function sendVerificationCode({ role, userId, email }) {
   const otp = await generateOtp({
@@ -88,6 +91,14 @@ async function createAdmin(masterAdminId, payload, reqMeta) {
     metadata: { email: payload.email, username: payload.username },
   });
 
+  await notifyMasterAdminAccountCreated({
+    accountRole: 'admin',
+    accountId: admin.id,
+    createdByMasterAdminId: masterAdminId,
+    username: admin.username,
+    email: payload.email,
+  });
+
   return { admin, verificationMode: 'email_code_sent' };
 }
 
@@ -130,6 +141,14 @@ async function createDeo(masterAdminId, payload, reqMeta) {
     ipAddress: reqMeta.ip,
     userAgent: reqMeta.userAgent,
     metadata: { email: payload.email, username: deo.username },
+  });
+
+  await notifyMasterAdminAccountCreated({
+    accountRole: 'deo',
+    accountId: deo.id,
+    createdByMasterAdminId: masterAdminId,
+    username: deo.username,
+    email: payload.email,
   });
 
   return { deo, verificationMode: 'email_code_sent' };

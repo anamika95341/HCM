@@ -2,10 +2,11 @@ import { useEffect, useState } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { ChevronRight, MapPin, Calendar, FileText, Hash, Briefcase } from "lucide-react";
 import { apiClient, authorizedConfig } from "../../../shared/api/client.js";
+import { openDownloadUrl } from "../../../shared/api/downloads.js";
 import { useAuth } from "../../../shared/auth/AuthContext.jsx";
 import { useNotifications } from "../../../shared/notifications/NotificationContext.jsx";
 import { usePortalTheme } from "../../../shared/theme/portalTheme.jsx";
-import { WorkspaceBadge, WorkspaceCard, WorkspaceEmptyState } from "../../../shared/components/WorkspaceUI.jsx";
+import { WorkspaceBadge, WorkspaceButton, WorkspaceCard, WorkspaceEmptyState } from "../../../shared/components/WorkspaceUI.jsx";
 
 function formatStatus(status) {
   return String(status || "pending")
@@ -61,6 +62,13 @@ function DetailBlock({ icon, label, value, multiline = false, compact = false })
       </div>
     </div>
   );
+}
+
+function getAttachedFiles(item) {
+  if (Array.isArray(item?.files) && item.files.length > 0) {
+    return item.files;
+  }
+  return item?.document ? [item.document] : [];
 }
 
 export default function CaseDetailsPage() {
@@ -132,7 +140,8 @@ export default function CaseDetailsPage() {
   const isMeeting = itemType === "meeting";
   const complaintTitle = caseData.title || caseData.subject;
   const complaintId = caseData.complaintId || caseData.id;
-  const hasUploadedDocument = Boolean(caseData.document_file_id);
+  const attachedFiles = getAttachedFiles(caseData);
+  const hasUploadedDocument = attachedFiles.length > 0;
   const createdLabel = caseData.createdAt || caseData.created_at
     ? new Date(caseData.createdAt || caseData.created_at).toLocaleString("en-IN")
     : "Not provided";
@@ -255,9 +264,32 @@ export default function CaseDetailsPage() {
                       background: C.bgElevated,
                     }}
                   >
-                    <div style={{ fontSize: 14, color: C.t1, fontWeight: 500, lineHeight: 1.5 }}>
-                      {hasUploadedDocument ? "Document uploaded with this complaint" : "No documents uploaded"}
-                    </div>
+                    {hasUploadedDocument ? (
+                      <div style={{ display: "grid", gap: 10 }}>
+                        {attachedFiles.map((file) => (
+                          <div
+                            key={file.id || file.downloadUrl || file.name}
+                            style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}
+                          >
+                            <div>
+                              <div style={{ fontSize: 14, color: C.t1, fontWeight: 600, lineHeight: 1.5 }}>{file.name}</div>
+                              <div style={{ marginTop: 4, fontSize: 12, color: C.t3 }}>{file.mimeType || "Document"}</div>
+                            </div>
+                            <WorkspaceButton
+                              type="button"
+                              variant="outline"
+                              onClick={() => openDownloadUrl(file.downloadUrl)}
+                            >
+                              Download
+                            </WorkspaceButton>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <div style={{ fontSize: 14, color: C.t1, fontWeight: 500, lineHeight: 1.5 }}>
+                        No documents uploaded
+                      </div>
+                    )}
                   </div>
                 </div>
               </WorkspaceCard>

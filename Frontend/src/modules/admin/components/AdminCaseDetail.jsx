@@ -3,6 +3,7 @@ import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { ChevronLeft, FileText } from "lucide-react";
 import { PATHS } from "../../../routes/paths.js";
 import { apiClient, authorizedConfig } from "../../../shared/api/client.js";
+import { openDownloadUrl } from "../../../shared/api/downloads.js";
 import { useAuth } from "../../../shared/auth/AuthContext.jsx";
 import {
   WorkspaceButton,
@@ -145,6 +146,13 @@ function Timeline({ items = [] }) {
       ))}
     </div>
   );
+}
+
+function getAttachedFiles(item) {
+  if (Array.isArray(item?.files) && item.files.length > 0) {
+    return item.files;
+  }
+  return item?.document ? [item.document] : [];
 }
 
 export function SuccessModal({ open, message, onClose }) {
@@ -367,6 +375,7 @@ export default function AdminCaseDetail() {
       : backPath === PATHS.admin.complaintQueue
         ? "Back to Complaint Queue"
         : "Back to My Cases";
+  const attachedFiles = getAttachedFiles(item);
 
   return (
     <WorkspacePage width={1200}>
@@ -419,6 +428,31 @@ export default function AdminCaseDetail() {
                 {item.resolutionSummary ? <NoticeBox tone="green" label="Resolution Summary" value={item.resolutionSummary} /> : null}
               </div>
             ) : null}
+            <div className="mt-6">
+              <p style={{ fontSize: 10, fontWeight: 600, color: C.t3, textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 8 }}>Attached Documents</p>
+              <div style={{ padding: 12, borderRadius: 12, border: `1px solid ${C.border}`, background: C.bgElevated }}>
+                {attachedFiles.length > 0 ? (
+                  <div style={{ display: "grid", gap: 10 }}>
+                    {attachedFiles.map((file) => (
+                      <div
+                        key={file.id || file.downloadUrl || file.name}
+                        style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}
+                      >
+                        <div>
+                          <div style={{ fontSize: 13, fontWeight: 700, color: C.t1 }}>{file.name}</div>
+                          <div style={{ marginTop: 4, fontSize: 12, color: C.t3 }}>{file.mimeType || "Document"}</div>
+                        </div>
+                        <WorkspaceButton type="button" variant="outline" onClick={() => openDownloadUrl(file.downloadUrl)}>
+                          Download
+                        </WorkspaceButton>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div style={{ fontSize: 13, color: C.t3 }}>No documents attached to this complaint.</div>
+                )}
+              </div>
+            </div>
           </WorkspaceCard>
 
           <WorkspaceCard>

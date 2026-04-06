@@ -48,48 +48,70 @@ export function NotificationProvider({ children }) {
   const socketRef = useRef(null);
   const reconnectTimerRef = useRef(null);
   const reconnectAttemptsRef = useRef(0);
+  const loadNotificationsRef = useRef(async () => {});
 
-  useEffect(() => {
-    let active = true;
-
-    async function loadNotifications() {
-      if (!session?.accessToken || !session?.role) {
-        if (active) {
-          setNotifications([]);
-          setUnreadCount(0);
-          setPreferences(null);
-        }
-        return;
-      }
-
-      setLoading(true);
-      try {
-        const basePath = getRoleBasePath(session.role);
-        const { data } = await apiClient.get(`${basePath}/notifications?limit=20`, authorizedConfig(session.accessToken));
-        if (!active) return;
-        setNotifications(Array.isArray(data.notifications) ? data.notifications : []);
-        setUnreadCount(Number(data.unreadCount) || 0);
-        setPreferences(data.preferences || null);
-      } catch {
-        if (!active) return;
+  const loadNotifications = useCallback(async (activeGuard = () => true) => {
+    if (!session?.accessToken || !session?.role) {
+      if (activeGuard()) {
         setNotifications([]);
         setUnreadCount(0);
         setPreferences(null);
-      } finally {
-        if (active) {
-          setLoading(false);
-        }
       }
+      return;
     }
 
-    loadNotifications();
+    setLoading(true);
+    try {
+      const basePath = getRoleBasePath(session.role);
+      const { data } = await apiClient.get(`${basePath}/notifications?limit=20`, authorizedConfig(session.accessToken));
+      if (!activeGuard()) return;
+      setNotifications(Array.isArray(data.notifications) ? data.notifications : []);
+      setUnreadCount(Number(data.unreadCount) || 0);
+      setPreferences(data.preferences || null);
+    } catch {
+      if (!activeGuard()) return;
+      setNotifications([]);
+      setUnreadCount(0);
+      setPreferences(null);
+    } finally {
+      if (activeGuard()) {
+        setLoading(false);
+      }
+    }
+  }, [session?.accessToken, session?.role]);
+
+  useEffect(() => {
+    loadNotificationsRef.current = loadNotifications;
+  }, [loadNotifications]);
+
+  useEffect(() => {
+    let active = true;
+    loadNotifications(() => active);
     return () => {
       active = false;
+    };
+  }, [loadNotifications]);
+
+  useEffect(() => {
+    if (!session?.accessToken || !session?.role) return undefined;
+
+    const intervalId = window.setInterval(() => {
+      loadNotificationsRef.current(() => true).catch(() => {});
+    }, 15000);
+
+    function handleFocus() {
+      loadNotificationsRef.current(() => true).catch(() => {});
+    }
+
+    window.addEventListener("focus", handleFocus);
+    return () => {
+      window.clearInterval(intervalId);
+      window.removeEventListener("focus", handleFocus);
     };
   }, [session?.accessToken, session?.role]);
 
   useEffect(() => {
-    if (!session?.accessToken || session?.role !== "citizen") {
+    if (!session?.accessToken || !session?.role) {
       if (socketRef.current) {
         socketRef.current.close();
         socketRef.current = null;

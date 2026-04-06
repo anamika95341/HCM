@@ -48,7 +48,7 @@ async function getCitizenComplaintDetail(req, res, next) {
 
 async function getAdminComplaintDetail(req, res, next) {
   try {
-    const detail = await complaintsService.getAdminComplaintDetail(req.params.complaintId);
+    const detail = await complaintsService.getAdminComplaintDetail(req.params.complaintId, req.user.sub, reqMeta(req));
     res.json(detail);
   } catch (error) {
     next(error);

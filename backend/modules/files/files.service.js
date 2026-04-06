@@ -2,6 +2,8 @@ const crypto = require('crypto');
 const createHttpError = require('http-errors');
 const redis = require('../../config/redis');
 const filesRepository = require('./files.repository');
+const complaintsRepository = require('../complaints/complaints.repository');
+const meetingsRepository = require('../meetings/meetings.repository');
 const storageService = require('../../services/storageService');
 const logger = require('../../utils/logger');
 const { writeAuditLog } = require('../../utils/audit');
@@ -23,6 +25,13 @@ function getUploadAuditTarget({ actorId, contextType, contextId }) {
   if (contextType === 'meeting' && contextId) {
     return {
       entityType: 'meeting',
+      entityId: contextId,
+    };
+  }
+
+  if (contextType === 'complaint' && contextId) {
+    return {
+      entityType: 'complaint',
       entityId: contextId,
     };
   }
@@ -82,6 +91,76 @@ async function resolveSignedFileAccess(fileId, token) {
   }
 
   return file;
+}
+
+async function assertLegacyFileViewerAccess(file, actorRole, actorId) {
+  if (actorRole === 'citizen') {
+    if (file.entity_type === 'meeting_document') {
+      const meeting = await meetingsRepository.getCitizenMeetingById(file.entity_id, actorId);
+      if (!meeting) {
+        throw createHttpError(404, 'File not found');
+      }
+      return;
+    }
+
+    if (file.entity_type === 'complaint_document') {
+      const complaint = await complaintsRepository.getCitizenComplaintById(file.entity_id, actorId);
+      if (!complaint) {
+        throw createHttpError(404, 'File not found');
+      }
+      return;
+    }
+
+    throw createHttpError(404, 'File not found');
+  }
+
+  if (actorRole === 'admin') {
+    if (file.entity_type === 'meeting_document' || file.entity_type === 'meeting_photo') {
+      const meeting = await meetingsRepository.getMeetingById(file.entity_id);
+      if (!meeting) {
+        throw createHttpError(404, 'File not found');
+      }
+      const canAccessMeeting = meeting.assignedAdminUserId === actorId
+        || (!meeting.assignedAdminUserId && meeting.status === 'pending');
+      if (!canAccessMeeting) {
+        throw createHttpError(404, 'File not found');
+      }
+      return;
+    }
+
+    if (file.entity_type === 'complaint_document') {
+      const complaint = await complaintsRepository.getComplaintById(file.entity_id);
+      if (!complaint) {
+        throw createHttpError(404, 'File not found');
+      }
+      const canAccessComplaint = complaint.assignedAdminUserId === actorId
+        || (!complaint.assignedAdminUserId && complaint.status === 'submitted');
+      if (!canAccessComplaint) {
+        throw createHttpError(404, 'File not found');
+      }
+      return;
+    }
+
+    throw createHttpError(404, 'File not found');
+  }
+
+  if (actorRole === 'minister') {
+    if (file.entity_type !== 'meeting_document' && file.entity_type !== 'meeting_photo') {
+      throw createHttpError(404, 'File not found');
+    }
+    const allowed = await canMinisterAccessFile({
+      context_type: 'meeting',
+      context_id: file.entity_id,
+      visible_to_role: 'minister',
+      uploader_role: 'deo',
+    }, actorId);
+    if (!allowed) {
+      throw createHttpError(404, 'File not found');
+    }
+    return;
+  }
+
+  throw createHttpError(403, 'Forbidden');
 }
 
 function uploadIntentKey(s3Key) {
@@ -150,16 +229,25 @@ async function assertContextAccess({ actorRole, actorId, contextType, contextId 
   }
 
   if (!contextId) {
-    throw createHttpError(400, 'contextId is required for meeting and event uploads');
+    throw createHttpError(400, 'contextId is required for contextual uploads');
   }
 
   if (actorRole === 'citizen') {
-    if (contextType !== 'meeting') {
-      throw createHttpError(400, 'Citizens can only upload files in meeting or general context');
+    if (!['meeting', 'complaint'].includes(contextType)) {
+      throw createHttpError(400, 'Citizens can only upload files in meeting, complaint, or general context');
     }
-    const meeting = await filesRepository.getCitizenMeetingById(contextId, actorId);
-    if (!meeting) {
-      throw createHttpError(403, 'You cannot upload files for this meeting');
+
+    if (contextType === 'meeting') {
+      const meeting = await filesRepository.getCitizenMeetingById(contextId, actorId);
+      if (!meeting) {
+        throw createHttpError(403, 'You cannot upload files for this meeting');
+      }
+      return;
+    }
+
+    const complaint = await filesRepository.getCitizenComplaintById(contextId, actorId);
+    if (!complaint) {
+      throw createHttpError(403, 'You cannot upload files for this complaint');
     }
     return;
   }
@@ -438,6 +526,12 @@ function mapFileResponse(file) {
   };
 }
 
+function assertOwnedFileAccess(file, actorRole, actorId) {
+  if (!file || file.uploader_role !== actorRole || file.uploaded_by !== actorId) {
+    throw createHttpError(404, 'File not found');
+  }
+}
+
 async function listFiles({ actorRole, actorId, query = {} }) {
   assertViewerRole(actorRole);
 
@@ -496,6 +590,105 @@ async function createDownloadUrl({ fileId, actorRole, actorId, reqMeta }) {
   };
 }
 
+async function createOwnerDownloadUrl({ fileId, actorRole, actorId, reqMeta }) {
+  const file = await filesRepository.findFileRecordById(fileId);
+  if (!file) {
+    throw createHttpError(404, 'File not found');
+  }
+
+  assertOwnedFileAccess(file, actorRole, actorId);
+
+  const signed = await storageService.generateDownloadUrl({
+    key: file.s3_key,
+    filename: file.original_name,
+    contentType: file.mime_type,
+  });
+
+  await writeAuditLog({
+    actorRole,
+    actorId,
+    entityType: 'file',
+    entityId: file.id,
+    action: 'owned_file_download_url_generated',
+    ipAddress: reqMeta?.ip || null,
+    userAgent: reqMeta?.userAgent || null,
+    metadata: {
+      s3Key: file.s3_key,
+      contextType: file.context_type,
+      contextId: file.context_id,
+    },
+  });
+
+  return {
+    downloadUrl: signed.downloadUrl,
+    expiresInSeconds: signed.expiresIn,
+    file: mapFileResponse(file),
+  };
+}
+
+async function listOwnedFiles({ actorRole, actorId, contextType, contextId, reqMeta }) {
+  const files = await filesRepository.listFilesUploadedByActor(actorRole, actorId, {
+    contextType,
+    contextId,
+  });
+
+  return Promise.all(files.map(async (file) => {
+    const owned = await createOwnerDownloadUrl({
+      fileId: file.id,
+      actorRole,
+      actorId,
+      reqMeta,
+    });
+    return {
+      ...owned.file,
+      downloadUrl: owned.downloadUrl,
+    };
+  }));
+}
+
+async function createLegacyDownloadAccess({ fileId, actorRole, actorId, reqMeta, scope = {} }) {
+  const file = await filesRepository.findUploadedFileById(fileId);
+  if (!file) {
+    throw createHttpError(404, 'File not found');
+  }
+
+  await assertLegacyFileViewerAccess(file, actorRole, actorId);
+  const signed = await createSignedFileAccess({
+    fileId,
+    actorRole,
+    actorId,
+    scope,
+  });
+
+  await writeAuditLog({
+    actorRole,
+    actorId,
+    entityType: 'file',
+    entityId: file.id,
+    action: 'legacy_file_download_url_generated',
+    ipAddress: reqMeta?.ip || null,
+    userAgent: reqMeta?.userAgent || null,
+    metadata: {
+      storagePath: file.storage_path,
+      entityType: file.entity_type,
+      entityId: file.entity_id,
+    },
+  });
+
+  return {
+    downloadUrl: signed.url,
+    expiresInSeconds: signed.expiresInSeconds,
+    file: {
+      id: file.id,
+      name: file.original_name,
+      mimeType: file.mime_type,
+      size: Number(file.file_size),
+      kind: file.entity_type,
+      createdAt: file.created_at,
+    },
+  };
+}
+
 async function createStorageUploadUrl({ key, contentType, metadata, expiresIn }) {
   return storageService.generateUploadUrl({
     key,
@@ -520,6 +713,9 @@ module.exports = {
   confirmUpload,
   listFiles,
   createDownloadUrl,
+  createOwnerDownloadUrl,
+  listOwnedFiles,
+  createLegacyDownloadAccess,
   createStorageUploadUrl,
   createStorageDownloadUrl,
   resolveSignedFileAccess,

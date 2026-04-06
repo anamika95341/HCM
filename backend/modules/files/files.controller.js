@@ -91,7 +91,7 @@ async function accessSignedFile(req, res, next) {
       res.setHeader('Content-Type', file.mime_type);
       res.setHeader('Content-Length', String(file.file_size));
       res.setHeader('Cache-Control', 'private, max-age=60');
-      res.setHeader('Content-Disposition', `inline; filename*=UTF-8''${encodeURIComponent(file.original_name)}`);
+      res.setHeader('Content-Disposition', `attachment; filename*=UTF-8''${encodeURIComponent(file.original_name)}`);
       return res.sendFile(legacyPath);
     }
 
