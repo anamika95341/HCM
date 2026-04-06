@@ -1114,14 +1114,14 @@ export default function LoginPage({ defaultRole = "citizen" }) {
           ) : role === "citizen" && citizenMode === "register" ? (
             <form onSubmit={handleCitizenRegister} noValidate style={{ display: "grid", gap: 14 }}>
               <div style={{ display: "grid", gridTemplateColumns: viewportWidth < 640 ? "1fr" : "repeat(3, minmax(0, 1fr))", gap: 14 }}>
-                <Field label="First Name" icon={<Mail size={16} color={C.t3} />} required error={getRegisterFieldError("firstName")}>
-                  <input maxLength={CITIZEN_NAME_MAX_LENGTH} value={registerForm.firstName} onChange={(event) => handleRegisterFieldChange("firstName", event.target.value)} style={fieldStyle(C, true, false, shouldHighlightRegisterField("firstName"))} />
+                <Field label="First Name" icon={null} required error={getRegisterFieldError("firstName")}>
+                  <input maxLength={CITIZEN_NAME_MAX_LENGTH} value={registerForm.firstName} onChange={(event) => handleRegisterFieldChange("firstName", event.target.value)} placeholder="First name" style={fieldStyle(C, false, false, shouldHighlightRegisterField("firstName"))} />
                 </Field>
-                <Field label="Middle Name" icon={<Mail size={16} color={C.t3} />} error={getRegisterFieldError("middleName")}>
-                  <input maxLength={CITIZEN_NAME_MAX_LENGTH} value={registerForm.middleName} onChange={(event) => handleRegisterFieldChange("middleName", event.target.value)} style={fieldStyle(C, true, false, shouldHighlightRegisterField("middleName"))} />
+                <Field label="Middle Name" icon={null} error={getRegisterFieldError("middleName")}>
+                  <input maxLength={CITIZEN_NAME_MAX_LENGTH} value={registerForm.middleName} onChange={(event) => handleRegisterFieldChange("middleName", event.target.value)} placeholder="Middle name" style={fieldStyle(C, false, false, shouldHighlightRegisterField("middleName"))} />
                 </Field>
-                <Field label="Last Name" icon={<Mail size={16} color={C.t3} />} required error={getRegisterFieldError("lastName")}>
-                  <input maxLength={CITIZEN_NAME_MAX_LENGTH} value={registerForm.lastName} onChange={(event) => handleRegisterFieldChange("lastName", event.target.value)} style={fieldStyle(C, true, false, shouldHighlightRegisterField("lastName"))} />
+                <Field label="Last Name" icon={null} required error={getRegisterFieldError("lastName")}>
+                  <input maxLength={CITIZEN_NAME_MAX_LENGTH} value={registerForm.lastName} onChange={(event) => handleRegisterFieldChange("lastName", event.target.value)} placeholder="Last name" style={fieldStyle(C, false, false, shouldHighlightRegisterField("lastName"))} />
                 </Field>
               </div>
 
@@ -1134,41 +1134,41 @@ export default function LoginPage({ defaultRole = "citizen" }) {
                     <option value="other">Other</option>
                   </select>
                 </Field>
-                <Field label="Age" icon={<Mail size={16} color={C.t3} />} required error={getRegisterFieldError("age")}>
-                  <input value={registerForm.age} onChange={(event) => handleRegisterFieldChange("age", event.target.value)} inputMode="numeric" style={fieldStyle(C, true, false, shouldHighlightRegisterField("age"))} />
+                <Field label="Age" icon={null} required error={getRegisterFieldError("age")}>
+                  <input value={registerForm.age} onChange={(event) => handleRegisterFieldChange("age", event.target.value)} inputMode="numeric" placeholder="Age" style={fieldStyle(C, false, false, shouldHighlightRegisterField("age"))} />
                 </Field>
                 <Field label="Email" icon={<Mail size={16} color={C.t3} />} required error={getRegisterFieldError("email")}>
-                  <input type="email" value={registerForm.email} onChange={(event) => handleRegisterFieldChange("email", event.target.value)} style={fieldStyle(C, true, false, shouldHighlightRegisterField("email"))} />
+                  <input type="email" value={registerForm.email} onChange={(event) => handleRegisterFieldChange("email", event.target.value)} placeholder="Email address" style={fieldStyle(C, true, false, shouldHighlightRegisterField("email"))} />
                 </Field>
               </div>
 
               <div style={{ display: "grid", gridTemplateColumns: viewportWidth < 640 ? "1fr" : "repeat(2, minmax(0, 1fr))", gap: 14 }}>
                 <Field label="Aadhaar Number" icon={<Shield size={16} color={C.t3} />} required error={getRegisterFieldError("aadhaarNumber")}>
-                  <input value={registerForm.aadhaarNumber} onChange={(event) => handleRegisterFieldChange("aadhaarNumber", event.target.value)} style={fieldStyle(C, true, false, shouldHighlightRegisterField("aadhaarNumber"))} />
+                  <input value={registerForm.aadhaarNumber} onChange={(event) => handleRegisterFieldChange("aadhaarNumber", event.target.value)} placeholder="12-digit Aadhaar number" style={fieldStyle(C, true, false, shouldHighlightRegisterField("aadhaarNumber"))} />
                 </Field>
                 <Field label="Mobile Number" icon={<Phone size={16} color={C.t3} />} required error={getRegisterFieldError("mobileNumber")}>
-                  <input value={registerForm.mobileNumber} onChange={(event) => handleRegisterFieldChange("mobileNumber", event.target.value)} style={fieldStyle(C, true, false, shouldHighlightRegisterField("mobileNumber"))} />
+                  <input value={registerForm.mobileNumber} onChange={(event) => handleRegisterFieldChange("mobileNumber", event.target.value)} placeholder="Mobile number" style={fieldStyle(C, true, false, shouldHighlightRegisterField("mobileNumber"))} />
                 </Field>
               </div>
 
               <div style={{ display: "grid", gridTemplateColumns: viewportWidth < 640 ? "1fr" : "repeat(3, minmax(0, 1fr))", gap: 14 }}>
                 <Field label="Pincode" icon={<MapPin size={16} color={C.t3} />} required error={getRegisterFieldError("pincode")}>
-                  <input value={registerForm.pincode} onChange={(event) => handleRegisterFieldChange("pincode", event.target.value)} style={fieldStyle(C, true, false, shouldHighlightRegisterField("pincode"))} />
+                  <input value={registerForm.pincode} onChange={(event) => handleRegisterFieldChange("pincode", event.target.value)} placeholder="Pincode" style={fieldStyle(C, true, false, shouldHighlightRegisterField("pincode"))} />
                 </Field>
                 <Field label="City" icon={<Building2 size={16} color={C.t3} />} required error={getRegisterFieldError("city")}>
-                  <input value={registerForm.city} onChange={(event) => handleRegisterFieldChange("city", event.target.value)} style={fieldStyle(C, true, false, shouldHighlightRegisterField("city"))} />
+                  <input value={registerForm.city} onChange={(event) => handleRegisterFieldChange("city", event.target.value)} placeholder="City" style={fieldStyle(C, true, false, shouldHighlightRegisterField("city"))} />
                 </Field>
                 <Field label="State" icon={<Landmark size={16} color={C.t3} />} required error={getRegisterFieldError("state")}>
-                  <input value={registerForm.state} onChange={(event) => handleRegisterFieldChange("state", event.target.value)} style={fieldStyle(C, true, false, shouldHighlightRegisterField("state"))} />
+                  <input value={registerForm.state} onChange={(event) => handleRegisterFieldChange("state", event.target.value)} placeholder="State" style={fieldStyle(C, true, false, shouldHighlightRegisterField("state"))} />
                 </Field>
               </div>
 
               <div style={{ display: "grid", gridTemplateColumns: viewportWidth < 640 ? "1fr" : "repeat(2, minmax(0, 1fr))", gap: 14 }}>
                 <Field label="Password" icon={<Lock size={16} color={C.t3} />} required error={getRegisterFieldError("password")}>
-                  <input type="password" maxLength={CITIZEN_REGISTER_PASSWORD_MAX_LENGTH} value={registerForm.password} onChange={(event) => handleRegisterFieldChange("password", event.target.value)} style={fieldStyle(C, true, false, shouldHighlightRegisterField("password"))} />
+                  <input type="password" maxLength={CITIZEN_REGISTER_PASSWORD_MAX_LENGTH} value={registerForm.password} onChange={(event) => handleRegisterFieldChange("password", event.target.value)} placeholder="Password" style={fieldStyle(C, true, false, shouldHighlightRegisterField("password"))} />
                 </Field>
                 <Field label="Confirm Password" icon={<Lock size={16} color={C.t3} />} required error={getRegisterFieldError("confirmPassword")}>
-                  <input type="password" maxLength={CITIZEN_REGISTER_PASSWORD_MAX_LENGTH} value={registerForm.confirmPassword} onChange={(event) => handleRegisterFieldChange("confirmPassword", event.target.value)} style={fieldStyle(C, true, false, shouldHighlightRegisterField("confirmPassword"))} />
+                  <input type="password" maxLength={CITIZEN_REGISTER_PASSWORD_MAX_LENGTH} value={registerForm.confirmPassword} onChange={(event) => handleRegisterFieldChange("confirmPassword", event.target.value)} placeholder="Confirm password" style={fieldStyle(C, true, false, shouldHighlightRegisterField("confirmPassword"))} />
                 </Field>
               </div>
 

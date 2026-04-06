@@ -962,7 +962,7 @@
 //   );
 // }
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   FileText, CheckCircle, AlertCircle, Users, Upload, Phone,
   ChevronRight, Calendar, MapPin, Briefcase, X, ArrowRight, Home, Clock,
@@ -990,7 +990,15 @@ function SuccessModal({ open, title, message, onClose }) {
   const { C } = usePortalTheme();
   if (!open) return null;
   return (
-    <div className="fixed inset-0 z-[120] flex items-center justify-center px-4 bg-black/40 backdrop-blur-sm">
+    <div
+      className="fixed z-[120] flex items-center justify-center px-4 bg-black/40 backdrop-blur-sm"
+      style={{
+        top: 0,
+        right: 0,
+        bottom: 0,
+        left: "var(--portal-sidebar-width, 280px)",
+      }}
+    >
       <div
         className="w-full max-w-md rounded-xl overflow-hidden animate-in fade-in zoom-in-95 duration-300"
         style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 12, boxShadow: C.dialogShadow }}
@@ -1010,6 +1018,303 @@ function SuccessModal({ open, title, message, onClose }) {
           </WorkspaceButton>
         </div>
       </div>
+    </div>
+  );
+}
+
+function CustomDatePicker({ value, onChange, min, max, placeholder = "Select date" }) {
+  const { C } = usePortalTheme();
+  const [isOpen, setIsOpen] = useState(false);
+  const [openDirection, setOpenDirection] = useState("down");
+  const rootRef = useRef(null);
+  const [visibleMonth, setVisibleMonth] = useState(() => {
+    if (value) return parseDateValue(value);
+    return parseDateValue(min) || parseDateValue(max) || new Date();
+  });
+
+  useEffect(() => {
+    if (!isOpen) return undefined;
+
+    const updateDirection = () => {
+      const root = rootRef.current;
+      if (!root) return;
+      const rect = root.getBoundingClientRect();
+      const dropdownHeight = 340;
+      const spaceBelow = window.innerHeight - rect.bottom;
+      const spaceAbove = rect.top;
+      setOpenDirection(spaceBelow < dropdownHeight && spaceAbove > spaceBelow ? "up" : "down");
+    };
+
+    updateDirection();
+
+    const handlePointerDown = (event) => {
+      const pickerRoot = event.target.closest?.('[data-meeting-date-picker="true"]');
+      if (!pickerRoot) {
+        setIsOpen(false);
+      }
+    };
+
+    window.addEventListener("resize", updateDirection);
+    window.addEventListener("scroll", updateDirection, true);
+    document.addEventListener("mousedown", handlePointerDown);
+    return () => {
+      window.removeEventListener("resize", updateDirection);
+      window.removeEventListener("scroll", updateDirection, true);
+      document.removeEventListener("mousedown", handlePointerDown);
+    };
+  }, [isOpen]);
+
+  useEffect(() => {
+    if (!value) return;
+    const parsedValue = parseDateValue(value);
+    if (parsedValue) {
+      setVisibleMonth(parsedValue);
+    }
+  }, [value]);
+
+  const monthStart = new Date(visibleMonth.getFullYear(), visibleMonth.getMonth(), 1);
+  const minDate = parseDateValue(min);
+  const maxDate = parseDateValue(max);
+  const days = buildCalendarDays(monthStart);
+
+  return (
+    <div ref={rootRef} data-meeting-date-picker="true" style={{ position: "relative" }}>
+      <button
+        type="button"
+        onClick={() => setIsOpen((current) => !current)}
+        style={{
+          width: "100%",
+          minHeight: 42,
+          padding: "10px 14px",
+          border: `1px solid ${C.border}`,
+          background: C.inp,
+          color: value ? C.t1 : C.t3,
+          fontSize: 13,
+          outline: "none",
+          borderRadius: "var(--portal-radius-sm, 10px)",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          cursor: "pointer",
+        }}
+      >
+        <span>{value ? formatDisplayDate(value) : placeholder}</span>
+        <Calendar size={16} style={{ color: C.t3 }} />
+      </button>
+
+      {isOpen ? (
+        <div
+          style={{
+            position: "absolute",
+            top: openDirection === "down" ? "calc(100% + 6px)" : "auto",
+            bottom: openDirection === "up" ? "calc(100% + 6px)" : "auto",
+            left: 0,
+            width: "100%",
+            minWidth: 280,
+            zIndex: 30,
+            padding: 12,
+            borderRadius: 12,
+            border: `1px solid ${C.border}`,
+            background: C.card,
+            boxShadow: "0 16px 36px rgba(15, 23, 42, 0.14)",
+          }}
+        >
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
+            <button
+              type="button"
+              onClick={() => setVisibleMonth((current) => new Date(current.getFullYear(), current.getMonth() - 1, 1))}
+              style={calendarNavButtonStyle(C)}
+            >
+              <ChevronRight size={16} style={{ transform: "rotate(180deg)" }} />
+            </button>
+            <div style={{ fontSize: 13, fontWeight: 700, color: C.t1 }}>
+              {monthStart.toLocaleString("en-US", { month: "long", year: "numeric" })}
+            </div>
+            <button
+              type="button"
+              onClick={() => setVisibleMonth((current) => new Date(current.getFullYear(), current.getMonth() + 1, 1))}
+              style={calendarNavButtonStyle(C)}
+            >
+              <ChevronRight size={16} />
+            </button>
+          </div>
+
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(7, minmax(0, 1fr))", gap: 4 }}>
+            {["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"].map((day) => (
+              <div key={day} style={{ textAlign: "center", fontSize: 11, fontWeight: 700, color: C.t3, padding: "6px 0" }}>
+                {day}
+              </div>
+            ))}
+            {days.map((day) => {
+              const dayValue = formatDateValue(day);
+              const isCurrentMonth = day.getMonth() === monthStart.getMonth();
+              const isDisabled = (minDate && dayValue < min) || (maxDate && dayValue > max) || !isCurrentMonth;
+              const isSelected = value === dayValue;
+
+              return (
+                <button
+                  key={dayValue}
+                  type="button"
+                  disabled={isDisabled}
+                  onClick={() => {
+                    onChange(dayValue);
+                    setIsOpen(false);
+                  }}
+                  style={{
+                    height: 34,
+                    borderRadius: 8,
+                    border: `1px solid ${isSelected ? C.purple : "transparent"}`,
+                    background: isSelected ? C.purple : "transparent",
+                    color: isSelected ? "#ffffff" : isCurrentMonth ? C.t1 : C.t3,
+                    opacity: isDisabled ? 0.35 : 1,
+                    cursor: isDisabled ? "not-allowed" : "pointer",
+                    fontSize: 12,
+                    fontWeight: 600,
+                  }}
+                >
+                  {day.getDate()}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+function CustomTimePicker({ value, onChange, options }) {
+  const { C } = usePortalTheme();
+  const [isOpen, setIsOpen] = useState(false);
+  const [openDirection, setOpenDirection] = useState("down");
+  const rootRef = useRef(null);
+
+  useEffect(() => {
+    if (!isOpen) return undefined;
+
+    const updateDirection = () => {
+      const root = rootRef.current;
+      if (!root) return;
+      const rect = root.getBoundingClientRect();
+      const dropdownHeight = 232;
+      const spaceBelow = window.innerHeight - rect.bottom;
+      const spaceAbove = rect.top;
+      setOpenDirection(spaceBelow < dropdownHeight && spaceAbove > spaceBelow ? "up" : "down");
+    };
+
+    updateDirection();
+
+    const handlePointerDown = (event) => {
+      const pickerRoot = event.target.closest?.('[data-meeting-time-picker="true"]');
+      if (!pickerRoot) {
+        setIsOpen(false);
+      }
+    };
+
+    window.addEventListener("resize", updateDirection);
+    window.addEventListener("scroll", updateDirection, true);
+    document.addEventListener("mousedown", handlePointerDown);
+    return () => {
+      window.removeEventListener("resize", updateDirection);
+      window.removeEventListener("scroll", updateDirection, true);
+      document.removeEventListener("mousedown", handlePointerDown);
+    };
+  }, [isOpen]);
+
+  return (
+    <div ref={rootRef} data-meeting-time-picker="true" style={{ position: "relative" }}>
+      <button
+        type="button"
+        onClick={() => setIsOpen((current) => !current)}
+        style={{
+          width: "100%",
+          minHeight: 42,
+          padding: "10px 14px",
+          border: `1px solid ${C.border}`,
+          background: C.inp,
+          color: value ? C.t1 : C.t3,
+          fontSize: 13,
+          outline: "none",
+          borderRadius: "var(--portal-radius-sm, 10px)",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          cursor: "pointer",
+        }}
+      >
+        <span>{value || "Select time slot"}</span>
+        <Clock size={16} style={{ color: C.t3 }} />
+      </button>
+
+      {isOpen ? (
+        <div
+          style={{
+            position: "absolute",
+            top: openDirection === "down" ? "calc(100% + 6px)" : "auto",
+            bottom: openDirection === "up" ? "calc(100% + 6px)" : "auto",
+            left: 0,
+            width: "100%",
+            zIndex: 30,
+            maxHeight: 220,
+            overflowY: "auto",
+            padding: 6,
+            borderRadius: 12,
+            border: `1px solid ${C.border}`,
+            background: C.card,
+            boxShadow: "0 16px 36px rgba(15, 23, 42, 0.14)",
+          }}
+        >
+          <button
+            type="button"
+            onClick={() => {
+              onChange("");
+              setIsOpen(false);
+            }}
+            style={{
+              width: "100%",
+              minHeight: 34,
+              borderRadius: 8,
+              border: "none",
+              background: "transparent",
+              color: C.t3,
+              textAlign: "left",
+              padding: "8px 10px",
+              fontSize: 12,
+              cursor: "pointer",
+            }}
+          >
+            Select time slot
+          </button>
+          {options.map((option) => {
+            const isSelected = value === option;
+
+            return (
+              <button
+                key={option}
+                type="button"
+                onClick={() => {
+                  onChange(option);
+                  setIsOpen(false);
+                }}
+                style={{
+                  width: "100%",
+                  minHeight: 34,
+                  borderRadius: 8,
+                  border: `1px solid ${isSelected ? C.purple : "transparent"}`,
+                  background: isSelected ? C.purple : "transparent",
+                  color: isSelected ? "#ffffff" : C.t1,
+                  textAlign: "left",
+                  padding: "8px 10px",
+                  fontSize: 12,
+                  cursor: "pointer",
+                }}
+              >
+                {option}
+              </button>
+            );
+          })}
+        </div>
+      ) : null}
     </div>
   );
 }
@@ -1105,6 +1410,63 @@ const getTomorrowDate = () => {
   return tomorrow.toISOString().split('T')[0];
 };
 
+const getTodayDate = () => {
+  const today = new Date();
+  const year = today.getFullYear();
+  const month = String(today.getMonth() + 1).padStart(2, "0");
+  const day = String(today.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+};
+
+const parseDateValue = (value) => {
+  if (!value) return null;
+  const [year, month, day] = value.split("-").map(Number);
+  if (!year || !month || !day) return null;
+  return new Date(year, month - 1, day);
+};
+
+const formatDateValue = (date) => {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+};
+
+const formatDisplayDate = (value) => {
+  const parsedDate = parseDateValue(value);
+  if (!parsedDate) return "";
+  return parsedDate.toLocaleDateString("en-US", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+  });
+};
+
+const buildCalendarDays = (monthStart) => {
+  const startDay = monthStart.getDay();
+  const gridStart = new Date(monthStart);
+  gridStart.setDate(monthStart.getDate() - startDay);
+
+  return Array.from({ length: 42 }, (_, index) => {
+    const date = new Date(gridStart);
+    date.setDate(gridStart.getDate() + index);
+    return date;
+  });
+};
+
+const calendarNavButtonStyle = (C) => ({
+  width: 28,
+  height: 28,
+  borderRadius: 8,
+  border: `1px solid ${C.border}`,
+  background: C.bgElevated,
+  color: C.t2,
+  display: "inline-flex",
+  alignItems: "center",
+  justifyContent: "center",
+  cursor: "pointer",
+});
+
 const toIsoFromDateAndSlot = (dateString, timeSlot) => {
   if (!dateString || !timeSlot) {
     return "";
@@ -1151,6 +1513,9 @@ export default function HCMNewCasePage() {
   const [error, setError] = useState("");
   const [successModal, setSuccessModal] = useState({ open: false, title: "", message: "" });
   const [loading, setLoading] = useState(false);
+  const [isBackHovered, setIsBackHovered] = useState(false);
+  const [isAddPersonHovered, setIsAddPersonHovered] = useState(false);
+  const [hoveredRemoveIndex, setHoveredRemoveIndex] = useState(null);
   const navigate = useNavigate();
   const { session } = useAuth();
 
@@ -1202,25 +1567,29 @@ export default function HCMNewCasePage() {
     };
   }, [session?.accessToken]);
 
+  useEffect(() => {
+    setIsBackHovered(false);
+  }, [activeTab]);
+
   const sectionLabelStyle = {
     display: "block",
     fontSize: 11,
     fontWeight: 700,
-    color: C.t3,
+    color: C.t2,
     textTransform: "uppercase",
     letterSpacing: ".08em",
-    marginBottom: 10,
+    marginBottom: 8,
   };
 
   const textareaStyle = {
     width: "100%",
-    padding: "12px 16px",
+    padding: "9px 14px",
     border: `1px solid ${C.border}`,
     borderRadius: 12,
     background: C.inp,
     color: C.t1,
     fontSize: 14,
-    lineHeight: 1.6,
+    lineHeight: 1.45,
     outline: "none",
   };
 
@@ -1231,6 +1600,7 @@ export default function HCMNewCasePage() {
     fontStyle: "italic",
     fontWeight: 500,
   };
+  const backButtonAccent = C.purple;
 
   const submitMeeting = async (event) => {
     event.preventDefault();
@@ -1438,24 +1808,34 @@ export default function HCMNewCasePage() {
 
         {/* HEADER */}
         {activeTab && (
-          <div className="mb-4" style={{ position: "sticky", top: 0, zIndex: 40, background: C.card, border: `1px solid ${C.border}`, borderRadius: 16, padding: "16px 24px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-            <div style={{ width: 160, flexShrink: 0 }}>
+          <div className="mb-4" style={{ display: "grid", gridTemplateColumns: "1fr auto 1fr", alignItems: "center" }}>
+            <div style={{ justifySelf: "start" }}>
               <button
+                onMouseEnter={() => setIsBackHovered(true)}
+                onMouseLeave={() => setIsBackHovered(false)}
                 onClick={() => {
+                  setIsBackHovered(false);
                   setActiveTab("");
                   setError("");
                 }}
-                className="flex items-center gap-2 font-medium transition-colors"
-                style={{ color: C.purple }}
+                className="flex items-center gap-1.5 font-medium transition-colors"
+                style={{
+                  border: `1px solid ${backButtonAccent}`,
+                  background: isBackHovered ? backButtonAccent : "transparent",
+                  color: isBackHovered ? "#ffffff" : backButtonAccent,
+                  fontSize: 13,
+                  padding: "8px 8px",
+                  borderRadius: 10,
+                }}
               >
-                <ChevronRight size={20} className="rotate-180" />
+                <ChevronRight size={16} className="rotate-180" />
                 Back to Services
               </button>
             </div>
-            <h2 style={{ fontSize: 20, fontWeight: 600, color: C.t1 }}>
-              {activeTab === "meeting" ? "Meeting Request" : "Submit Complaint"}
+            <h2 style={{ fontSize: 20, fontWeight: 600, color: C.t1, margin: 0, textAlign: "center" }}>
+              {activeTab === "meeting" ? "MEETING REQUEST" : "SUBMIT COMPLAINT"}
             </h2>
-            <div style={{ width: 160, flexShrink: 0 }}></div>
+            <div />
           </div>
         )}
 
@@ -1475,12 +1855,29 @@ export default function HCMNewCasePage() {
           <div className="grid md:grid-cols-2 gap-6 mb-12">
             {/* MEETING REQUEST */}
             <button
-              onClick={() => setActiveTab("meeting")}
-              className="group relative rounded-xl border transition-[border-color,opacity] duration-200 overflow-hidden text-left hover:opacity-[0.98]"
-              style={{ background: C.card, borderColor: C.border, boxShadow: "none", minHeight: 340 }}
+              onClick={() => {
+                setIsBackHovered(false);
+                setActiveTab("meeting");
+              }}
+              className="group relative rounded-xl border overflow-hidden text-left transition-all duration-300 hover:-translate-y-1 hover:scale-[1.01] hover:opacity-[0.99]"
+              style={{
+                background: C.card,
+                borderColor: C.border,
+                boxShadow: `0 18px 36px rgba(15, 23, 42, 0.08), 0 0 0 0 ${C.purple}00`,
+                minHeight: 340,
+              }}
+              onMouseEnter={(event) => {
+                event.currentTarget.style.boxShadow = `0 22px 44px rgba(15, 23, 42, 0.12), 0 0 28px ${C.purple}55`;
+              }}
+              onMouseLeave={(event) => {
+                event.currentTarget.style.boxShadow = `0 18px 36px rgba(15, 23, 42, 0.08), 0 0 0 0 ${C.purple}00`;
+              }}
             >
               <div className="relative p-10" style={{ minHeight: 340, display: "flex", flexDirection: "column", justifyContent: "space-between" }}>
-                <div className="h-14 w-14 rounded-xl flex items-center justify-center mb-5" style={{ background: C.purpleDim }}>
+                <div
+                  className="h-14 w-14 rounded-xl flex items-center justify-center mb-5"
+                  style={{ background: C.purpleDim }}
+                >
                   <Calendar size={26} style={{ color: C.purple }} />
                 </div>
                 <div>
@@ -1489,21 +1886,41 @@ export default function HCMNewCasePage() {
                     Schedule a meeting with an administration desk. You can specify purpose, add supporting documents, and invite companions.
                   </p>
                 </div>
-                <div className="flex items-center gap-2 font-medium group-hover:gap-3 transition-all duration-300" style={{ color: C.purple, marginTop: 12 }}>
-                  Get Started
-                  <ArrowRight size={18} />
+                <div
+                  className="flex items-center gap-2 font-medium group-hover:gap-3 group-hover:translate-x-1 transition-all duration-300"
+                  style={{ color: C.purple, marginTop: 12 }}
+                >
+                  <span>Get Started</span>
+                  <ArrowRight size={18} className="group-hover:scale-110 transition-transform duration-300" />
                 </div>
               </div>
             </button>
 
             {/* SUBMIT COMPLAINT */}
             <button
-              onClick={() => setActiveTab("complaint")}
-              className="group relative rounded-xl border transition-[border-color,opacity] duration-200 overflow-hidden text-left hover:opacity-[0.98]"
-              style={{ background: C.card, borderColor: C.border, boxShadow: "none", minHeight: 340 }}
+              onClick={() => {
+                setIsBackHovered(false);
+                setActiveTab("complaint");
+              }}
+              className="group relative rounded-xl border overflow-hidden text-left transition-all duration-300 hover:-translate-y-1 hover:scale-[1.01] hover:opacity-[0.99]"
+              style={{
+                background: C.card,
+                borderColor: C.border,
+                boxShadow: `0 18px 36px rgba(15, 23, 42, 0.08), 0 0 0 0 ${C.mint}00`,
+                minHeight: 340,
+              }}
+              onMouseEnter={(event) => {
+                event.currentTarget.style.boxShadow = `0 22px 44px rgba(15, 23, 42, 0.12), 0 0 28px ${C.mint}55`;
+              }}
+              onMouseLeave={(event) => {
+                event.currentTarget.style.boxShadow = `0 18px 36px rgba(15, 23, 42, 0.08), 0 0 0 0 ${C.mint}00`;
+              }}
             >
               <div className="relative p-10" style={{ minHeight: 340, display: "flex", flexDirection: "column", justifyContent: "space-between" }}>
-                <div className="h-14 w-14 rounded-xl flex items-center justify-center mb-5" style={{ background: `${C.mint}20` }}>
+                <div
+                  className="h-14 w-14 rounded-xl flex items-center justify-center mb-5"
+                  style={{ background: `${C.mint}20` }}
+                >
                   <FileText size={26} style={{ color: C.mint }} />
                 </div>
                 <div>
@@ -1512,9 +1929,12 @@ export default function HCMNewCasePage() {
                     File a formal complaint regarding any civic or government issue. Supports multiple document formats and categories.
                   </p>
                 </div>
-                <div className="flex items-center gap-2 font-medium group-hover:gap-3 transition-all duration-300" style={{ color: C.mint, marginTop: 12 }}>
-                  Get Started
-                  <ArrowRight size={18} />
+                <div
+                  className="flex items-center gap-2 font-medium group-hover:gap-3 group-hover:translate-x-1 transition-all duration-300"
+                  style={{ color: C.mint, marginTop: 12 }}
+                >
+                  <span>Get Started</span>
+                  <ArrowRight size={18} className="group-hover:scale-110 transition-transform duration-300" />
                 </div>
               </div>
             </button>
@@ -1522,11 +1942,8 @@ export default function HCMNewCasePage() {
         ) : activeTab === "meeting" ? (
           // MEETING FORM
           <WorkspaceCard style={{ marginBottom: 32 }}>
-            <form onSubmit={submitMeeting} className="space-y-8">
-              <WorkspaceCardHeader
-                title="Meeting Request Form"
-                subtitle="Share the purpose, timing, supporting documents, and any accompanying attendees."
-              />
+            <form onSubmit={submitMeeting} className="space-y-5">
+              
 
               {/* TITLE */}
               <div>
@@ -1546,15 +1963,12 @@ export default function HCMNewCasePage() {
                   }
                   placeholder="Enter meeting title (e.g. Document Verification)"
                 />
-                <div style={{ display: "flex", justifyContent: "space-between", marginTop: 4 }}>
+                <div style={{ marginTop: 4 }}>
                   {meetingForm.title.length >= 200 ? (
                     <div style={errorTextStyle}>Maximum 200 characters allowed.</div>
                   ) : (
                     <div />
                   )}
-                  <span style={{ fontSize: 11, color: C.t3 }}>
-                    {meetingForm.title.length}/200
-                  </span>
                 </div>
               </div>
 
@@ -1574,84 +1988,66 @@ export default function HCMNewCasePage() {
                   style={textareaStyle}
                   rows={5}
                 />
-                <div style={{ display: "flex", justifyContent: "space-between", marginTop: 4 }}>
+                <div style={{ marginTop: 4 }}>
                   {meetingForm.purpose.length >= 1000 ? (
                     <div style={errorTextStyle}>Maximum 1000 characters allowed.</div>
                   ) : (
                     <div />
                   )}
-                  <span style={{ fontSize: 11, color: C.t3 }}>
-                    {meetingForm.purpose.length}/1000
-                  </span>
                 </div>
               </div>
 
-              {/* DATE AND TIME */}
-               <div style={{ padding: 20, borderRadius: 12, border: `1px solid ${C.border}`, background: C.bgElevated }}>
-                <div style={{ fontSize: 12, fontWeight: 700, color: C.t3, textTransform: "uppercase", letterSpacing: ".08em", marginBottom: 16 }}>
-                  Scheduling Preferences
-                </div>
-                <div className="grid md:grid-cols-2 gap-6">
-                <div>
-                  <label className="flex items-center gap-2" style={{ ...sectionLabelStyle, display: "flex", alignItems: "center" }}>
-                    <Calendar size={16} />
-                    <span>Preferred Date <span style={{ color: C.danger }}>*</span></span>
-                  </label>
-                  <WorkspaceInput
-                    required
-                    type="date"
-                    value={meetingForm.preferredDate}
-                    onChange={(event) =>
-                      setMeetingForm((current) => ({ ...current, preferredDate: event.target.value }))
-                    }
-                    min={getTomorrowDate()}
-                  />
-                  <p style={{ fontSize: 11, color: C.t3, marginTop: 8 }}>Select a date from tomorrow onwards</p>
+              <div className="grid lg:grid-cols-2 gap-3 items-start">
+                <div className="grid md:grid-cols-2 gap-3">
+                  <div>
+                    <label className="flex items-center gap-2" style={{ ...sectionLabelStyle, display: "flex", alignItems: "center" }}>
+                      <Calendar size={16} />
+                      <span>Preferred Date <span style={{ color: C.danger }}>*</span></span>
+                    </label>
+                    <CustomDatePicker
+                      value={meetingForm.preferredDate}
+                      onChange={(nextDate) =>
+                        setMeetingForm((current) => ({ ...current, preferredDate: nextDate }))
+                      }
+                      min={getTomorrowDate()}
+                      placeholder="Select preferred date"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="flex items-center gap-2" style={{ ...sectionLabelStyle, display: "flex", alignItems: "center" }}>
+                      <Clock size={16} />
+                      <span>Preferred Time <span style={{ color: C.danger }}>*</span></span>
+                    </label>
+                    <CustomTimePicker
+                      value={meetingForm.preferredTime}
+                      onChange={(nextTime) =>
+                        setMeetingForm((current) => ({ ...current, preferredTime: nextTime }))
+                      }
+                      options={timeSlots}
+                    />
+                  </div>
                 </div>
 
                 <div>
-                  <label className="flex items-center gap-2" style={{ ...sectionLabelStyle, display: "flex", alignItems: "center" }}>
-                    <Clock size={16} />
-                    <span>Preferred Time <span style={{ color: C.danger }}>*</span></span>
+                  <label style={sectionLabelStyle}>
+                    Admin Desk (Optional)
                   </label>
                   <WorkspaceSelect
-                    required
-                    value={meetingForm.preferredTime}
+                    value={meetingForm.referralAdminUserId}
                     onChange={(event) =>
-                      setMeetingForm((current) => ({ ...current, preferredTime: event.target.value }))
+                      setMeetingForm((current) => ({ ...current, referralAdminUserId: event.target.value }))
                     }
+                    style={{ width: "100%", minWidth: 0, boxSizing: "border-box", color: meetingForm.referralAdminUserId ? C.t1 : C.t3 }}
                   >
-                    <option value="">-- Select time slot --</option>
-                    {timeSlots.map((time) => (
-                      <option key={time} value={time}>
-                        {time}
+                    <option value="">-- Select an admin desk --</option>
+                    {admins.map((admin) => (
+                      <option key={admin.id} value={admin.id}>
+                        {admin.name ? `${admin.name} (${admin.username})` : admin.username} · {admin.department}
                       </option>
                     ))}
                   </WorkspaceSelect>
-                  <p style={{ fontSize: 11, color: C.t3, marginTop: 8 }}>24-hour slots available • 30-minute intervals</p>
                 </div>
-              </div>
-              </div>
-
-              {/* ADMIN REFERRAL */}
-              <div>
-                <label style={sectionLabelStyle}>
-                  Admin Desk (Optional)
-                </label>
-                <WorkspaceSelect
-                  value={meetingForm.referralAdminUserId}
-                  onChange={(event) =>
-                    setMeetingForm((current) => ({ ...current, referralAdminUserId: event.target.value }))
-                  }
-                >
-                  <option value="">-- Select an admin desk --</option>
-                  {admins.map((admin) => (
-                    <option key={admin.id} value={admin.id}>
-                      {admin.name ? `${admin.name} (${admin.username})` : admin.username} · {admin.department}
-                    </option>
-                  ))}
-                </WorkspaceSelect>
-                <p style={{ fontSize: 11, color: C.t3, marginTop: 8 }}>Not sure? Leave blank to auto-assign.</p>
               </div>
 
               {/* FILE UPLOAD */}
@@ -1665,7 +2061,7 @@ export default function HCMNewCasePage() {
                       <Upload size={24} style={{ color: C.t3 }} />
                     </div>
                     <div className="flex-1">
-                      <div style={{ fontWeight: 600, color: C.t1 }}>
+                      <div style={{ fontWeight: 600, color: meetingForm.files.length > 0 ? C.t1 : C.t3 }}>
                         {meetingForm.files.length > 0
                           ? `${meetingForm.files.length} file(s) selected`
                           : "Click to upload or drag and drop"}
@@ -1693,19 +2089,40 @@ export default function HCMNewCasePage() {
               </div>
 
               {/* COMPANIONS */}
-                 <div style={{ padding: 20, borderRadius: 12, border: `1px solid ${C.border}`, background: C.bgElevated }}>
+
                 <label className="flex items-center gap-2" style={{ ...sectionLabelStyle, display: "flex", alignItems: "center" }}>
                   <Users size={18} />
                   <span>Additional Attendees</span>
                 </label>
-                <div className="space-y-4">
+                <button
+                  type="button"
+                  onMouseEnter={() => setIsAddPersonHovered(true)}
+                  onMouseLeave={() => setIsAddPersonHovered(false)}
+                  onClick={() =>
+                    setMeetingForm((current) => ({
+                      ...current,
+                      companions: [...current.companions, { name: "", phone: "" }],
+                    }))
+                  }
+                  className="inline-flex items-center gap-2 px-3 py-2 rounded-lg transition-colors font-medium text-sm"
+                  style={{
+                    border: `1px solid ${C.purple}`,
+                    background: isAddPersonHovered ? C.purple : "transparent",
+                    color: isAddPersonHovered ? "#ffffff" : C.purple,
+                    marginBottom: 12,
+                    width: "fit-content",
+                  }}
+                >
+                  + Add Person
+                </button>
+                <div className="space-y-2.5">
                   {meetingForm.companions.map((person, index) => {
                     // Logic to explicitly check phone validity
                     const isPhoneStartedWrong = person.phone.length > 0 && !/^[6-9]/.test(person.phone);
                     const isPhoneIncomplete = person.phone.length > 0 && person.phone.length < 10 && !isPhoneStartedWrong;
 
                     return (
-                      <div key={`companion-${index}`} className="grid md:grid-cols-[1fr_1fr_auto] gap-3 items-start">
+                      <div key={`companion-${index}`} className="grid md:grid-cols-[1fr_1fr_auto] gap-2 items-start">
                         {/* Name Input wrapper */}
                         <div className="flex flex-col">
                           <input
@@ -1723,15 +2140,12 @@ export default function HCMNewCasePage() {
                             placeholder="Full name"
                             style={textareaStyle}
                           />
-                          <div style={{ display: "flex", justifyContent: "space-between", marginTop: 4 }}>
+                          <div style={{ marginTop: 4 }}>
                             {person.name.length >= 60 ? (
                               <div style={errorTextStyle}>Maximum 60 characters allowed.</div>
                             ) : (
                               <div />
                             )}
-                            <span style={{ fontSize: 11, color: C.t3 }}>
-                              {person.name.length}/60
-                            </span>
                           </div>
                         </div>
 
@@ -1767,6 +2181,8 @@ export default function HCMNewCasePage() {
                         
                         <button
                           type="button"
+                          onMouseEnter={() => setHoveredRemoveIndex(index)}
+                          onMouseLeave={() => setHoveredRemoveIndex(null)}
                           onClick={() =>
                             setMeetingForm((current) => ({
                               ...current,
@@ -1776,35 +2192,25 @@ export default function HCMNewCasePage() {
                                   : current.companions.filter((_, entryIndex) => entryIndex !== index),
                             }))
                           }
-                          className="px-4 py-3 rounded-lg transition-colors font-medium h-[47px]"
-                          style={{ border: `1px solid ${C.border}`, color: C.t2, background: "transparent" }}
+                          className="px-3 py-2 rounded-lg transition-colors font-medium h-[40px] text-sm"
+                          style={{
+                            border: `1px solid ${C.danger}`,
+                            color: hoveredRemoveIndex === index ? "#ffffff" : C.danger,
+                            background: hoveredRemoveIndex === index ? C.danger : "transparent",
+                          }}
                         >
                           Remove
                         </button>
                       </div>
                     );
                   })}
-                  <button
-                    type="button"
-                    onClick={() =>
-                      setMeetingForm((current) => ({
-                        ...current,
-                        companions: [...current.companions, { name: "", phone: "" }],
-                      }))
-                    }
-                    className="px-4 py-3 rounded-lg transition-colors font-medium"
-                    style={{ border: `1px solid ${C.purple}55`, background: C.purpleDim, color: C.purple }}
-                  >
-                    + Add Person
-                  </button>
                 </div>
-              </div>
 
               {/* SUBMIT */}
               <WorkspaceButton
                 type="submit"
                 disabled={loading || isMeetingFormInvalid}
-                style={{ width: "100%", padding: "16px 24px" }}
+                style={{ width: "30%", minWidth: 220, padding: "16px 24px", margin: "0 auto", display: "flex", justifyContent: "center" }}
               >
                 {loading ? "Submitting..." : "Submit Meeting Request"}
               </WorkspaceButton>
@@ -1830,15 +2236,12 @@ export default function HCMNewCasePage() {
                   }
                   placeholder="Brief title of your complaint"
                 />
-                <div style={{ display: "flex", justifyContent: "space-between", marginTop: 4 }}>
+                <div style={{ marginTop: 4 }}>
                   {complaintForm.title.length >= 200 ? (
                     <div style={errorTextStyle}>Maximum 200 characters allowed.</div>
                   ) : (
                     <div />
                   )}
-                  <span style={{ fontSize: 11, color: C.t3 }}>
-                    {complaintForm.title.length}/200
-                  </span>
                 </div>
               </div>
 
@@ -1858,74 +2261,68 @@ export default function HCMNewCasePage() {
                   style={textareaStyle}
                   rows={6}
                 />
-                <div style={{ display: "flex", justifyContent: "space-between", marginTop: 4 }}>
+                <div style={{ marginTop: 4 }}>
                   {complaintForm.details.length >= 1000 ? (
                     <div style={errorTextStyle}>Maximum 1000 characters allowed.</div>
                   ) : (
                     <div />
                   )}
-                  <span style={{ fontSize: 11, color: C.t3 }}>
-                    {complaintForm.details.length}/1000
-                  </span>
                 </div>
               </div>
 
               {/* LOCATION */}
-              <div style={{ padding: 20, borderRadius: 12, border: `1px solid ${C.border}`, background: C.bgElevated }}>
-                <div className="grid md:grid-cols-3 gap-6">
-                  <div>
-                    <label className="flex items-center gap-2" style={{ ...sectionLabelStyle, display: "flex", alignItems: "center" }}>
-                      <Briefcase size={16} />
-                      <span>Category <span style={{ color: C.danger }}>*</span></span>
-                    </label>
-                    <WorkspaceSelect
-                      required
-                      value={complaintForm.complaintType}
-                      onChange={(event) =>
-                        setComplaintForm((current) => ({ ...current, complaintType: event.target.value }))
-                      }
-                    >
-                      <option value="">-- Select category --</option>
-                      {complaintCategories.map((category) => (
-                        <option key={category} value={category}>
-                          {category}
-                        </option>
-                      ))}
-                    </WorkspaceSelect>
-                  </div>
+              <div className="grid md:grid-cols-3 gap-6">
+                <div>
+                  <label className="flex items-center gap-2" style={{ ...sectionLabelStyle, display: "flex", alignItems: "center" }}>
+                    <Briefcase size={16} />
+                    <span>Category <span style={{ color: C.danger }}>*</span></span>
+                  </label>
+                  <WorkspaceSelect
+                    required
+                    value={complaintForm.complaintType}
+                    onChange={(event) =>
+                      setComplaintForm((current) => ({ ...current, complaintType: event.target.value }))
+                    }
+                    style={{ color: complaintForm.complaintType ? C.t1 : C.t3 }}
+                  >
+                    <option value="">-- Select category --</option>
+                    {complaintCategories.map((category) => (
+                      <option key={category} value={category}>
+                        {category}
+                      </option>
+                    ))}
+                  </WorkspaceSelect>
+                </div>
 
-                  <div>
-                    <label className="flex items-center gap-2" style={{ ...sectionLabelStyle, display: "flex", alignItems: "center" }}>
-                      <MapPin size={16} />
-                      <span>Location <span style={{ color: C.danger }}>*</span></span>
-                    </label>
-                    <WorkspaceInput
-                      required
-                      type="text"
-                      value={complaintForm.complaintLocation}
-                      onChange={(event) =>
-                        setComplaintForm((current) => ({ ...current, complaintLocation: event.target.value }))
-                      }
-                      placeholder="Where did this issue occur?"
-                    />
-                  </div>
+                <div>
+                  <label className="flex items-center gap-2" style={{ ...sectionLabelStyle, display: "flex", alignItems: "center" }}>
+                    <MapPin size={16} />
+                    <span>Location <span style={{ color: C.danger }}>*</span></span>
+                  </label>
+                  <WorkspaceInput
+                    required
+                    type="text"
+                    value={complaintForm.complaintLocation}
+                    onChange={(event) =>
+                      setComplaintForm((current) => ({ ...current, complaintLocation: event.target.value }))
+                    }
+                    placeholder="Where did this issue occur?"
+                  />
+                </div>
 
-                  <div>
-                    <label className="flex items-center gap-2" style={{ ...sectionLabelStyle, display: "flex", alignItems: "center" }}>
-                      <Calendar size={16} />
-                      <span>Date of Incident <span style={{ color: C.danger }}>*</span></span>
-                    </label>
-                    <WorkspaceInput
-                      required
-                      type="date"
-                      value={complaintForm.incidentDate}
-                      onChange={(event) =>
-                        setComplaintForm((current) => ({ ...current, incidentDate: event.target.value }))
-                      }
-                      max={new Date().toISOString().split("T")[0]}
-                      style={{ minHeight: 42 }}
-                    />
-                  </div>
+                <div>
+                  <label className="flex items-center gap-2" style={{ ...sectionLabelStyle, display: "flex", alignItems: "center" }}>
+                    <Calendar size={16} />
+                    <span>Date of Incident <span style={{ color: C.danger }}>*</span></span>
+                  </label>
+                  <CustomDatePicker
+                    value={complaintForm.incidentDate}
+                    onChange={(nextDate) =>
+                      setComplaintForm((current) => ({ ...current, incidentDate: nextDate }))
+                    }
+                    max={getTodayDate()}
+                    placeholder="Select incident date"
+                  />
                 </div>
               </div>
 
@@ -1940,7 +2337,7 @@ export default function HCMNewCasePage() {
                       <Upload size={24} style={{ color: C.t3 }} />
                     </div>
                     <div className="flex-1">
-                      <div style={{ fontWeight: 600, color: C.t1 }}>
+                      <div style={{ fontWeight: 600, color: complaintForm.files.length > 0 ? C.t1 : C.t3 }}>
                         {complaintForm.files.length > 0
                           ? `${complaintForm.files.length} file(s) selected`
                           : "Click to upload or drag and drop"}
