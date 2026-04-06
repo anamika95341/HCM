@@ -1148,7 +1148,6 @@
 //   );
 // }
 
-
 import { useEffect, useMemo, useState } from "react";
 import {
   ChevronLeft,
@@ -1289,7 +1288,7 @@ function EventPill({ item, compact = false, onClick }) {
   );
 }
 
-// ── File Tabs Constant ───────────────────────────────────────────────────────
+// ── FilesSection (UI only — no API calls, no upload logic) ───────────────────
 
 const FILE_TABS = [
   { id: "photos", label: "Photos", icon: ImageIcon },
@@ -1297,15 +1296,483 @@ const FILE_TABS = [
   { id: "documents", label: "Documents", icon: FileText },
 ];
 
+function FilePlaceholderIcon({ type, tone }) {
+  const Icon = type === "photos" ? ImageIcon : type === "videos" ? Film : FileText;
+  return (
+    <div
+      style={{
+        width: "100%",
+        aspectRatio: "4 / 3",
+        display: "flex",
+        flexDirection: "column",
+        alignItems: "center",
+        justifyContent: "center",
+        background: `${tone}10`,
+        borderRadius: 8,
+        gap: 6,
+        color: tone,
+        opacity: 0.7,
+      }}
+    >
+      <Icon size={22} />
+    </div>
+  );
+}
+
+function FilesSection({ C, tone }) {
+  const [activeTab, setActiveTab] = useState("photos");
+  const files = MOCK_FILES[activeTab] || [];
+
+  return (
+    <div>
+      {/* Tab bar */}
+      <div style={{ display: "flex", gap: 4, marginBottom: 16, borderBottom: `1px solid ${C.border}`, paddingBottom: 12 }}>
+        {FILE_TABS.map(({ id, label }) => {
+          const active = activeTab === id;
+          const count = MOCK_FILES[id].length;
+          return (
+            <button
+              key={id}
+              type="button"
+              onClick={() => setActiveTab(id)}
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 6,
+                padding: "6px 12px",
+                borderRadius: 8,
+                border: active ? `1px solid ${tone}40` : `1px solid transparent`,
+                background: active ? `${tone}12` : "transparent",
+                color: active ? tone : C.t3,
+                fontSize: 12,
+                fontWeight: 600,
+                cursor: "pointer",
+                transition: "all 0.15s ease",
+              }}
+            >
+              {id === "photos" ? <ImageIcon size={13} /> : id === "videos" ? <Film size={13} /> : <FileText size={13} />}
+              {label}
+              <span
+                style={{
+                  fontSize: 10,
+                  fontWeight: 700,
+                  padding: "1px 6px",
+                  borderRadius: 99,
+                  background: active ? `${tone}20` : `${C.t3}15`,
+                  color: active ? tone : C.t3,
+                }}
+              >
+                {count}
+              </span>
+            </button>
+          );
+        })}
+      </div>
+
+      {/* File grid */}
+      {files.length === 0 ? (
+        <div style={{ color: C.t3, fontSize: 13, textAlign: "center", padding: "16px 0" }}>
+          No {activeTab} attached to this meeting.
+        </div>
+      ) : (
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: "repeat(auto-fill, minmax(120px, 1fr))",
+            gap: 12,
+          }}
+        >
+          {files.map((file) => (
+            <div
+              key={file.id}
+              style={{
+                border: `1px solid ${C.border}`,
+                borderRadius: 10,
+                padding: 10,
+                background: C.bgElevated,
+                cursor: "default",
+                transition: "border-color 0.15s ease",
+              }}
+              onMouseEnter={(e) => (e.currentTarget.style.borderColor = `${tone}40`)}
+              onMouseLeave={(e) => (e.currentTarget.style.borderColor = C.border)}
+            >
+              <FilePlaceholderIcon type={activeTab} tone={tone} />
+              <div
+                style={{
+                  marginTop: 8,
+                  fontSize: 11,
+                  fontWeight: 600,
+                  color: C.t1,
+                  lineHeight: 1.4,
+                  wordBreak: "break-word",
+                  overflow: "hidden",
+                  display: "-webkit-box",
+                  WebkitLineClamp: 2,
+                  WebkitBoxOrient: "vertical",
+                }}
+              >
+                {file.name}
+              </div>
+              <div style={{ marginTop: 4, fontSize: 10, color: C.t3 }}>
+                {file.duration ? `Video · ${file.duration}` : formatFileSize(file.size)}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      <div
+        style={{
+          marginTop: 14,
+          padding: "8px 12px",
+          borderRadius: 8,
+          background: `${C.t3}10`,
+          fontSize: 11,
+          color: C.t3,
+          fontStyle: "italic",
+        }}
+      >
+        File preview — backend integration pending.
+      </div>
+    </div>
+  );
+}
+
+// ── DayMeetingsPanel (Side Panel that pushes content) ────────────────────────
+
+function DayMeetingsPanel({ date, items, onClose, onSelectMeeting, isVisible }) {
+  const { C } = usePortalTheme();
+
+  return (
+    <div
+      style={{
+        width: 300,
+        height: "100%",
+        background: C.card,
+        border: `1px solid ${C.border}`,
+        borderRadius: 12,
+        display: "flex",
+        flexDirection: "column",
+        overflow: "hidden",
+        opacity: isVisible ? 1 : 0,
+        transform: isVisible ? "translateX(0)" : "translateX(-20px)",
+        transition: "opacity 0.3s ease, transform 0.35s cubic-bezier(0.4, 0, 0.2, 1)",
+      }}
+    >
+      {/* Header */}
+      <div
+        style={{
+          padding: "20px",
+          borderBottom: `1px solid ${C.border}`,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          gap: 12,
+          flexShrink: 0,
+        }}
+      >
+        <div style={{ minWidth: 0 }}>
+          <div 
+            style={{ 
+              fontSize: 10, 
+              fontWeight: 700, 
+              color: C.t3, 
+              textTransform: "uppercase", 
+              letterSpacing: ".08em",
+              marginBottom: 4,
+            }}
+          >
+            Schedule
+          </div>
+          <h3 
+            style={{ 
+              fontSize: 16, 
+              fontWeight: 700, 
+              color: C.t1,
+              margin: 0,
+              lineHeight: 1.3,
+            }}
+          >
+            {date?.toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" })}
+          </h3>
+        </div>
+        <button
+          type="button"
+          onClick={onClose}
+          style={{
+            width: 28,
+            height: 28,
+            borderRadius: 6,
+            border: `1px solid ${C.border}`,
+            background: C.bgElevated,
+            color: C.t2,
+            cursor: "pointer",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            flexShrink: 0,
+            transition: "all 0.15s ease",
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.borderColor = C.purple;
+            e.currentTarget.style.color = C.purple;
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.borderColor = C.border;
+            e.currentTarget.style.color = C.t2;
+          }}
+          aria-label="Close"
+        >
+          <X size={14} />
+        </button>
+      </div>
+
+      {/* Content */}
+      <div 
+        style={{ 
+          flex: 1, 
+          overflowY: "auto", 
+          padding: "16px 20px",
+        }}
+      >
+        {items.length === 0 ? (
+          <div 
+            style={{ 
+              fontSize: 13, 
+              color: C.t3, 
+              textAlign: "center", 
+              padding: "32px 16px",
+              background: `${C.t3}06`,
+              borderRadius: 10,
+              border: `1px dashed ${C.border}`,
+            }}
+          >
+            No schedule for this date.
+          </div>
+        ) : (
+          <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+            {items.map((item) => {
+              const tone = item.isVip ? C.warn : C.purple;
+              const kindLabel = getItemKind(item) === "event" ? "Event" : "Meeting";
+              return (
+                <button
+                  key={item.id}
+                  type="button"
+                  onClick={() => onSelectMeeting(item)}
+                  style={{
+                    width: "100%",
+                    textAlign: "left",
+                    borderRadius: 10,
+                    padding: "14px",
+                    paddingLeft: "16px",
+                    border: `1px solid ${tone}30`,
+                    background: `${tone}06`,
+                    cursor: "pointer",
+                    position: "relative",
+                    overflow: "hidden",
+                    transition: "all 0.2s ease",
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.borderColor = `${tone}60`;
+                    e.currentTarget.style.background = `${tone}10`;
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.borderColor = `${tone}30`;
+                    e.currentTarget.style.background = `${tone}06`;
+                  }}
+                >
+                  {/* Left accent bar */}
+                  <div 
+                    style={{ 
+                      position: "absolute", 
+                      left: 0, 
+                      top: 10, 
+                      bottom: 10, 
+                      width: 3, 
+                      background: tone, 
+                      borderRadius: "0 3px 3px 0",
+                    }} 
+                  />
+                  
+                  {/* Badge */}
+                  <div
+                    style={{
+                      display: "inline-block",
+                      padding: "3px 8px",
+                      borderRadius: 5,
+                      fontSize: 10,
+                      fontWeight: 600,
+                      border: `1px solid ${tone}40`,
+                      background: C.card,
+                      color: tone,
+                      marginBottom: 8,
+                    }}
+                  >
+                    {kindLabel}
+                  </div>
+                  
+                  {/* Title */}
+                  <div 
+                    style={{ 
+                      fontSize: 14, 
+                      fontWeight: 700, 
+                      color: C.t1,
+                      lineHeight: 1.4,
+                      marginBottom: 4,
+                    }}
+                  >
+                    {item.title}
+                  </div>
+                  
+                  {/* Time */}
+                  <div 
+                    style={{ 
+                      fontSize: 12, 
+                      color: C.t2,
+                      fontWeight: 500,
+                    }}
+                  >
+                    {formatTime(item.startsAt)} - {formatTime(item.endsAt)}
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ── Modal Tabs Configuration ──────────────────────────────────────────────────
+
+const MODAL_TABS = [
+  { id: "details", label: "Details", icon: FileText },
+  { id: "photos", label: "Photos", icon: ImageIcon },
+  { id: "videos", label: "Videos", icon: Film },
+  { id: "documents", label: "Documents", icon: FileText },
+];
+
+// ── FileGridSection (for individual file tabs in modal) ───────────────────────
+
+function FileGridSection({ type, C, tone }) {
+  const files = MOCK_FILES[type] || [];
+  
+  if (files.length === 0) {
+    return (
+      <div 
+        style={{ 
+          color: C.t3, 
+          fontSize: 13, 
+          textAlign: "center", 
+          padding: "48px 24px",
+          background: `${C.t3}06`,
+          borderRadius: 12,
+          border: `1px dashed ${C.border}`,
+        }}
+      >
+        <div style={{ marginBottom: 8, display: "flex", justifyContent: "center" }}>
+          {type === "photos" ? <ImageIcon size={32} style={{ opacity: 0.4 }} /> : 
+           type === "videos" ? <Film size={32} style={{ opacity: 0.4 }} /> : 
+           <FileText size={32} style={{ opacity: 0.4 }} />}
+        </div>
+        No {type} attached to this meeting.
+      </div>
+    );
+  }
+
+  return (
+    <div>
+      <div
+        style={{
+          display: "grid",
+          gridTemplateColumns: "repeat(auto-fill, minmax(140px, 1fr))",
+          gap: 14,
+        }}
+      >
+        {files.map((file) => (
+          <div
+            key={file.id}
+            style={{
+              border: `1px solid ${C.border}`,
+              borderRadius: 12,
+              padding: 12,
+              background: C.bgElevated,
+              cursor: "pointer",
+              transition: "all 0.15s ease",
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.borderColor = `${tone}40`;
+              e.currentTarget.style.transform = "translateY(-2px)";
+              e.currentTarget.style.boxShadow = `0 4px 12px ${tone}15`;
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.borderColor = C.border;
+              e.currentTarget.style.transform = "translateY(0)";
+              e.currentTarget.style.boxShadow = "none";
+            }}
+          >
+            <FilePlaceholderIcon type={type} tone={tone} />
+            <div
+              style={{
+                marginTop: 10,
+                fontSize: 12,
+                fontWeight: 600,
+                color: C.t1,
+                lineHeight: 1.4,
+                wordBreak: "break-word",
+                overflow: "hidden",
+                display: "-webkit-box",
+                WebkitLineClamp: 2,
+                WebkitBoxOrient: "vertical",
+              }}
+            >
+              {file.name}
+            </div>
+            <div style={{ marginTop: 6, fontSize: 11, color: C.t3 }}>
+              {file.duration ? `${file.duration}` : formatFileSize(file.size)}
+            </div>
+          </div>
+        ))}
+      </div>
+
+      <div
+        style={{
+          marginTop: 16,
+          padding: "10px 14px",
+          borderRadius: 8,
+          background: `${C.t3}08`,
+          fontSize: 11,
+          color: C.t3,
+          fontStyle: "italic",
+          display: "flex",
+          alignItems: "center",
+          gap: 8,
+        }}
+      >
+        <Clock size={12} />
+        File preview — backend integration pending.
+      </div>
+    </div>
+  );
+}
+
 // ── MeetingDetailModal ────────────────────────────────────────────────────────
 
 function MeetingDetailModal({ meeting, onClose }) {
   const { C } = usePortalTheme();
-  const [activeFileTab, setActiveFileTab] = useState("photos");
+  const [activeTab, setActiveTab] = useState("details");
   
   if (!meeting) return null;
   const tone = meeting.isVip ? C.warn : C.purple;
-  const files = MOCK_FILES[activeFileTab] || [];
+
+  const getTabCount = (tabId) => {
+    if (tabId === "details") return null;
+    if (tabId === "photos") return MOCK_FILES.photos.length;
+    if (tabId === "videos") return MOCK_FILES.videos.length;
+    if (tabId === "documents") return MOCK_FILES.documents.length;
+    return null;
+  };
 
   return (
     <>
@@ -1315,422 +1782,293 @@ function MeetingDetailModal({ meeting, onClose }) {
       />
       <div className="fixed inset-0 z-[70] flex sm:items-center justify-center overflow-y-auto p-4">
         <div
-          className="w-full max-w-3xl rounded-2xl overflow-hidden animate-in slide-in-from-bottom-5 sm:zoom-in-95 fade-in duration-300 my-auto"
+          className="w-full max-w-2xl rounded-2xl overflow-hidden animate-in slide-in-from-bottom-5 sm:zoom-in-95 fade-in duration-300"
           style={{ background: C.card, border: `1px solid ${C.border}`, boxShadow: C.dialogShadow }}
           onClick={(e) => e.stopPropagation()}
         >
-          {/* Header with colored accent */}
-          <div style={{ position: "relative" }}>
-            {/* Top accent bar */}
-            <div style={{ height: 4, background: tone }} />
-            
-            <div
-              className="px-6 sm:px-8 py-6"
-              style={{ background: C.bgElevated, borderBottom: `1px solid ${C.border}` }}
-            >
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 16 }}>
-                <div style={{ flex: 1, minWidth: 0, overflow: "hidden" }}>
-                  {/* Badge row */}
-                  <div style={{ marginBottom: 16 }}>
-                    <div
-                      style={{
-                        display: "inline-flex",
-                        alignItems: "center",
-                        gap: 6,
-                        padding: "5px 12px",
-                        borderRadius: 99,
-                        background: `${tone}12`,
-                        border: `1px solid ${tone}30`,
-                        color: tone,
-                        fontSize: 11,
-                        fontWeight: 700,
-                        textTransform: "uppercase",
-                        letterSpacing: ".05em",
-                      }}
-                    >
-                      {meeting.isVip && <Star size={11} fill={tone} />}
-                      {getItemTypeLabel(meeting)}
-                    </div>
-                  </div>
-
-                  {/* Title */}
-                  <h3 style={{ fontSize: 24, fontWeight: 700, color: C.t1, marginBottom: 12, lineHeight: 1.3, wordWrap: "break-word", overflowWrap: "break-word" }}>
-                    {meeting.title}
-                  </h3>
-
-                  {/* Date/Time info row */}
-                  <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 12 }}>
-                    <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                      <div style={{ padding: 6, borderRadius: 8, background: `${tone}10`, flexShrink: 0 }}>
-                        <Calendar size={14} color={tone} />
-                      </div>
-                      <span style={{ fontSize: 13, fontWeight: 600, color: C.t1 }}>
-                        {new Date(meeting.startsAt).toLocaleDateString("en-IN", { weekday: "short", day: "numeric", month: "short", year: "numeric" })}
-                      </span>
-                    </div>
-                    <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
-                      <div style={{ padding: 6, borderRadius: 8, background: `${tone}10`, flexShrink: 0 }}>
-                        <Clock size={14} color={tone} />
-                      </div>
-                      <span style={{ fontSize: 13, fontWeight: 600, color: C.t1 }}>
-                        {formatTime(meeting.startsAt)} – {formatTime(meeting.endsAt)}
-                      </span>
-                      <span style={{ fontSize: 12, color: C.t3, fontWeight: 500 }}>
-                        ({formatDuration(meeting)})
-                      </span>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Close button */}
-                <button
-                  type="button"
-                  onClick={onClose}
+          {/* Header */}
+          <div
+            style={{ 
+              padding: "20px 24px", 
+              background: C.bgElevated, 
+              borderBottom: `1px solid ${C.border}`,
+            }}
+          >
+            <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 16 }}>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div
                   style={{
-                    padding: 8,
-                    borderRadius: 8,
-                    border: `1px solid ${C.border}`,
-                    background: C.card,
-                    color: C.t2,
-                    cursor: "pointer",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    flexShrink: 0,
+                    display: "inline-flex",
+                    padding: "4px 10px",
+                    borderRadius: 6,
+                    fontSize: 10,
+                    fontWeight: 700,
+                    border: `1px solid ${tone}33`,
+                    background: `${tone}12`,
+                    color: tone,
+                    textTransform: "uppercase",
+                    letterSpacing: ".05em",
                   }}
                 >
-                  <X size={18} />
-                </button>
+                  {getItemTypeLabel(meeting)}
+                </div>
+                <h3 
+                  style={{ 
+                    marginTop: 12, 
+                    fontSize: 22, 
+                    fontWeight: 700, 
+                    color: C.t1,
+                    lineHeight: 1.3,
+                    wordBreak: "break-word",
+                  }}
+                >
+                  {meeting.title}
+                </h3>
+                <div 
+                  style={{ 
+                    marginTop: 10, 
+                    fontSize: 13, 
+                    color: C.t2,
+                    display: "flex",
+                    flexWrap: "wrap",
+                    alignItems: "center",
+                    gap: 8,
+                  }}
+                >
+                  <span style={{ fontWeight: 500 }}>
+                    {new Date(meeting.startsAt).toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric", year: "numeric" })}
+                  </span>
+                  <span style={{ color: C.t3 }}>•</span>
+                  <span style={{ fontWeight: 600, color: tone }}>
+                    {formatTime(meeting.startsAt)} – {formatTime(meeting.endsAt)}
+                  </span>
+                  <span 
+                    style={{ 
+                      fontSize: 11, 
+                      padding: "2px 8px", 
+                      borderRadius: 4, 
+                      background: `${C.t3}10`, 
+                      color: C.t3,
+                      fontWeight: 500,
+                    }}
+                  >
+                    {formatDuration(meeting)}
+                  </span>
+                </div>
               </div>
+              <button
+                type="button"
+                onClick={onClose}
+                style={{
+                  width: 32,
+                  height: 32,
+                  borderRadius: 8,
+                  border: `1px solid ${C.border}`,
+                  background: C.card,
+                  color: C.t2,
+                  cursor: "pointer",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  flexShrink: 0,
+                  transition: "all 0.15s ease",
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.borderColor = C.danger;
+                  e.currentTarget.style.color = C.danger;
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.borderColor = C.border;
+                  e.currentTarget.style.color = C.t2;
+                }}
+                aria-label="Close"
+              >
+                <X size={16} />
+              </button>
+            </div>
+
+            {/* Tabs */}
+            <div 
+              style={{ 
+                display: "flex", 
+                gap: 6, 
+                marginTop: 20,
+                paddingTop: 16,
+                borderTop: `1px solid ${C.border}`,
+              }}
+            >
+              {MODAL_TABS.map(({ id, label, icon: Icon }) => {
+                const isActive = activeTab === id;
+                const count = getTabCount(id);
+                return (
+                  <button
+                    key={id}
+                    type="button"
+                    onClick={() => setActiveTab(id)}
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 6,
+                      padding: "8px 14px",
+                      borderRadius: 8,
+                      border: isActive ? `1px solid ${tone}40` : `1px solid transparent`,
+                      background: isActive ? `${tone}10` : "transparent",
+                      color: isActive ? tone : C.t3,
+                      fontSize: 13,
+                      fontWeight: 600,
+                      cursor: "pointer",
+                      transition: "all 0.15s ease",
+                    }}
+                    onMouseEnter={(e) => {
+                      if (!isActive) {
+                        e.currentTarget.style.background = `${C.t3}10`;
+                        e.currentTarget.style.color = C.t1;
+                      }
+                    }}
+                    onMouseLeave={(e) => {
+                      if (!isActive) {
+                        e.currentTarget.style.background = "transparent";
+                        e.currentTarget.style.color = C.t3;
+                      }
+                    }}
+                  >
+                    <Icon size={14} />
+                    {label}
+                    {count !== null && (
+                      <span
+                        style={{
+                          fontSize: 10,
+                          fontWeight: 700,
+                          padding: "2px 6px",
+                          borderRadius: 99,
+                          background: isActive ? `${tone}20` : `${C.t3}15`,
+                          color: isActive ? tone : C.t3,
+                          minWidth: 18,
+                          textAlign: "center",
+                        }}
+                      >
+                        {count}
+                      </span>
+                    )}
+                  </button>
+                );
+              })}
             </div>
           </div>
 
-          {/* Scrollable content */}
-          <div className="p-6 sm:p-8 max-h-[calc(100vh-320px)] overflow-y-auto" style={{ background: C.card }}>
-            <div style={{ display: "flex", flexDirection: "column", gap: 28 }}>
-              
-              {/* Info Cards Row */}
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: 12 }}>
-                {/* Location Card */}
-                <div
-                  style={{
-                    padding: 16,
-                    borderRadius: 12,
-                    border: `1px solid ${C.border}`,
-                    background: C.bgElevated,
-                    overflow: "hidden",
-                  }}
-                >
-                  <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
-                    <MapPin size={14} color={C.t3} />
-                    <span style={{ fontSize: 11, fontWeight: 700, color: C.t3, textTransform: "uppercase", letterSpacing: ".08em" }}>
-                      Location
-                    </span>
-                  </div>
-                  <p style={{ fontSize: 14, color: C.t1, fontWeight: 600, lineHeight: 1.5, margin: 0, wordWrap: "break-word", overflowWrap: "break-word" }}>
-                    {meeting.location || "Location pending"}
-                  </p>
-                </div>
-
-                {/* Source Card */}
-                <div
-                  style={{
-                    padding: 16,
-                    borderRadius: 12,
-                    border: `1px solid ${C.border}`,
-                    background: C.bgElevated,
-                    overflow: "hidden",
-                  }}
-                >
-                  <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
-                    <TrendingUp size={14} color={C.t3} />
-                    <span style={{ fontSize: 11, fontWeight: 700, color: C.t3, textTransform: "uppercase", letterSpacing: ".08em" }}>
-                      Source
-                    </span>
-                  </div>
-                  <p style={{ fontSize: 14, color: C.t1, fontWeight: 600, margin: 0, wordWrap: "break-word", overflowWrap: "break-word" }}>
-                    {meeting.source}
-                  </p>
-                </div>
-              </div>
-
-              {/* Participants */}
-              {Array.isArray(meeting.participants) && meeting.participants.length > 0 && (
-                <div
-                  style={{
-                    padding: 16,
-                    borderRadius: 12,
-                    border: `1px solid ${C.border}`,
-                    background: C.bgElevated,
-                    overflow: "hidden",
-                  }}
-                >
-                  <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 14 }}>
-                    <Users size={14} color={C.t3} />
-                    <span style={{ fontSize: 11, fontWeight: 700, color: C.t3, textTransform: "uppercase", letterSpacing: ".08em" }}>
-                      Participants
-                    </span>
-                    <span
-                      style={{
-                        fontSize: 10,
-                        fontWeight: 700,
-                        padding: "2px 8px",
-                        borderRadius: 99,
-                        background: `${tone}15`,
-                        color: tone,
-                      }}
-                    >
-                      {meeting.participants.length}
-                    </span>
-                  </div>
-                  <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
-                    {meeting.participants.map((p) => (
-                      <span
-                        key={p}
-                        style={{
-                          fontSize: 13,
-                          padding: "6px 14px",
-                          borderRadius: 99,
-                          background: `${tone}08`,
-                          color: C.t1,
-                          border: `1px solid ${tone}20`,
-                          fontWeight: 500,
-                          wordWrap: "break-word",
-                          overflowWrap: "break-word",
-                          maxWidth: "100%",
-                        }}
-                      >
-                        {p}
-                      </span>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {/* Description */}
-              <div
-                style={{
-                  padding: 16,
-                  borderRadius: 12,
-                  border: `1px solid ${C.border}`,
-                  background: C.bgElevated,
-                  overflow: "hidden",
-                }}
-              >
-                <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
-                  <FileText size={14} color={C.t3} />
-                  <span style={{ fontSize: 11, fontWeight: 700, color: C.t3, textTransform: "uppercase", letterSpacing: ".08em" }}>
-                    Description
-                  </span>
-                </div>
-                <p style={{ color: C.t2, lineHeight: 1.8, fontSize: 14, margin: 0, wordWrap: "break-word", overflowWrap: "break-word" }}>
-                  {meeting.details || "No description available."}
-                </p>
-              </div>
-
-              {/* ══════════════════════════════════════════════════════════════
-                  FILES SECTION - Separate Card
-                 ══════════════════════════════════════════════════════════════ */}
-              <div
-                style={{
-                  borderRadius: 12,
-                  border: `1px solid ${C.border}`,
-                  background: C.bgElevated,
-                  overflow: "hidden",
-                }}
-              >
-                {/* Files Header */}
-                <div
-                  style={{
-                    padding: "16px 20px",
-                    borderBottom: `1px solid ${C.border}`,
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "space-between",
-                  }}
-                >
-                  <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                    <div style={{ padding: 8, borderRadius: 10, background: `${tone}12` }}>
-                      <FileText size={16} color={tone} />
-                    </div>
-                    <div>
-                      <h4 style={{ fontSize: 15, fontWeight: 700, color: C.t1, margin: 0 }}>
-                        Attached Files
-                      </h4>
-                      <p style={{ fontSize: 12, color: C.t3, margin: 0, marginTop: 2 }}>
-                        {MOCK_FILES.photos.length + MOCK_FILES.videos.length + MOCK_FILES.documents.length} files attached
-                      </p>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Files Tab Bar */}
-                <div
-                  style={{
-                    display: "flex",
-                    gap: 0,
-                    padding: "0 16px",
-                    borderBottom: `1px solid ${C.border}`,
-                    background: C.card,
-                  }}
-                >
-                  {FILE_TABS.map(({ id, label, icon: Icon }) => {
-                    const active = activeFileTab === id;
-                    const count = MOCK_FILES[id].length;
-                    return (
-                      <button
-                        key={id}
-                        type="button"
-                        onClick={() => setActiveFileTab(id)}
-                        style={{
-                          display: "flex",
-                          alignItems: "center",
-                          gap: 8,
-                          padding: "14px 16px",
-                          background: "transparent",
-                          border: "none",
-                          borderBottom: active ? `2px solid ${tone}` : "2px solid transparent",
-                          color: active ? tone : C.t3,
-                          fontSize: 13,
-                          fontWeight: 600,
-                          cursor: "pointer",
-                          transition: "all 0.15s ease",
-                          marginBottom: -1,
-                        }}
-                      >
-                        <Icon size={14} />
-                        {label}
-                        <span
-                          style={{
-                            fontSize: 10,
-                            fontWeight: 700,
-                            padding: "2px 7px",
-                            borderRadius: 99,
-                            background: active ? `${tone}15` : `${C.t3}12`,
-                            color: active ? tone : C.t3,
-                          }}
-                        >
-                          {count}
-                        </span>
-                      </button>
-                    );
-                  })}
-                </div>
-
-                {/* Files Grid */}
-                <div style={{ padding: 16 }}>
-                  {files.length === 0 ? (
-                    <div
-                      style={{
-                        textAlign: "center",
-                        padding: "32px 16px",
-                        color: C.t3,
-                      }}
-                    >
-                      <div style={{ marginBottom: 8 }}>
-                        {activeFileTab === "photos" ? <ImageIcon size={32} /> : activeFileTab === "videos" ? <Film size={32} /> : <FileText size={32} />}
-                      </div>
-                      <p style={{ fontSize: 13, margin: 0 }}>No {activeFileTab} attached</p>
-                    </div>
-                  ) : (
-                    <div
-                      style={{
-                        display: "grid",
-                        gridTemplateColumns: "repeat(auto-fill, minmax(130px, 1fr))",
-                        gap: 12,
-                      }}
-                    >
-                      {files.map((file) => (
-                        <div
-                          key={file.id}
-                          style={{
-                            border: `1px solid ${C.border}`,
-                            borderRadius: 10,
-                            padding: 12,
-                            background: C.card,
-                            cursor: "pointer",
-                            transition: "all 0.15s ease",
-                          }}
-                          onMouseEnter={(e) => {
-                            e.currentTarget.style.borderColor = `${tone}40`;
-                            e.currentTarget.style.transform = "translateY(-2px)";
-                          }}
-                          onMouseLeave={(e) => {
-                            e.currentTarget.style.borderColor = C.border;
-                            e.currentTarget.style.transform = "translateY(0)";
-                          }}
-                        >
-                          {/* File Preview Placeholder */}
-                          <div
-                            style={{
-                              width: "100%",
-                              aspectRatio: "4 / 3",
-                              display: "flex",
-                              flexDirection: "column",
-                              alignItems: "center",
-                              justifyContent: "center",
-                              background: `${tone}08`,
-                              borderRadius: 8,
-                              color: tone,
-                            }}
-                          >
-                            {activeFileTab === "photos" ? (
-                              <ImageIcon size={24} />
-                            ) : activeFileTab === "videos" ? (
-                              <Film size={24} />
-                            ) : (
-                              <FileText size={24} />
-                            )}
-                          </div>
-                          {/* File Info */}
-                          <div style={{ marginTop: 10 }}>
-                            <div
-                              style={{
-                                fontSize: 12,
-                                fontWeight: 600,
-                                color: C.t1,
-                                lineHeight: 1.4,
-                                overflow: "hidden",
-                                display: "-webkit-box",
-                                WebkitLineClamp: 2,
-                                WebkitBoxOrient: "vertical",
-                                wordWrap: "break-word",
-                                overflowWrap: "break-word",
-                              }}
-                            >
-                              {file.name}
-                            </div>
-                            <div style={{ marginTop: 4, fontSize: 11, color: C.t3 }}>
-                              {file.duration ? `${file.duration}` : formatFileSize(file.size)}
-                            </div>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-
-                  {/* Backend pending notice */}
-                  <div
-                    style={{
-                      marginTop: 16,
-                      padding: "10px 14px",
-                      borderRadius: 8,
-                      background: `${C.warn}08`,
-                      border: `1px solid ${C.warn}20`,
-                      fontSize: 12,
-                      color: C.warn,
-                      display: "flex",
-                      alignItems: "center",
-                      gap: 8,
+          {/* Tab Content */}
+          <div 
+            style={{ 
+              padding: 24, 
+              maxHeight: "calc(100vh - 320px)", 
+              overflowY: "auto",
+            }}
+          >
+            {/* Details Tab */}
+            {activeTab === "details" && (
+              <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
+                {/* Info grid */}
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 16 }}>
+                  <div 
+                    style={{ 
+                      padding: 16, 
+                      borderRadius: 10, 
+                      background: C.bgElevated,
+                      border: `1px solid ${C.border}`,
                     }}
                   >
-                    <Clock size={14} />
-                    File upload & preview — backend integration pending
+                    <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
+                      <div style={{ padding: 6, borderRadius: 6, background: `${tone}12`, color: tone }}>
+                        <MapPin size={14} />
+                      </div>
+                      <span style={{ fontSize: 11, fontWeight: 700, color: C.t3, textTransform: "uppercase", letterSpacing: ".08em" }}>
+                        Location
+                      </span>
+                    </div>
+                    <p style={{ fontSize: 14, color: C.t1, fontWeight: 600, wordBreak: "break-word", margin: 0 }}>
+                      {meeting.location || "Location pending"}
+                    </p>
+                  </div>
+                  <div 
+                    style={{ 
+                      padding: 16, 
+                      borderRadius: 10, 
+                      background: C.bgElevated,
+                      border: `1px solid ${C.border}`,
+                    }}
+                  >
+                    <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
+                      <div style={{ padding: 6, borderRadius: 6, background: `${tone}12`, color: tone }}>
+                        <Calendar size={14} />
+                      </div>
+                      <span style={{ fontSize: 11, fontWeight: 700, color: C.t3, textTransform: "uppercase", letterSpacing: ".08em" }}>
+                        Source
+                      </span>
+                    </div>
+                    <p style={{ fontSize: 14, color: C.t1, fontWeight: 600, margin: 0 }}>
+                      {meeting.source}
+                    </p>
                   </div>
                 </div>
-              </div>
 
-            </div>
+                {/* Participants */}
+                {Array.isArray(meeting.participants) && meeting.participants.length > 0 && (
+                  <div>
+                    <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
+                      <div style={{ padding: 6, borderRadius: 6, background: `${tone}12`, color: tone }}>
+                        <Users size={14} />
+                      </div>
+                      <span style={{ fontSize: 11, fontWeight: 700, color: C.t3, textTransform: "uppercase", letterSpacing: ".08em" }}>
+                        Participants
+                      </span>
+                    </div>
+                    <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+                      {meeting.participants.map((p) => (
+                        <span
+                          key={p}
+                          style={{
+                            fontSize: 12,
+                            padding: "6px 14px",
+                            borderRadius: 99,
+                            background: `${tone}10`,
+                            color: tone,
+                            border: `1px solid ${tone}25`,
+                            fontWeight: 500,
+                          }}
+                        >
+                          {p}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Description */}
+                <div>
+                  <p style={{ fontSize: 11, fontWeight: 700, color: C.t3, textTransform: "uppercase", letterSpacing: ".08em", marginBottom: 12 }}>
+                    Description
+                  </p>
+                  <p style={{ color: C.t2, lineHeight: 1.75, fontSize: 14, margin: 0 }}>
+                    {meeting.details || "No description available."}
+                  </p>
+                </div>
+              </div>
+            )}
+
+            {/* Photos Tab */}
+            {activeTab === "photos" && (
+              <FileGridSection type="photos" C={C} tone={tone} />
+            )}
+
+            {/* Videos Tab */}
+            {activeTab === "videos" && (
+              <FileGridSection type="videos" C={C} tone={tone} />
+            )}
+
+            {/* Documents Tab */}
+            {activeTab === "documents" && (
+              <FileGridSection type="documents" C={C} tone={tone} />
+            )}
           </div>
         </div>
       </div>
@@ -1754,6 +2092,7 @@ export default function MinisterCalendar() {
   const [cursorDate, setCursorDate] = useState(startOfDay(new Date()));
 
   // Modal state
+  const [selectedDate, setSelectedDate] = useState(null);   // controls DayMeetingsDrawer
   const [selectedMeeting, setSelectedMeeting] = useState(null); // controls MeetingDetailModal
 
   useEffect(() => {
@@ -1847,6 +2186,13 @@ export default function MinisterCalendar() {
     return grid;
   }, [cursorDate]);
 
+  const meetingsForDate = useMemo(() => {
+    if (!selectedDate) return [];
+    return items
+      .filter((item) => isSameDay(item.startsAt, selectedDate))
+      .sort((a, b) => new Date(a.startsAt) - new Date(b.startsAt));
+  }, [items, selectedDate]);
+
   const dayItems = useMemo(
     () => filteredItems.slice().sort((a, b) => new Date(a.startsAt) - new Date(b.startsAt)),
     [filteredItems]
@@ -1881,11 +2227,26 @@ export default function MinisterCalendar() {
     return `${MONTHS[cursorDate.getMonth()]} ${cursorDate.getFullYear()}`;
   }
 
+  function handleDateSelect(day) {
+    setSelectedDate(day);
+    setSelectedMeeting(null);
+  }
+
+  function handleEventPillClick(day, meeting) {
+    setSelectedDate(day);
+    setSelectedMeeting(meeting);
+  }
+
   function handleSelectMeeting(meeting) {
     setSelectedMeeting(meeting);
   }
 
   function handleCloseMeetingDetail() {
+    setSelectedMeeting(null);
+  }
+
+  function handleCloseDayDrawer() {
+    setSelectedDate(null);
     setSelectedMeeting(null);
   }
 
@@ -1903,11 +2264,29 @@ export default function MinisterCalendar() {
         <WorkspaceCard style={{ color: C.danger }}>{error}</WorkspaceCard>
       ) : (
         <div>
-          {/* Main Grid: Calendar & Right Panel */}
-          <div className="grid grid-cols-1 xl:grid-cols-[1fr_300px] gap-6" style={{ alignItems: "start" }}>
+          {/* Main Grid: Drawer, Calendar & Right Panel */}
+          <div style={{ display: "flex", gap: 24, alignItems: "stretch", height: "calc(100vh - 120px)" }}>
             
-            {/* Left: Calendar Card */}
-            <WorkspaceCard style={{ marginBottom: 0 }}>
+            {/* Schedule Panel - Separate div outside calendar */}
+            <div 
+              style={{ 
+                width: selectedDate ? 300 : 0,
+                flexShrink: 0,
+                overflow: "hidden",
+                transition: "width 0.35s cubic-bezier(0.4, 0, 0.2, 1)",
+              }}
+            >
+              <DayMeetingsPanel
+                date={selectedDate}
+                items={meetingsForDate}
+                onClose={handleCloseDayDrawer}
+                onSelectMeeting={handleSelectMeeting}
+                isVisible={selectedDate !== null}
+              />
+            </div>
+
+            {/* Calendar Card */}
+            <WorkspaceCard style={{ marginBottom: 0, flex: 1, minWidth: 0, display: "flex", flexDirection: "column", overflow: "hidden", transition: "all 0.35s cubic-bezier(0.4, 0, 0.2, 1)" }}>
               <WorkspaceCardHeader
                 title={viewLabel()}
                 subtitle={`${filteredItems.length} event${filteredItems.length !== 1 ? "s" : ""} in view`}
@@ -1916,7 +2295,10 @@ export default function MinisterCalendar() {
                     {/* View Dropdown */}
                     <select
                       value={view}
-                      onChange={(e) => setView(e.target.value)}
+                      onChange={(e) => {
+                        setView(e.target.value);
+                        handleCloseDayDrawer();
+                      }}
                       style={{
                         padding: "6px 12px",
                         borderRadius: 8,
@@ -1996,7 +2378,7 @@ export default function MinisterCalendar() {
 
               {/* ── Month View ── */}
               {view === "month" && (
-                <div>
+                <div style={{ flex: 1, display: "flex", flexDirection: "column", minHeight: 0 }}>
                   <div
                     style={{
                       display: "grid",
@@ -2026,44 +2408,48 @@ export default function MinisterCalendar() {
                     style={{
                       display: "grid",
                       gridTemplateColumns: "repeat(7, minmax(0, 1fr))",
+                      gridTemplateRows: `repeat(${rowsCount}, 1fr)`,
                       gap: 8,
+                      flex: 1,
+                      minHeight: 0,
                     }}
                   >
                     {monthGrid.map((day) => {
                       const inMonth = day.getMonth() === cursorDate.getMonth();
                       const isToday = isSameDay(day, new Date());
+                      const isSelected = selectedDate && isSameDay(day, selectedDate);
                       const eventsForDay = items.filter((item) => isSameDay(item.startsAt, day));
                       const daySummary = getItemSummary(eventsForDay);
-                      const hasEvents = eventsForDay.length > 0;
 
                       return (
                         <div
                           key={day.toISOString()}
-                          onClick={() => {
-                            if (hasEvents) {
-                              handleSelectMeeting(eventsForDay[0]);
-                            }
-                          }}
+                          onClick={() => handleDateSelect(day)}
                           style={{
-                            height: `calc((100vh - 280px) / ${rowsCount})`,
-                            minHeight: 70,
                             borderRadius: 12,
-                            border: `1px solid ${isToday ? C.purple + "40" : C.border}`,
-                            background: inMonth ? C.bgElevated : C.bg,
+                            border: `1px solid ${isSelected ? C.purple + "60" : isToday ? C.purple + "40" : C.border}`,
+                            background: isSelected
+                              ? `${C.purple}08`
+                              : inMonth
+                              ? C.bgElevated
+                              : C.bg,
                             padding: 10,
-                            display: "grid",
+                            display: "flex",
+                            flexDirection: "column",
                             gap: 6,
-                            alignContent: "start",
-                            cursor: hasEvents ? "pointer" : "default",
+                            cursor: "pointer",
                             transition: "border-color 0.15s ease, background 0.15s ease",
+                            overflow: "hidden",
                           }}
                           onMouseEnter={(e) => {
-                            if (hasEvents) {
+                            if (!isSelected)
                               e.currentTarget.style.borderColor = `${C.purple}40`;
-                            }
                           }}
                           onMouseLeave={(e) => {
-                            e.currentTarget.style.borderColor = isToday ? `${C.purple}40` : C.border;
+                            if (!isSelected)
+                              e.currentTarget.style.borderColor = isToday
+                                ? `${C.purple}40`
+                                : C.border;
                           }}
                         >
                           <div
@@ -2085,17 +2471,20 @@ export default function MinisterCalendar() {
                           {eventsForDay.length > 0 && (
                             <div
                               style={{
-                                fontSize: 11,
+                                fontSize: 10,
                                 fontWeight: 600,
                                 color: C.purple,
                                 background: `${C.purple}12`,
                                 border: `1px solid ${C.purple}30`,
-                                borderRadius: 8,
-                                padding: "4px 8px",
+                                borderRadius: 6,
+                                padding: "3px 6px",
                                 textAlign: "center",
+                                whiteSpace: "nowrap",
+                                overflow: "hidden",
+                                textOverflow: "ellipsis",
                               }}
                             >
-                              {daySummary}
+                              {eventsForDay.length} {eventsForDay.length === 1 ? "meeting" : "meetings"}
                             </div>
                           )}
                         </div>
@@ -2112,31 +2501,29 @@ export default function MinisterCalendar() {
                     const eventsForDay = items.filter((item) => isSameDay(item.startsAt, day));
                     const daySummary = getItemSummary(eventsForDay);
                     const isToday = isSameDay(day, new Date());
-                    const hasEvents = eventsForDay.length > 0;
+                    const isSelected = selectedDate && isSameDay(day, selectedDate);
                     return (
                       <div
                         key={day.toISOString()}
-                        onClick={() => {
-                          if (hasEvents) {
-                            handleSelectMeeting(eventsForDay[0]);
-                          }
-                        }}
                         style={{
-                          border: `1px solid ${isToday ? C.purple + "40" : C.border}`,
+                          border: `1px solid ${isSelected ? C.purple + "60" : isToday ? C.purple + "40" : C.border}`,
                           borderRadius: 12,
-                          background: C.bgElevated,
+                          background: isSelected ? `${C.purple}08` : C.bgElevated,
                           padding: 10,
                           minHeight: 120,
-                          cursor: hasEvents ? "pointer" : "default",
+                          cursor: "pointer",
                           transition: "border-color 0.15s ease, background 0.15s ease",
                         }}
+                        onClick={() => handleDateSelect(day)}
                         onMouseEnter={(e) => {
-                          if (hasEvents) {
+                          if (!isSelected)
                             e.currentTarget.style.borderColor = `${C.purple}40`;
-                          }
                         }}
                         onMouseLeave={(e) => {
-                          e.currentTarget.style.borderColor = isToday ? `${C.purple}40` : C.border;
+                          if (!isSelected)
+                            e.currentTarget.style.borderColor = isToday
+                              ? `${C.purple}40`
+                              : C.border;
                         }}
                       >
                         <div style={{ marginBottom: 10 }}>
@@ -2197,7 +2584,7 @@ export default function MinisterCalendar() {
                         <button
                           key={item.id}
                           type="button"
-                          onClick={() => handleSelectMeeting(item)}
+                          onClick={() => handleEventPillClick(cursorDate, item)}
                           style={{
                             border: `1px solid ${C.border}`,
                             borderRadius: 12,
@@ -2218,13 +2605,13 @@ export default function MinisterCalendar() {
                         >
                           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "start", gap: 12 }}>
                             <div style={{ minWidth: 0, flex: 1 }}>
-                              <div style={{ fontSize: 15, fontWeight: 700, color: C.t1, marginBottom: 4, wordWrap: "break-word", overflowWrap: "break-word" }}>
+                              <div style={{ fontSize: 15, fontWeight: 700, color: C.t1, marginBottom: 4 }}>
                                 {item.title}
                               </div>
                               <div style={{ fontSize: 12, color: C.t2, marginBottom: 4 }}>
                                 {formatTime(item.startsAt)} – {formatTime(item.endsAt)} · {formatDuration(item)}
                               </div>
-                              <div style={{ fontSize: 12, color: C.t3, wordWrap: "break-word", overflowWrap: "break-word" }}>
+                              <div style={{ fontSize: 12, color: C.t3 }}>
                                 {item.location || "Location pending"}
                               </div>
                             </div>
@@ -2240,13 +2627,16 @@ export default function MinisterCalendar() {
                   )}
                 </div>
               )}
+
+              {/* Footer hint when panel is open */}
+             
             </WorkspaceCard>
 
             {/* Right Panel: Upcoming Meetings */}
-            <div style={{ display: "flex", flexDirection: "column", gap: 24, position: "sticky", top: 24, height: "fit-content" }}>
+            <div style={{ width: 300, flexShrink: 0, display: "flex", flexDirection: "column" }}>
               
               {/* Upcoming Meetings */}
-              <WorkspaceCard style={{ padding: 24, marginBottom: 0 }}>
+              <WorkspaceCard style={{ padding: 24, marginBottom: 0, flex: 1, display: "flex", flexDirection: "column", overflow: "hidden" }}>
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
                   <div>
                     <div style={{ fontSize: 11, fontWeight: 700, color: C.t3, textTransform: "uppercase", letterSpacing: ".1em", marginBottom: 4 }}>Upcoming</div>
@@ -2267,7 +2657,7 @@ export default function MinisterCalendar() {
                         <button
                           key={item.id}
                           type="button"
-                          onClick={() => handleSelectMeeting(item)}
+                          onClick={() => { setSelectedDate(startOfDay(new Date(item.startsAt))); setSelectedMeeting(item); }}
                           style={{
                             display: "flex",
                             alignItems: "stretch",
@@ -2316,7 +2706,7 @@ export default function MinisterCalendar() {
         </div>
       )}
 
-      {/* Meeting detail modal — opens when a meeting is selected */}
+      {/* Meeting detail modal — opens on top when a meeting is selected */}
       {selectedMeeting && (
         <MeetingDetailModal
           meeting={selectedMeeting}
