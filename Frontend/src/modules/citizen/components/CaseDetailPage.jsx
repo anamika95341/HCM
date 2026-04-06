@@ -1,27 +1,65 @@
 import { useEffect, useState } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
-import { ArrowLeft, FileText, User, MapPin, Calendar, Users, FileCheck } from "lucide-react";
+import { ChevronRight, MapPin, Calendar, FileText, Hash, Briefcase } from "lucide-react";
 import { apiClient, authorizedConfig } from "../../../shared/api/client.js";
 import { useAuth } from "../../../shared/auth/AuthContext.jsx";
-import { PATHS } from "../../../routes/paths.js";
-import { WorkspaceBadge, WorkspaceButton, WorkspaceCard, WorkspaceCardHeader, WorkspaceEmptyState, WorkspacePage, WorkspaceSectionHeader } from "../../../shared/components/WorkspaceUI.jsx";
 import { usePortalTheme } from "../../../shared/theme/portalTheme.jsx";
+import { WorkspaceBadge, WorkspaceCard, WorkspaceEmptyState } from "../../../shared/components/WorkspaceUI.jsx";
 
-function citizenFacingStatus(caseData, itemType) {
-  if (itemType === "meeting" && ["verification_pending", "accepted", "verified", "pending"].includes(caseData?.status)) {
-    return "Under Review";
-  }
-  if (itemType === "meeting" && caseData?.status === "not_verified") {
-    return "Verification Failed";
-  }
-  if (itemType === "complaint" && ["assigned", "department_contact_identified", "call_scheduled", "followup_in_progress", "escalated_to_meeting"].includes(caseData?.status)) {
-    return "Under Review";
-  }
-  return String(caseData?.status || "")
+function formatStatus(status) {
+  return String(status || "pending")
     .split("_")
     .filter(Boolean)
     .map((chunk) => chunk.charAt(0).toUpperCase() + chunk.slice(1))
     .join(" ");
+}
+
+function formatActorRole(role) {
+  return String(role || "")
+    .split("_")
+    .filter(Boolean)
+    .map((chunk) => chunk.charAt(0).toUpperCase() + chunk.slice(1))
+    .join(" ");
+}
+
+function DetailBlock({ icon, label, value, multiline = false, compact = false }) {
+  const { C } = usePortalTheme();
+  return (
+    <div
+      style={{
+        padding: compact ? "0 0 14px" : "0 0 16px",
+      }}
+    >
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          gap: 8,
+          marginBottom: 8,
+          fontSize: 11,
+          fontWeight: 700,
+          color: C.t3,
+          textTransform: "uppercase",
+          letterSpacing: ".08em",
+        }}
+      >
+        {icon}
+        {label}
+      </div>
+      <div
+        style={{
+          fontSize: 14,
+          color: C.t1,
+          fontWeight: 500,
+          lineHeight: multiline ? 1.6 : 1.45,
+          whiteSpace: multiline ? "normal" : undefined,
+          wordBreak: "break-word",
+        }}
+      >
+        {value || <span style={{ color: C.t3, fontStyle: "italic" }}>Not provided</span>}
+      </div>
+    </div>
+  );
 }
 
 export default function CaseDetailsPage() {
@@ -35,6 +73,8 @@ export default function CaseDetailsPage() {
   const [history, setHistory] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [isBackHovered, setIsBackHovered] = useState(false);
+  const pageHeight = "calc(100vh - 73px)";
 
   useEffect(() => {
     let mounted = true;
@@ -42,15 +82,13 @@ export default function CaseDetailsPage() {
     async function loadCaseDetail() {
       try {
         const { data } = await apiClient.get(`/citizen/cases/${id}`, authorizedConfig(session.accessToken));
-        if (mounted) {
-          setCaseData(data.caseData);
-          setItemType(data.itemType);
-          setHistory(data.history || []);
-        }
+        if (!mounted) return;
+        setCaseData(data.caseData);
+        setItemType(data.itemType);
+        setHistory(data.history || []);
       } catch (loadError) {
-        if (mounted) {
-          setError(loadError?.response?.data?.error || "Unable to load case details");
-        }
+        if (!mounted) return;
+        setError(loadError?.response?.data?.error || "Unable to load case details");
       } finally {
         if (mounted) {
           setLoading(false);
@@ -68,131 +106,198 @@ export default function CaseDetailsPage() {
   }, [id, session?.accessToken]);
 
   if (loading) {
-    return <WorkspacePage width={1200}><WorkspaceEmptyState title="Loading case details..." /></WorkspacePage>;
+    return (
+      <div style={{ height: pageHeight, overflow: "hidden", padding: "16px 20px 12px" }}>
+        <div style={{ width: "100%", maxWidth: 1320, margin: "0 auto" }}>
+          <WorkspaceEmptyState title="Loading complaint details..." />
+        </div>
+      </div>
+    );
   }
 
   if (error || !caseData) {
     return (
-      <WorkspacePage width={1200}>
-        <WorkspaceCard style={{ textAlign: "center" }}>
-          <p style={{ color: C.t2, fontWeight: 600, marginBottom: 16 }}>{error || "Case details not found"}</p>
-          <WorkspaceButton onClick={() => navigate(PATHS.citizen.cases)}>Back to Cases</WorkspaceButton>
-        </WorkspaceCard>
-      </WorkspacePage>
+      <div style={{ height: pageHeight, overflow: "hidden", padding: "16px 20px 12px" }}>
+        <div style={{ width: "100%", maxWidth: 1320, margin: "0 auto" }}>
+          <WorkspaceCard style={{ textAlign: "center" }}>
+            <p style={{ color: C.t2, fontWeight: 600, marginBottom: 16 }}>{error || "Case details not found"}</p>
+          </WorkspaceCard>
+        </div>
+      </div>
     );
   }
 
   const isMeeting = itemType === "meeting";
+  const complaintTitle = caseData.title || caseData.subject;
+  const complaintId = caseData.complaintId || caseData.id;
+  const hasUploadedDocument = Boolean(caseData.document_file_id);
+  const createdLabel = caseData.createdAt || caseData.created_at
+    ? new Date(caseData.createdAt || caseData.created_at).toLocaleString("en-IN")
+    : "Not provided";
+  const incidentDateLabel = caseData.incidentDate
+    ? new Date(caseData.incidentDate).toLocaleDateString("en-IN", { dateStyle: "medium" })
+    : "Not provided";
+
   return (
-    <WorkspacePage width={1200}>
-      <WorkspaceSectionHeader
-        eyebrow="Citizen Workspace"
-        title={isMeeting ? caseData.requestId : caseData.complaintId}
-        subtitle={isMeeting ? caseData.title || caseData.purpose : caseData.title}
-        action={<WorkspaceButton variant="ghost" onClick={() => navigate(-1)}><ArrowLeft size={16} />Back</WorkspaceButton>}
-        icon={<FileText size={20} />}
-      />
-
-      <div style={{ marginBottom: 24 }}>
-        <WorkspaceBadge status={caseData?.status}>{citizenFacingStatus(caseData, itemType)}</WorkspaceBadge>
-      </div>
-
-        <div className="grid md:grid-cols-3 gap-6">
-          <div className="md:col-span-2 space-y-6">
-            <WorkspaceCard>
-              <WorkspaceCardHeader title="Description" subtitle="Primary context shared for this request or complaint." />
-              <p style={{ color: C.t2, lineHeight: 1.7 }}>{caseData.description || caseData.purpose || "No description available"}</p>
-            </WorkspaceCard>
-
-            <div className="grid sm:grid-cols-2 gap-4">
-              <InfoBox icon={<User size={18} color={C.purple} />} label="Owner/Holder" value={caseData.currentOwner || caseData.assignedAdminName || "Pending"} />
-              <InfoBox icon={<FileCheck size={18} color={C.purple} />} label="Department" value={isMeeting ? (caseData.admin_referral || caseData.assignedAdminName || "Admin Pool") : (caseData.department || "Complaint Desk")} />
-              {isMeeting && <InfoBox icon={<MapPin size={18} color={C.purple} />} label="Location" value={caseData.scheduled_location || "Pending"} />}
-              {isMeeting && <InfoBox icon={<Calendar size={18} color={C.purple} />} label="Scheduled Date" value={caseData.scheduled_at ? new Date(caseData.scheduled_at).toLocaleString("en-IN") : "Pending"} />}
-              {!isMeeting && <InfoBox icon={<MapPin size={18} color={C.purple} />} label="Complaint Location" value={caseData.complaintLocation || "Not provided"} />}
-              {!isMeeting && <InfoBox icon={<Users size={18} color={C.purple} />} label="Complaint Type" value={caseData.complaintType || "Not provided"} />}
+    <div
+      style={{
+        height: pageHeight,
+        overflow: "hidden",
+        padding: "16px 20px 12px",
+        display: "flex",
+        flexDirection: "column",
+      }}
+    >
+      <div style={{ width: "100%", maxWidth: 1320, margin: "0 auto", display: "flex", flexDirection: "column", flex: 1, minHeight: 0 }}>
+        <div style={{ display: "flex", flexDirection: "column", flex: 1, minHeight: 0 }}>
+          <div className="mb-4" style={{ display: "grid", gridTemplateColumns: "1fr auto 1fr", alignItems: "center", flexShrink: 0 }}>
+            <div style={{ justifySelf: "start" }}>
+              <button
+                type="button"
+                onMouseEnter={() => setIsBackHovered(true)}
+                onMouseLeave={() => setIsBackHovered(false)}
+                onClick={() => navigate(-1)}
+                className="flex items-center gap-1.5 font-medium transition-colors"
+                style={{
+                  border: `1px solid ${C.purple}`,
+                  background: isBackHovered ? C.purple : "transparent",
+                  color: isBackHovered ? "#ffffff" : C.purple,
+                  fontSize: 13,
+                  padding: "8px 8px",
+                  borderRadius: 10,
+                  whiteSpace: "nowrap",
+                }}
+              >
+                <ChevronRight size={16} className="rotate-180" />
+                {isMeeting ? "Back to Meetings" : "Back to Complaints"}
+              </button>
             </div>
+            <h2 style={{ fontSize: 20, fontWeight: 600, color: C.t1, margin: 0, textAlign: "center" }}>
+              {isMeeting ? "MEETING DETAILS" : "COMPLAINT DETAILS"}
+            </h2>
+            <div />
+          </div>
 
-            <WorkspaceCard>
-              <WorkspaceCardHeader title="Workflow Notes" subtitle="Latest citizen-visible notes from the active workflow." />
-              <div className="space-y-3" style={{ color: C.t2 }}>
-                {isMeeting && caseData.admin_comments && <p><strong>Admin Comments:</strong> {caseData.admin_comments}</p>}
-                {isMeeting && caseData.verification_reason && <p><strong>Verification Note:</strong> {caseData.verification_reason}</p>}
-                {isMeeting && caseData.rejection_reason && <p><strong>Rejection Reason:</strong> {caseData.rejection_reason}</p>}
-                {!isMeeting && caseData.statusReason && <p><strong>Status Reason:</strong> {caseData.statusReason}</p>}
-                {!isMeeting && caseData.callOutcome && <p><strong>Call Outcome:</strong> {caseData.callOutcome}</p>}
-                {!isMeeting && caseData.resolutionSummary && <p><strong>Resolution Summary:</strong> {caseData.resolutionSummary}</p>}
-                {!isMeeting && !caseData.statusReason && !caseData.callOutcome && !caseData.resolutionSummary && <p>No workflow notes available yet.</p>}
-                {isMeeting && !caseData.admin_comments && !caseData.verification_reason && !caseData.rejection_reason && <p>No workflow notes available yet.</p>}
-              </div>
-            </WorkspaceCard>
-
-            <WorkspaceCard>
-              <WorkspaceCardHeader title="Timeline" subtitle="Citizen-safe history of major status changes." />
-              <div className="space-y-4">
-                {history.length === 0 ? (
-                  <p style={{ color: C.t3, fontSize: 13 }}>No timeline entries yet.</p>
-                ) : history.map((entry, index) => (
-                  <div key={`${entry.id || entry.created_at}-${index}`} className="flex gap-4">
-                    <div className="flex flex-col items-center">
-                      <div className="w-3 h-3 rounded-full" style={{ background: C.purple, border: `2px solid ${C.card}` }} />
-                      {index !== history.length - 1 && <div className="w-0.5 h-12 mt-2" style={{ background: C.border }} />}
+          <div className="grid lg:grid-cols-[7fr_3fr] gap-6" style={{ flex: 1, minHeight: 0, alignItems: "stretch" }}>
+            <div style={{ minHeight: 0 }}>
+              <WorkspaceCard style={{ height: "100%" }}>
+                <div className="grid sm:grid-cols-2 gap-4">
+                  <DetailBlock icon={<Hash size={14} />} label="Complaint ID" value={complaintId} compact />
+                  <div style={{ padding: "0 0 14px" }}>
+                    <div
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 8,
+                        marginBottom: 8,
+                        fontSize: 11,
+                        fontWeight: 700,
+                        color: C.t3,
+                        textTransform: "uppercase",
+                        letterSpacing: ".08em",
+                      }}
+                    >
+                      <Calendar size={14} />
+                      Status
                     </div>
-                    <div className="flex-1 pb-4">
-                      <div style={{ background: C.bgElevated, border: `1px solid ${C.border}`, borderRadius: 10, padding: 16 }}>
-                        <p style={{ fontWeight: 600, color: C.t1 }}>
-                          {String(entry.new_status || "").split("_").filter(Boolean).map((chunk) => chunk.charAt(0).toUpperCase() + chunk.slice(1)).join(" ")}
-                        </p>
-                        <p style={{ fontSize: 12, color: C.t3, marginTop: 4 }}>{entry.actor_role}</p>
-                        {entry.note && <p style={{ fontSize: 13, color: C.t2, marginTop: 8 }}>{entry.note}</p>}
-                        <p style={{ fontSize: 12, color: C.t3, marginTop: 8 }}>{new Date(entry.created_at).toLocaleString("en-IN")}</p>
-                      </div>
+                    <WorkspaceBadge status={caseData.status}>{formatStatus(caseData.status)}</WorkspaceBadge>
+                  </div>
+                </div>
+
+                <div style={{ marginTop: 16 }}>
+                  <DetailBlock icon={<FileText size={14} />} label="Complaint Title" value={complaintTitle} multiline compact />
+                </div>
+
+                <div className="grid md:grid-cols-3 gap-4" style={{ marginTop: 16 }}>
+                  <DetailBlock icon={<MapPin size={14} />} label="Complaint Location" value={caseData.complaintLocation || "Not provided"} compact />
+                  <DetailBlock icon={<Calendar size={14} />} label="Date of Incident" value={incidentDateLabel} compact />
+                  <DetailBlock icon={<Calendar size={14} />} label="Complaint Filed Date" value={createdLabel} compact />
+                </div>
+
+                <div style={{ marginTop: 16 }}>
+                  <DetailBlock icon={<Briefcase size={14} />} label="Category" value={caseData.complaintType || "Not provided"} compact />
+                </div>
+
+                <div style={{ marginTop: 16 }}>
+                  <DetailBlock
+                    icon={<FileText size={14} />}
+                    label="Complaint Description"
+                    value={caseData.description || "No description available"}
+                    multiline
+                    compact
+                  />
+                </div>
+
+                <div style={{ marginTop: 16 }}>
+                  <div
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 8,
+                      marginBottom: 8,
+                      fontSize: 11,
+                      fontWeight: 700,
+                      color: C.t3,
+                      textTransform: "uppercase",
+                      letterSpacing: ".08em",
+                    }}
+                  >
+                    <FileText size={14} />
+                    Documents
+                  </div>
+                  <div
+                    style={{
+                      padding: 16,
+                      borderRadius: 12,
+                      border: `1px solid ${C.border}`,
+                      background: C.bgElevated,
+                    }}
+                  >
+                    <div style={{ fontSize: 14, color: C.t1, fontWeight: 500, lineHeight: 1.5 }}>
+                      {hasUploadedDocument ? "Document uploaded with this complaint" : "No documents uploaded"}
                     </div>
                   </div>
-                ))}
-              </div>
-            </WorkspaceCard>
-          </div>
+                </div>
+              </WorkspaceCard>
+            </div>
 
-          <div className="space-y-6">
-            <WorkspaceCard>
-              <WorkspaceCardHeader title="Case Summary" subtitle="Reference details tied to this case record." />
-              <div className="space-y-4">
-                <SummaryRow label="Created" value={new Date(caseData.createdAt || caseData.created_at).toLocaleString("en-IN")} />
-                {isMeeting && <SummaryRow label="Preferred Time" value={caseData.preferred_time ? new Date(caseData.preferred_time).toLocaleString("en-IN") : "Not provided"} />}
-                {isMeeting && <SummaryRow label="Visitor ID" value={caseData.visitorId || "Pending"} />}
-                {isMeeting && <SummaryRow label="Meeting Docket" value={caseData.meetingDocket || "Pending"} />}
-                {!isMeeting && <SummaryRow label="Officer" value={caseData.officerName || "Pending"} />}
-                {!isMeeting && <SummaryRow label="Officer Contact" value={caseData.officerContact || caseData.manualContact || "Pending"} />}
-                {!isMeeting && <SummaryRow label="Linked Meeting" value={caseData.relatedMeeting?.requestId || "No linked meeting"} />}
-                {isMeeting && <SummaryRow label="Linked Complaint" value={caseData.relatedComplaint?.complaintId || "No linked complaint"} />}
-              </div>
-            </WorkspaceCard>
+            <div style={{ minHeight: 0 }}>
+              <WorkspaceCard style={{ height: "100%", display: "flex", flexDirection: "column", minHeight: 0 }}>
+                <div style={{ fontSize: 16, fontWeight: 700, color: C.t1, marginBottom: 16, flexShrink: 0 }}>
+                  Timeline
+                </div>
+
+                <div style={{ flex: 1, minHeight: 0, overflowY: "auto", paddingRight: 0, marginRight: -8 }}>
+                  {history.length === 0 ? (
+                    <p style={{ color: C.t3, fontSize: 13 }}>No timeline entries yet.</p>
+                  ) : (
+                    <div className="space-y-4">
+                      {history.map((entry, index) => (
+                        <div key={`${entry.id || entry.created_at}-${index}`} className="flex gap-4" style={{ alignItems: "flex-start" }}>
+                          <div className="flex flex-col items-center self-stretch" style={{ paddingTop: 2 }}>
+                            <div className="w-3 h-3 rounded-full" style={{ background: C.purple, border: `2px solid ${C.card}` }} />
+                            {index !== history.length - 1 ? <div className="w-0.5 flex-1 min-h-14 mt-2" style={{ background: C.purple }} /> : null}
+                          </div>
+                          <div className="flex-1 pb-3">
+                            <div>
+                              <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 12 }}>
+                                <p style={{ fontSize: 13, fontWeight: 600, color: C.t2, margin: 0, whiteSpace: "normal", wordBreak: "break-word" }}>{formatStatus(entry.new_status)}</p>
+                                <p style={{ fontSize: 12, color: C.t3, margin: 0, paddingRight: 10, whiteSpace: "normal", wordBreak: "break-word", textAlign: "right" }}>{formatActorRole(entry.actor_role)}</p>
+                              </div>
+                              {entry.note ? <p style={{ fontSize: 13, color: C.t2, marginTop: 8, marginBottom: 0, whiteSpace: "normal", wordBreak: "break-word", lineHeight: 1.5 }}>{entry.note}</p> : null}
+                              <p style={{ fontSize: 12, color: C.t3, marginTop: 8, marginBottom: 0 }}>{new Date(entry.created_at).toLocaleString("en-IN")}</p>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </WorkspaceCard>
+            </div>
           </div>
         </div>
-    </WorkspacePage>
-  );
-}
-
-function InfoBox({ icon, label, value }) {
-  const { C } = usePortalTheme();
-  return (
-    <WorkspaceCard style={{ padding: 18, minHeight: 118 }}>
-      <div className="flex items-center gap-2 mb-2">
-        {icon}
-        <p style={{ fontSize: 11, textTransform: "uppercase", letterSpacing: ".08em", color: C.t3, fontWeight: 700 }}>{label}</p>
       </div>
-      <p style={{ color: C.t1, fontWeight: 600, lineHeight: 1.5 }}>{value}</p>
-    </WorkspaceCard>
-  );
-}
-
-function SummaryRow({ label, value }) {
-  const { C } = usePortalTheme();
-  return (
-    <div>
-      <p style={{ fontSize: 11, textTransform: "uppercase", letterSpacing: ".08em", color: C.t3, fontWeight: 700 }}>{label}</p>
-      <p style={{ color: C.t1, fontWeight: 500, marginTop: 4 }}>{value}</p>
     </div>
   );
 }

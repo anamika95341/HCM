@@ -1,41 +1,85 @@
-import { useLocation, useNavigate } from "react-router-dom";
+import { useEffect, useState } from "react";
+import { useLocation, useNavigate, useParams } from "react-router-dom";
 import {
-  ChevronRight, Calendar, Clock, MapPin, Users, FileText,
-  MessageSquare, ShieldCheck, User, Phone, Hash
+  ChevronRight,
+  Calendar,
+  Clock,
+  MapPin,
+  FileText,
+  Hash,
 } from "lucide-react";
+import { apiClient, authorizedConfig } from "../../../shared/api/client.js";
+import { useAuth } from "../../../shared/auth/AuthContext.jsx";
 import { usePortalTheme } from "../../../shared/theme/portalTheme.jsx";
 import {
   WorkspaceBadge,
   WorkspaceCard,
-  WorkspaceCardHeader,
-  WorkspacePage,
+  WorkspaceEmptyState,
 } from "../../../shared/components/WorkspaceUI.jsx";
 
-function meetingStatus(item) {
-  const status = item.status || "pending";
-  if (["pending", "accepted", "verification_pending", "verified"].includes(status)) {
-    return { value: status, label: "Under Review" };
-  }
-  if (status === "not_verified") {
-    return { value: status, label: "Verification Failed" };
-  }
-  const label = String(status)
+function formatStatus(status) {
+  return String(status || "pending")
     .split("_")
     .filter(Boolean)
     .map((chunk) => chunk.charAt(0).toUpperCase() + chunk.slice(1))
     .join(" ");
-  return { value: status, label };
 }
 
-function InfoRow({ label, value, icon }) {
+function formatActorRole(role) {
+  return String(role || "")
+    .split("_")
+    .filter(Boolean)
+    .map((chunk) => chunk.charAt(0).toUpperCase() + chunk.slice(1))
+    .join(" ");
+}
+
+function cleanTimelineNote(note) {
+  if (!note) return "";
+  return String(note).replace(/Sent to DEO\s+[a-f0-9-]+\s+for verification/i, "Sent to DEO for verification");
+}
+
+function valueTone(status, C) {
+  const s = String(status || "").toLowerCase().replace(/[_\s-]/g, "");
+  if (/^(verified|resolved|completed|scheduled|active|accepted|approved)$/.test(s)) return C.mint;
+  if (/^(rejected|cancelled|notverified|locked|failed)$/.test(s)) return C.danger;
+  if (/^(pending|submitted|inreview|assigned|verificationpending|deptcontactidentified|callscheduled|followup|escalatedtomeeting|escalated)$/.test(s)) return C.warn;
+  return C.purple;
+}
+
+function DetailBlock({ icon, label, value, multiline = false, compact = false, valueColor }) {
   const { C } = usePortalTheme();
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-      <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 10, fontWeight: 700, color: C.t3, textTransform: "uppercase", letterSpacing: ".08em" }}>
+    <div
+      style={{
+        padding: compact ? "0 0 14px" : "0 0 16px",
+      }}
+    >
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          gap: 8,
+          marginBottom: 8,
+          fontSize: 11,
+          fontWeight: 700,
+          color: C.t3,
+          textTransform: "uppercase",
+          letterSpacing: ".08em",
+        }}
+      >
         {icon}
         {label}
       </div>
-      <div style={{ fontSize: 14, color: C.t1, fontWeight: 500 }}>
+      <div
+        style={{
+          fontSize: 14,
+          color: valueColor || C.t1,
+          fontWeight: 500,
+          lineHeight: multiline ? 1.6 : 1.45,
+          whiteSpace: multiline ? "normal" : undefined,
+          wordBreak: "break-word",
+        }}
+      >
         {value || <span style={{ color: C.t3, fontStyle: "italic" }}>Not provided</span>}
       </div>
     </div>
@@ -46,175 +90,333 @@ export default function MeetingDetail() {
   const { C } = usePortalTheme();
   const navigate = useNavigate();
   const { state } = useLocation();
-  const item = state?.meetingData;
+  const { id } = useParams();
+  const { session } = useAuth();
 
-  if (!item) {
+  const [meeting, setMeeting] = useState(state?.meetingData || null);
+  const [history, setHistory] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+  const [isBackHovered, setIsBackHovered] = useState(false);
+  const pageHeight = "calc(100vh - 73px)";
+
+  useEffect(() => {
+    let mounted = true;
+
+    async function loadMeeting() {
+      try {
+        const { data } = await apiClient.get(`/meetings/my/${id}`, authorizedConfig(session.accessToken));
+        if (!mounted) return;
+        setMeeting(data.meeting || null);
+        setHistory(data.history || []);
+      } catch (loadError) {
+        if (!mounted) return;
+        setError(loadError?.response?.data?.error || "Unable to load meeting details");
+      } finally {
+        if (mounted) {
+          setLoading(false);
+        }
+      }
+    }
+
+    if (session?.accessToken && id) {
+      loadMeeting();
+    }
+
+    return () => {
+      mounted = false;
+    };
+  }, [id, session?.accessToken]);
+
+  if (loading) {
     return (
-      <WorkspacePage width={1320}>
-        <div style={{ textAlign: "center", padding: 60, color: C.t3 }}>
-          Meeting not found. Please go back and try again.
+      <div
+        style={{
+          height: pageHeight,
+          overflow: "hidden",
+          padding: "16px 20px 12px",
+        }}
+      >
+        <div style={{ width: "100%", maxWidth: 1320, margin: "0 auto" }}>
+          <WorkspaceEmptyState title="Loading meeting details..." />
         </div>
-      </WorkspacePage>
+      </div>
     );
   }
 
-  const statusObj = meetingStatus(item);
-  const preferredTimeLabel = item.preferred_time
-    ? new Date(item.preferred_time).toLocaleString("en-IN", { dateStyle: "long", timeStyle: "short" })
-    : null;
-  const scheduledTimeLabel = item.scheduled_at
-    ? new Date(item.scheduled_at).toLocaleString("en-IN", { dateStyle: "long", timeStyle: "short" })
-    : null;
-  const createdAtLabel = item.created_at
-    ? new Date(item.created_at).toLocaleString("en-IN", { dateStyle: "long", timeStyle: "short" })
-    : null;
-
-  let attendees = [];
-  try {
-    if (typeof item.additional_attendees === "string") {
-      attendees = JSON.parse(item.additional_attendees);
-    } else if (Array.isArray(item.additional_attendees)) {
-      attendees = item.additional_attendees;
-    }
-  } catch {
-    attendees = [];
-  }
-
-  return (
-    <WorkspacePage width={1320}>
-      {/* HEADER */}
+  if (error || !meeting) {
+    return (
       <div
-        className="mb-4"
         style={{
-          position: "sticky", top: 0, zIndex: 40,
-          background: C.card, border: `1px solid ${C.border}`, borderRadius: 16,
-          padding: "0 24px", height: 56, display: "flex", alignItems: "center", justifyContent: "space-between",
+          height: pageHeight,
+          overflow: "hidden",
+          padding: "16px 20px 12px",
         }}
       >
-        <div style={{ width: 160, flexShrink: 0 }}>
-          <button
-            onClick={() => navigate(-1)}
-            className="flex items-center gap-2 font-medium transition-colors"
-            style={{ color: C.purple, whiteSpace: "nowrap" }}
-          >
-            <ChevronRight size={20} className="rotate-180" />
-            Back to Meetings
-          </button>
+        <div style={{ width: "100%", maxWidth: 1320, margin: "0 auto" }}>
+          <WorkspaceCard style={{ textAlign: "center" }}>
+            <p style={{ color: C.t2, fontWeight: 600, marginBottom: 16 }}>{error || "Meeting not found"}</p>
+          </WorkspaceCard>
         </div>
-        <h2 style={{ fontSize: 20, fontWeight: 600, color: C.t1 }}>Meeting Details</h2>
-        <div style={{ width: 160, flexShrink: 0 }}></div>
       </div>
+    );
+  }
 
-      {/* TITLE + STATUS */}
-      <WorkspaceCard style={{ marginBottom: 16 }}>
-        <div style={{ flex: 1, minWidth: 0, overflow: "hidden" }}> 
-          <h1 style={{ fontSize: 22, fontWeight: 700, color: C.t1, marginBottom: 6 }}>
-            {item.primaryTitle || item.title}
-          </h1>
-          {item.purpose && (
-            <p style={{
-              fontSize: 14,
-              color: C.t2,
-              lineHeight: 1.6,
-              overflowWrap: "break-word",   // ← add
-              wordBreak: "break-word",      // ← add
-              // maxWidth: 700  ← remove this, let the container control width
-            }}>
-              {item.purpose}
-            </p>
-          )}
-        </div>
-      </WorkspaceCard>
+  const preferredTimeLabel = meeting.preferred_time
+    ? new Date(meeting.preferred_time).toLocaleString("en-IN", { dateStyle: "long", timeStyle: "short" })
+    : null;
+  const scheduledTimeLabel = meeting.scheduled_at
+    ? new Date(meeting.scheduled_at).toLocaleString("en-IN", { dateStyle: "long", timeStyle: "short" })
+    : "Pending";
+  const hasUploadedDocument = Boolean(meeting.document_file_id);
+  const statusLabel = formatStatus(meeting.status);
+  const locationLabel = meeting.scheduled_location || "Pending";
+  const pageOverflow = hasUploadedDocument ? "auto" : "hidden";
+  const scheduledTone = valueTone(meeting.scheduled_at ? "scheduled" : "pending", C);
+  const locationTone = valueTone(meeting.scheduled_location ? "scheduled" : "pending", C);
 
-      {/* SCHEDULING INFO */}
-      <WorkspaceCard style={{ marginBottom: 16 }}>
-        <WorkspaceCardHeader title="Scheduling" />
-        <div className="grid md:grid-cols-3 gap-6" style={{ marginTop: 16 }}>
-          <InfoRow icon={<Calendar size={12} />} label="Preferred Time" value={preferredTimeLabel} />
-          <InfoRow icon={<Clock size={12} />} label="Scheduled Time" value={scheduledTimeLabel} />
-          <InfoRow icon={<MapPin size={12} />} label="Location" value={item.scheduled_location} />
-        </div>
-      </WorkspaceCard>
-
-      {/* ADMIN / REFERRAL INFO */}
-      {(item.admin_referral || item.requestId || item.id) && (
-        <WorkspaceCard style={{ marginBottom: 16 }}>
-          <WorkspaceCardHeader title="Reference" />
-          <div className="grid md:grid-cols-2 gap-6" style={{ marginTop: 16 }}>
-            {(item.requestId || item.id) && (
-              <InfoRow icon={<Hash size={12} />} label="Request ID" value={item.requestId || item.id} />
-            )}
-            {item.admin_referral && (
-              <InfoRow icon={<User size={12} />} label="Admin Desk" value={item.admin_referral} />
-            )}
+  return (
+    <div
+      style={{
+        height: pageHeight,
+        overflowY: pageOverflow,
+        overflowX: "hidden",
+        padding: "16px 20px 12px",
+        display: "flex",
+        flexDirection: "column",
+      }}
+    >
+      <div style={{ width: "100%", maxWidth: 1320, margin: "0 auto", display: "flex", flexDirection: "column", flex: 1, minHeight: 0 }}>
+      <div
+        style={{
+          display: "flex",
+          flexDirection: "column",
+          flex: 1,
+          minHeight: 0,
+        }}
+      >
+        <div className="mb-4" style={{ display: "grid", gridTemplateColumns: "1fr auto 1fr", alignItems: "center", flexShrink: 0 }}>
+          <div style={{ justifySelf: "start" }}>
+            <button
+              type="button"
+              onMouseEnter={() => setIsBackHovered(true)}
+              onMouseLeave={() => setIsBackHovered(false)}
+              onClick={() => navigate(-1)}
+              className="flex items-center gap-1.5 font-medium transition-colors"
+              style={{
+                border: `1px solid ${C.purple}`,
+                background: isBackHovered ? C.purple : "transparent",
+                color: isBackHovered ? "#ffffff" : C.purple,
+                fontSize: 13,
+                padding: "8px 8px",
+                borderRadius: 10,
+                whiteSpace: "nowrap",
+              }}
+            >
+              <ChevronRight size={16} className="rotate-180" />
+              Back to Meetings
+            </button>
           </div>
-        </WorkspaceCard>
-      )}
+          <h2 style={{ fontSize: 20, fontWeight: 600, color: C.t1, margin: 0, textAlign: "center" }}>MEETING DETAILS</h2>
+          <div />
+        </div>
 
-      {/* ADMIN NOTES */}
-      {(item.verification_note || item.admin_comments) && (
-        <WorkspaceCard style={{ marginBottom: 16 }}>
-          <WorkspaceCardHeader title="Admin Notes" />
-          <div style={{ marginTop: 16, display: "flex", flexDirection: "column", gap: 16 }}>
-            {item.verification_note && (
-              <div style={{ padding: 16, borderRadius: 10, background: C.bgElevated, border: `1px solid ${C.border}` }}>
-                <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, fontWeight: 700, color: C.t3, textTransform: "uppercase", letterSpacing: ".08em", marginBottom: 8 }}>
-                  <ShieldCheck size={14} />
-                  Verification Note
+        <div className="grid lg:grid-cols-[7fr_3fr] gap-6" style={{ flex: 1, minHeight: 0, alignItems: "stretch" }}>
+          <div style={{ minHeight: 0 }}>
+            <WorkspaceCard style={{ height: "100%" }}>
+              <div className="grid sm:grid-cols-2 gap-4">
+                <DetailBlock icon={<Hash size={14} />} label="Meeting ID" value={meeting.requestId || meeting.id} compact />
+                <div style={{ padding: "0 0 14px" }}>
+                  <div
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 8,
+                      marginBottom: 8,
+                      fontSize: 11,
+                      fontWeight: 700,
+                      color: C.t3,
+                      textTransform: "uppercase",
+                      letterSpacing: ".08em",
+                    }}
+                  >
+                    <Clock size={14} />
+                    Status
+                  </div>
+                  <WorkspaceBadge status={meeting.status}>{statusLabel}</WorkspaceBadge>
                 </div>
-                <p style={{ fontSize: 14, color: C.t1, lineHeight: 1.6 }}>{item.verification_note}</p>
               </div>
-            )}
-            {item.admin_comments && (
-              <div style={{ padding: 16, borderRadius: 10, background: C.bgElevated, border: `1px solid ${C.border}` }}>
-                <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, fontWeight: 700, color: C.t3, textTransform: "uppercase", letterSpacing: ".08em", marginBottom: 8 }}>
-                  <MessageSquare size={14} />
-                  Admin Comments
-                </div>
-                <p style={{ fontSize: 14, color: C.t1, lineHeight: 1.6, wordBreak: "break-word" }}>{item.admin_comments}</p>
-              </div>
-            )}
-          </div>
-        </WorkspaceCard>
-      )}
 
-      {/* ATTENDEES */}
-      {attendees.length > 0 && (
-        <WorkspaceCard style={{ marginBottom: 16 }}>
-          <WorkspaceCardHeader
-            title="Additional Attendees"
-            subtitle={`${attendees.length} companion(s) accompanying this meeting`}
-          />
-          <div className="grid md:grid-cols-2 gap-3" style={{ marginTop: 16 }}>
-            {attendees.map((person, idx) => (
+              <div style={{ marginTop: 16 }}>
+                <DetailBlock
+                  icon={<FileText size={14} />}
+                  label="Meeting Title"
+                  value={meeting.title || meeting.primaryTitle}
+                  multiline
+                  compact
+                />
+              </div>
+
+              <div className="grid md:grid-cols-3 gap-4" style={{ marginTop: 16 }}>
+                <DetailBlock icon={<Calendar size={14} />} label="Preferred Time" value={preferredTimeLabel} compact />
+                <div style={{ padding: "0 0 14px" }}>
+                  <div
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 8,
+                      marginBottom: 8,
+                      fontSize: 11,
+                      fontWeight: 700,
+                      color: C.t3,
+                      textTransform: "uppercase",
+                      letterSpacing: ".08em",
+                    }}
+                  >
+                    <Clock size={14} />
+                    Scheduled Time
+                  </div>
+                  <span style={{
+                    display: "inline-flex",
+                    alignItems: "center",
+                    padding: "6px 10px",
+                    borderRadius: 999,
+                    background: `${scheduledTone}18`,
+                    color: scheduledTone,
+                    border: `1px solid ${scheduledTone}28`,
+                    fontSize: 12,
+                    fontWeight: 600,
+                    lineHeight: 1,
+                    whiteSpace: "nowrap",
+                  }}>
+                    {scheduledTimeLabel}
+                  </span>
+                </div>
+                <div style={{ padding: "0 0 14px" }}>
+                  <div
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 8,
+                      marginBottom: 8,
+                      fontSize: 11,
+                      fontWeight: 700,
+                      color: C.t3,
+                      textTransform: "uppercase",
+                      letterSpacing: ".08em",
+                    }}
+                  >
+                    <MapPin size={14} />
+                    Location
+                  </div>
+                  <span style={{
+                    display: "inline-flex",
+                    alignItems: "center",
+                    padding: "6px 10px",
+                    borderRadius: 999,
+                    background: `${locationTone}18`,
+                    color: locationTone,
+                    border: `1px solid ${locationTone}28`,
+                    fontSize: 12,
+                    fontWeight: 600,
+                    lineHeight: 1,
+                    whiteSpace: "nowrap",
+                  }}>
+                    {locationLabel}
+                  </span>
+                </div>
+              </div>
+
+              <div style={{ marginTop: 16 }}>
+                <DetailBlock
+                  icon={<FileText size={14} />}
+                  label="Meeting Description"
+                  value={meeting.purpose}
+                  multiline
+                  compact
+                />
+              </div>
+
               <div
-                key={idx}
-                style={{ padding: 14, borderRadius: 10, background: C.bgElevated, border: `1px solid ${C.border}`, display: "flex", alignItems: "center", gap: 12 }}
+                style={{ marginTop: 16 }}
               >
-                <div style={{ width: 36, height: 36, borderRadius: "50%", background: C.purpleDim, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-                  <Users size={16} style={{ color: C.purple }} />
+                <div
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 8,
+                    marginBottom: 8,
+                    fontSize: 11,
+                    fontWeight: 700,
+                    color: C.t3,
+                    textTransform: "uppercase",
+                    letterSpacing: ".08em",
+                  }}
+                >
+                  <FileText size={14} />
+                  Documents
                 </div>
-                <div>
-                  <div style={{ fontWeight: 600, color: C.t1, fontSize: 14 }}>{person.attendeeName || person.name}</div>
-                  {(person.attendeePhone || person.phone) && (
-                    <div style={{ fontSize: 12, color: C.t3, display: "flex", alignItems: "center", gap: 4, marginTop: 2 }}>
-                      <Phone size={11} /> {person.attendeePhone || person.phone}
-                    </div>
-                  )}
+                <div
+                  style={{
+                    padding: 16,
+                    borderRadius: 12,
+                    border: `1px solid ${C.border}`,
+                    background: C.bgElevated,
+                  }}
+                >
+                  <div style={{ fontSize: 14, color: C.t1, fontWeight: 500, lineHeight: 1.5 }}>
+                    {hasUploadedDocument ? "Document uploaded with this meeting request" : "No documents uploaded"}
+                  </div>
                 </div>
               </div>
-            ))}
+            </WorkspaceCard>
           </div>
-        </WorkspaceCard>
-      )}
 
-      {/* FOOTER - REQUESTED ON */}
-      {createdAtLabel && (
-        <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, color: C.t3, paddingBottom: 24 }}>
-          <Clock size={13} />
-          Requested on {createdAtLabel}
+          <div style={{ minHeight: 0 }}>
+            <WorkspaceCard style={{ height: "100%", display: "flex", flexDirection: "column", minHeight: 0 }}>
+              <div
+                style={{
+                  fontSize: 16,
+                  fontWeight: 700,
+                  color: C.t1,
+                  marginBottom: 16,
+                  flexShrink: 0,
+                }}
+              >
+                Timeline
+              </div>
+
+              <div style={{ flex: 1, minHeight: 0, overflowY: "auto", paddingRight: 0, marginRight: -8 }}>
+                {history.length === 0 ? (
+                  <p style={{ color: C.t3, fontSize: 13 }}>No timeline entries yet.</p>
+                ) : (
+                  <div className="space-y-4">
+                    {history.map((entry, index) => (
+                      <div key={`${entry.id || entry.created_at}-${index}`} className="flex gap-4" style={{ alignItems: "flex-start" }}>
+                        <div className="flex flex-col items-center self-stretch" style={{ paddingTop: 2 }}>
+                          <div className="w-3 h-3 rounded-full" style={{ background: C.purple, border: `2px solid ${C.card}` }} />
+                          {index !== history.length - 1 ? <div className="w-0.5 flex-1 min-h-14 mt-2" style={{ background: C.purple }} /> : null}
+                        </div>
+                        <div className="flex-1 pb-3">
+                          <div>
+                            <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 12 }}>
+                              <p style={{ fontSize: 13, fontWeight: 600, color: C.t2, margin: 0, whiteSpace: "normal", wordBreak: "break-word" }}>{formatStatus(entry.new_status)}</p>
+                              <p style={{ fontSize: 12, color: C.t3, margin: 0, paddingRight: 10, whiteSpace: "normal", wordBreak: "break-word", textAlign: "right" }}>{formatActorRole(entry.actor_role)}</p>
+                            </div>
+                            {entry.note ? <p style={{ fontSize: 13, color: C.t2, marginTop: 8, marginBottom: 0, whiteSpace: "normal", wordBreak: "break-word", lineHeight: 1.5 }}>{cleanTimelineNote(entry.note)}</p> : null}
+                            <p style={{ fontSize: 12, color: C.t3, marginTop: 8, marginBottom: 0 }}>{new Date(entry.created_at).toLocaleString("en-IN")}</p>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </WorkspaceCard>
+          </div>
         </div>
-      )}
-    </WorkspacePage>
+      </div>
+      </div>
+    </div>
   );
 }

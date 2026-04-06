@@ -1,5 +1,4 @@
 import { FiCalendar, FiClipboard, FiHome, FiLogOut } from "react-icons/fi";
-import { Link } from "react-router-dom";
 import {
     FiMenu,
 } from "react-icons/fi";
@@ -75,26 +74,13 @@ function Sidebar({ collapsed, onToggle }) {
         style={{
           display: "flex",
           alignItems: "center",
-          justifyContent: collapsed ? "center" : "space-between",
+          justifyContent: "flex-start",
           height: 55,
-          padding: collapsed ? "var(--portal-space-10) var(--portal-space-8)" : "var(--portal-space-11) var(--portal-space-10)",
+          padding: "var(--portal-space-10) var(--portal-space-8)",
           borderBottom: `1px solid ${C.border}`,
           gap: 10,
         }}
       >
-        {!collapsed && (
-          <Link
-            to={PATHS.login}
-            style={{
-              display: "flex",
-              flexDirection: "column",
-              gap: 4,
-              minWidth: 0,
-            }}
-          >
-           
-          </Link>
-        )}
         <SidebarItem type="" collapsed={collapsed} label="Toggle Navigation">
           <button
             onClick={onToggle}
