@@ -45,8 +45,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Prepare backend env example for compose validation
-        run: cp backend/.env.example backend/.env
+      - name: Prepare backend env files for compose validation
+        run: |
+          cp backend/.env.example backend/.env
+          cp backend/.env.example backend/.env.localhost
       - name: Validate Compose files
         run: |
           docker compose --env-file backend/.env.example -f compose.yml config >/dev/null
