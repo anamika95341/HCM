@@ -2048,7 +2048,8 @@ function MeetingDetailModal({ meeting, onClose }) {
                   <p style={{ fontSize: 11, fontWeight: 700, color: C.t3, textTransform: "uppercase", letterSpacing: ".08em", marginBottom: 12 }}>
                     Description
                   </p>
-                  <p style={{ color: C.t2, lineHeight: 1.75, fontSize: 14, margin: 0 }}>
+                  <p style={{ color: C.t2, lineHeight: 1.75, fontSize: 14, margin: 0 ,
+                    wordBreak: "break-word",whiteSpace: "pre-wrap"}}>
                     {meeting.details || "No description available."}
                   </p>
                 </div>
