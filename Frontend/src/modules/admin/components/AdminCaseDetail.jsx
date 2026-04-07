@@ -212,6 +212,7 @@ export default function AdminCaseDetail() {
   const [history, setHistory] = useState([]);
   const [selectedAction, setSelectedAction] = useState("");
   const [successMessage, setSuccessMessage] = useState("");
+  const [pendingSuccessRedirect, setPendingSuccessRedirect] = useState("");
   const [actionLoading, setActionLoading] = useState(false);
   const [error, setError] = useState("");
   const [complaintForm, setComplaintForm] = useState({
@@ -327,7 +328,12 @@ export default function AdminCaseDetail() {
         setHistory(detail.data.history || []);
       }
       if (actionName === "assign") {
-        navigate(PATHS.admin.complaintQueue);
+        if (source === "work-queue") {
+          setSuccessMessage("Complaint assigned successfully.");
+          setPendingSuccessRedirect(PATHS.admin.complaintQueue);
+        } else {
+          navigate(PATHS.admin.complaintQueue);
+        }
         return;
       }
       if (actionName === "escalate" || actionName === "reassign") {
@@ -345,6 +351,17 @@ export default function AdminCaseDetail() {
 
   function closeActionModal() {
     setSelectedAction("");
+  }
+
+  function handleSuccessModalClose() {
+    if (pendingSuccessRedirect) {
+      const redirect = pendingSuccessRedirect;
+      setPendingSuccessRedirect("");
+      setSuccessMessage("");
+      navigate(redirect);
+      return;
+    }
+    setSuccessMessage("");
   }
 
   if (!item) {
@@ -370,7 +387,7 @@ export default function AdminCaseDetail() {
 
   return (
     <WorkspacePage width={1200}>
-      <SuccessModal open={!!successMessage} message={successMessage} onClose={() => setSuccessMessage("")} />
+      <SuccessModal open={!!successMessage} message={successMessage} onClose={handleSuccessModalClose} />
       <WorkspaceSectionHeader
         title={item.complaintId}
         subtitle={item.title}
@@ -380,20 +397,22 @@ export default function AdminCaseDetail() {
       <div style={{ display: "grid", gap: 24 }}>
         {error ? <WorkspaceCard style={{ color: C.danger }}>{error}</WorkspaceCard> : null}
 
-        <WorkspaceCard>
-          {showAssignToMeOnly ? (
+        {showAssignToMeOnly ? (
+          <div style={{ marginBottom: 24 }}>
             <WorkspaceButton type="button" disabled={actionLoading} onClick={() => runAction("assign", () => apiClient.patch(`/complaints/${id}/assign-self`, {}, authorizedConfig(session.accessToken)))}>
               Assign to Me
             </WorkspaceButton>
-          ) : (
+          </div>
+        ) : (
+          <WorkspaceCard>
             <div className="grid md:grid-cols-[minmax(0,320px)_auto] gap-3 items-start">
               <WorkspaceSelect value={activeAction} onChange={(event) => setSelectedAction(event.target.value)}>
                 <option value="">Select workflow action</option>
                 {availableActions.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
               </WorkspaceSelect>
             </div>
-          )}
-        </WorkspaceCard>
+          </WorkspaceCard>
+        )}
 
         <div className="grid md:grid-cols-2 gap-6">
           <WorkspaceCard>

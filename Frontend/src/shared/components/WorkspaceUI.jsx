@@ -260,10 +260,10 @@ export function WorkspaceButton({ variant = "primary", children, style, ...props
     <button
       {...props}
       className={`portal-btn portal-btn-${variant === "primary" ? "primary" : variant === "ghost" ? "ghost" : variant === "outline" ? "outline" : "danger"}`}
-      onMouseEnter={() => setHovered(true)}
-      onMouseLeave={() => { setHovered(false); setPressed(false); }}
-      onMouseDown={() => setPressed(true)}
-      onMouseUp={() => setPressed(false)}
+      onMouseEnter={(event) => { setHovered(true); props.onMouseEnter?.(event); }}
+      onMouseLeave={(event) => { setHovered(false); setPressed(false); props.onMouseLeave?.(event); }}
+      onMouseDown={(event) => { setPressed(true); props.onMouseDown?.(event); }}
+      onMouseUp={(event) => { setPressed(false); props.onMouseUp?.(event); }}
       style={{
         opacity: props.disabled ? 0.4 : h ? 0.9 : 1,
         transform: p ? "scale(0.98)" : "none",

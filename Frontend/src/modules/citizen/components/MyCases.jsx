@@ -23,6 +23,25 @@ function citizenStatus(item) {
   return { value: status, label };
 }
 
+const tableCellTextStyle = {
+  display: "block",
+  maxWidth: "100%",
+  overflow: "hidden",
+  textOverflow: "ellipsis",
+  whiteSpace: "nowrap",
+};
+
+const idColumnStyle = {
+  width: 160,
+  minWidth: 160,
+  maxWidth: 160,
+};
+
+function toTooltipText(value) {
+  if (value === null || value === undefined) return "";
+  return String(value);
+}
+
 export default function MyCases() {
   const { C } = usePortalTheme();
   const navigate = useNavigate();
@@ -35,9 +54,10 @@ export default function MyCases() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [hoveredActionId, setHoveredActionId] = useState(null);
+  const [hoveredPagerButton, setHoveredPagerButton] = useState(null);
   const [filters, setFilters] = useState({ q: "", status: "all" });
   const [currentPage, setCurrentPage] = useState(1);
-  const itemsPerPage = 7;
+  const itemsPerPage = 8;
 
   useEffect(() => {
     let mounted = true;
@@ -101,18 +121,18 @@ export default function MyCases() {
       style={{
         height: pageHeight,
         overflow: "hidden",
-        padding: "16px 20px 8px",
+        padding: "20px 20px 0",
         display: "flex",
         flexDirection: "column",
       }}
     >
-      <div style={{ width: "100%", maxWidth: 1320, margin: "0 auto", display: "flex", flexDirection: "column", flex: 1, minHeight: 0 }}>
-        <div style={{ marginBottom: 22, display: "flex", alignItems: "center", gap: 10 }}>
+      <div style={{ width: "100%", display: "flex", flexDirection: "column", flex: 1, minHeight: 0 }}>
+        <div style={{ marginBottom: 24, display: "flex", alignItems: "center", gap: 10 }}>
           <FileText size={20} style={{ color: C.purple, flexShrink: 0 }} />
           <h1 style={{ margin: 0, fontSize: 20, lineHeight: 1.3, fontWeight: 600, color: C.t1 }}>MY COMPLAINTS</h1>
         </div>
 
-        <div style={{ marginBottom: 22 }}>
+        <div style={{ marginBottom: 20 }}>
           <div className="grid md:grid-cols-2 gap-3">
             <div className="relative">
               <Search className="absolute left-3 top-3" size={18} style={{ color: C.t3 }} />
@@ -147,7 +167,7 @@ export default function MyCases() {
           </div>
         </div>
 
-        <div style={{ marginBottom: 22, minHeight: 0 }}>
+        <div style={{ flex: 1, minHeight: 0, display: "flex", flexDirection: "column" }}>
           {loading && (
             <WorkspaceEmptyState title="Loading your complaints..." />
           )}
@@ -160,15 +180,18 @@ export default function MyCases() {
                 <WorkspaceEmptyState title="No complaints found" subtitle="Try adjusting your filters." />
               ) : (
                 <>
-                  <div className="hidden lg:block" style={{ border: `1px solid ${C.border}`, borderRadius: 12, overflow: "hidden" }}>
+                  <div className="hidden lg:block" style={{ border: `1px solid ${C.border}`, borderRadius: 12, overflow: "hidden", display: "flex", flexDirection: "column", flex: 1, minHeight: 0 }}>
                     <table className="w-full text-sm" style={{ borderCollapse: "collapse" }}>
+                      <colgroup>
+                        <col style={idColumnStyle} />
+                      </colgroup>
                       <thead>
                         <tr>
                           <th style={{ padding: "13px 16px", fontSize: 10, fontWeight: 600, color: tableHeaderText, textTransform: "uppercase", letterSpacing: "0.06em", textAlign: "left", whiteSpace: "nowrap", background: tableHeaderBackground, borderBottom: `1px solid ${C.border}`, verticalAlign: "middle" }}>Complaint ID</th>
                           <th style={{ padding: "13px 16px", fontSize: 10, fontWeight: 600, color: tableHeaderText, textTransform: "uppercase", letterSpacing: "0.06em", textAlign: "left", whiteSpace: "nowrap", background: tableHeaderBackground, borderBottom: `1px solid ${C.border}`, verticalAlign: "middle" }}>Complaint Title</th>
                           <th style={{ padding: "13px 16px", fontSize: 10, fontWeight: 600, color: tableHeaderText, textTransform: "uppercase", letterSpacing: "0.06em", textAlign: "left", whiteSpace: "nowrap", background: tableHeaderBackground, borderBottom: `1px solid ${C.border}`, verticalAlign: "middle" }}>Category</th>
-                          <th style={{ padding: "13px 16px", fontSize: 10, fontWeight: 600, color: tableHeaderText, textTransform: "uppercase", letterSpacing: "0.06em", textAlign: "left", whiteSpace: "nowrap", background: tableHeaderBackground, borderBottom: `1px solid ${C.border}`, verticalAlign: "middle" }}>Status</th>
-                          <th style={{ padding: "13px 16px", fontSize: 10, fontWeight: 600, color: tableHeaderText, textTransform: "uppercase", letterSpacing: "0.06em", textAlign: "center", whiteSpace: "nowrap", background: tableHeaderBackground, borderBottom: `1px solid ${C.border}`, verticalAlign: "middle" }}>Action</th>
+                          <th style={{ width: "1%", padding: "13px 16px", fontSize: 10, fontWeight: 600, color: tableHeaderText, textTransform: "uppercase", letterSpacing: "0.06em", textAlign: "left", whiteSpace: "nowrap", background: tableHeaderBackground, borderBottom: `1px solid ${C.border}`, verticalAlign: "middle" }}>Status</th>
+                          <th style={{ width: "1%", padding: "13px 16px", fontSize: 10, fontWeight: 600, color: tableHeaderText, textTransform: "uppercase", letterSpacing: "0.06em", textAlign: "center", whiteSpace: "nowrap", background: tableHeaderBackground, borderBottom: `1px solid ${C.border}`, verticalAlign: "middle" }}>Action</th>
                         </tr>
                       </thead>
                       <tbody>
@@ -180,17 +203,25 @@ export default function MyCases() {
 
                           return (
                             <tr key={`${item.itemType}-${item._id}`} style={{ borderBottom: `1px solid ${C.borderLight}`, background: rowBackground, verticalAlign: "middle" }}>
-                              <td style={{ padding: "10px 16px", verticalAlign: "middle" }}><span style={{ fontWeight: 600, color: C.purple, fontSize: 13 }}>{item.primaryId}</span></td>
-                              <td style={{ padding: "10px 16px", verticalAlign: "middle", whiteSpace: "normal", wordBreak: "break-word", lineHeight: 1.35, minWidth: 260, maxWidth: 340 }}>
-                                <div>
-                                  <p style={{ fontSize: 13, fontWeight: 600, color: C.t1, margin: 0, whiteSpace: "normal", wordBreak: "break-word" }}>{item.primaryTitle}</p>
+                              <td style={{ padding: "10px 16px", verticalAlign: "middle" }}>
+                                <span title={toTooltipText(item.primaryId)} style={{ display: "block", fontWeight: 600, color: C.purple, fontSize: 13, whiteSpace: "nowrap" }}>
+                                  {item.primaryId}
+                                </span>
+                              </td>
+                              <td style={{ padding: "10px 16px", verticalAlign: "middle", maxWidth: 0 }}>
+                                <div title={toTooltipText(item.primaryTitle)} style={{ ...tableCellTextStyle, fontSize: 13, fontWeight: 600, color: C.t1, margin: 0 }}>
+                                  {item.primaryTitle}
                                 </div>
                               </td>
-                              <td style={{ padding: "10px 16px", fontSize: 13, color: C.t2, verticalAlign: "middle" }}>{categoryLabel}</td>
-                              <td style={{ padding: "10px 16px", verticalAlign: "middle" }}>
+                              <td style={{ padding: "10px 16px", fontSize: 13, color: C.t2, verticalAlign: "middle" }}>
+                                <span title={toTooltipText(categoryLabel)} style={tableCellTextStyle}>
+                                  {categoryLabel}
+                                </span>
+                              </td>
+                              <td style={{ width: "1%", padding: "10px 16px", verticalAlign: "middle", whiteSpace: "nowrap" }}>
                                 <WorkspaceBadge status={status.value}>{status.label}</WorkspaceBadge>
                               </td>
-                              <td style={{ padding: "10px 16px", textAlign: "center", verticalAlign: "middle" }}>
+                              <td style={{ width: "1%", padding: "10px 16px", textAlign: "center", verticalAlign: "middle", whiteSpace: "nowrap" }}>
                                 <button
                                   type="button"
                                   onMouseEnter={() => setHoveredActionId(item._id)}
@@ -219,6 +250,44 @@ export default function MyCases() {
                         })}
                       </tbody>
                     </table>
+
+                    <div style={{ background: C.bgElevated, borderTop: `1px solid ${C.border}`, margin: "0 0 8px" }}>
+                      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 px-6 py-3.5">
+                        <p style={{ fontSize: 12, color: C.t2, margin: 0 }}>
+                          Showing <span className="font-semibold">{Math.min((currentPage - 1) * itemsPerPage + 1, items.length)}</span>-<span className="font-semibold">{Math.min(currentPage * itemsPerPage, items.length)}</span> of <span className="font-semibold">{items.length}</span> requests
+                        </p>
+
+                        {totalPages > 1 && (
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <WorkspaceButton
+                              onMouseEnter={() => setHoveredPagerButton("previous")}
+                              onMouseLeave={() => setHoveredPagerButton(null)}
+                              onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
+                              disabled={currentPage === 1}
+                              variant="outline"
+                              style={{ width: 92, minHeight: 34, padding: "8px 12px", fontSize: 12, background: hoveredPagerButton === "previous" && currentPage !== 1 ? C.purple : "transparent", color: hoveredPagerButton === "previous" && currentPage !== 1 ? "#ffffff" : C.purple, border: `1px solid ${C.purple}`, opacity: currentPage === 1 ? 0.4 : 1, display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 6 }}
+                            >
+                              <ChevronLeft size={16} /> Previous
+                            </WorkspaceButton>
+
+                            <span style={{ padding: "6px 10px", fontSize: 12, color: C.t3 }}>
+                              Page <span className="font-semibold">{currentPage}</span> of <span className="font-semibold">{totalPages}</span>
+                            </span>
+
+                            <WorkspaceButton
+                              onMouseEnter={() => setHoveredPagerButton("next")}
+                              onMouseLeave={() => setHoveredPagerButton(null)}
+                              onClick={() => setCurrentPage(Math.min(totalPages, currentPage + 1))}
+                              disabled={currentPage === totalPages}
+                              variant="outline"
+                              style={{ width: 92, minHeight: 34, padding: "8px 12px", fontSize: 12, background: hoveredPagerButton === "next" && currentPage !== totalPages ? C.purple : "transparent", color: hoveredPagerButton === "next" && currentPage !== totalPages ? "#ffffff" : C.purple, border: `1px solid ${C.purple}`, opacity: currentPage === totalPages ? 0.4 : 1, display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 6 }}
+                            >
+                              Next <ChevronRight size={16} />
+                            </WorkspaceButton>
+                          </div>
+                        )}
+                      </div>
+                    </div>
                   </div>
 
                   <div className="lg:hidden space-y-3 pb-2">
@@ -263,43 +332,6 @@ export default function MyCases() {
           )}
         </div>
 
-        {!loading && !error && items.length > 0 && (
-          <div style={{ width: "100%", maxWidth: 1320, margin: "0 auto" }}>
-            <div style={{ border: `1px solid ${C.border}`, borderRadius: 12, padding: 10, background: C.card }}>
-              <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
-                <p style={{ fontSize: 12, color: C.t2, margin: 0 }}>
-                  Showing <span className="font-semibold">{(currentPage - 1) * itemsPerPage + 1}</span> to{" "}
-                  <span className="font-semibold">{Math.min(currentPage * itemsPerPage, items.length)}</span> of{" "}
-                  <span className="font-semibold">{items.length}</span> requests
-                </p>
-
-                <div className="flex items-center gap-2 flex-wrap">
-                  <WorkspaceButton
-                    onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
-                    disabled={currentPage === 1}
-                    variant="ghost"
-                    style={{ minHeight: 34, padding: "8px 12px" }}
-                  >
-                    <ChevronLeft size={16} /> Previous
-                  </WorkspaceButton>
-
-                  <span style={{ padding: "6px 10px", fontSize: 12, color: C.t3 }}>
-                    Page <span className="font-semibold">{currentPage}</span> of <span className="font-semibold">{totalPages}</span>
-                  </span>
-
-                  <WorkspaceButton
-                    onClick={() => setCurrentPage(Math.min(totalPages, currentPage + 1))}
-                    disabled={currentPage === totalPages}
-                    variant="ghost"
-                    style={{ minHeight: 34, padding: "8px 12px" }}
-                  >
-                    Next <ChevronRight size={16} />
-                  </WorkspaceButton>
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
       </div>
     </div>
   );
