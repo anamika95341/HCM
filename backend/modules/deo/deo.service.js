@@ -35,12 +35,12 @@ function formatFileSize(bytes = 0) {
 }
 
 async function getCompletedMeetings(deoId) {
-  const meetings = await deoRepository.getCompletedMeetings(deoId);
+  const meetings = await deoRepository.getCompletedMeetings();
   return Promise.all(
     meetings.map(async (meeting) => {
       const [legacyFiles, uploadedFiles] = await Promise.all([
         deoRepository.listMeetingFilesForDeo(meeting.id),
-        filesRepository.listFilesUploadedByActor('deo', meeting.assigned_deo_id || null, {
+        filesRepository.listFilesForContext('deo', {
           contextType: 'meeting',
           contextId: meeting.id,
         }),

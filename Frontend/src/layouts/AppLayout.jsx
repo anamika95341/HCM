@@ -7,7 +7,7 @@ import { usePortalTheme } from "../shared/theme/portalTheme.jsx";
 function Layout() {
   const [collapsed, setCollapsed] = useState(false);
   const { C } = usePortalTheme();
-  const sidebarWidth = collapsed ? 84 : 280;
+  const sidebarWidth = collapsed ? 84 : 200;
   const modalOffsetLeft = collapsed ? 0 : sidebarWidth;
 
   return (

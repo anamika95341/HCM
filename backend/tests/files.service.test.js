@@ -17,6 +17,7 @@ jest.mock('../modules/files/files.repository', () => ({
   getDeoCalendarEventById: jest.fn(),
   hasMinisterMeetingAccess: jest.fn(),
   hasMinisterEventAccess: jest.fn(),
+  listFilesForContext: jest.fn(),
 }));
 
 jest.mock('../modules/complaints/complaints.repository', () => ({
@@ -153,6 +154,25 @@ describe('files service', () => {
           size: 100 * 1024 * 1024,
           contextType: 'event',
           contextId: 'event-1',
+        },
+        reqMeta: { ip: '127.0.0.1', userAgent: 'jest' },
+      })
+    ).resolves.toEqual(expect.objectContaining({ uploadUrl: 'http://upload-url' }));
+  });
+
+  test('allows a DEO to upload files for a completed meeting even when it was not assigned to that DEO', async () => {
+    filesRepository.getAssignedMeetingForDeo.mockResolvedValue({ id: 'meeting-1' });
+
+    await expect(
+      filesService.createUploadUrl({
+        actorRole: 'deo',
+        actorId: 'deo-2',
+        body: {
+          fileName: 'completion-photo.png',
+          mimeType: 'image/png',
+          size: 1024,
+          contextType: 'meeting',
+          contextId: 'meeting-1',
         },
         reqMeta: { ip: '127.0.0.1', userAgent: 'jest' },
       })

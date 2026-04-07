@@ -1,5 +1,5 @@
-import { createContext, useContext, useEffect, useMemo, useState } from "react";
-import { apiClient, setUnauthorizedHandler } from "../api/client.js";
+import { createContext, useContext, useEffect, useMemo, useRef, useState } from "react";
+import { apiClient, setRefreshHandler, setUnauthorizedHandler } from "../api/client.js";
 
 const AuthContext = createContext(null);
 
@@ -13,14 +13,33 @@ function mapRoleToLogoutPath(role) {
 
 export function AuthProvider({ children }) {
   const [session, setSession] = useState(null);
+  const sessionRef = useRef(null);
+
+  useEffect(() => {
+    sessionRef.current = session;
+  }, [session]);
 
   useEffect(() => {
     setUnauthorizedHandler(() => {
       setSession(null);
     });
 
+    setRefreshHandler(async () => {
+      const current = sessionRef.current;
+      if (!current?.refreshToken || !current?.role) {
+        throw new Error("No refresh token available");
+      }
+      const { data } = await apiClient.post("/auth/token/refresh", {
+        refreshToken: current.refreshToken,
+      });
+      if (!data?.accessToken) throw new Error("Refresh failed");
+      setSession((prev) => ({ ...prev, ...data }));
+      return data.accessToken;
+    });
+
     return () => {
       setUnauthorizedHandler(null);
+      setRefreshHandler(null);
     };
   }, []);
 

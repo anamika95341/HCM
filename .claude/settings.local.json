@@ -2,7 +2,17 @@
   "permissions": {
     "allow": [
       "Bash(find /mnt/d/hcmproject/HCM/backend/validators -type f -name *.js)",
-      "Bash(grep:*)"
+      "Bash(grep:*)",
+      "Bash(docker ps:*)",
+      "Bash(docker exec:*)",
+      "Bash(find /mnt/d/hcmproject/HCM -name docker-compose*.yml -o -name docker-compose*.yaml)",
+      "Bash(docker compose:*)",
+      "Bash(find /mnt/d/hcmproject/HCM/backend -name seed* -o -name *seed*)",
+      "Bash(curl -s -X POST http://localhost:3000/api/v1/auth/admin/login -H \"Content-Type: application/json\" -d '{\"\"\"\"usernameOrEmail\"\"\"\":\"\"\"\"admin@example.gov.in\"\"\"\",\"\"\"\"password\"\"\"\":\"\"\"\"ChangeMe123!\"\"\"\"}')",
+      "Bash(TOKEN=\"eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiI5MWIyZGQyNS0wYWM4LTRiM2ItOGFlMC0xYTk3ZTIwMWEyNjUiLCJyb2xlIjoiYWRtaW4iLCJqdGkiOiI2OGU5NmQ5Ny0yZGQ3LTQ5OWYtYmE0My01ZmZhODZiOGVhZWUiLCJpYXQiOjE3NzU1ODkzMzksImV4cCI6MTc3NTU5MDIzOSwiYXVkIjoiYWRtaW4iLCJpc3MiOiJjaXRpemVuLXBvcnRhbCJ9.UNYsRZmWcwuiYI0DVsFCh5Ai335bLHB4bt1_vciiffWWhzMzcHon4xmYMZju5a4-Yeo2Kw2kbm5x8l57Q565ilVeTGM7Wt0Phs8dHoPvILlX08w-NXSwGWmI41MVg6yxX2mwbDOCr97QMN5IDSyngfU-agUbdUTglCZZA1uiO5Nk9Cf9_xvF33mi2MU2aVFML6qJa_sYz24Bsmutz5OVkThxI6bALn1deYkmtco52o1GQxhm-o5twnhPmz3iQf2d2UH7kgXnOk-9CbqbOJ1MRN2be_E5s2O2jUjMUbpw2iQp31vGEFCjO10czE-OxYy5TchgUo-OmZQ1Jn5L9copRw\")",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\" http://localhost:3000/api/v1/admin/work-queue -H \"Authorization: Bearer $TOKEN\")",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\" http://localhost/api/v1/admin/work-queue -H \"Authorization: Bearer $TOKEN\")",
+      "Bash(find /mnt/d/hcmproject/HCM -name *.yml -path */.github/* -o -name *.yaml -path */.github/*)"
     ]
   }
 }

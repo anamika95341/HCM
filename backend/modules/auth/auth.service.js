@@ -97,11 +97,18 @@ function createRefreshToken({ role, userId }) {
 
 function verifyJwtByRole(role, token) {
   const config = getRoleConfig(role);
-  return jwt.verify(token, config.publicKey, {
-    algorithms: ['RS256'],
-    audience: config.audience,
-    issuer: config.issuer,
-  });
+  try {
+    return jwt.verify(token, config.publicKey, {
+      algorithms: ['RS256'],
+      audience: config.audience,
+      issuer: config.issuer,
+    });
+  } catch (error) {
+    if (error?.name === 'JsonWebTokenError' || error?.name === 'TokenExpiredError' || error?.name === 'NotBeforeError') {
+      throw createHttpError(401, 'Unauthorized');
+    }
+    throw error;
+  }
 }
 
 async function issueSession(role, user) {

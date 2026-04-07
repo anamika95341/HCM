@@ -12,16 +12,14 @@ async function getAssignedMeetings(deoId) {
   return result.rows;
 }
 
-async function getCompletedMeetings(deoId) {
+async function getCompletedMeetings() {
   const result = await pool.query(
     `SELECT m.id, m.request_id, m.title, m.purpose, m.status, m.created_at, m.completed_at, m.completion_note, m.admin_comments, m.scheduled_at, m.scheduled_location, m.assigned_deo_id, c.first_name, c.last_name, c.citizen_id, c.mobile_number, c.email
      FROM meetings m
      JOIN citizens c ON c.id = m.citizen_id
      WHERE m.status = 'completed'
-       AND m.assigned_deo_id = $1
      ORDER BY m.completed_at DESC NULLS LAST, m.updated_at DESC, m.created_at DESC`
-    ,
-    [deoId]
+    
   );
   return result.rows;
 }

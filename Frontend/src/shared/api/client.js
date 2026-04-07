@@ -2,6 +2,17 @@ import axios from "axios";
 import { API_BASE_URL } from "../config/env.js";
 
 let unauthorizedHandler = null;
+let refreshHandler = null;
+let isRefreshing = false;
+let pendingQueue = [];
+
+function drainQueue(error, token) {
+  pendingQueue.forEach(({ resolve, reject }) => {
+    if (error) reject(error);
+    else resolve(token);
+  });
+  pendingQueue = [];
+}
 
 export const apiClient = axios.create({
   baseURL: API_BASE_URL,
@@ -28,10 +39,44 @@ apiClient.interceptors.response.use(
     return response;
   },
   async (error) => {
-    const authHeader = error?.config?.headers?.Authorization || error?.config?.headers?.authorization;
-    if (error?.response?.status === 401 && authHeader && typeof unauthorizedHandler === "function") {
-      unauthorizedHandler(error);
+    const originalRequest = error?.config;
+    const authHeader = originalRequest?.headers?.Authorization || originalRequest?.headers?.authorization;
+
+    if (error?.response?.status === 401 && authHeader && !originalRequest?._retried) {
+      if (typeof refreshHandler === "function") {
+        if (isRefreshing) {
+          return new Promise((resolve, reject) => {
+            pendingQueue.push({ resolve, reject });
+          }).then((token) => {
+            originalRequest.headers.Authorization = `Bearer ${token}`;
+            return apiClient(originalRequest);
+          });
+        }
+
+        originalRequest._retried = true;
+        isRefreshing = true;
+
+        try {
+          const newToken = await refreshHandler();
+          drainQueue(null, newToken);
+          originalRequest.headers.Authorization = `Bearer ${newToken}`;
+          return apiClient(originalRequest);
+        } catch (refreshError) {
+          drainQueue(refreshError, null);
+          if (typeof unauthorizedHandler === "function") {
+            unauthorizedHandler();
+          }
+          return Promise.reject(refreshError);
+        } finally {
+          isRefreshing = false;
+        }
+      }
+
+      if (typeof unauthorizedHandler === "function") {
+        unauthorizedHandler();
+      }
     }
+
     return Promise.reject(error);
   }
 );
@@ -57,4 +102,8 @@ export function authorizedConfig(accessToken, extra = {}) {
 
 export function setUnauthorizedHandler(handler) {
   unauthorizedHandler = handler;
+}
+
+export function setRefreshHandler(handler) {
+  refreshHandler = handler;
 }

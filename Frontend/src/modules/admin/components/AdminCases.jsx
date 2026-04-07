@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Eye, ChevronLeft, ChevronRight } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { apiClient, authorizedConfig } from "../../../shared/api/client.js";
@@ -7,13 +7,11 @@ import {
   WorkspaceBadge,
   WorkspaceButton,
   WorkspaceCard,
-  WorkspaceCardHeader,
   WorkspaceEmptyState,
   WorkspaceInput,
   WorkspacePage,
   WorkspaceSectionHeader,
   WorkspaceSelect,
-  WorkspaceTabs,
 } from "../../../shared/components/WorkspaceUI.jsx";
 import { usePortalTheme } from "../../../shared/theme/portalTheme.jsx";
 
@@ -81,10 +79,32 @@ function buildItemRoute(item, tab) {
   return source ? `${item.route}?source=${source}` : item.route;
 }
 
+const tableCellTextStyle = {
+  display: "block",
+  maxWidth: "100%",
+  overflow: "hidden",
+  textOverflow: "ellipsis",
+  whiteSpace: "nowrap",
+};
+
+const idColumnStyle = {
+  width: 160,
+  minWidth: 160,
+  maxWidth: 160,
+};
+
+function toTooltipText(value) {
+  if (value === null || value === undefined) return "";
+  return String(value);
+}
+
 export default function AdminCases() {
   const { C } = usePortalTheme();
   const navigate = useNavigate();
   const { session } = useAuth();
+  const tableHeaderBackground = C.purple;
+  const tableHeaderText = "#FFFFFF";
+  const alternateRowBackground = C.name === "dark" ? C.bgElevated : "#F7F1FF";
   const [complaints, setComplaints] = useState([]);
   const [meetings, setMeetings] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -94,7 +114,10 @@ export default function AdminCases() {
   const [statusFilter, setStatusFilter] = useState("all");
   const [currentPage, setCurrentPage] = useState(1);
   const [tabInitialized, setTabInitialized] = useState(false);
-  const ITEMS_PER_PAGE = 8;
+  const [hoveredCard, setHoveredCard] = useState(null);
+  const [hoveredActionId, setHoveredActionId] = useState(null);
+  const [hoveredPagerButton, setHoveredPagerButton] = useState(null);
+  const ITEMS_PER_PAGE = 6;
 
   useEffect(() => {
     let active = true;
@@ -150,7 +173,7 @@ export default function AdminCases() {
     { id: "meetingPool",   label: "Meeting Pool",         count: meetingPool.length   },
     { id: "myCases",       label: "My Cases",             count: myCases.length       },
     { id: "resolved",      label: "Resolved / Completed", count: resolved.length      },
-    { id: "escalated",     label: "Escalated / Reassigned Requests", count: escalated.length },
+    { id: "escalated",     label: "Escalated / Reassigned", count: escalated.length },
   ];
 
   useEffect(() => {
@@ -166,8 +189,37 @@ export default function AdminCases() {
     setTabInitialized(true);
   }, [loading, tab, tabInitialized, tabs]);
 
+  const columns = useMemo(() => {
+    const baseColumns = [
+      { key: "primaryId", label: "ID", align: "left" },
+      { key: "itemType", label: "Type", align: "left" },
+      { key: "title", label: "Title", align: "left" },
+      { key: "citizen", label: "Citizen", align: "left" },
+      { key: "owner", label: "Owner", align: "left" },
+      { key: "reference", label: "Reference", align: "left" },
+      { key: "createdAt", label: "Created", align: "left" },
+      { key: "status", label: "Status", align: "center" },
+      { key: "action", label: "Action", align: "center" },
+    ];
+
+    const hiddenColumns = {
+      complaintPool: new Set(["itemType", "owner", "status"]),
+      meetingPool: new Set(["itemType", "owner", "status"]),
+      myCases: new Set(["owner", "reference"]),
+      resolved: new Set(["owner"]),
+      escalated: new Set(["owner", "reference"]),
+    };
+
+    return baseColumns.filter((column) => !hiddenColumns[tab]?.has(column.key));
+  }, [tab]);
+
   return (
-    <WorkspacePage width={1280}>
+    <WorkspacePage
+      width={1280}
+      outerStyle={{ height: "calc(100vh - 73px)", overflow: "hidden" }}
+      contentStyle={{ height: "100%", display: "flex", flexDirection: "column" }}
+    >
+      <div style={{ height: "100%", display: "flex", flexDirection: "column", minHeight: 0 }}>
         {/* HEADER */}
         <WorkspaceSectionHeader
           
@@ -179,27 +231,40 @@ export default function AdminCases() {
           style={{
             display: "grid",
             gridTemplateColumns: "repeat(5, 1fr)",
-            gap: 14,
+            gap: 18,
             marginBottom: 20,
+            alignItems: "stretch",
           }}
         >
           {tabs.map((item) => (
             <div
               key={item.id}
               onClick={() => setTab(item.id)}
+              onMouseEnter={() => setHoveredCard(item.id)}
+              onMouseLeave={() => setHoveredCard(null)}
               style={{
                 background: tab === item.id ? C.purple : C.card,
                 border: `1px solid ${tab === item.id ? C.purple : C.border}`,
                 borderRadius: 14,
-                padding: "18px 20px",
+                padding: "11px 14px",
+                minHeight: 74,
+                width: "calc(100% - 8px)",
+                justifySelf: "center",
                 cursor: "pointer",
-                transition: "all 0.15s",
+                transform: hoveredCard === item.id && tab !== item.id ? "perspective(900px) translateY(-3px) scale(1.02)" : "perspective(900px) translateY(0) scale(1)",
+                boxShadow:
+                  tab === item.id
+                    ? `0 16px 32px ${C.purple}2f`
+                    : hoveredCard === item.id
+                      ? `0 14px 28px ${C.purple}26, 0 0 0 1px ${C.purple}1f inset`
+                      : "0 8px 18px rgba(15, 23, 42, 0.06)",
+                transition: "transform 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease, background 0.18s ease",
               }}
             >
-              <div style={{ fontSize: 26, fontWeight: 800, color: tab === item.id ? "#fff" : C.t1, lineHeight: 1 }}>
+              <div style={{ fontSize: 20, fontWeight: 800, color: tab === item.id ? "#fff" : C.t1, lineHeight: 1 }}>
                 {item.count}
               </div>
-              <div style={{ fontSize: 12, fontWeight: 600, color: tab === item.id ? "rgba(255,255,255,0.8)" : C.t3, marginTop: 6 }}>
+              <div style={{ fontSize: 10, fontWeight: 700, color: tab === item.id ? "rgba(255,255,255,0.82)" : C.t3, marginTop: 5 }}>
                 {item.label}
               </div>
             </div>
@@ -231,126 +296,243 @@ export default function AdminCases() {
         </div>
 
         {/* TABLE / STATES */}
-        {loading ? (
-          <WorkspaceEmptyState title="Loading work queue..." />
-        ) : error ? (
-          <WorkspaceCard style={{ color: C.danger }}>
-            <div style={{ fontSize: 14, fontWeight: 600 }}>Unable to load work queue</div>
-            <div style={{ marginTop: 8, fontSize: 12 }}>{error}</div>
-          </WorkspaceCard>
-        ) : activeRows.length === 0 ? (
-          <WorkspaceEmptyState title="No items found" subtitle="Try adjusting your current search or status filters." />
-        ) : (
-          <WorkspaceCard style={{ padding: 0, overflow: "hidden" }}>
-            {/* Table header bar */}
-            <div style={{ padding: "18px 22px", background: C.bgElevated, borderBottom: `1px solid ${C.border}` }}>
-              <div style={{ display: "flex", justifyContent: "space-between", gap: 16, flexWrap: "wrap", alignItems: "center" }}>
-                <div>
-                  <div style={{ fontSize: 14, fontWeight: 700, color: C.t1 }}>
-                    {tabs.find((t) => t.id === tab)?.label || "Queue Items"}
-                  </div>
-                  <div style={{ marginTop: 4, fontSize: 12, color: C.t3 }}>
-                    {activeRows.length} item{activeRows.length === 1 ? "" : "s"} match the current view.
-                  </div>
-                </div>
-                <WorkspaceBadge>{statusFilter === "all" ? "All statuses" : humanizeStatus(statusFilter)}</WorkspaceBadge>
-              </div>
-            </div>
-
-            <div className="overflow-x-auto">
-              <table className="w-full">
-                <thead style={{ background: C.bgElevated, borderBottom: `1px solid ${C.border}` }}>
-                  <tr>
-                    {["ID", "Type", "Title", "Citizen", "Owner", "Reference", "Created", "Status", "Action"].map((label) => (
-                      <th
-                        key={label}
-                        style={{
-                          padding: "12px 16px",
-                          fontSize: 10,
-                          fontWeight: 600,
-                          color: C.t3,
-                          textTransform: "uppercase",
-                          letterSpacing: "0.06em",
-                          whiteSpace: "nowrap",
-                          textAlign: label === "Status" || label === "Action" ? "center" : "left",
-                        }}
-                      >
-                        {label}
-                      </th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {paginatedRows.map((item, index) => (
-                    <tr key={`${item.itemType}-${item.id}`} style={{ background: index % 2 === 0 ? C.card : C.bgElevated }}>
-                      <td style={{ padding: "12px 16px", fontSize: 13, fontWeight: 600, color: C.purple, borderBottom: `1px solid ${C.borderLight}` }}>{item.primaryId}</td>
-                      <td style={{ padding: "12px 16px", fontSize: 13, textTransform: "capitalize", color: C.t2, borderBottom: `1px solid ${C.borderLight}` }}>{item.itemType}</td>
-                      <td style={{ padding: "12px 16px", fontSize: 13, color: C.t1, borderBottom: `1px solid ${C.borderLight}` }}>{item.title}</td>
-                      <td style={{ padding: "12px 16px", fontSize: 13, color: C.t2, borderBottom: `1px solid ${C.borderLight}` }}>
-                        <div>{item.citizenName}</div>
-                      
-                      </td>
-                      <td style={{ padding: "12px 16px", fontSize: 13, color: C.t2, borderBottom: `1px solid ${C.borderLight}` }}>{item.owner}</td>
-                      <td style={{ padding: "12px 16px", fontSize: 13, color: C.t3, borderBottom: `1px solid ${C.borderLight}` }}>{item.reference}</td>
-                      <td style={{ padding: "12px 16px", fontSize: 13, color: C.t3, borderBottom: `1px solid ${C.borderLight}` }}>
-                        {item.createdAt ? new Date(item.createdAt).toLocaleDateString("en-IN") : "-"}
-                      </td>
-                      <td style={{ padding: "12px 16px", textAlign: "center", borderBottom: `1px solid ${C.borderLight}` }}>
-                        <WorkspaceBadge status={item.status}>{item.statusLabel}</WorkspaceBadge>
-                      </td>
-                      <td style={{ padding: "12px 16px", textAlign: "center", borderBottom: `1px solid ${C.borderLight}` }}>
-                        <button
-                          onClick={() => navigate(buildItemRoute(item, tab))}
-                          className="transition-colors"
+        <div style={{ flex: 1, minHeight: 0, display: "flex", flexDirection: "column" }}>
+          {loading ? (
+            <WorkspaceEmptyState title="Loading work queue..." />
+          ) : error ? (
+            <WorkspaceCard style={{ color: C.danger, marginBottom: 0 }}>
+              <div style={{ fontSize: 14, fontWeight: 600 }}>Unable to load work queue</div>
+              <div style={{ marginTop: 8, fontSize: 12 }}>{error}</div>
+            </WorkspaceCard>
+          ) : activeRows.length === 0 ? (
+            <WorkspaceEmptyState title="No items found" subtitle="Try adjusting your current search or status filters." />
+          ) : (
+            <WorkspaceCard style={{ padding: 0, overflow: "hidden", display: "flex", flexDirection: "column", flex: 1, minHeight: 0, marginBottom: 0 }}>
+              <div className="overflow-x-auto" style={{ flex: 1, minHeight: 0 }}>
+                <table className="w-full">
+                  <colgroup>
+                    <col style={idColumnStyle} />
+                  </colgroup>
+                  <thead style={{ background: tableHeaderBackground, borderBottom: `1px solid ${C.border}` }}>
+                    <tr>
+                      {columns.map((column) => (
+                        <th
+                          key={column.key}
                           style={{
-                            color: C.purple,
-                            background: `${C.purple}10`,
-                            border: `1px solid ${C.purple}22`,
-                            width: 36,
-                            height: 36,
-                            borderRadius: 12,
-                            display: "inline-flex",
-                            alignItems: "center",
-                            justifyContent: "center",
-                            cursor: "pointer",
+                            width: column.key === "status" || column.key === "action" ? "1%" : undefined,
+                            padding: column.key === "status" || column.key === "action" ? "13px 10px" : "13px 12px",
+                            fontSize: 10,
+                            fontWeight: 600,
+                            color: tableHeaderText,
+                            textTransform: "uppercase",
+                            letterSpacing: "0.06em",
+                            whiteSpace: "nowrap",
+                            textAlign: column.align,
+                            background: tableHeaderBackground,
+                            verticalAlign: "middle",
                           }}
-                          title="View details"
                         >
-                          <Eye size={20} />
-                        </button>
-                      </td>
+                          {column.label}
+                        </th>
+                      ))}
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+                  </thead>
+                  <tbody>
+                    {paginatedRows.map((item, index) => (
+                      <tr key={`${item.itemType}-${item.id}`} style={{ background: index % 2 === 0 ? C.card : alternateRowBackground, verticalAlign: "middle" }}>
+                        {columns.map((column) => {
+                          if (column.key === "primaryId") {
+                            return (
+                              <td key={column.key} style={{ padding: "10px 12px", fontSize: 13, fontWeight: 600, color: C.purple, borderBottom: `1px solid ${C.borderLight}`, verticalAlign: "middle" }}>
+                                <span title={toTooltipText(item.primaryId)} style={{ display: "block", whiteSpace: "nowrap" }}>
+                                  {item.primaryId}
+                                </span>
+                              </td>
+                            );
+                          }
 
-            {totalPages > 1 && (
+                          if (column.key === "itemType") {
+                            return (
+                              <td key={column.key} style={{ padding: "10px 12px", fontSize: 13, textTransform: "capitalize", color: C.t2, borderBottom: `1px solid ${C.borderLight}`, verticalAlign: "middle", maxWidth: 0 }}>
+                                <span title={toTooltipText(item.itemType)} style={tableCellTextStyle}>
+                                  {item.itemType}
+                                </span>
+                              </td>
+                            );
+                          }
+
+                          if (column.key === "title") {
+                            return (
+                            <td key={column.key} style={{ padding: "10px 12px", borderBottom: `1px solid ${C.borderLight}`, maxWidth: 0, verticalAlign: "middle" }}>
+                              <div
+                                title={toTooltipText(item.title)}
+                                style={{
+                                  fontSize: 13,
+                                  fontWeight: 600,
+                                  color: C.t1,
+                                  ...tableCellTextStyle,
+                                }}
+                                >
+                                  {item.title}
+                                </div>
+                              </td>
+                            );
+                          }
+
+                          if (column.key === "citizen") {
+                            return (
+                              <td key={column.key} style={{ padding: "10px 12px", fontSize: 13, color: C.t2, borderBottom: `1px solid ${C.borderLight}`, verticalAlign: "middle", maxWidth: 0 }}>
+                                <div title={toTooltipText(item.citizenName)} style={tableCellTextStyle}>
+                                  {item.citizenName}
+                                </div>
+                              </td>
+                            );
+                          }
+
+                          if (column.key === "owner") {
+                            return (
+                              <td key={column.key} style={{ padding: "10px 12px", fontSize: 13, color: C.t2, borderBottom: `1px solid ${C.borderLight}`, verticalAlign: "middle", maxWidth: 0 }}>
+                                <span title={toTooltipText(item.owner)} style={tableCellTextStyle}>
+                                  {item.owner}
+                                </span>
+                              </td>
+                            );
+                          }
+
+                          if (column.key === "reference") {
+                            return (
+                              <td key={column.key} style={{ padding: "10px 12px", fontSize: 13, color: C.t3, borderBottom: `1px solid ${C.borderLight}`, verticalAlign: "middle", maxWidth: 0 }}>
+                                <span title={toTooltipText(item.reference)} style={tableCellTextStyle}>
+                                  {item.reference}
+                                </span>
+                              </td>
+                            );
+                          }
+
+                          if (column.key === "createdAt") {
+                            return (
+                              <td key={column.key} style={{ padding: "10px 12px", fontSize: 13, color: C.t2, borderBottom: `1px solid ${C.borderLight}`, verticalAlign: "middle", maxWidth: 0 }}>
+                                <span title={toTooltipText(item.createdAt ? new Date(item.createdAt).toLocaleDateString("en-IN") : "-")} style={tableCellTextStyle}>
+                                  {item.createdAt ? new Date(item.createdAt).toLocaleDateString("en-IN") : "-"}
+                                </span>
+                              </td>
+                            );
+                          }
+
+                          if (column.key === "status") {
+                            return (
+                              <td key={column.key} style={{ width: "1%", padding: "10px 10px", textAlign: "center", borderBottom: `1px solid ${C.borderLight}`, verticalAlign: "middle", whiteSpace: "nowrap" }}>
+                                <WorkspaceBadge status={item.status}>{item.statusLabel}</WorkspaceBadge>
+                              </td>
+                            );
+                          }
+
+                          const isActionHovered = hoveredActionId === `${item.itemType}-${item.id}`;
+                          return (
+                            <td key={column.key} style={{ width: "1%", padding: "10px 10px", textAlign: "center", borderBottom: `1px solid ${C.borderLight}`, verticalAlign: "middle", whiteSpace: "nowrap" }}>
+                              <button
+                                type="button"
+                                onMouseEnter={() => setHoveredActionId(`${item.itemType}-${item.id}`)}
+                                onMouseLeave={() => setHoveredActionId(null)}
+                                onClick={() => navigate(buildItemRoute(item, tab))}
+                                title="View details"
+                                style={{
+                                  minWidth: 0,
+                                  padding: 7,
+                                  borderRadius: 10,
+                                  border: `1px solid ${C.purple}`,
+                                  background: isActionHovered ? C.purple : "transparent",
+                                  color: isActionHovered ? "#ffffff" : C.purple,
+                                  display: "inline-flex",
+                                  alignItems: "center",
+                                  justifyContent: "center",
+                                  cursor: "pointer",
+                                  transition: "background var(--portal-duration-fast) ease, color var(--portal-duration-fast) ease, border-color var(--portal-duration-fast) ease",
+                                }}
+                              >
+                                <Eye size={18} />
+                              </button>
+                            </td>
+                          );
+                        })}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+
               <div
-                className="flex items-center justify-between px-6 py-4"
                 style={{ background: C.bgElevated, borderTop: `1px solid ${C.border}` }}
               >
-                <WorkspaceButton
-                  type="button"
-                  variant="ghost"
-                  disabled={currentPage === 1}
-                  onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
-                >
-                  <ChevronLeft size={16} /> Previous
-                </WorkspaceButton>
-                <span style={{ fontSize: 12, color: C.t3 }}>Page {currentPage} of {totalPages}</span>
-                <WorkspaceButton
-                  type="button"
-                  variant="ghost"
-                  disabled={currentPage === totalPages}
-                  onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
-                >
-                  Next <ChevronRight size={16} />
-                </WorkspaceButton>
+                <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 px-6 py-3.5">
+                  <p style={{ fontSize: 12, color: C.t2, margin: 0 }}>
+                    Showing <span style={{ fontWeight: 600 }}>{Math.min((currentPage - 1) * ITEMS_PER_PAGE + 1, activeRows.length)}</span>-<span style={{ fontWeight: 600 }}>{Math.min(currentPage * ITEMS_PER_PAGE, activeRows.length)}</span> of{" "}
+                    <span style={{ fontWeight: 600 }}>{activeRows.length}</span> requests
+                  </p>
+
+                  {totalPages > 1 && (
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <WorkspaceButton
+                        type="button"
+                        variant="outline"
+                        disabled={currentPage === 1}
+                        onMouseEnter={() => setHoveredPagerButton("previous")}
+                        onMouseLeave={() => setHoveredPagerButton(null)}
+                        onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                        style={{
+                          width: 92,
+                          minHeight: 34,
+                          padding: "8px 12px",
+                          fontSize: 12,
+                          background: hoveredPagerButton === "previous" && currentPage !== 1 ? C.purple : "transparent",
+                          color: hoveredPagerButton === "previous" && currentPage !== 1 ? "#ffffff" : C.purple,
+                          border: `1px solid ${C.purple}`,
+                          opacity: currentPage === 1 ? 0.4 : 1,
+                          display: "inline-flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          gap: 6,
+                        }}
+                      >
+                        <ChevronLeft size={16} /> Previous
+                      </WorkspaceButton>
+
+                      <span style={{ padding: "6px 10px", fontSize: 12, color: C.t3 }}>
+                        Page <span style={{ fontWeight: 600 }}>{currentPage}</span> of <span style={{ fontWeight: 600 }}>{totalPages}</span>
+                      </span>
+
+                      <WorkspaceButton
+                        type="button"
+                        variant="outline"
+                        disabled={currentPage === totalPages}
+                        onMouseEnter={() => setHoveredPagerButton("next")}
+                        onMouseLeave={() => setHoveredPagerButton(null)}
+                        onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                        style={{
+                          width: 92,
+                          minHeight: 34,
+                          padding: "8px 12px",
+                          fontSize: 12,
+                          background: hoveredPagerButton === "next" && currentPage !== totalPages ? C.purple : "transparent",
+                          color: hoveredPagerButton === "next" && currentPage !== totalPages ? "#ffffff" : C.purple,
+                          border: `1px solid ${C.purple}`,
+                          opacity: currentPage === totalPages ? 0.4 : 1,
+                          display: "inline-flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          gap: 6,
+                        }}
+                      >
+                        Next <ChevronRight size={16} />
+                      </WorkspaceButton>
+                    </div>
+                  )}
+                </div>
               </div>
-            )}
-          </WorkspaceCard>
-        )}
+            </WorkspaceCard>
+          )}
+        </div>
+      </div>
     </WorkspacePage>
   );
 }

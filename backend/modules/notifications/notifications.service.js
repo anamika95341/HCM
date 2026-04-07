@@ -155,19 +155,39 @@ async function deliverOutOfBandChannels(recipientRole, recipientId, preferences,
   }
 
   if (preferences.channels.email && user.email) {
-    await sendMail({
-      to: user.email,
-      subject: notification.title,
-      text: notification.body,
-    });
+    try {
+      await sendMail({
+        to: user.email,
+        subject: notification.title,
+        text: notification.body,
+      });
+    } catch (error) {
+      logger.warn('Notification email delivery failed', {
+        recipientRole,
+        recipientId,
+        notificationId: notification.id,
+        eventType: notification.event_type || notification.eventType,
+        error,
+      });
+    }
   }
 
   const phone = user.mobile_number || user.phone_number;
   if (preferences.channels.sms && phone) {
-    await sendSms({
-      to: phone,
-      message: notification.body,
-    });
+    try {
+      await sendSms({
+        to: phone,
+        message: notification.body,
+      });
+    } catch (error) {
+      logger.warn('Notification SMS delivery failed', {
+        recipientRole,
+        recipientId,
+        notificationId: notification.id,
+        eventType: notification.event_type || notification.eventType,
+        error,
+      });
+    }
   }
 }
 

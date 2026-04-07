@@ -183,4 +183,17 @@ describe('auth service resilience', () => {
       expect.anything()
     );
   });
+
+  test('refreshSession returns unauthorized for invalid refresh token signature', async () => {
+    jwt.verify.mockImplementation(() => {
+      const error = new Error('invalid signature');
+      error.name = 'JsonWebTokenError';
+      throw error;
+    });
+
+    await expect(authService.refreshSession('refresh-token')).rejects.toMatchObject({
+      statusCode: 401,
+      message: 'Unauthorized',
+    });
+  });
 });
