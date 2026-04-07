@@ -1,4 +1,24 @@
 services:
+  nginx:
+    image: nginx:1.27-alpine
+    ports:
+      - "80:80"
+    volumes:
+      - ./backend/nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+    depends_on:
+      frontend:
+        condition: service_healthy
+      backend:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost/health || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+    restart: unless-stopped
+    networks:
+      - frontend-backend-net
+
   frontend:
     image: ${FRONTEND_IMAGE:-hcm-frontend:latest}
     build:
@@ -13,8 +33,6 @@ services:
     environment:
       # Browser calls /api/v1 on the same origin; server.cjs forwards to the API container.
       API_UPSTREAM: http://backend:3000
-    ports:
-      - "${FRONTEND_PORT:-5173}:5173"
     healthcheck:
       test: ["CMD", "node", "-e", "fetch('http://localhost:5173').then((res)=>process.exit(res.ok?0:1)).catch(()=>process.exit(1))"]
       interval: 30s
@@ -36,25 +54,28 @@ services:
       NODE_ENV: production
       PORT: 3000
       RUN_MIGRATIONS: "true"
-      FRONTEND_ORIGINS: ${FRONTEND_ORIGINS:-http://localhost:5173}
+      FRONTEND_ORIGINS: ${FRONTEND_ORIGINS:-http://ec2-65-0-92-232.ap-south-1.compute.amazonaws.com}
       DATABASE_URL: postgresql://app_user:${DB_PASSWORD:-change_me}@postgres:5432/citizen_portal
       REDIS_URL: redis://:${REDIS_PASSWORD:-change_me}@redis:6379
-      STORAGE_MODE: ${STORAGE_MODE:-aws}
-      S3_BUCKET: ${S3_BUCKET}
+      STORAGE_MODE: ${STORAGE_MODE:-local}
+      S3_BUCKET: ${S3_BUCKET:-portal-private-files}
       S3_SIGNED_URL_EXPIRY_SECONDS: ${S3_SIGNED_URL_EXPIRY_SECONDS:-90}
       AWS_REGION: ${AWS_REGION:-ap-south-1}
       AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID:-}
       AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY:-}
-      S3_ENDPOINT: ${S3_ENDPOINT:-}
-      S3_FORCE_PATH_STYLE: ${S3_FORCE_PATH_STYLE:-false}
-      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-}
-      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-}
-    ports:
-      - "${BACKEND_PORT:-3000}:3000"
+      S3_ENDPOINT: ${S3_ENDPOINT:-http://minio:9000}
+      S3_PUBLIC_ENDPOINT: ${S3_PUBLIC_ENDPOINT:-http://ec2-65-0-92-232.ap-south-1.compute.amazonaws.com:9000}
+      S3_FORCE_PATH_STYLE: ${S3_FORCE_PATH_STYLE:-true}
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-admin}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-password}
+    volumes:
+      - uploads-data:/app/uploads
     depends_on:
       postgres:
         condition: service_healthy
       redis:
+        condition: service_healthy
+      minio:
         condition: service_healthy
     healthcheck:
       test: ["CMD", "node", "-e", "fetch('http://localhost:3000/health').then((res)=>process.exit(res.ok?0:1)).catch(()=>process.exit(1))"]
@@ -79,22 +100,47 @@ services:
       RUN_MIGRATIONS: "false"
       DATABASE_URL: postgresql://app_user:${DB_PASSWORD:-change_me}@postgres:5432/citizen_portal
       REDIS_URL: redis://:${REDIS_PASSWORD:-change_me}@redis:6379
-      STORAGE_MODE: ${STORAGE_MODE:-aws}
-      S3_BUCKET: ${S3_BUCKET}
+      STORAGE_MODE: ${STORAGE_MODE:-local}
+      S3_BUCKET: ${S3_BUCKET:-portal-private-files}
       S3_SIGNED_URL_EXPIRY_SECONDS: ${S3_SIGNED_URL_EXPIRY_SECONDS:-90}
       AWS_REGION: ${AWS_REGION:-ap-south-1}
       AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID:-}
       AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY:-}
-      S3_ENDPOINT: ${S3_ENDPOINT:-}
-      S3_FORCE_PATH_STYLE: ${S3_FORCE_PATH_STYLE:-false}
-      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-}
-      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-}
+      S3_ENDPOINT: ${S3_ENDPOINT:-http://minio:9000}
+      S3_PUBLIC_ENDPOINT: ${S3_PUBLIC_ENDPOINT:-http://ec2-65-0-92-232.ap-south-1.compute.amazonaws.com:9000}
+      S3_FORCE_PATH_STYLE: ${S3_FORCE_PATH_STYLE:-true}
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-admin}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-password}
+    volumes:
+      - uploads-data:/app/uploads
     command: ["npm", "run", "worker:auth-stream"]
     depends_on:
       postgres:
         condition: service_healthy
       redis:
         condition: service_healthy
+      minio:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - backend-data-net
+
+  minio:
+    image: quay.io/minio/minio:latest
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-admin}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-password}
+    ports:
+      - "${MINIO_API_PORT:-9000}:9000"
+      - "${MINIO_CONSOLE_PORT:-9001}:9001"
+    volumes:
+      - minio-data:/data
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:9000/minio/health/live >/dev/null || exit 1"]
+      interval: 20s
+      timeout: 5s
+      retries: 5
     restart: unless-stopped
     networks:
       - backend-data-net
@@ -144,3 +190,5 @@ networks:
 volumes:
   postgres-data:
   redis-data:
+  uploads-data:
+  minio-data:

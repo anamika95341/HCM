@@ -122,7 +122,7 @@ jobs:
       - name: Add host key
         run: |
           mkdir -p ~/.ssh
-          ssh-keyscan -p "${{ secrets.PROD_SSH_PORT }}" -H "${{ secrets.PROD_SSH_HOST }}" >> ~/.ssh/known_hosts
+          ssh-keyscan -H "${{ secrets.PROD_SSH_HOST }}" >> ~/.ssh/known_hosts
 
       - name: Sync repository
         run: |
@@ -133,7 +133,12 @@ jobs:
             --exclude 'backend/.env' \
             ./ "${{ secrets.PROD_SSH_USER }}@${{ secrets.PROD_SSH_HOST }}:${{ secrets.PROD_DEPLOY_PATH }}/"
 
+      - name: Login to GHCR on EC2
+        run: |
+          ssh "${{ secrets.PROD_SSH_USER }}@${{ secrets.PROD_SSH_HOST }}" \
+            "echo '${{ secrets.GITHUB_TOKEN }}' | docker login ghcr.io -u '${{ github.actor }}' --password-stdin"
+
       - name: Deploy production stack
         run: |
-          ssh -p "${{ secrets.PROD_SSH_PORT }}" "${{ secrets.PROD_SSH_USER }}@${{ secrets.PROD_SSH_HOST }}" \
+          ssh "${{ secrets.PROD_SSH_USER }}@${{ secrets.PROD_SSH_HOST }}" \
             "cd '${{ secrets.PROD_DEPLOY_PATH }}' && chmod +x scripts/deploy-prod.sh && FRONTEND_IMAGE='${{ env.FRONTEND_IMAGE }}' BACKEND_IMAGE='${{ env.BACKEND_IMAGE }}' AUTH_STREAM_WORKER_IMAGE='${{ env.AUTH_STREAM_WORKER_IMAGE }}' ./scripts/deploy-prod.sh '${{ secrets.PROD_DEPLOY_PATH }}'"

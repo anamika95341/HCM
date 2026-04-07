@@ -23,7 +23,7 @@ services:
     build:
       target: dev
     env_file:
-      - ./backend/.env
+      - ./backend/.env.localhost
     environment:
       NODE_ENV: development
       RUN_MIGRATIONS: "true"
@@ -57,7 +57,7 @@ services:
     build:
       target: dev
     env_file:
-      - ./backend/.env
+      - ./backend/.env.localhost
     environment:
       NODE_ENV: development
       RUN_MIGRATIONS: "false"
