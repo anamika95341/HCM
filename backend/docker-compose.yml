@@ -51,6 +51,10 @@ services:
       SMTP_USER: ${SMTP_USER}
       SMTP_PASSWORD: ${SMTP_PASSWORD}
       SMTP_FROM: ${SMTP_FROM}
+      # Tune DB pool per worker process in cluster mode. Default 5 → safe under postgres max_connections=50.
+      POOL_MAX_PER_WORKER: ${POOL_MAX_PER_WORKER:-5}
+      # WebSocket heartbeat interval in ms. Default 30s.
+      WS_HEARTBEAT_INTERVAL_MS: ${WS_HEARTBEAT_INTERVAL_MS:-30000}
       TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN}
       TELEGRAM_CHAT_ID: ${TELEGRAM_CHAT_ID}
       ALERT_EMAIL_TO: ${ALERT_EMAIL_TO}
@@ -91,6 +95,15 @@ services:
       RUN_MIGRATIONS: "false"
       DATABASE_URL: ${DATABASE_URL}
       REDIS_URL: ${REDIS_URL}
+      # SMTP credentials are required here — the worker calls sendMail() directly.
+      # Without these, emails are silently skipped (mailer.js returns early when SMTP_HOST is unset).
+      SMTP_HOST: ${SMTP_HOST}
+      SMTP_PORT: ${SMTP_PORT}
+      SMTP_USER: ${SMTP_USER}
+      SMTP_PASSWORD: ${SMTP_PASSWORD}
+      SMTP_FROM: ${SMTP_FROM}
+      # Optional: set to a real SMS provider name when SMS delivery is implemented.
+      SMS_PROVIDER: ${SMS_PROVIDER:-mock}
       STORAGE_MODE: ${STORAGE_MODE:-aws}
       S3_BUCKET: ${S3_BUCKET}
       S3_SIGNED_URL_EXPIRY_SECONDS: ${S3_SIGNED_URL_EXPIRY_SECONDS:-90}
@@ -102,8 +115,6 @@ services:
       MINIO_ROOT_USER: ${MINIO_ROOT_USER:-}
       MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-}
     depends_on:
-      postgres:
-        condition: service_healthy
       redis:
         condition: service_healthy
     healthcheck:
@@ -174,7 +185,11 @@ services:
 
   redis:
     image: redis:7-alpine
-    command: ["redis-server", "--appendonly", "yes", "--requirepass", "${REDIS_PASSWORD}", "--maxmemory", "64mb", "--maxmemory-policy", "allkeys-lru", "--bind", "0.0.0.0"]
+    # noeviction: Redis returns errors when full instead of silently evicting keys.
+    # With allkeys-lru, BullMQ job data can be evicted before processing — jobs vanish with no error.
+    # noeviction means the API/worker gets an explicit error, which is logged and retried.
+    # maxmemory raised to 128mb to accommodate app keys + BullMQ job queue data side by side.
+    command: ["redis-server", "--appendonly", "yes", "--requirepass", "${REDIS_PASSWORD}", "--maxmemory", "128mb", "--maxmemory-policy", "noeviction", "--bind", "0.0.0.0"]
     volumes:
       - redis-data:/data
     healthcheck:
@@ -183,7 +198,7 @@ services:
       timeout: 5s
       retries: 5
     cpus: 0.2
-    mem_limit: 80m
+    mem_limit: 144m
     networks:
       - backend-data-net
 
