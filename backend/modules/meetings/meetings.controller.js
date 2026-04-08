@@ -31,8 +31,8 @@ async function submitMeetingRequest(req, res, next) {
 async function getCitizenMeetings(req, res, next) {
   try {
     const { page, limit } = req.query;
-    const meetings = await meetingsService.getCitizenMeetings(req.user.sub, { page, limit });
-    res.json({ meetings });
+    const result = await meetingsService.getCitizenMeetings(req.user.sub, { page, limit });
+    res.json(result);
   } catch (error) {
     next(error);
   }

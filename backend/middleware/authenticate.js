@@ -93,6 +93,8 @@ function authenticate(expectedRole) {
           expectedRole: matchedRole,
           error: err.message,
         });
+        // WHY: publishAuthEvent also uses Redis. If Redis is down this will fail.
+        // Swallow the error — we are already in a Redis-down handler.
         await publishAuthEvent(redis, {
           event: 'token_revoke_check_bypassed',
           role: matchedRole,
@@ -100,12 +102,15 @@ function authenticate(expectedRole) {
           ip: req.ip,
           reason: 'redis_down',
           requestId: getRequestId(req),
-        });
+        }).catch(() => {});
       }
 
       // Password-changed invalidation check — fail-open on Redis error
       try {
-        const changedAt = await redis.get(`password_changed:${expectedRole}:${payload.sub}`);
+        // WHY: Use matchedRole (the verified role), not expectedRole (which may be an array
+        // when authenticate() is called with multiple allowed roles). Using expectedRole would
+        // produce a key like "password_changed:admin,masteradmin:<sub>" that never matches.
+        const changedAt = await redis.get(`password_changed:${matchedRole}:${payload.sub}`);
         if (changedAt && Number(changedAt) > payload.iat * 1000) {
           logger.warn('Authentication failed', {
             reason: 'password_changed_after_token_issued',

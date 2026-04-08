@@ -1,4 +1,8 @@
 'use strict';
+// IMPORTANT: This file is a standalone entry point — run it as a separate process
+// via `node workers/jobRunner.js` or `npm run worker:jobs`. Do NOT require() it
+// from the HTTP server process — that would register duplicate signal handlers
+// and potentially double-exit on SIGTERM.
 
 const { Worker } = require('bullmq');
 const { createRedisClient } = require('../config/redis');
@@ -17,7 +21,8 @@ function isPermanentSmtpError(error) {
   // SMTP 5xx codes = permanent failure (bad address, rejected, etc.)
   // These should NOT be retried — they will always fail
   if (error.responseCode >= 500) return true;
-  const PERMANENT_CODES = [550, 551, 553, 554, 421];
+  // 421 is "Service temporarily unavailable" — transient, NOT permanent. Do NOT add it here.
+  const PERMANENT_CODES = [550, 551, 553, 554];
   if (PERMANENT_CODES.includes(error.code)) return true;
   return false;
 }
@@ -93,12 +98,8 @@ const smsWorker = new Worker(
       correlationId,
     });
 
-    try {
-      await sendSms({ to, message });
-      logger.info('SMS job completed', { jobId: job.id, correlationId });
-    } catch (error) {
-      throw error;
-    }
+    await sendSms({ to, message });
+    logger.info('SMS job completed', { jobId: job.id, correlationId });
   },
   {
     concurrency: 5,

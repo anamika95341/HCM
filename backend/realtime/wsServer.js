@@ -103,18 +103,22 @@ function initializeWebSocket(server) {
       ws.on('pong', () => { ws.isAlive = true; });
 
       ws.on('close', async () => {
-        const sockets = socketsByChannel.get(channel);
-        if (sockets) {
-          sockets.delete(ws);
-          if (sockets.size === 0) {
-            socketsByChannel.delete(channel);
-            // WHY: Unsubscribe when last client on channel disconnects to prevent Redis
-            // subscription leak. .catch() prevents throw in close handler.
-            await subscriber.unsubscribe(channel).catch(() => {});
-            subscribedChannels.delete(channel);
+        try {
+          const sockets = socketsByChannel.get(channel);
+          if (sockets) {
+            sockets.delete(ws);
+            if (sockets.size === 0) {
+              socketsByChannel.delete(channel);
+              // WHY: Unsubscribe when last client on channel disconnects to prevent Redis
+              // subscription leak. .catch() prevents throw in close handler.
+              await subscriber.unsubscribe(channel).catch(() => {});
+              subscribedChannels.delete(channel);
+            }
           }
+          redis.decr('metrics:ws:active').catch(() => {});
+        } catch (err) {
+          logger.error('WebSocket close handler error', { channel, error: err.message });
         }
-        redis.decr('metrics:ws:active').catch(() => {});
       });
     } catch (error) {
       logger.error('WebSocket authentication failed', { error });

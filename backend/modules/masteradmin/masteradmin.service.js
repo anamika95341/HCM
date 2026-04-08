@@ -80,6 +80,9 @@ async function createAdmin(masterAdminId, payload, reqMeta) {
   });
 
   try {
+    // WHY: This catch handles OTP generation/Redis failures only — enqueue() inside
+    // sendVerificationCode() uses .catch() and never propagates. The rollback here is
+    // correct because if OTP infra fails the admin cannot verify and should be cleaned up.
     await sendVerificationCode({ role: 'admin', userId: admin.id, email: payload.email });
   } catch (error) {
     await masteradminRepository.deletePendingAdminById(admin.id);
@@ -132,6 +135,8 @@ async function createDeo(masterAdminId, payload, reqMeta) {
   });
 
   try {
+    // WHY: Same as createAdmin — this catch handles OTP infra failures only, not
+    // enqueue failures (those are swallowed in sendVerificationCode with .catch()).
     await sendVerificationCode({ role: 'deo', userId: deo.id, email: payload.email });
   } catch (error) {
     await adminRepository.purgePendingDeoById(deo.id);

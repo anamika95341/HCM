@@ -123,18 +123,32 @@ async function submitMeetingRequest({ citizenId, body, file, reqMeta, idempotenc
 }
 
 // WHY: Optional pagination params. If absent → same behavior as before (returns all).
-// page/limit only applied when both are provided. Limit capped at 100.
+// page/limit only applied when limit is provided. Limit capped at 100.
 async function getCitizenMeetings(citizenId, { page, limit } = {}) {
   const parsedLimit = (limit != null && !Number.isNaN(Number(limit)))
     ? Math.min(Math.max(1, Number(limit)), 100)
     : undefined;
-  const parsedOffset = (parsedLimit != null && page != null && !Number.isNaN(Number(page)))
-    ? (Math.max(1, Number(page)) - 1) * parsedLimit
+  const parsedPage = (parsedLimit != null && page != null && !Number.isNaN(Number(page)))
+    ? Math.max(1, Number(page))
     : undefined;
-  return meetingsRepository.getCitizenMeetings(citizenId, {
+  const parsedOffset = parsedPage != null ? (parsedPage - 1) * parsedLimit : undefined;
+  const meetings = await meetingsRepository.getCitizenMeetings(citizenId, {
     limit: parsedLimit,
     offset: parsedOffset,
   });
+  // WHY: Return pagination metadata only when params were supplied so clients can detect
+  // partial results. When no pagination params given, metadata is omitted (backward-compatible).
+  if (parsedLimit != null) {
+    return {
+      meetings,
+      pagination: {
+        page: parsedPage || 1,
+        limit: parsedLimit,
+        hasMore: meetings.length === parsedLimit,
+      },
+    };
+  }
+  return { meetings };
 }
 
 async function getCitizenMeetingDetail(meetingId, citizenId) {
