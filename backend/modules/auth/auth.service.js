@@ -6,8 +6,10 @@ const redis = require('../../config/redis');
 const { getRoleConfig } = require('../../config/jwt');
 const { encryptAadhaar, sha256 } = require('../../utils/crypto');
 const generateCitizenId = require('../../utils/generateCitizenId');
-const { sendMail } = require('../../utils/mailer');
-const { sendSms } = require('../../utils/smsService');
+// WHY: OTP emails/SMS enqueued to unblock auth endpoints. OTP stored in Redis first
+// so delivery failure is recoverable via resend endpoints.
+const { enqueue, JOBS, buildJobId } = require('../../queues/index');
+const { getOtpWindowSlot } = require('../../queues/jobs');
 const { generateOtp, verifyOtp } = require('../../utils/otpService');
 const { verifyCaptcha } = require('../../utils/captchaVerify');
 const { writeAuditLog } = require('../../utils/audit');
@@ -194,19 +196,33 @@ async function registerCitizen(payload, reqMeta) {
         expiresAt: new Date(Date.now() + 5 * 60 * 1000),
       });
 
+      // WHY: OTP stored in Redis before enqueue. Delivery failure is recoverable via
+      // resend endpoint — we no longer rollback citizen on SMTP failure.
       if (payload.preferredVerificationChannel === 'email') {
-        stage = 'send-email';
-        await sendMail({
+        stage = 'enqueue-email';
+        enqueue(JOBS.SEND_EMAIL, {
           to: payload.email,
           subject: 'Verify your Citizen Portal account',
           text: `Your OTP is ${otp}. It expires in 5 minutes.`,
-        });
+          correlationId: reqMeta?.requestId,
+          context: { entityType: 'citizen', userId: citizen.id },
+        }, {
+          jobId: buildJobId('otp-email', citizen.id, 'registration_verification', getOtpWindowSlot()),
+        }).catch((err) => logger.warn('Failed to enqueue citizen registration OTP email', {
+          citizenId: citizen.id, error: err.message,
+        }));
       } else {
-        stage = 'send-sms';
-        await sendSms({
+        stage = 'enqueue-sms';
+        enqueue(JOBS.SEND_SMS, {
           to: payload.mobileNumber,
           message: `Your OTP is ${otp}. It expires in 5 minutes.`,
-        });
+          correlationId: reqMeta?.requestId,
+          context: { entityType: 'citizen', userId: citizen.id },
+        }, {
+          jobId: buildJobId('otp-sms', citizen.id, 'registration_verification', getOtpWindowSlot()),
+        }).catch((err) => logger.warn('Failed to enqueue citizen registration OTP SMS', {
+          citizenId: citizen.id, error: err.message,
+        }));
       }
     } catch (error) {
       stage = `${stage}-rollback`;
@@ -431,11 +447,15 @@ async function resendAdminVerificationCode({ usernameOrEmail }, reqMeta) {
     expiresAt: new Date(Date.now() + 5 * 60 * 1000),
   });
 
-  await sendMail({
+  enqueue(JOBS.SEND_EMAIL, {
     to: user.email,
     subject: 'Your admin verification code',
     text: `Your admin verification code is ${otp}. It expires in 5 minutes.`,
-  });
+    correlationId: reqMeta?.requestId,
+    context: { entityType: 'admin', userId: user.id },
+  }, {
+    jobId: buildJobId('otp-email', user.id, 'registration_verification', getOtpWindowSlot()),
+  }).catch((err) => logger.warn('Failed to enqueue admin verification email', { userId: user.id, error: err.message }));
 
   await writeAuditLog({
     actorRole: 'admin',
@@ -487,11 +507,15 @@ async function resendDeoVerificationCode({ usernameOrEmail }, reqMeta) {
     expiresAt: new Date(Date.now() + 5 * 60 * 1000),
   });
 
-  await sendMail({
+  enqueue(JOBS.SEND_EMAIL, {
     to: user.email,
     subject: 'Your DEO verification code',
     text: `Your DEO verification code is ${otp}. It expires in 5 minutes.`,
-  });
+    correlationId: reqMeta?.requestId,
+    context: { entityType: 'deo', userId: user.id },
+  }, {
+    jobId: buildJobId('otp-email', user.id, 'registration_verification', getOtpWindowSlot()),
+  }).catch((err) => logger.warn('Failed to enqueue DEO verification email', { userId: user.id, error: err.message }));
 
   await writeAuditLog({
     actorRole: 'deo',
@@ -550,11 +574,14 @@ async function checkLockout({ role, userId, ip, email }) {
       try {
         const alreadyNotified = await redis.get(notifiedKey);
         if (!alreadyNotified) {
-          await sendMail({
+          enqueue(JOBS.SEND_EMAIL, {
             to: email,
             subject: 'Account temporarily locked',
             text: 'Your account has been temporarily locked due to repeated failed login attempts.',
-          });
+            context: { entityType: role, userId },
+          }, {
+            jobId: buildJobId('lockout-email', role, userId),
+          }).catch((err) => logger.warn('Failed to enqueue lockout email', { role, userId, error: err.message }));
           await redis.set(notifiedKey, '1', 'EX', 900);
         }
       } catch (err) {
@@ -767,17 +794,25 @@ async function forgotCitizenPassword({ aadhaarNumber, email, captchaToken }, req
   });
 
   if (user.email) {
-    await sendMail({
+    enqueue(JOBS.SEND_EMAIL, {
       to: user.email,
       subject: 'Citizen Portal password reset OTP',
       text: `Your password reset OTP is ${otp}. It expires in 5 minutes.`,
-    });
+      correlationId: reqMeta?.requestId,
+      context: { entityType: 'citizen', userId: user.id },
+    }, {
+      jobId: buildJobId('otp-email', user.id, 'password_reset', getOtpWindowSlot()),
+    }).catch((err) => logger.warn('Failed to enqueue password reset email', { userId: user.id, error: err.message }));
   }
 
-  await sendSms({
+  enqueue(JOBS.SEND_SMS, {
     to: user.mobile_number,
     message: `Your password reset OTP is ${otp}. It expires in 5 minutes.`,
-  });
+    correlationId: reqMeta?.requestId,
+    context: { entityType: 'citizen', userId: user.id },
+  }, {
+    jobId: buildJobId('otp-sms', user.id, 'password_reset', getOtpWindowSlot()),
+  }).catch((err) => logger.warn('Failed to enqueue password reset SMS', { userId: user.id, error: err.message }));
 
   return { message: 'If that ID exists, instructions were sent.' };
 }
