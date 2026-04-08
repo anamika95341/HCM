@@ -1,12 +1,35 @@
+'use strict';
+
 const redis = require('../config/redis');
 const logger = require('../utils/logger');
+
+// WHY: Per-process in-memory fallback so rate limiting continues when Redis is unavailable.
+// Limitation: per-process only (not cross-cluster). Better than unlimited access during Redis outages.
+const inMemoryCounters = new Map(); // key -> { count, resetAt }
+
+function inMemoryIncr(key, windowSeconds) {
+  const now = Date.now();
+  const entry = inMemoryCounters.get(key);
+  if (!entry || now >= entry.resetAt) {
+    inMemoryCounters.set(key, { count: 1, resetAt: now + windowSeconds * 1000 });
+    return 1;
+  }
+  entry.count += 1;
+  return entry.count;
+}
+
+// Prune expired entries every 60s to prevent unbounded memory growth
+setInterval(() => {
+  const now = Date.now();
+  for (const [key, entry] of inMemoryCounters) {
+    if (now >= entry.resetAt) inMemoryCounters.delete(key);
+  }
+}, 60_000).unref(); // .unref() so this timer doesn't prevent process exit
 
 function createLimiter({ windowSeconds, max, prefix, skip, identifierResolver }) {
   return async function limit(req, res, next) {
     try {
-      if (typeof skip === 'function' && skip(req)) {
-        return next();
-      }
+      if (typeof skip === 'function' && skip(req)) return next();
 
       const identifier = typeof identifierResolver === 'function'
         ? identifierResolver(req)
@@ -15,19 +38,25 @@ function createLimiter({ windowSeconds, max, prefix, skip, identifierResolver })
       const normalizedIdentifier = String(identifier || req.ip || 'anonymous');
       const key = `ratelimit:${prefix}:${normalizedIdentifier}`;
       const count = await redis.incr(key);
-      if (count === 1) {
-        await redis.expire(key, windowSeconds);
-      }
+      if (count === 1) await redis.expire(key, windowSeconds);
       if (count > max) {
         res.setHeader('Retry-After', String(windowSeconds));
         return res.status(429).json({ error: 'Too many attempts. Try again later.' });
       }
       return next();
     } catch (error) {
-      logger.warn('Rate limiter Redis unavailable, bypassing', {
+      // WHY: Redis unavailable — fall back to per-process in-memory counter.
+      // Not cross-cluster but better than unlimited access during Redis outages.
+      logger.warn('Rate limiter Redis unavailable, using in-memory fallback', {
         prefix,
         error: error.message,
       });
+      const fallbackKey = `${prefix}:${req.ip || 'anon'}`;
+      const count = inMemoryIncr(fallbackKey, windowSeconds);
+      if (count > max) {
+        res.setHeader('Retry-After', String(windowSeconds));
+        return res.status(429).json({ error: 'Too many attempts. Try again later.' });
+      }
       return next();
     }
   };
