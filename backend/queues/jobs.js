@@ -1,3 +1,5 @@
+'use strict';
+
 /**
  * Job Contract Module - Defines job names, payload schemas, and utilities
  * This is a pure contract/utility module with zero dependencies.
@@ -11,6 +13,9 @@
 const JOBS = {
   SEND_EMAIL: 'sendEmail',
   SEND_SMS: 'sendSms',
+  // NOTE: SEND_EMAIL_BATCH — worker processor not yet implemented.
+  // Jobs enqueued with this name will queue but not be consumed until
+  // jobRunner.js adds a 'sendEmailBatch' worker. See Task 3.
   SEND_EMAIL_BATCH: 'sendEmailBatch',
 };
 
@@ -89,8 +94,12 @@ function validateJobPayload(name, data) {
  */
 function validateSendEmailPayload(data) {
   // Validate required fields
-  if (typeof data.to !== 'string' || !data.to.includes('@')) {
-    throw new TypeError('sendEmail: "to" must be a non-empty email address containing "@"');
+  if (typeof data.to !== 'string') {
+    throw new TypeError('sendEmail: "to" must be a valid email address (local@domain)');
+  }
+  const atIndex = data.to.trim().indexOf('@');
+  if (atIndex < 1 || atIndex === data.to.trim().length - 1) {
+    throw new TypeError('sendEmail: "to" must be a valid email address (local@domain)');
   }
 
   if (typeof data.subject !== 'string' || data.subject.trim() === '') {
@@ -106,8 +115,8 @@ function validateSendEmailPayload(data) {
     throw new TypeError('sendEmail: "html" must be a string if provided');
   }
 
-  if (data.correlationId !== undefined && typeof data.correlationId !== 'string') {
-    throw new TypeError('sendEmail: "correlationId" must be a string if provided');
+  if (data.correlationId !== undefined && (typeof data.correlationId !== 'string' || data.correlationId.trim() === '')) {
+    throw new TypeError('sendEmail: "correlationId" must be a non-empty string if provided');
   }
 
   if (data.context !== undefined) {
@@ -136,8 +145,8 @@ function validateSendSmsPayload(data) {
   }
 
   // Validate optional fields
-  if (data.correlationId !== undefined && typeof data.correlationId !== 'string') {
-    throw new TypeError('sendSms: "correlationId" must be a string if provided');
+  if (data.correlationId !== undefined && (typeof data.correlationId !== 'string' || data.correlationId.trim() === '')) {
+    throw new TypeError('sendSms: "correlationId" must be a non-empty string if provided');
   }
 
   if (data.context !== undefined) {
@@ -149,6 +158,9 @@ function validateSendSmsPayload(data) {
 
 /**
  * Validates sendEmailBatch payload
+ * NOTE: SEND_EMAIL_BATCH — worker processor not yet implemented.
+ * Jobs enqueued with this name will queue but not be consumed until
+ * jobRunner.js adds a 'sendEmailBatch' worker. See Task 3.
  * @private
  */
 function validateSendEmailBatchPayload(data) {
@@ -167,9 +179,15 @@ function validateSendEmailBatchPayload(data) {
       throw new TypeError(`sendEmailBatch: recipient at index ${index} must be an object`);
     }
 
-    if (typeof recipient.to !== 'string' || !recipient.to.includes('@')) {
+    if (typeof recipient.to !== 'string') {
       throw new TypeError(
-        `sendEmailBatch: recipient at index ${index} "to" must be a non-empty email address containing "@"`
+        `sendEmailBatch: recipient at index ${index} "to" must be a valid email address (local@domain)`
+      );
+    }
+    const atIndex = recipient.to.trim().indexOf('@');
+    if (atIndex < 1 || atIndex === recipient.to.trim().length - 1) {
+      throw new TypeError(
+        `sendEmailBatch: recipient at index ${index} "to" must be a valid email address (local@domain)`
       );
     }
 
@@ -183,8 +201,8 @@ function validateSendEmailBatchPayload(data) {
   });
 
   // Validate optional fields
-  if (data.correlationId !== undefined && typeof data.correlationId !== 'string') {
-    throw new TypeError('sendEmailBatch: "correlationId" must be a string if provided');
+  if (data.correlationId !== undefined && (typeof data.correlationId !== 'string' || data.correlationId.trim() === '')) {
+    throw new TypeError('sendEmailBatch: "correlationId" must be a non-empty string if provided');
   }
 
   if (data.context !== undefined) {
@@ -218,10 +236,17 @@ function buildJobId(type, ...parts) {
   }
 
   // Convert all parts to strings and join with ':'
-  const stringParts = parts.map((part) => {
-    if (part === null || part === undefined) {
-      throw new TypeError('Job ID parts must not be null or undefined');
+  const stringParts = parts.map((part, i) => {
+    // Guard: null, undefined, or empty string
+    if (part === null || part === undefined || String(part).trim() === '') {
+      throw new TypeError(`buildJobId: part at index ${i} must not be null, undefined, or empty string`);
     }
+
+    // Guard: object type
+    if (typeof part === 'object') {
+      throw new TypeError(`buildJobId: part at index ${i} must be a primitive, not an object`);
+    }
+
     return String(part);
   });
 
@@ -234,10 +259,16 @@ function buildJobId(type, ...parts) {
  */
 const DEFAULT_JOB_OPTIONS = {
   attempts: 4,
-  backoff: { type: 'exponential', delay: 2000 },
-  removeOnComplete: { count: 500, age: 86400 },
-  removeOnFail: { count: 1000, age: 604800 },
+  backoff: { type: 'exponential', delay: 2000 }, // 2s → 4s → 8s → 16s
+  removeOnComplete: { count: 500, age: 86400 },    // keep last 500 or 24 h, whichever is smaller
+  removeOnFail:     { count: 1000, age: 604800 },  // keep last 1000 or 7 days for post-mortem
 };
+
+/**
+ * OTP deduplication window: 5 minutes
+ * Prevents duplicate OTP emails within same OTP lifecycle but allows re-send after expiry
+ */
+const OTP_WINDOW_MS = 5 * 60 * 1000; // 5-minute OTP deduplication window
 
 /**
  * Helper function to calculate OTP window slot (5-minute windows)
@@ -246,7 +277,7 @@ const DEFAULT_JOB_OPTIONS = {
  * @returns {number} Current 5-minute window slot
  */
 function getOtpWindowSlot() {
-  return Math.floor(Date.now() / 300000);
+  return Math.floor(Date.now() / OTP_WINDOW_MS);
 }
 
 // Exports
@@ -255,5 +286,6 @@ module.exports = {
   validateJobPayload,
   buildJobId,
   DEFAULT_JOB_OPTIONS,
+  OTP_WINDOW_MS,
   getOtpWindowSlot,
 };
