@@ -2,8 +2,10 @@ const bcrypt = require('bcryptjs');
 const createHttpError = require('http-errors');
 const { encryptAadhaar, sha256 } = require('../../utils/crypto');
 const { writeAuditLog } = require('../../utils/audit');
-const { sendMail } = require('../../utils/mailer');
 const { generateOtp } = require('../../utils/otpService');
+const { enqueue, JOBS, buildJobId } = require('../../queues/index');
+const { getOtpWindowSlot } = require('../../queues/jobs');
+const logger = require('../../utils/logger');
 const redis = require('../../config/redis');
 const authRepository = require('../auth/auth.repository');
 const adminRepository = require('../admin/admin.repository');
@@ -35,11 +37,15 @@ async function sendVerificationCode({ role, userId, email }) {
     expiresAt: new Date(Date.now() + 5 * 60 * 1000),
   });
 
-  await sendMail({
+  // WHY: OTP stored in Redis before enqueue. Email failure is recoverable via resend endpoint.
+  enqueue(JOBS.SEND_EMAIL, {
     to: email,
     subject: `Your ${role === 'admin' ? 'admin' : 'DEO'} verification code`,
     text: `Your verification code is ${otp}. It expires in 5 minutes.`,
-  });
+    context: { entityType: role, userId },
+  }, {
+    jobId: buildJobId('otp-email', userId, 'registration_verification', getOtpWindowSlot()),
+  }).catch((err) => logger.warn('Failed to enqueue verification email', { role, userId, error: err.message }));
 }
 
 async function getDashboard() {
@@ -77,7 +83,7 @@ async function createAdmin(masterAdminId, payload, reqMeta) {
     await sendVerificationCode({ role: 'admin', userId: admin.id, email: payload.email });
   } catch (error) {
     await masteradminRepository.deletePendingAdminById(admin.id);
-    throw createHttpError(502, 'Unable to send admin verification code');
+    throw createHttpError(502, 'Unable to set up admin verification. Please try again.');
   }
 
   await writeAuditLog({
@@ -129,7 +135,7 @@ async function createDeo(masterAdminId, payload, reqMeta) {
     await sendVerificationCode({ role: 'deo', userId: deo.id, email: payload.email });
   } catch (error) {
     await adminRepository.purgePendingDeoById(deo.id);
-    throw createHttpError(502, 'Unable to send DEO verification code');
+    throw createHttpError(502, 'Unable to set up DEO verification. Please try again.');
   }
 
   await writeAuditLog({
