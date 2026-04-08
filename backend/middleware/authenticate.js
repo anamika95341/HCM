@@ -73,7 +73,22 @@ function authenticate(expectedRole) {
           return res.status(401).json({ error: 'Unauthorized' });
         }
       } catch (err) {
-        logger.warn('authenticate: Redis JTI check unavailable, continuing (fail-open)', {
+        // WHY: Privileged roles must fail CLOSED when Redis is unavailable.
+        // A manually revoked admin/masteradmin/minister/deo token must never slip through.
+        // Citizens fail-open because their tokens are lower-risk and Redis outages
+        // shouldn't lock out citizens from basic services.
+        const PRIVILEGED_ROLES = new Set(['admin', 'masteradmin', 'minister', 'deo']);
+        if (PRIVILEGED_ROLES.has(matchedRole)) {
+          logger.error('authenticate: Redis unavailable for JTI check on privileged role — denying (fail-closed)', {
+            jti: payload.jti,
+            role: matchedRole,
+            userId: payload.sub,
+            error: err.message,
+          });
+          return res.status(503).json({ error: 'Service temporarily unavailable. Please try again.' });
+        }
+        // Citizen: fail-open (log + continue)
+        logger.warn('authenticate: Redis JTI check unavailable for citizen, continuing (fail-open)', {
           jti: payload.jti,
           expectedRole: matchedRole,
           error: err.message,
