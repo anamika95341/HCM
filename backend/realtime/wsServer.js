@@ -1,3 +1,5 @@
+'use strict';
+
 const { WebSocketServer } = require('ws');
 const jwt = require('jsonwebtoken');
 const redis = require('../config/redis');
@@ -5,14 +7,23 @@ const { getRoleConfig } = require('../config/jwt');
 const { buildChannel } = require('./wsPublisher');
 const logger = require('../utils/logger');
 
+const HEARTBEAT_INTERVAL_MS = Number(process.env.WS_HEARTBEAT_INTERVAL_MS || 30_000);
+
 function extractToken(req) {
   const header = req.headers.authorization || '';
   if (header.startsWith('Bearer ')) {
     return header.slice(7);
   }
 
-  const url = new URL(req.url, 'http://localhost');
-  return url.searchParams.get('token');
+  // WHY: JWT in URL query params are logged by proxies/access logs — security risk.
+  // URL token kept ONLY for non-production to support tooling/testing.
+  // Remove once all WS clients send Authorization header.
+  if (process.env.NODE_ENV !== 'production') {
+    const url = new URL(req.url, 'http://localhost');
+    return url.searchParams.get('token');
+  }
+
+  return null;
 }
 
 function initializeWebSocket(server) {
@@ -30,6 +41,21 @@ function initializeWebSocket(server) {
       }
     }
   });
+
+  // Heartbeat timer: detect dead connections and terminate them
+  const heartbeatTimer = setInterval(() => {
+    for (const client of wss.clients) {
+      if (client.isAlive === false) {
+        client.terminate(); // zombie — no pong response
+        continue;
+      }
+      client.isAlive = false;
+      client.ping();
+    }
+  }, HEARTBEAT_INTERVAL_MS);
+
+  // Stop timer when WSS closes (important for tests)
+  wss.on('close', () => clearInterval(heartbeatTimer));
 
   wss.on('connection', async (ws, req) => {
     try {
@@ -56,9 +82,10 @@ function initializeWebSocket(server) {
       const recipientId = payload.sub;
       const channel = buildChannel(role, recipientId);
 
+      // Fix subscription race condition: mark BEFORE await
       if (!subscribedChannels.has(channel)) {
-        await subscriber.subscribe(channel);
         subscribedChannels.add(channel);
+        await subscriber.subscribe(channel);
       }
 
       if (!socketsByChannel.has(channel)) {
@@ -67,13 +94,21 @@ function initializeWebSocket(server) {
       socketsByChannel.get(channel).add(ws);
       redis.incr('metrics:ws:active').catch(() => {});
 
+      // Initialize heartbeat state
+      ws.isAlive = true;
+
+      // Register pong handler for heartbeat
+      ws.on('pong', () => {
+        ws.isAlive = true;
+      });
+
       ws.on('close', async () => {
         const sockets = socketsByChannel.get(channel);
         if (sockets) {
           sockets.delete(ws);
           if (sockets.size === 0) {
             socketsByChannel.delete(channel);
-            await subscriber.unsubscribe(channel);
+            await subscriber.unsubscribe(channel).catch(() => {});
             subscribedChannels.delete(channel);
           }
         }
@@ -86,10 +121,11 @@ function initializeWebSocket(server) {
   });
 
   async function shutdown() {
+    clearInterval(heartbeatTimer);
     for (const client of wss.clients) {
-      client.close();
+      client.close(1001, 'Server shutting down');
     }
-    await subscriber.quit();
+    await subscriber.quit().catch(() => {});
   }
 
   return { shutdown };
