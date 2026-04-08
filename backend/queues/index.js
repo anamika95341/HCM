@@ -18,10 +18,16 @@ const {
  * @private
  */
 function makeBullConnection() {
-  return createRedisClient({
+  const conn = createRedisClient({
     maxRetriesPerRequest: null,
     enableReadyCheck: false,
   });
+  // WHY: Dedicated connections for BullMQ have no listener from config/redis.js.
+  // Without this, an ioredis 'error' event would crash the process (unhandled EventEmitter error).
+  conn.on('error', (err) =>
+    logger.error('BullMQ queue Redis connection error', { error: err.message })
+  );
+  return conn;
 }
 
 /**
@@ -43,26 +49,41 @@ const smsQueue = new Queue('sms', {
 });
 
 /**
- * Safely enqueues a job to the specified queue
+ * Map job names to queues to prevent accidental misrouting
+ * (e.g. sending a sendEmail job to the sms queue where no worker would consume it)
+ */
+const JOB_QUEUE_MAP = {
+  [JOBS.SEND_EMAIL]: emailQueue,
+  [JOBS.SEND_SMS]: smsQueue,
+  [JOBS.SEND_EMAIL_BATCH]: emailQueue,
+};
+
+/**
+ * Safely enqueues a job to the correct queue based on job name
  * Validates payload before enqueueing, rethrows errors for caller to handle
  *
- * @param {Queue} queue - BullMQ queue instance (emailQueue or smsQueue)
  * @param {string} jobName - Job name from JOBS constant
  * @param {object} payload - Job payload (validated against schema)
  * @param {object} options - BullMQ job options (e.g., { jobId, delay, priority })
- * @throws {TypeError} If payload validation fails
+ * @throws {TypeError} If jobName is unknown or payload validation fails
  * @throws {Error} If queue.add() fails
  */
-async function enqueue(queue, jobName, payload, options = {}) {
+async function enqueue(jobName, payload, options = {}) {
+  const queue = JOB_QUEUE_MAP[jobName];
+  if (!queue) {
+    throw new TypeError(`enqueue: unknown job name "${jobName}" — not mapped to any queue`);
+  }
+
   // Validate payload before enqueueing (throws TypeError if invalid)
   validateJobPayload(jobName, payload);
 
   // Add job to queue (caller handles errors with swallow-log pattern)
   const job = await queue.add(jobName, payload, options);
 
-  // Log enqueued job with jobId and correlationId for observability
+  // Log enqueued job with jobId, queueName and correlationId for observability
   logger.info('Job enqueued', {
     jobName,
+    queueName: queue.name,
     jobId: job.id,
     correlationId: payload?.correlationId,
   });
@@ -79,4 +100,5 @@ module.exports = {
   // Services only need to require('../../queues/index')
   JOBS,
   buildJobId,
+  validateJobPayload,
 };
