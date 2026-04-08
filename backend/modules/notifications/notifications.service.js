@@ -1,9 +1,10 @@
 const createHttpError = require('http-errors');
 const authRepository = require('../auth/auth.repository');
 const notificationsRepository = require('./notifications.repository');
-const { sendMail } = require('../../utils/mailer');
-const { sendSms } = require('../../utils/smsService');
 const logger = require('../../utils/logger');
+// WHY: Email/SMS delivery enqueued to BullMQ workers so the HTTP request cycle
+// is not blocked by SMTP/SMS latency (up to 10s per SMTP send).
+const { enqueue, JOBS, buildJobId } = require('../../queues/index');
 const {
   publishMeetingStatusUpdate,
   publishComplaintStatusUpdate,
@@ -145,6 +146,7 @@ async function markAllNotificationsRead(role, userId) {
 }
 
 async function deliverOutOfBandChannels(recipientRole, recipientId, preferences, notification) {
+  // WHY: Skip for digest users — their batch digest jobs run separately (not implemented yet).
   if (preferences.digestFrequency !== 'realtime') {
     return;
   }
@@ -154,40 +156,47 @@ async function deliverOutOfBandChannels(recipientRole, recipientId, preferences,
     return;
   }
 
+  const correlationId = notification.id ? `notif:${notification.id}` : undefined;
+
   if (preferences.channels.email && user.email) {
-    try {
-      await sendMail({
-        to: user.email,
-        subject: notification.title,
-        text: notification.body,
-      });
-    } catch (error) {
-      logger.warn('Notification email delivery failed', {
+    // WHY: jobId = notif-email:{notification.id} ensures idempotency —
+    // if this function is called twice for the same notification (e.g. API retry),
+    // BullMQ deduplicates the job while it's pending/active.
+    enqueue(JOBS.SEND_EMAIL, {
+      to: user.email,
+      subject: notification.title,
+      text: notification.body,
+      correlationId,
+      context: { entityType: notification.entityType || notification.entity_type, entityId: notification.entityId || notification.entity_id, recipientRole, recipientId },
+    }, {
+      jobId: notification.id ? buildJobId('notif-email', notification.id) : undefined,
+    }).catch((err) => {
+      logger.warn('Failed to enqueue notification email job', {
         recipientRole,
         recipientId,
         notificationId: notification.id,
-        eventType: notification.event_type || notification.eventType,
-        error,
+        error: err.message,
       });
-    }
+    });
   }
 
   const phone = user.mobile_number || user.phone_number;
   if (preferences.channels.sms && phone) {
-    try {
-      await sendSms({
-        to: phone,
-        message: notification.body,
-      });
-    } catch (error) {
-      logger.warn('Notification SMS delivery failed', {
+    enqueue(JOBS.SEND_SMS, {
+      to: phone,
+      message: notification.body,
+      correlationId,
+      context: { recipientRole, recipientId },
+    }, {
+      jobId: notification.id ? buildJobId('notif-sms', notification.id) : undefined,
+    }).catch((err) => {
+      logger.warn('Failed to enqueue notification SMS job', {
         recipientRole,
         recipientId,
         notificationId: notification.id,
-        eventType: notification.event_type || notification.eventType,
-        error,
+        error: err.message,
       });
-    }
+    });
   }
 }
 
