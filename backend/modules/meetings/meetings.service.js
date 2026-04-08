@@ -122,8 +122,19 @@ async function submitMeetingRequest({ citizenId, body, file, reqMeta, idempotenc
   }
 }
 
-async function getCitizenMeetings(citizenId) {
-  return meetingsRepository.getCitizenMeetings(citizenId);
+// WHY: Optional pagination params. If absent → same behavior as before (returns all).
+// page/limit only applied when both are provided. Limit capped at 100.
+async function getCitizenMeetings(citizenId, { page, limit } = {}) {
+  const parsedLimit = (limit != null && !Number.isNaN(Number(limit)))
+    ? Math.min(Math.max(1, Number(limit)), 100)
+    : undefined;
+  const parsedOffset = (parsedLimit != null && page != null && !Number.isNaN(Number(page)))
+    ? (Math.max(1, Number(page)) - 1) * parsedLimit
+    : undefined;
+  return meetingsRepository.getCitizenMeetings(citizenId, {
+    limit: parsedLimit,
+    offset: parsedOffset,
+  });
 }
 
 async function getCitizenMeetingDetail(meetingId, citizenId) {

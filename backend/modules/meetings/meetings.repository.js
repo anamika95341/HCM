@@ -193,13 +193,21 @@ async function createMeeting({
   }
 }
 
-async function getCitizenMeetings(citizenId) {
-  const result = await pool.query(
-    `${meetingSelect}
+async function getCitizenMeetings(citizenId, { limit, offset } = {}) {
+  const params = [citizenId];
+  // WHY: limit/offset are optional — if absent, all records returned (backward-compatible).
+  let sql = `${meetingSelect}
      WHERE m.citizen_id = $1
-     ORDER BY m.updated_at DESC, m.created_at DESC`,
-    [citizenId]
-  );
+     ORDER BY m.updated_at DESC, m.created_at DESC`;
+  if (limit != null) {
+    params.push(limit);
+    sql += ` LIMIT $${params.length}`;
+  }
+  if (offset != null) {
+    params.push(offset);
+    sql += ` OFFSET $${params.length}`;
+  }
+  const result = await pool.query(sql, params);
   return result.rows.map(mapMeeting);
 }
 
