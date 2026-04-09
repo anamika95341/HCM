@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { ChevronLeft, ChevronRight, Eye, Search } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { PATHS } from "../../../routes/paths.js";
-import { apiClient, authorizedConfig } from "../../../shared/api/client.js";
+import { apiClient } from "../../../shared/api/client.js";
 import { useAuth } from "../../../shared/auth/AuthContext.jsx";
 import {
   WorkspaceBadge,
@@ -56,13 +56,13 @@ export default function AdminComplaintQueue() {
     let active = true;
 
     async function loadComplaintQueue() {
-      if (!session?.accessToken) {
+      if (!session?.role) {
         return;
       }
       try {
         setLoading(true);
         setError("");
-        const response = await apiClient.get("/admin/work-queue", authorizedConfig(session.accessToken));
+        const response = await apiClient.get("/admin/work-queue");
         if (!active) return;
         setComplaints(Array.isArray(response.data?.complaints) ? response.data.complaints : []);
       } catch (loadError) {
@@ -80,7 +80,7 @@ export default function AdminComplaintQueue() {
     return () => {
       active = false;
     };
-  }, [session?.accessToken]);
+  }, [session?.role]);
 
   const personalComplaintQueue = useMemo(
     () => complaints.filter(

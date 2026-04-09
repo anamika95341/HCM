@@ -78,4 +78,6 @@ module.exports = {
   authStreamMaxRetries: Number(process.env.AUTH_STREAM_MAX_RETRIES || 5),
   authStreamClaimIdleMs: Number(process.env.AUTH_STREAM_CLAIM_IDLE_MS || 60000),
   authStreamReplayBatchSize: Number(process.env.AUTH_STREAM_REPLAY_BATCH_SIZE || 100),
+  idleTimeoutSeconds: Number(process.env.IDLE_TIMEOUT_SECONDS || 1800),
+  maxSessionSeconds: Number(process.env.MAX_SESSION_SECONDS || 28800),
 };

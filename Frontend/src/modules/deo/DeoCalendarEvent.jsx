@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { CheckCircle2, Search, XCircle } from "lucide-react";
-import { apiClient, authorizedConfig } from "../../shared/api/client.js";
+import { apiClient } from "../../shared/api/client.js";
 import { useAuth } from "../../shared/auth/AuthContext.jsx";
 import {
   WorkspaceBadge,
@@ -27,7 +27,7 @@ export default function DeoCalendarEvent() {
 
     async function loadAssignedMeetings() {
       try {
-        const { data } = await apiClient.get("/deo/assigned-meetings", authorizedConfig(session.accessToken));
+        const { data } = await apiClient.get("/deo/assigned-meetings");
         if (mounted) {
           setMeetings(data.meetings || []);
         }
@@ -42,14 +42,14 @@ export default function DeoCalendarEvent() {
       }
     }
 
-    if (session?.accessToken) {
+    if (session?.role) {
       loadAssignedMeetings();
     }
 
     return () => {
       mounted = false;
     };
-  }, [session?.accessToken]);
+  }, [session?.role]);
 
   async function submitVerification(meetingId, verified) {
     setSubmittingId(meetingId);
@@ -62,7 +62,6 @@ export default function DeoCalendarEvent() {
           reason: verified ? "Verified by DEO after citizen confirmation" : "Citizen details could not be verified",
           notes: verified ? "Verification completed successfully" : "Verification failed during DEO review",
         },
-        authorizedConfig(session.accessToken)
       );
       setMeetings((current) => current.filter((meeting) => meeting.id !== meetingId));
     } catch (submissionError) {

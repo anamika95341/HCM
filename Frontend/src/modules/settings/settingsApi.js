@@ -1,4 +1,4 @@
-import { apiClient, authorizedConfig } from '../../shared/api/client.js';
+import { apiClient } from '../../shared/api/client.js';
 
 const roleToProfilePath = {
   citizen: '/citizen/me',
@@ -24,32 +24,32 @@ const roleToNotificationsPath = {
   deo: '/deo/me/notifications',
 };
 
-export async function fetchProfile(role, accessToken) {
+export async function fetchProfile(role) {
   const path = roleToProfilePath[role] ?? roleToProfilePath.citizen;
-  const { data } = await apiClient.get(path, authorizedConfig(accessToken));
+  const { data } = await apiClient.get(path);
   return data.profile ?? null;
 }
 
-export async function updateProfile(role, payload, accessToken) {
+export async function updateProfile(role, payload) {
   const path = roleToProfilePath[role] ?? roleToProfilePath.citizen;
-  const { data } = await apiClient.patch(path, payload, authorizedConfig(accessToken));
+  const { data } = await apiClient.patch(path, payload);
   return data;
 }
 
-export async function changePassword(role, payload, accessToken) {
+export async function changePassword(role, payload) {
   const path = roleToChangePasswordPath[role] ?? roleToChangePasswordPath.citizen;
-  const { data } = await apiClient.post(path, payload, authorizedConfig(accessToken));
+  const { data } = await apiClient.post(path, payload);
   return data;
 }
 
-export async function updateNotifications(role, payload, accessToken) {
+export async function updateNotifications(role, payload) {
   const path = roleToNotificationsPath[role] ?? roleToNotificationsPath.citizen;
-  const { data } = await apiClient.patch(path, payload, authorizedConfig(accessToken));
+  const { data } = await apiClient.patch(path, payload);
   return data;
 }
 
-export async function fetchNotificationPreferences(role, accessToken) {
+export async function fetchNotificationPreferences(role) {
   const path = roleToNotificationsPath[role] ?? roleToNotificationsPath.citizen;
-  const { data } = await apiClient.get(path, authorizedConfig(accessToken));
+  const { data } = await apiClient.get(path);
   return data.preferences ?? null;
 }

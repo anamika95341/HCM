@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Eye, ChevronLeft, ChevronRight } from "lucide-react";
 import { useNavigate } from "react-router-dom";
-import { apiClient, authorizedConfig } from "../../../shared/api/client.js";
+import { apiClient } from "../../../shared/api/client.js";
 import { useAuth } from "../../../shared/auth/AuthContext.jsx";
 import {
   WorkspaceBadge,
@@ -122,14 +122,14 @@ export default function AdminCases() {
   useEffect(() => {
     let active = true;
     async function loadQueue() {
-      if (!session?.accessToken) {
+      if (!session?.role) {
         if (active) { setLoading(false); setError("Admin session not available"); }
         return;
       }
       try {
         setLoading(true);
         setError("");
-        const response = await apiClient.get("/admin/work-queue", authorizedConfig(session.accessToken));
+        const response = await apiClient.get("/admin/work-queue");
         if (!active) return;
         setComplaints(Array.isArray(response.data?.complaints) ? response.data.complaints : []);
         setMeetings(Array.isArray(response.data?.meetings) ? response.data.meetings : []);
@@ -141,7 +141,7 @@ export default function AdminCases() {
     }
     loadQueue();
     return () => { active = false; };
-  }, [session?.accessToken]);
+  }, [session?.role]);
 
   const complaintPool = complaints.filter((item) => !item.assignedAdminUserId && !isResolvedComplaint(item.status)).map(complaintRow);
   const meetingPool = meetings.filter((item) => !item.assignedAdminUserId && !isResolvedMeeting(item.status)).map(meetingRow);

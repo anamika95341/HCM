@@ -4,7 +4,7 @@ import {
   FiPaperclip, FiDownload, FiX,
   FiCalendar, FiImage, FiVideo, FiFile, FiUploadCloud,
 } from "react-icons/fi";
-import { apiClient, authorizedConfig } from "../../../shared/api/client.js";
+import { apiClient } from "../../../shared/api/client.js";
 import { DEO_ACCEPT, getFileUiType, uploadPrivateFile } from "../../../shared/api/privateFiles.js";
 import { useAuth } from "../../../shared/auth/AuthContext.jsx";
 
@@ -51,7 +51,7 @@ function FileIcon({ type }) {
   return <FiFile size={15} className="text-amber-500" />;
 }
 
-function EventUploadModal({ accessToken, event, onClose, onEdit, onUploaded }) {
+function EventUploadModal({ event, onClose, onEdit, onUploaded }) {
   const [selectedFile, setSelectedFile] = useState(null);
   const [error, setError] = useState("");
   const [uploading, setUploading] = useState(false);
@@ -65,7 +65,6 @@ function EventUploadModal({ accessToken, event, onClose, onEdit, onUploaded }) {
       setUploading(true);
       setError("");
       await uploadPrivateFile({
-        accessToken,
         file: selectedFile,
         contextType: "event",
         contextId: event.id,
@@ -335,7 +334,7 @@ export default function ManageEvent() {
       try {
         setLoading(true);
         setError("");
-        const { data } = await apiClient.get("/deo/calendar-events", authorizedConfig(session.accessToken));
+        const { data } = await apiClient.get("/deo/calendar-events");
         if (mounted) {
           setEvents((data.events || []).map(formatEventRow));
         }
@@ -350,7 +349,7 @@ export default function ManageEvent() {
       }
     }
 
-    if (session?.accessToken) {
+    if (session?.role) {
       loadEvents();
     } else {
       setLoading(false);
@@ -359,10 +358,10 @@ export default function ManageEvent() {
     return () => {
       mounted = false;
     };
-  }, [session?.accessToken]);
+  }, [session?.role]);
 
   async function reloadEvents() {
-    const { data } = await apiClient.get("/deo/calendar-events", authorizedConfig(session.accessToken));
+    const { data } = await apiClient.get("/deo/calendar-events");
     setEvents((data.events || []).map(formatEventRow));
   }
 
@@ -576,7 +575,7 @@ export default function ManageEvent() {
       </div>
 
       {/* Modals */}
-      {uploadEvent && <EventUploadModal accessToken={session?.accessToken} event={uploadEvent} onUploaded={reloadEvents} onClose={() => setUploadEvent(null)} onEdit={() => { setManageUploadEvent(uploadEvent); setUploadEvent(null); }} />}
+      {uploadEvent && <EventUploadModal event={uploadEvent} onUploaded={reloadEvents} onClose={() => setUploadEvent(null)} onEdit={() => { setManageUploadEvent(uploadEvent); setUploadEvent(null); }} />}
       {manageUploadEvent && <ManageEventMediaModal event={manageUploadEvent} onSave={upd => { setEvents(p => p.map(e => e.id === upd.id ? upd : e)); setManageUploadEvent(upd); }} onClose={() => setManageUploadEvent(null)} onBack={() => { setUploadEvent(manageUploadEvent); setManageUploadEvent(null); }} />}
     </div>
   );

@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Eye, Clock, CheckCircle2, AlertCircle, FileText, Search, Filter, ChevronLeft, ChevronRight } from "lucide-react";
-import { apiClient, authorizedConfig } from "../../../shared/api/client.js";
+import { apiClient } from "../../../shared/api/client.js";
 import { useAuth } from "../../../shared/auth/AuthContext.jsx";
 import { useNotifications } from "../../../shared/notifications/NotificationContext.jsx";
 import {
@@ -66,7 +66,7 @@ export default function MyCases() {
 
     async function loadCases() {
       try {
-        const { data: response } = await apiClient.get("/citizen/my-cases", authorizedConfig(session.accessToken));
+        const { data: response } = await apiClient.get("/citizen/my-cases");
         if (mounted) {
           setComplaints(response.complaints || []);
         }
@@ -81,14 +81,14 @@ export default function MyCases() {
       }
     }
 
-    if (session?.accessToken) {
+    if (session?.role) {
       loadCases();
     }
 
     return () => {
       mounted = false;
     };
-  }, [session?.accessToken, eventVersion]);
+  }, [session?.role, eventVersion]);
 
   const items = useMemo(() => {
     const complaintItems = complaints.map((item) => ({

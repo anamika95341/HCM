@@ -4,6 +4,7 @@ const jwt = require('jsonwebtoken');
 const createHttpError = require('http-errors');
 const redis = require('../../config/redis');
 const { getRoleConfig } = require('../../config/jwt');
+const env = require('../../config/env');
 const { encryptAadhaar, sha256 } = require('../../utils/crypto');
 const generateCitizenId = require('../../utils/generateCitizenId');
 // WHY: OTP emails/SMS enqueued to unblock auth endpoints. OTP stored in Redis first
@@ -22,6 +23,8 @@ const {
   notifyMasterAdminSecurityAlert,
 } = require('../notifications/notifications.service');
 const { lookupMp } = require('../../utils/mpLookup');
+
+const PRIVILEGED_ROLES = new Set(['admin', 'masteradmin', 'minister', 'deo']);
 
 function publicUser(user, role) {
   if (role === 'citizen') {
@@ -65,11 +68,11 @@ function publicUser(user, role) {
   };
 }
 
-function createAccessToken({ role, userId }) {
+function createAccessToken({ role, userId, sessionId }) {
   const config = getRoleConfig(role);
   const jti = crypto.randomUUID();
   const token = jwt.sign(
-    { sub: userId, role, jti },
+    { sub: userId, role, jti, sid: sessionId },
     config.privateKey,
     {
       algorithm: 'RS256',
@@ -81,11 +84,11 @@ function createAccessToken({ role, userId }) {
   return { token, jti };
 }
 
-function createRefreshToken({ role, userId }) {
+function createRefreshToken({ role, userId, sessionId }) {
   const config = getRoleConfig(role);
   const jti = crypto.randomUUID();
   const token = jwt.sign(
-    { sub: userId, role, jti, type: 'refresh' },
+    { sub: userId, role, jti, sid: sessionId, type: 'refresh' },
     config.privateKey,
     {
       algorithm: 'RS256',
@@ -113,9 +116,10 @@ function verifyJwtByRole(role, token) {
   }
 }
 
-async function issueSession(role, user) {
-  const access = createAccessToken({ role, userId: user.id });
-  const refresh = createRefreshToken({ role, userId: user.id });
+async function issueSession(role, user, { sessionId: existingSessionId, absoluteExpiry: existingAbsoluteExpiry, userAgent } = {}) {
+  const sessionId = existingSessionId || crypto.randomUUID();
+  const access = createAccessToken({ role, userId: user.id, sessionId });
+  const refresh = createRefreshToken({ role, userId: user.id, sessionId });
   const refreshPayload = verifyJwtByRole(role, refresh.token);
   await authRepository.storeRefreshToken({
     userRole: role,
@@ -125,9 +129,34 @@ async function issueSession(role, user) {
     expiresAt: new Date(refreshPayload.exp * 1000),
   });
 
+  const csrfToken = crypto.randomBytes(32).toString('hex');
+  const uaHash = userAgent ? sha256(userAgent) : null;
+  const now = Date.now();
+  const absoluteExpiry = existingAbsoluteExpiry || (now + env.maxSessionSeconds * 1000);
+  const absoluteTtlSecs = Math.max(1, Math.ceil((absoluteExpiry - now) / 1000));
+  try {
+    await redis.set(
+      `session:meta:${sessionId}`,
+      JSON.stringify({ role, userId: user.id, absoluteExpiry, ...(uaHash && { uaHash }) }),
+      'EX',
+      absoluteTtlSecs,
+    );
+    await redis.set(
+      `lastActivity:${role}:${user.id}:${sessionId}`,
+      String(now),
+      'EX',
+      env.idleTimeoutSeconds,
+    );
+  } catch (err) {
+    logger.warn('issueSession: Redis session tracking unavailable', {
+      role, userId: user.id, sessionId, error: err.message,
+    });
+  }
+
   return {
     accessToken: access.token,
     refreshToken: refresh.token,
+    csrfToken,
     user: publicUser(user, role),
   };
 }
@@ -688,7 +717,7 @@ async function loginCitizen({ citizenId, password }, reqMeta) {
     throw createHttpError(403, 'Please verify your account before logging in');
   }
   await clearLoginFailures({ role: 'citizen', userId: user.id, ip: reqMeta.ip });
-  const session = await issueSession('citizen', user);
+  const session = await issueSession('citizen', user, { userAgent: reqMeta.userAgent });
   await emitAuthEvent({
     event: 'login_success',
     role: 'citizen',
@@ -761,7 +790,7 @@ async function loginOperator(role, identifier, password, reqMeta) {
 
   if (role === 'minister' || role === 'admin' || role === 'masteradmin' || role === 'deo') {
     await clearLoginFailures({ role, userId: user.id, ip: reqMeta.ip });
-    const session = await issueSession(role, user);
+    const session = await issueSession(role, user, { userAgent: reqMeta.userAgent });
     await emitAuthEvent({
       event: 'login_success',
       role,
@@ -856,7 +885,10 @@ async function resetCitizenPassword({ citizenId, otp, password }, reqMeta) {
   return { message: 'Password reset completed if the account exists.' };
 }
 
-async function refreshSession(refreshToken) {
+async function refreshSession(refreshToken, userAgent) {
+  if (!refreshToken) {
+    throw createHttpError(401, 'Unauthorized');
+  }
   const decoded = jwt.decode(refreshToken);
   const role = decoded?.role;
 
@@ -868,17 +900,82 @@ async function refreshSession(refreshToken) {
     throw createHttpError(401, 'Unauthorized');
   }
 
-  const stored = await authRepository.findActiveRefreshToken(payload.jti);
-  if (!stored || stored.token_hash !== sha256(refreshToken)) {
+  // Replay detection: look up token regardless of revocation status
+  const tokenRecord = await authRepository.findRefreshTokenByJti(payload.jti);
+  if (!tokenRecord) {
     throw createHttpError(401, 'Unauthorized');
   }
+  if (tokenRecord.revoked_at !== null) {
+    // A previously-used token was presented again — possible token theft
+    logger.warn('refreshSession: replay token detected — revoking session', {
+      jti: payload.jti, role, userId: payload.sub, sid: payload.sid,
+    });
+    if (payload.sid) {
+      await redis.del(
+        `session:meta:${payload.sid}`,
+        `lastActivity:${role}:${payload.sub}:${payload.sid}`
+      ).catch((err) => logger.error('refreshSession: redis del failed on replay', { error: err.message }));
+    }
+    await authRepository.revokeAllUserRefreshTokens(role, payload.sub).catch((err) =>
+      logger.error('refreshSession: failed to revoke all tokens on replay', { error: err.message })
+    );
+    await publishAuthEvent(redis, {
+      event: 'refresh_token_replay',
+      role,
+      userId: payload.sub,
+      jti: payload.jti,
+      sid: payload.sid,
+    }).catch(() => {});
+    throw createHttpError(401, 'Unauthorized');
+  }
+  if (tokenRecord.token_hash !== sha256(refreshToken)) {
+    throw createHttpError(401, 'Unauthorized');
+  }
+  const stored = tokenRecord;
 
   const user = await authRepository.findActiveUserById(role, payload.sub);
   if (!user) {
     throw createHttpError(401, 'Unauthorized');
   }
 
-  const session = await issueSession(role, user);
+  const sessionId = payload.sid;
+  let absoluteExpiry;
+
+  // Enforce absolute session timeout and idle timeout via Redis
+  try {
+    const [sessionMeta, lastActivity] = await Promise.all([
+      sessionId ? redis.get(`session:meta:${sessionId}`) : null,
+      sessionId ? redis.get(`lastActivity:${role}:${payload.sub}:${sessionId}`) : null,
+    ]);
+
+    if (sessionId) {
+      if (!sessionMeta) {
+        throw createHttpError(401, 'Unauthorized');
+      }
+      const meta = JSON.parse(sessionMeta);
+      absoluteExpiry = meta.absoluteExpiry;
+      if (Date.now() >= absoluteExpiry) {
+        throw createHttpError(401, 'Unauthorized');
+      }
+      if (!lastActivity) {
+        // Idle timeout expired
+        throw createHttpError(401, 'Unauthorized');
+      }
+    }
+  } catch (err) {
+    if (err.status === 401) throw err;
+    if (PRIVILEGED_ROLES.has(role)) {
+      logger.error('refreshSession: Redis unavailable for privileged role — denying (fail-closed)', {
+        role, sessionId, error: err.message,
+      });
+      throw createHttpError(503, 'Service temporarily unavailable. Please try again.');
+    }
+    logger.warn('refreshSession: Redis session/idle check unavailable for citizen, continuing (fail-open)', {
+      role, sessionId, error: err.message,
+    });
+  }
+
+  const session = await issueSession(role, user, { sessionId, absoluteExpiry, userAgent });
   const newPayload = verifyJwtByRole(role, session.refreshToken);
   const replacement = await authRepository.findActiveRefreshToken(newPayload.jti);
   await authRepository.revokeRefreshToken(stored.id, replacement.id);
@@ -890,6 +987,9 @@ async function logout(role, token, refreshToken, reqMeta = {}) {
   const ttl = Math.max(accessPayload.exp - Math.floor(Date.now() / 1000), 1);
   try {
     await redis.set(`revoked:jti:${accessPayload.jti}`, '1', 'EX', ttl);
+    if (accessPayload.sid) {
+      await redis.del(`session:meta:${accessPayload.sid}`, `lastActivity:${role}:${accessPayload.sub}:${accessPayload.sid}`);
+    }
     await emitAuthEvent({
       event: 'token_revoked',
       role,
@@ -934,6 +1034,12 @@ async function logout(role, token, refreshToken, reqMeta = {}) {
   return { message: 'Logged out successfully' };
 }
 
+async function getSessionUser(role, userId) {
+  const user = await authRepository.findActiveUserById(role, userId);
+  if (!user) throw createHttpError(401, 'Unauthorized');
+  return { user: publicUser(user, role), role };
+}
+
 module.exports = {
   registerCitizen,
   verifyCitizenRegistration,
@@ -947,4 +1053,5 @@ module.exports = {
   resetCitizenPassword,
   refreshSession,
   logout,
+  getSessionUser,
 };

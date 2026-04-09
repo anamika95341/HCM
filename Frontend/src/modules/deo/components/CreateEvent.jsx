@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { apiClient, authorizedConfig } from "../../../shared/api/client.js";
+import { apiClient } from "../../../shared/api/client.js";
 import { useAuth } from "../../../shared/auth/AuthContext.jsx";
 import { usePortalTheme } from "../../../shared/theme/portalTheme.jsx";
 import { PATHS } from "../../../routes/paths.js";
@@ -48,7 +48,7 @@ export default function CreateEvent() {
     async function loadMinisters() {
       try {
         setLoadingMinisters(true);
-        const { data } = await apiClient.get("/deo/ministers", authorizedConfig(session.accessToken));
+        const { data } = await apiClient.get("/deo/ministers");
         if (mounted) {
           setMinisters(data.ministers || []);
           if ((data.ministers || []).length === 1) {
@@ -66,7 +66,7 @@ export default function CreateEvent() {
       }
     }
 
-    if (session?.accessToken) {
+    if (session?.role) {
       loadMinisters();
     } else {
       setLoadingMinisters(false);
@@ -75,7 +75,7 @@ export default function CreateEvent() {
     return () => {
       mounted = false;
     };
-  }, [session?.accessToken]);
+  }, [session?.role]);
 
   async function handleSubmit(event) {
     event.preventDefault();
@@ -105,8 +105,7 @@ export default function CreateEvent() {
           endsAt: endsAtDate.toISOString(),
           location: [form.location.trim(), form.locationDetail.trim()].filter(Boolean).join(", "),
           description: form.description.trim(),
-        },
-        authorizedConfig(session.accessToken)
+        }
       );
       navigate(PATHS.deo.manageEvent);
     } catch (submitError) {

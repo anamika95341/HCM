@@ -211,7 +211,7 @@ const SH = ({ icon, title, sub }) => {
 // ═══════════════════════════════════════════
 //  SECTION 1 — PROFILE & ACCOUNT
 // ═══════════════════════════════════════════
-const ProfileSection = ({ permissions, profile, role, accessToken, onProfileSaved }) => {
+const ProfileSection = ({ permissions, profile, role, onProfileSaved }) => {
   const { C } = useTheme();
 
   const buildName = (p) =>
@@ -288,7 +288,7 @@ const ProfileSection = ({ permissions, profile, role, accessToken, onProfileSave
       if (!permissions.nameReadOnly) payload.name = name.trim();
       if (!permissions.phoneReadOnly) payload.contact = contact.trim();
       if (!permissions.emailReadOnly) payload.email = email.trim();
-      const result = await updateProfile(role, payload, accessToken);
+      const result = await updateProfile(role, payload);
       const nextProfile = result?.profile ?? null;
       if (nextProfile) {
         onProfileSaved?.(nextProfile);
@@ -322,15 +322,11 @@ const ProfileSection = ({ permissions, profile, role, accessToken, onProfileSave
     }
 
     try {
-      const result = await changePassword(
-        role,
-        {
-          currentPassword,
-          newPassword,
-          confirmPassword,
-        },
-        accessToken,
-      );
+      const result = await changePassword(role, {
+        currentPassword,
+        newPassword,
+        confirmPassword,
+      });
       setPasswordSuccess(result?.message ?? 'Password updated successfully.');
       setCurrentPassword('');
       setNewPassword('');
@@ -753,13 +749,13 @@ function SettingsPortalContent() {
   const [profile, setProfile] = useState(null);
 
   useEffect(() => {
-    if (!session?.accessToken) return;
+    if (!session?.role) return;
     let cancelled = false;
-    fetchProfile(role, session.accessToken)
+    fetchProfile(role)
       .then(data => { if (!cancelled) setProfile(data); })
       .catch(() => { if (!cancelled) setProfile(null); });
     return () => { cancelled = true; };
-  }, [role, session?.accessToken]);
+  }, [role, session?.role]);
 
   const tabs = [
     { id: 'profile', icon: 'person', label: 'Profile & Account' },
@@ -816,7 +812,6 @@ function SettingsPortalContent() {
                 permissions={profilePermissions}
                 profile={profile}
                 role={role}
-                accessToken={session?.accessToken}
                 onProfileSaved={setProfile}
               />
             )}
@@ -824,7 +819,6 @@ function SettingsPortalContent() {
               <NotificationsSection
                 permissions={notifPermissions}
                 role={role}
-                accessToken={session?.accessToken}
               />
             )}
           </div>

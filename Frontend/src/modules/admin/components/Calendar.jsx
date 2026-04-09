@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { Calendar as CalendarIcon, ChevronLeft, ChevronRight, X } from "lucide-react";
-import { apiClient, authorizedConfig } from "../../../shared/api/client.js";
+import { apiClient } from "../../../shared/api/client.js";
 import { useAuth } from "../../../shared/auth/AuthContext.jsx";
 import { usePortalTheme } from "../../../shared/theme/portalTheme.jsx";
 import { WorkspaceBadge, WorkspaceButton, WorkspaceCard, WorkspaceCardHeader, WorkspaceEmptyState, WorkspacePage, WorkspaceSectionHeader, WorkspaceTabs } from "../../../shared/components/WorkspaceUI.jsx";
@@ -378,7 +378,7 @@ export default function Calendar() {
 
     async function loadCalendar() {
       try {
-        const queueResponse = await apiClient.get("/admin/work-queue", authorizedConfig(session.accessToken));
+        const queueResponse = await apiClient.get("/admin/work-queue");
         const data = queueResponse.data;
         const scheduledMeetings = (data.meetings || [])
           .filter((meeting) => meeting.status === "scheduled" && meeting.scheduled_at)
@@ -433,14 +433,14 @@ export default function Calendar() {
       }
     }
 
-    if (session?.accessToken) {
+    if (session?.role) {
       loadCalendar();
     }
 
     return () => {
       mounted = false;
     };
-  }, [session?.accessToken]);
+  }, [session?.role]);
 
   const normalizedItems = useMemo(
     () => sortByStartTime(items.map((item) => ({ ...item, startDate: new Date(item.startsAt), endDate: new Date(item.endsAt) }))),
@@ -588,7 +588,6 @@ export default function Calendar() {
           {
             callScheduledAt: new Date(`${editForm.meetingDate}T${editForm.startTime}`).toISOString(),
           },
-          authorizedConfig(session.accessToken)
         );
       } else {
         await apiClient.patch(
@@ -601,7 +600,6 @@ export default function Calendar() {
             isVip: selectedItem.isVip || false,
             comments: editForm.details,
           },
-          authorizedConfig(session.accessToken)
         );
       }
 

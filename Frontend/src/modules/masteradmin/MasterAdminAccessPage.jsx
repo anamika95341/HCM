@@ -1,6 +1,6 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { Shield, Trash2, UserCog, Users } from "lucide-react";
-import { apiClient, authorizedConfig } from "../../shared/api/client.js";
+import { apiClient } from "../../shared/api/client.js";
 import { useAuth } from "../../shared/auth/AuthContext.jsx";
 import { normalizeInputText, toSafeUserMessage } from "../../shared/security/text.js";
 import {
@@ -160,7 +160,6 @@ export default function MasterAdminAccessPage({ mode }) {
   const [adminForm, setAdminForm] = useState(emptyAdminForm);
   const [deoForm, setDeoForm] = useState(emptyDeoForm);
 
-  const config = useMemo(() => authorizedConfig(session?.accessToken), [session?.accessToken]);
   const isCreateAdmin = mode === "create-admin";
   const isCreateDeo = mode === "create-deo";
   const isManageAdmins = mode === "manage-admins";
@@ -175,7 +174,7 @@ export default function MasterAdminAccessPage({ mode }) {
   }
 
   useEffect(() => {
-    if (!session?.accessToken) return;
+    if (!session?.role) return;
     if (isManageAdmins) {
       loadAdmins();
       return;
@@ -183,12 +182,12 @@ export default function MasterAdminAccessPage({ mode }) {
     if (isManageDeos) {
       loadDeos();
     }
-  }, [session?.accessToken, isManageAdmins, isManageDeos]);
+  }, [session?.role, isManageAdmins, isManageDeos]);
 
   async function loadAdmins() {
     setLoading(true);
     try {
-      const { data } = await apiClient.get("/masteradmin/admins", config);
+      const { data } = await apiClient.get("/masteradmin/admins");
       setAdmins(data.admins || []);
       setError("");
     } catch (requestError) {
@@ -201,7 +200,7 @@ export default function MasterAdminAccessPage({ mode }) {
   async function loadDeos() {
     setLoading(true);
     try {
-      const { data } = await apiClient.get("/masteradmin/deos", config);
+      const { data } = await apiClient.get("/masteradmin/deos");
       setDeos(data.deos || []);
       setError("");
     } catch (requestError) {
@@ -228,7 +227,7 @@ export default function MasterAdminAccessPage({ mode }) {
         email: sanitizeText(adminForm.email, 255).trim(),
         age: Number(adminForm.age),
       };
-      const { data } = await apiClient.post("/masteradmin/admins", payload, config);
+      const { data } = await apiClient.post("/masteradmin/admins", payload);
       setSuccess(`Admin created. Verification code sent to ${data.admin.email}. Username: ${data.admin.username}. Verify the account on /admin/verify before first login.`);
       setAdminForm(emptyAdminForm);
     } catch (requestError) {
@@ -254,7 +253,7 @@ export default function MasterAdminAccessPage({ mode }) {
         email: sanitizeText(deoForm.email, 255).trim(),
         age: Number(deoForm.age),
       };
-      const { data } = await apiClient.post("/masteradmin/deos", payload, config);
+      const { data } = await apiClient.post("/masteradmin/deos", payload);
       setSuccess(`DEO created. Verification code sent to ${data.deo.email}. Login username: ${data.deo.username}. Verify the account on /DEO/verify before first login.`);
       setDeoForm(emptyDeoForm);
     } catch (requestError) {
@@ -268,7 +267,7 @@ export default function MasterAdminAccessPage({ mode }) {
     setError("");
     setSuccess("");
     try {
-      await apiClient.delete(`/masteradmin/admins/${adminId}`, config);
+      await apiClient.delete(`/masteradmin/admins/${adminId}`);
       setSuccess("Admin removed successfully.");
       await loadAdmins();
     } catch (requestError) {
@@ -280,7 +279,7 @@ export default function MasterAdminAccessPage({ mode }) {
     setError("");
     setSuccess("");
     try {
-      await apiClient.delete(`/masteradmin/deos/${deoId}`, config);
+      await apiClient.delete(`/masteradmin/deos/${deoId}`);
       setSuccess("DEO removed successfully.");
       await loadDeos();
     } catch (requestError) {

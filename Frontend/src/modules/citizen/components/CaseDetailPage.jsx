@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { ChevronRight, MapPin, Calendar, FileText, Hash, Briefcase } from "lucide-react";
-import { apiClient, authorizedConfig } from "../../../shared/api/client.js";
+import { apiClient } from "../../../shared/api/client.js";
 import { openDownloadUrl } from "../../../shared/api/downloads.js";
 import { useAuth } from "../../../shared/auth/AuthContext.jsx";
 import { useNotifications } from "../../../shared/notifications/NotificationContext.jsx";
@@ -91,7 +91,7 @@ export default function CaseDetailsPage() {
 
     async function loadCaseDetail() {
       try {
-        const { data } = await apiClient.get(`/citizen/cases/${id}`, authorizedConfig(session.accessToken));
+        const { data } = await apiClient.get(`/citizen/cases/${id}`);
         if (!mounted) return;
         setCaseData(data.caseData);
         setItemType(data.itemType);
@@ -106,14 +106,14 @@ export default function CaseDetailsPage() {
       }
     }
 
-    if (session?.accessToken) {
+    if (session?.role) {
       loadCaseDetail();
     }
 
     return () => {
       mounted = false;
     };
-  }, [id, session?.accessToken, eventVersion]);
+  }, [id, session?.role, eventVersion]);
 
   if (loading) {
     return (

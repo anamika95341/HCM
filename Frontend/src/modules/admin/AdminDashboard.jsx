@@ -20,7 +20,7 @@ import {
   WorkspaceEmptyState,
 } from "../../shared/components/WorkspaceUI.jsx";
 import { usePortalTheme } from "../../shared/theme/portalTheme.jsx";
-import { apiClient, authorizedConfig } from "../../shared/api/client.js";
+import { apiClient } from "../../shared/api/client.js";
 import { useAuth } from "../../shared/auth/AuthContext.jsx";
 
 // ─── Status helpers ───────────────────────────────────────────────────────────
@@ -354,7 +354,7 @@ export default function AdminDashboard() {
     let mounted = true;
     async function load() {
       try {
-        const { data } = await apiClient.get("/admin/work-queue", authorizedConfig(session.accessToken));
+        const { data } = await apiClient.get("/admin/work-queue");
         if (!mounted) return;
         setComplaints(Array.isArray(data?.complaints) ? data.complaints : []);
         setMeetings(Array.isArray(data?.meetings)     ? data.meetings   : []);
@@ -364,9 +364,9 @@ export default function AdminDashboard() {
         if (mounted) setLoading(false);
       }
     }
-    if (session?.accessToken) load();
+    if (session?.role) load();
     return () => { mounted = false; };
-  }, [session?.accessToken]);
+  }, [session?.role]);
 
   const metrics = useMemo(() => deriveMetrics(complaints, meetings), [complaints, meetings]);
 

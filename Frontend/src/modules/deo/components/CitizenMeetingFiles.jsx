@@ -13,7 +13,7 @@ import {
   FiVideo,
   FiX,
 } from "react-icons/fi";
-import { apiClient, authorizedConfig } from "../../../shared/api/client.js";
+import { apiClient } from "../../../shared/api/client.js";
 import { DEO_ACCEPT, getFileUiType, uploadPrivateFile } from "../../../shared/api/privateFiles.js";
 import { useAuth } from "../../../shared/auth/AuthContext.jsx";
 
@@ -55,7 +55,7 @@ function FileIcon({ type }) {
   return <FiFile size={15} className="text-amber-500" />;
 }
 
-function UploadModal({ accessToken, meeting, onClose, onEdit, onUploaded }) {
+function UploadModal({ meeting, onClose, onEdit, onUploaded }) {
   const [selectedFile, setSelectedFile] = useState(null);
   const [error, setError] = useState("");
   const [uploading, setUploading] = useState(false);
@@ -69,7 +69,6 @@ function UploadModal({ accessToken, meeting, onClose, onEdit, onUploaded }) {
       setUploading(true);
       setError("");
       await uploadPrivateFile({
-        accessToken,
         file: selectedFile,
         contextType: "meeting",
         contextId: meeting.id,
@@ -320,7 +319,7 @@ export default function CitizenMeetingFiles() {
       try {
         setLoading(true);
         setError("");
-        const { data } = await apiClient.get("/deo/completed-meetings", authorizedConfig(session.accessToken));
+        const { data } = await apiClient.get("/deo/completed-meetings");
         if (!mounted) return;
         setMeetings((data.meetings || []).map(mapMeetingToRow));
       } catch (loadError) {
@@ -334,7 +333,7 @@ export default function CitizenMeetingFiles() {
       }
     }
 
-    if (session?.accessToken) {
+    if (session?.role) {
       loadAssignedMeetings();
     } else {
       setLoading(false);
@@ -343,10 +342,10 @@ export default function CitizenMeetingFiles() {
     return () => {
       mounted = false;
     };
-  }, [session?.accessToken]);
+  }, [session?.role]);
 
   async function reloadCompletedMeetings() {
-    const { data } = await apiClient.get("/deo/completed-meetings", authorizedConfig(session.accessToken));
+    const { data } = await apiClient.get("/deo/completed-meetings");
     setMeetings((data.meetings || []).map(mapMeetingToRow));
   }
 
@@ -581,7 +580,6 @@ export default function CitizenMeetingFiles() {
 
       {uploadMeeting && (
         <UploadModal
-          accessToken={session?.accessToken}
           meeting={uploadMeeting}
           onUploaded={reloadCompletedMeetings}
           onClose={handleCloseModals}

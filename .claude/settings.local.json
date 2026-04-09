@@ -20,7 +20,9 @@
       "Bash(git branch:*)",
       "Bash(node -e \"const j = require\\(''./queues/jobs''\\); console.log\\(''Exports:'', Object.keys\\(j\\)\\)\")",
       "Bash(node:*)",
-      "Bash(node -e \":*)"
+      "Bash(node -e \":*)",
+      "Bash(python3:*)",
+      "Bash(find /mnt/d/hcmproject/HCM -maxdepth 2 -name docker-compose*.yml -o -name .env*)"
     ]
   }
 }

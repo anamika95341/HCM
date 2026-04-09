@@ -1,5 +1,6 @@
 const express = require('express');
 const authenticate = require('../../middleware/authenticate');
+const authenticateAny = require('../../middleware/authenticateAny');
 const validateRequest = require('../../middleware/validateRequest');
 const rateLimiter = require('../../middleware/rateLimiter');
 const authController = require('./auth.controller');
@@ -29,7 +30,8 @@ router.post('/deo/resend-verification-code', rateLimiter.auth, validateRequest(d
 
 router.post('/minister/login', rateLimiter.auth, validateRequest(adminLoginSchema), authController.ministerLogin);
 
-router.post('/token/refresh', rateLimiter.auth, validateRequest(z.object({ refreshToken: z.string().min(20) })), authController.refresh);
+router.get('/session', authenticateAny('citizen', 'admin', 'masteradmin', 'deo', 'minister'), authController.getSession);
+router.post('/token/refresh', rateLimiter.auth, authController.refresh);
 router.post('/citizen/change-password', authenticate('citizen'), validateRequest(changePasswordSchema), settingsController.changePassword);
 router.post('/admin/change-password', authenticate('admin'), validateRequest(changePasswordSchema), settingsController.changePassword);
 router.post('/masteradmin/change-password', authenticate('masteradmin'), validateRequest(changePasswordSchema), settingsController.changePassword);

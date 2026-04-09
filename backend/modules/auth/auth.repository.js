@@ -182,6 +182,14 @@ async function findActiveRefreshToken(jti) {
   return result.rows[0] || null;
 }
 
+async function findRefreshTokenByJti(jti) {
+  const result = await pool.query(
+    'SELECT * FROM refresh_tokens WHERE jti = $1',
+    [jti]
+  );
+  return result.rows[0] || null;
+}
+
 async function revokeRefreshToken(id, replacedByTokenId = null) {
   await pool.query(
     'UPDATE refresh_tokens SET revoked_at = NOW(), replaced_by_token_id = COALESCE($2, replaced_by_token_id), last_used_at = NOW() WHERE id = $1',
@@ -263,6 +271,7 @@ module.exports = {
   clearVerificationRecords,
   storeRefreshToken,
   findActiveRefreshToken,
+  findRefreshTokenByJti,
   revokeRefreshToken,
   updatePassword,
   getPasswordChangedAt,

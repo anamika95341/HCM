@@ -7,17 +7,18 @@ const { getRoleConfig } = require('../config/jwt');
 const { buildChannel } = require('./wsPublisher');
 const logger = require('../utils/logger');
 
-// WHY: JWT in URL query params are logged by proxies/CDNs/access logs — security risk.
-// URL token retained ONLY in non-production for tooling/testing convenience.
-// Remove once all WS clients send the Authorization header.
+// WHY: Read access token from httpOnly cookie on WS upgrade request.
+// Cookies are included automatically by the browser in the upgrade handshake,
+// so no token exposure in URL query params or Authorization headers.
 function extractToken(req) {
-  const header = req.headers.authorization || '';
-  if (header.startsWith('Bearer ')) {
-    return header.slice(7);
-  }
-  if (process.env.NODE_ENV !== 'production') {
-    const url = new URL(req.url, 'http://localhost');
-    return url.searchParams.get('token');
+  const cookieHeader = req.headers.cookie || '';
+  for (const pair of cookieHeader.split(';')) {
+    const eqIdx = pair.indexOf('=');
+    if (eqIdx === -1) continue;
+    const key = pair.slice(0, eqIdx).trim();
+    if (key === 'access_token') {
+      return decodeURIComponent(pair.slice(eqIdx + 1).trim());
+    }
   }
   return null;
 }

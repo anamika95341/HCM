@@ -6,10 +6,10 @@ let refreshHandler = null;
 let isRefreshing = false;
 let pendingQueue = [];
 
-function drainQueue(error, token) {
+function drainQueue(error) {
   pendingQueue.forEach(({ resolve, reject }) => {
     if (error) reject(error);
-    else resolve(token);
+    else resolve();
   });
   pendingQueue = [];
 }
@@ -17,7 +17,27 @@ function drainQueue(error, token) {
 export const apiClient = axios.create({
   baseURL: API_BASE_URL,
   timeout: 15000,
+  withCredentials: true,
 });
+
+// Auth endpoints that should NOT trigger the refresh flow on 401
+const AUTH_ENDPOINTS = [
+  "/auth/citizen/login",
+  "/auth/admin/login",
+  "/auth/masteradmin/login",
+  "/auth/deo/login",
+  "/auth/minister/login",
+  "/auth/token/refresh",
+  "/auth/session",
+  "/auth/citizen/register",
+  "/auth/citizen/verify-account",
+  "/auth/citizen/forgot-password",
+  "/auth/citizen/reset-password",
+  "/auth/admin/verify-account",
+  "/auth/admin/resend-verification-code",
+  "/auth/deo/verify-account",
+  "/auth/deo/resend-verification-code",
+];
 
 function looksLikeHtmlDocument(payload) {
   return typeof payload === "string" && /^\s*<(!DOCTYPE|html)\b/i.test(payload);
@@ -40,29 +60,31 @@ apiClient.interceptors.response.use(
   },
   async (error) => {
     const originalRequest = error?.config;
-    const authHeader = originalRequest?.headers?.Authorization || originalRequest?.headers?.authorization;
+    const isAuthEndpoint = AUTH_ENDPOINTS.some((path) =>
+      originalRequest?.url?.includes(path),
+    );
 
-    if (error?.response?.status === 401 && authHeader && !originalRequest?._retried) {
+    if (
+      error?.response?.status === 401 &&
+      !originalRequest?._retried &&
+      !isAuthEndpoint
+    ) {
       if (typeof refreshHandler === "function") {
         if (isRefreshing) {
           return new Promise((resolve, reject) => {
             pendingQueue.push({ resolve, reject });
-          }).then((token) => {
-            originalRequest.headers.Authorization = `Bearer ${token}`;
-            return apiClient(originalRequest);
-          });
+          }).then(() => apiClient(originalRequest));
         }
 
         originalRequest._retried = true;
         isRefreshing = true;
 
         try {
-          const newToken = await refreshHandler();
-          drainQueue(null, newToken);
-          originalRequest.headers.Authorization = `Bearer ${newToken}`;
+          await refreshHandler();
+          drainQueue(null);
           return apiClient(originalRequest);
         } catch (refreshError) {
-          drainQueue(refreshError, null);
+          drainQueue(refreshError);
           if (typeof unauthorizedHandler === "function") {
             unauthorizedHandler();
           }
@@ -78,27 +100,8 @@ apiClient.interceptors.response.use(
     }
 
     return Promise.reject(error);
-  }
+  },
 );
-
-function isUsableToken(accessToken) {
-  return typeof accessToken === "string" && accessToken.trim().length > 20;
-}
-
-export function authorizedConfig(accessToken, extra = {}) {
-  const headers = {
-    ...(extra.headers || {}),
-  };
-
-  if (isUsableToken(accessToken)) {
-    headers.Authorization = `Bearer ${accessToken.trim()}`;
-  }
-
-  return {
-    ...extra,
-    headers,
-  };
-}
 
 export function setUnauthorizedHandler(handler) {
   unauthorizedHandler = handler;

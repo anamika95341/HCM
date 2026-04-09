@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { Shield, Users, UserCog, UserX, ArrowRight } from "lucide-react";
 import { Link } from "react-router-dom";
-import { apiClient, authorizedConfig } from "../../shared/api/client.js";
+import { apiClient } from "../../shared/api/client.js";
 import { useAuth } from "../../shared/auth/AuthContext.jsx";
 import { usePortalTheme } from "../../shared/theme/portalTheme.jsx";
 import { toSafeUserMessage } from "../../shared/security/text.js";
@@ -23,17 +23,17 @@ export default function MasterAdminDashboard() {
   useEffect(() => {
     async function loadDashboard() {
       try {
-        const { data } = await apiClient.get("/masteradmin/dashboard", authorizedConfig(session?.accessToken));
+        const { data } = await apiClient.get("/masteradmin/dashboard");
         setData(data);
       } catch (requestError) {
         setError(toSafeUserMessage(requestError, "Unable to load master admin dashboard"));
       }
     }
 
-    if (session?.accessToken) {
+    if (session?.role) {
       loadDashboard();
     }
-  }, [session?.accessToken]);
+  }, [session?.role]);
 
   const statItems = [
     { label: "Active Admins", value: data?.activeAdmins ?? "—", accent: C.purple, icon: <UserCog size={16} /> },

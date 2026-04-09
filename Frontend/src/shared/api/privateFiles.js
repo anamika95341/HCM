@@ -1,4 +1,4 @@
-import { apiClient, authorizedConfig } from "./client.js";
+import { apiClient } from "./client.js";
 
 const ROLE_MAX_SIZES = Object.freeze({
   citizen: Object.freeze({
@@ -7,12 +7,12 @@ const ROLE_MAX_SIZES = Object.freeze({
     "image/png": 5 * 1024 * 1024,
   }),
   deo: Object.freeze({
-  "application/pdf": 5 * 1024 * 1024,
-  "image/jpeg": 20 * 1024 * 1024,
-  "image/png": 20 * 1024 * 1024,
-  "video/mp4": 100 * 1024 * 1024,
-  "video/mpeg": 100 * 1024 * 1024,
-  "video/webm": 100 * 1024 * 1024,
+    "application/pdf": 5 * 1024 * 1024,
+    "image/jpeg": 20 * 1024 * 1024,
+    "image/png": 20 * 1024 * 1024,
+    "video/mp4": 100 * 1024 * 1024,
+    "video/mpeg": 100 * 1024 * 1024,
+    "video/webm": 100 * 1024 * 1024,
   }),
 });
 
@@ -58,26 +58,16 @@ export function validateCitizenFile(file) {
   validatePrivateFile(file, "citizen");
 }
 
-export async function uploadPrivateFile({
-  accessToken,
-  file,
-  contextType,
-  contextId,
-  role = "deo",
-}) {
+export async function uploadPrivateFile({ file, contextType, contextId, role = "deo" }) {
   validatePrivateFile(file, role);
 
-  const { data: uploadData } = await apiClient.post(
-    "/files/upload-url",
-    {
-      fileName: file.name,
-      mimeType: file.type,
-      size: file.size,
-      contextType,
-      contextId,
-    },
-    authorizedConfig(accessToken),
-  );
+  const { data: uploadData } = await apiClient.post("/files/upload-url", {
+    fileName: file.name,
+    mimeType: file.type,
+    size: file.size,
+    contextType,
+    contextId,
+  });
 
   const uploadResponse = await fetch(uploadData.uploadUrl, {
     method: "PUT",
@@ -91,31 +81,22 @@ export async function uploadPrivateFile({
     throw new Error("Direct upload to storage failed");
   }
 
-  const { data: confirmData } = await apiClient.post(
-    "/files/confirm-upload",
-    { s3Key: uploadData.s3Key },
-    authorizedConfig(accessToken),
-  );
+  const { data: confirmData } = await apiClient.post("/files/confirm-upload", {
+    s3Key: uploadData.s3Key,
+  });
 
   return confirmData.file;
 }
 
-export async function listVisibleFiles({ accessToken, contextType, contextId }) {
-  const { data } = await apiClient.get(
-    "/files",
-    authorizedConfig(accessToken, {
-      params: { contextType, contextId },
-    }),
-  );
+export async function listVisibleFiles({ contextType, contextId }) {
+  const { data } = await apiClient.get("/files", {
+    params: { contextType, contextId },
+  });
 
   return Array.isArray(data.files) ? data.files : [];
 }
 
-export async function getDownloadUrl({ accessToken, fileId }) {
-  const { data } = await apiClient.get(
-    `/files/${fileId}/download`,
-    authorizedConfig(accessToken),
-  );
-
+export async function getDownloadUrl({ fileId }) {
+  const { data } = await apiClient.get(`/files/${fileId}/download`);
   return data.downloadUrl;
 }

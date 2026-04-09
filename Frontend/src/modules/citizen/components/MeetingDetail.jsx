@@ -8,7 +8,7 @@ import {
   FileText,
   Hash,
 } from "lucide-react";
-import { apiClient, authorizedConfig } from "../../../shared/api/client.js";
+import { apiClient } from "../../../shared/api/client.js";
 import { openDownloadUrl } from "../../../shared/api/downloads.js";
 import { useAuth } from "../../../shared/auth/AuthContext.jsx";
 import { useNotifications } from "../../../shared/notifications/NotificationContext.jsx";
@@ -118,7 +118,7 @@ export default function MeetingDetail() {
       try {
         setLoading(true);
         setError("");
-        const { data } = await apiClient.get(`/meetings/my/${id}`, authorizedConfig(session?.accessToken));
+        const { data } = await apiClient.get(`/meetings/my/${id}`);
         if (mounted) {
           setMeeting(data.meeting || null);
           setHistory(data.history || []);
@@ -134,14 +134,14 @@ export default function MeetingDetail() {
       }
     }
 
-    if (session?.accessToken && id) {
+    if (session?.role && id) {
       loadMeeting();
     }
 
     return () => {
       mounted = false;
     };
-  }, [id, session?.accessToken, eventVersion]);
+  }, [id, session?.role, eventVersion]);
 
   if (loading) {
     return (

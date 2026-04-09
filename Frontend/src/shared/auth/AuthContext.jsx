@@ -13,11 +13,45 @@ function mapRoleToLogoutPath(role) {
 
 export function AuthProvider({ children }) {
   const [session, setSession] = useState(null);
+  const [isLoading, setIsLoading] = useState(true);
   const sessionRef = useRef(null);
 
   useEffect(() => {
     sessionRef.current = session;
   }, [session]);
+
+  // Restore session from valid httpOnly cookies on app load / browser refresh.
+  // Tries access token first; if expired, silently refreshes and retries.
+  useEffect(() => {
+    async function restoreSession() {
+      try {
+        const { data } = await apiClient.get("/auth/session");
+        if (data?.user && data?.role) {
+          setSession({ user: data.user, role: data.role });
+        }
+      } catch (err) {
+        if (err?.response?.status === 401) {
+          // Access token expired — try token refresh before giving up
+          try {
+            const { data: refreshData } = await apiClient.post(
+              "/auth/token/refresh",
+            );
+            if (refreshData?.user) {
+              const { data: sessionData } = await apiClient.get("/auth/session");
+              if (sessionData?.user && sessionData?.role) {
+                setSession({ user: sessionData.user, role: sessionData.role });
+              }
+            }
+          } catch {
+            // Refresh token also expired or absent — user must log in
+          }
+        }
+      } finally {
+        setIsLoading(false);
+      }
+    }
+    restoreSession();
+  }, []);
 
   useEffect(() => {
     setUnauthorizedHandler(() => {
@@ -26,15 +60,10 @@ export function AuthProvider({ children }) {
 
     setRefreshHandler(async () => {
       const current = sessionRef.current;
-      if (!current?.refreshToken || !current?.role) {
-        throw new Error("No refresh token available");
-      }
-      const { data } = await apiClient.post("/auth/token/refresh", {
-        refreshToken: current.refreshToken,
-      });
-      if (!data?.accessToken) throw new Error("Refresh failed");
-      setSession((prev) => ({ ...prev, ...data }));
-      return data.accessToken;
+      if (!current?.role) throw new Error("Not authenticated");
+      const { data } = await apiClient.post("/auth/token/refresh");
+      if (!data?.user) throw new Error("Refresh failed");
+      setSession((prev) => ({ ...prev, user: data.user }));
     });
 
     return () => {
@@ -44,9 +73,9 @@ export function AuthProvider({ children }) {
   }, []);
 
   function assertSessionPayload(data, contextLabel) {
-    const token = data?.accessToken;
-    if (typeof token !== "string" || token.trim().length < 20) {
-      const hint = " If the app is served from Docker or a static server, ensure API requests reach the backend (e.g. API_UPSTREAM / reverse proxy for /api).";
+    if (!data?.user || typeof data.user !== "object") {
+      const hint =
+        " If the app is served from Docker or a static server, ensure API requests reach the backend (e.g. API_UPSTREAM / reverse proxy for /api).";
       throw new Error(`Invalid login response (${contextLabel}).${hint}`);
     }
   }
@@ -58,7 +87,7 @@ export function AuthProvider({ children }) {
         password,
       });
       assertSessionPayload(data, "citizen");
-      setSession({ ...data, role: "citizen" });
+      setSession({ user: data.user, role: "citizen" });
       return { requiresOtp: false };
     }
 
@@ -68,7 +97,7 @@ export function AuthProvider({ children }) {
         password,
       });
       assertSessionPayload(data, "minister");
-      setSession({ ...data, role: "minister" });
+      setSession({ user: data.user, role: "minister" });
       return { requiresOtp: false };
     }
 
@@ -78,7 +107,7 @@ export function AuthProvider({ children }) {
         password,
       });
       assertSessionPayload(data, "masteradmin");
-      setSession({ ...data, role: "masteradmin" });
+      setSession({ user: data.user, role: "masteradmin" });
       return { requiresOtp: false };
     }
 
@@ -89,22 +118,14 @@ export function AuthProvider({ children }) {
     });
 
     assertSessionPayload(data, role);
-    setSession({ ...data, role });
+    setSession({ user: data.user, role });
     return { requiresOtp: false };
   }
 
   async function logout() {
-    if (session?.accessToken && session?.refreshToken && session?.role) {
+    if (session?.role) {
       try {
-        await apiClient.post(
-          mapRoleToLogoutPath(session.role),
-          { refreshToken: session.refreshToken },
-          {
-            headers: {
-              Authorization: `Bearer ${session.accessToken}`,
-            },
-          }
-        );
+        await apiClient.post(mapRoleToLogoutPath(session.role));
       } catch {
         // Ignore logout transport errors and clear the client session anyway.
       }
@@ -112,12 +133,16 @@ export function AuthProvider({ children }) {
     setSession(null);
   }
 
-  const value = useMemo(() => ({
-    session,
-    login,
-    logout,
-    isAuthenticated: Boolean(session?.accessToken),
-  }), [session]);
+  const value = useMemo(
+    () => ({
+      session,
+      login,
+      logout,
+      isAuthenticated: Boolean(session?.role),
+      isLoading,
+    }),
+    [session, isLoading],
+  );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }

@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { ChevronLeft, Eye, FileText, Search } from "lucide-react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { PATHS } from "../../../routes/paths.js";
-import { apiClient, authorizedConfig } from "../../../shared/api/client.js";
+import { apiClient } from "../../../shared/api/client.js";
 import { openDownloadUrl } from "../../../shared/api/downloads.js";
 import { useAuth } from "../../../shared/auth/AuthContext.jsx";
 import {
@@ -129,8 +129,8 @@ export default function AdminMeeting() {
 
   async function loadMeetingPool() {
     const [queueResponse, directoryResponse] = await Promise.all([
-      apiClient.get("/admin/work-queue", authorizedConfig(session.accessToken)),
-      apiClient.get("/admin/workflow-directory", authorizedConfig(session.accessToken)),
+      apiClient.get("/admin/work-queue"),
+      apiClient.get("/admin/workflow-directory"),
     ]);
     setMeetings(Array.isArray(queueResponse.data?.meetings) ? queueResponse.data.meetings : []);
     setWorkflowDirectory(directoryResponse.data || { deos: [], ministers: [] });
@@ -140,8 +140,8 @@ export default function AdminMeeting() {
     setDetailLoading(true);
     try {
       const [detailResult, filesResult] = await Promise.allSettled([
-        apiClient.get(`/meetings/${id}/admin-view`, authorizedConfig(session.accessToken)),
-        apiClient.get(`/meetings/${id}/files`, authorizedConfig(session.accessToken)),
+        apiClient.get(`/meetings/${id}/admin-view`),
+        apiClient.get(`/meetings/${id}/files`),
       ]);
       if (detailResult.status === "rejected") {
         throw detailResult.reason;
@@ -174,7 +174,7 @@ export default function AdminMeeting() {
   useEffect(() => {
     let active = true;
     async function bootstrap() {
-      if (!session?.accessToken) return;
+      if (!session?.role) return;
       try {
         setLoading(true);
         setError("");
@@ -201,7 +201,7 @@ export default function AdminMeeting() {
     return () => {
       active = false;
     };
-  }, [meetingId, session?.accessToken]);
+  }, [meetingId, session?.role]);
 
   const personalMeetingQueue = useMemo(
     () => meetings.filter(
@@ -287,7 +287,7 @@ export default function AdminMeeting() {
     try {
       const formData = new FormData();
       formData.append("file", uploadFile);
-      await apiClient.post(`/meetings/${meetingId}/photos`, formData, authorizedConfig(session.accessToken));
+      await apiClient.post(`/meetings/${meetingId}/photos`, formData);
       await loadMeetingDetail(meetingId);
       setUploadFile(null);
     } catch (uploadError) {
@@ -352,7 +352,7 @@ export default function AdminMeeting() {
                 type="button"
                 disabled={actionLoading}
                 onClick={() => runAction(
-                  () => apiClient.patch(`/meetings/${meetingId}/assign-self`, {}, authorizedConfig(session.accessToken)),
+                  () => apiClient.patch(`/meetings/${meetingId}/assign-self`, {}),
                   { successMessage: "Meeting successfully assigned to you.", navigateToMeetingQueue: true }
                 )}
               >
@@ -493,7 +493,7 @@ export default function AdminMeeting() {
                   disabled={actionLoading}
                   onClick={() =>
                     runAction(
-                      () => apiClient.patch(`/meetings/${meetingId}/accept`, {}, authorizedConfig(session.accessToken)),
+                      () => apiClient.patch(`/meetings/${meetingId}/accept`, {}),
                       { successMessage: "Meeting accepted successfully." }
                     ).then((ok) => { if (ok) setSelectedAction(""); })
                   }
@@ -526,7 +526,7 @@ export default function AdminMeeting() {
                   disabled={actionLoading || rejectReason.trim().length < 5}
                   onClick={() =>
                     runAction(
-                      () => apiClient.patch(`/meetings/${meetingId}/reject`, { reason: rejectReason }, authorizedConfig(session.accessToken)),
+                      () => apiClient.patch(`/meetings/${meetingId}/reject`, { reason: rejectReason }),
                       { successMessage: "Meeting rejected successfully." }
                     ).then((ok) => { if (ok) setSelectedAction(""); })
                   }
@@ -571,7 +571,7 @@ export default function AdminMeeting() {
                   disabled={actionLoading || !verificationForm.deoId || verificationPending || verificationDone}
                   onClick={() =>
                     runAction(
-                      () => apiClient.patch(`/meetings/${meetingId}/assign-verification`, { deoId: verificationForm.deoId }, authorizedConfig(session.accessToken)),
+                      () => apiClient.patch(`/meetings/${meetingId}/assign-verification`, { deoId: verificationForm.deoId }),
                       { successMessage: "Meeting sent for verification successfully." }
                     ).then((ok) => { if (ok) setSelectedAction(""); })
                   }
@@ -659,7 +659,7 @@ export default function AdminMeeting() {
                         location: scheduleForm.location.trim(),
                         isVip: scheduleForm.isVip,
                         comments: scheduleForm.comments,
-                      }, authorizedConfig(session.accessToken)),
+                      }),
                       { successMessage: "Meeting scheduled successfully." }
                     ).then((ok) => { if (ok) setSelectedAction(""); });
                   }}
@@ -691,7 +691,7 @@ export default function AdminMeeting() {
                   disabled={actionLoading || completeNote.trim().length < 3}
                   onClick={() =>
                     runAction(
-                      () => apiClient.patch(`/meetings/${meetingId}/complete`, { reason: completeNote.trim() }, authorizedConfig(session.accessToken)),
+                      () => apiClient.patch(`/meetings/${meetingId}/complete`, { reason: completeNote.trim() }),
                       { successMessage: "Meeting marked as completed." }
                     ).then((ok) => { if (ok) setSelectedAction(""); })
                   }
@@ -724,7 +724,7 @@ export default function AdminMeeting() {
                   disabled={actionLoading || scheduledRejectNote.trim().length < 3}
                   onClick={() =>
                     runAction(
-                      () => apiClient.patch(`/meetings/${meetingId}/cancel`, { reason: scheduledRejectNote.trim() }, authorizedConfig(session.accessToken)),
+                      () => apiClient.patch(`/meetings/${meetingId}/cancel`, { reason: scheduledRejectNote.trim() }),
                       { successMessage: "Meeting rejected successfully." }
                     ).then((ok) => { if (ok) setSelectedAction(""); })
                   }

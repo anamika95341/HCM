@@ -1,4 +1,5 @@
 const authService = require('./auth.service');
+const env = require('../../config/env');
 
 function reqMeta(req) {
   return {
@@ -6,6 +7,40 @@ function reqMeta(req) {
     userAgent: req.get('user-agent'),
     requestId: req.get('x-request-id'),
   };
+}
+
+function setAuthCookies(res, { accessToken, refreshToken, csrfToken }) {
+  const secure = env.nodeEnv === 'production';
+  res.cookie('access_token', accessToken, {
+    httpOnly: true,
+    secure,
+    sameSite: 'strict',
+    maxAge: 15 * 60 * 1000,
+    path: '/',
+  });
+  res.cookie('refresh_token', refreshToken, {
+    httpOnly: true,
+    secure,
+    sameSite: 'strict',
+    maxAge: env.refreshTokenTtlDays * 24 * 60 * 60 * 1000,
+    path: '/api/v1/auth',
+  });
+  // Non-httpOnly so Axios can read it and send as X-XSRF-TOKEN header (double-submit CSRF defense)
+  res.cookie('XSRF-TOKEN', csrfToken, {
+    httpOnly: false,
+    secure,
+    sameSite: 'strict',
+    maxAge: env.refreshTokenTtlDays * 24 * 60 * 60 * 1000,
+    path: '/',
+  });
+}
+
+function clearAuthCookies(res) {
+  const secure = env.nodeEnv === 'production';
+  const base = { httpOnly: true, secure, sameSite: 'strict' };
+  res.clearCookie('access_token', { ...base, path: '/' });
+  res.clearCookie('refresh_token', { ...base, path: '/api/v1/auth' });
+  res.clearCookie('XSRF-TOKEN', { secure, sameSite: 'strict', path: '/' });
 }
 
 async function citizenRegister(req, res, next) {
@@ -69,7 +104,8 @@ async function deoResendVerification(req, res, next) {
 async function citizenLogin(req, res, next) {
   try {
     const session = await authService.loginCitizen(req.body, reqMeta(req));
-    res.json(session);
+    setAuthCookies(res, session);
+    res.json({ user: session.user });
   } catch (error) {
     next(error);
   }
@@ -77,8 +113,9 @@ async function citizenLogin(req, res, next) {
 
 async function adminLogin(req, res, next) {
   try {
-    const result = await authService.loginOperator('admin', req.body.usernameOrEmail, req.body.password, reqMeta(req));
-    res.json(result);
+    const session = await authService.loginOperator('admin', req.body.usernameOrEmail, req.body.password, reqMeta(req));
+    setAuthCookies(res, session);
+    res.json({ user: session.user });
   } catch (error) {
     next(error);
   }
@@ -86,8 +123,9 @@ async function adminLogin(req, res, next) {
 
 async function masteradminLogin(req, res, next) {
   try {
-    const result = await authService.loginOperator('masteradmin', req.body.usernameOrEmail, req.body.password, reqMeta(req));
-    res.json(result);
+    const session = await authService.loginOperator('masteradmin', req.body.usernameOrEmail, req.body.password, reqMeta(req));
+    setAuthCookies(res, session);
+    res.json({ user: session.user });
   } catch (error) {
     next(error);
   }
@@ -95,8 +133,9 @@ async function masteradminLogin(req, res, next) {
 
 async function deoLogin(req, res, next) {
   try {
-    const result = await authService.loginOperator('deo', req.body.usernameOrEmail, req.body.password, reqMeta(req));
-    res.json(result);
+    const session = await authService.loginOperator('deo', req.body.usernameOrEmail, req.body.password, reqMeta(req));
+    setAuthCookies(res, session);
+    res.json({ user: session.user });
   } catch (error) {
     next(error);
   }
@@ -104,8 +143,9 @@ async function deoLogin(req, res, next) {
 
 async function ministerLogin(req, res, next) {
   try {
-    const result = await authService.loginOperator('minister', req.body.usernameOrEmail, req.body.password, reqMeta(req));
-    res.json(result);
+    const session = await authService.loginOperator('minister', req.body.usernameOrEmail, req.body.password, reqMeta(req));
+    setAuthCookies(res, session);
+    res.json({ user: session.user });
   } catch (error) {
     next(error);
   }
@@ -129,18 +169,33 @@ async function resetCitizenPassword(req, res, next) {
   }
 }
 
-async function refresh(req, res, next) {
+async function getSession(req, res, next) {
   try {
-    const session = await authService.refreshSession(req.body.refreshToken);
-    res.json(session);
+    const result = await authService.getSessionUser(req.authRole, req.user.sub);
+    res.json(result);
   } catch (error) {
     next(error);
   }
 }
 
+async function refresh(req, res, next) {
+  try {
+    const refreshToken = req.cookies?.refresh_token;
+    if (!refreshToken) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+    const session = await authService.refreshSession(refreshToken, req.get('user-agent'));
+    setAuthCookies(res, session);
+    return res.json({ user: session.user });
+  } catch (error) {
+    return next(error);
+  }
+}
+
 async function logout(req, res, next) {
   try {
-    const result = await authService.logout(req.user.role, req.token, req.body.refreshToken, reqMeta(req));
+    const result = await authService.logout(req.user.role, req.token, req.cookies?.refresh_token, reqMeta(req));
+    clearAuthCookies(res);
     res.json(result);
   } catch (error) {
     next(error);
@@ -148,6 +203,7 @@ async function logout(req, res, next) {
 }
 
 module.exports = {
+  getSession,
   citizenRegister,
   citizenVerify,
   adminVerify,

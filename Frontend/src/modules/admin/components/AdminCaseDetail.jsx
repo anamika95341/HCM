@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { ChevronLeft, FileText } from "lucide-react";
 import { PATHS } from "../../../routes/paths.js";
-import { apiClient, authorizedConfig } from "../../../shared/api/client.js";
+import { apiClient } from "../../../shared/api/client.js";
 import { openDownloadUrl } from "../../../shared/api/downloads.js";
 import { useAuth } from "../../../shared/auth/AuthContext.jsx";
 import {
@@ -249,7 +249,7 @@ export default function AdminCaseDetail() {
 
     async function loadDetail() {
       try {
-        const { data } = await apiClient.get(`/complaints/${id}/admin-view`, authorizedConfig(session.accessToken));
+        const { data } = await apiClient.get(`/complaints/${id}/admin-view`);
         if (!mounted) return;
         const callScheduledAt = data.complaint.callScheduledAt ? new Date(data.complaint.callScheduledAt) : null;
         setItem(data.complaint);
@@ -268,14 +268,14 @@ export default function AdminCaseDetail() {
       }
     }
 
-    if (session?.accessToken) {
+    if (session?.role) {
       loadDetail();
     }
 
     return () => {
       mounted = false;
     };
-  }, [id, session?.accessToken]);
+  }, [id, session?.role]);
 
   const availableActions = useMemo(
     () => buildComplaintActions(item || {}, session?.user?.id),
@@ -331,7 +331,7 @@ export default function AdminCaseDetail() {
       if (data.history) {
         setHistory(data.history);
       } else {
-        const detail = await apiClient.get(`/complaints/${id}/admin-view`, authorizedConfig(session.accessToken));
+        const detail = await apiClient.get(`/complaints/${id}/admin-view`);
         setItem(detail.data.complaint);
         setHistory(detail.data.history || []);
       }
@@ -408,7 +408,7 @@ export default function AdminCaseDetail() {
 
         {showAssignToMeOnly ? (
           <div style={{ marginBottom: 24 }}>
-            <WorkspaceButton type="button" disabled={actionLoading} onClick={() => runAction("assign", () => apiClient.patch(`/complaints/${id}/assign-self`, {}, authorizedConfig(session.accessToken)))}>
+            <WorkspaceButton type="button" disabled={actionLoading} onClick={() => runAction("assign", () => apiClient.patch(`/complaints/${id}/assign-self`, {}))}>
               Assign to Me
             </WorkspaceButton>
           </div>
@@ -517,7 +517,7 @@ export default function AdminCaseDetail() {
               <WorkspaceButton
                 type="button"
                 disabled={actionLoading || !complaintForm.reassignTo || !!reassignReasonError || reassignTrimmed.length < 4}
-                onClick={() => runAction("reassign", () => apiClient.patch(`/complaints/${id}/reassign`, { adminId: complaintForm.reassignTo, reason: reassignTrimmed }, authorizedConfig(session.accessToken)))}
+                onClick={() => runAction("reassign", () => apiClient.patch(`/complaints/${id}/reassign`, { adminId: complaintForm.reassignTo, reason: reassignTrimmed }))}
               >
                 Confirm Reassign
               </WorkspaceButton>
@@ -550,7 +550,7 @@ export default function AdminCaseDetail() {
               <WorkspaceButton
                 type="button"
                 disabled={actionLoading || !!escalationReasonError || escalationTrimmed.length < 4}
-                onClick={() => runAction("escalate", () => apiClient.patch(`/complaints/${id}/escalate`, { reason: escalationTrimmed }, authorizedConfig(session.accessToken)))}
+                onClick={() => runAction("escalate", () => apiClient.patch(`/complaints/${id}/escalate`, { reason: escalationTrimmed }))}
               >
                 Confirm Escalate
               </WorkspaceButton>
@@ -584,7 +584,7 @@ export default function AdminCaseDetail() {
               <WorkspaceButton
                 type="button"
                 disabled={actionLoading || !!resolutionError || resolutionTrimmed.length < 10}
-                onClick={() => runAction("resolve", () => apiClient.patch(`/complaints/${id}/resolve`, { resolutionSummary: resolutionTrimmed, resolutionDocs: [] }, authorizedConfig(session.accessToken)))}
+                onClick={() => runAction("resolve", () => apiClient.patch(`/complaints/${id}/resolve`, { resolutionSummary: resolutionTrimmed, resolutionDocs: [] }))}
               >
                 Confirm Resolve
               </WorkspaceButton>
@@ -615,7 +615,7 @@ export default function AdminCaseDetail() {
               <WorkspaceButton
                 type="button"
                 disabled={actionLoading || !scheduledIso || !!scheduleError}
-                onClick={() => runAction("scheduleMeeting", () => apiClient.patch(`/complaints/${id}/schedule-call`, { callScheduledAt: scheduledIso }, authorizedConfig(session.accessToken)))}
+                onClick={() => runAction("scheduleMeeting", () => apiClient.patch(`/complaints/${id}/schedule-call`, { callScheduledAt: scheduledIso }))}
               >
                 Confirm Schedule
               </WorkspaceButton>
@@ -658,7 +658,7 @@ export default function AdminCaseDetail() {
               <WorkspaceButton
                 type="button"
                 disabled={actionLoading || !complaintForm.logType}
-                onClick={() => runAction("logs", () => apiClient.patch(`/complaints/${id}/log`, { logType: complaintForm.logType, summary: complaintForm.logSummary.trim() }, authorizedConfig(session.accessToken)))}
+                onClick={() => runAction("logs", () => apiClient.patch(`/complaints/${id}/log`, { logType: complaintForm.logType, summary: complaintForm.logSummary.trim() }))}
               >
                 Confirm Log
               </WorkspaceButton>
@@ -673,7 +673,7 @@ export default function AdminCaseDetail() {
             <WorkspaceTextArea value={complaintForm.reopenReason} onChange={(event) => setComplaintForm((current) => ({ ...current, reopenReason: event.target.value }))} rows={6} placeholder="Reason to reopen" />
             <div style={{ display: "flex", justifyContent: "flex-end", gap: 12 }}>
               <WorkspaceButton type="button" variant="ghost" onClick={closeActionModal} disabled={actionLoading}>Cancel</WorkspaceButton>
-              <WorkspaceButton type="button" disabled={actionLoading || complaintForm.reopenReason.trim().length < 3} onClick={() => runAction("reopen", () => apiClient.patch(`/complaints/${id}/reopen`, { reason: complaintForm.reopenReason.trim() }, authorizedConfig(session.accessToken)))}>
+              <WorkspaceButton type="button" disabled={actionLoading || complaintForm.reopenReason.trim().length < 3} onClick={() => runAction("reopen", () => apiClient.patch(`/complaints/${id}/reopen`, { reason: complaintForm.reopenReason.trim() }))}>
                 Confirm Reopen
               </WorkspaceButton>
             </div>
@@ -687,7 +687,7 @@ export default function AdminCaseDetail() {
             <WorkspaceTextArea value={complaintForm.closeNote} onChange={(event) => setComplaintForm((current) => ({ ...current, closeNote: event.target.value }))} rows={6} placeholder="Closure note" />
             <div style={{ display: "flex", justifyContent: "flex-end", gap: 12 }}>
               <WorkspaceButton type="button" variant="ghost" onClick={closeActionModal} disabled={actionLoading}>Cancel</WorkspaceButton>
-              <WorkspaceButton type="button" disabled={actionLoading || complaintForm.closeNote.trim().length < 3} onClick={() => runAction("close", () => apiClient.patch(`/complaints/${id}/close`, { note: complaintForm.closeNote.trim() }, authorizedConfig(session.accessToken)))}>
+              <WorkspaceButton type="button" disabled={actionLoading || complaintForm.closeNote.trim().length < 3} onClick={() => runAction("close", () => apiClient.patch(`/complaints/${id}/close`, { note: complaintForm.closeNote.trim() }))}>
                 Confirm Close
               </WorkspaceButton>
             </div>

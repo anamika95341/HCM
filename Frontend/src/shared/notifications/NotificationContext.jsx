@@ -1,5 +1,5 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
-import { apiClient, authorizedConfig } from "../api/client.js";
+import { apiClient } from "../api/client.js";
 import { API_BASE_URL } from "../config/env.js";
 import { useAuth } from "../auth/AuthContext.jsx";
 
@@ -13,9 +13,7 @@ function getRoleBasePath(role) {
   return "/citizen";
 }
 
-function buildWebSocketUrl(accessToken) {
-  if (!accessToken) return null;
-
+function buildWebSocketUrl() {
   let origin;
   if (/^https?:\/\//i.test(API_BASE_URL)) {
     origin = API_BASE_URL.replace(/\/api\/v1\/?$/i, "");
@@ -26,7 +24,7 @@ function buildWebSocketUrl(accessToken) {
   }
 
   const socketBase = origin.replace(/^http/i, "ws");
-  return `${socketBase}/ws?token=${encodeURIComponent(accessToken)}`;
+  return `${socketBase}/ws`;
 }
 
 function dedupeNotifications(items) {
@@ -51,7 +49,7 @@ export function NotificationProvider({ children }) {
   const loadNotificationsRef = useRef(async () => {});
 
   const loadNotifications = useCallback(async (activeGuard = () => true) => {
-    if (!session?.accessToken || !session?.role) {
+    if (!session?.role) {
       if (activeGuard()) {
         setNotifications([]);
         setUnreadCount(0);
@@ -63,7 +61,7 @@ export function NotificationProvider({ children }) {
     setLoading(true);
     try {
       const basePath = getRoleBasePath(session.role);
-      const { data } = await apiClient.get(`${basePath}/notifications?limit=20`, authorizedConfig(session.accessToken));
+      const { data } = await apiClient.get(`${basePath}/notifications?limit=20`);
       if (!activeGuard()) return;
       setNotifications(Array.isArray(data.notifications) ? data.notifications : []);
       setUnreadCount(Number(data.unreadCount) || 0);
@@ -78,7 +76,7 @@ export function NotificationProvider({ children }) {
         setLoading(false);
       }
     }
-  }, [session?.accessToken, session?.role]);
+  }, [session?.role]);
 
   useEffect(() => {
     loadNotificationsRef.current = loadNotifications;
@@ -93,7 +91,7 @@ export function NotificationProvider({ children }) {
   }, [loadNotifications]);
 
   useEffect(() => {
-    if (!session?.accessToken || !session?.role) return undefined;
+    if (!session?.role) return undefined;
 
     const intervalId = window.setInterval(() => {
       loadNotificationsRef.current(() => true).catch(() => {});
@@ -108,10 +106,10 @@ export function NotificationProvider({ children }) {
       window.clearInterval(intervalId);
       window.removeEventListener("focus", handleFocus);
     };
-  }, [session?.accessToken, session?.role]);
+  }, [session?.role]);
 
   useEffect(() => {
-    if (!session?.accessToken || !session?.role) {
+    if (!session?.role) {
       if (socketRef.current) {
         socketRef.current.close();
         socketRef.current = null;
@@ -136,11 +134,15 @@ export function NotificationProvider({ children }) {
     }
 
     function connect() {
-      if (closedByEffect || socketRef.current?.readyState === WebSocket.OPEN || socketRef.current?.readyState === WebSocket.CONNECTING) {
+      if (
+        closedByEffect ||
+        socketRef.current?.readyState === WebSocket.OPEN ||
+        socketRef.current?.readyState === WebSocket.CONNECTING
+      ) {
         return;
       }
 
-      const url = buildWebSocketUrl(session.accessToken);
+      const url = buildWebSocketUrl();
       if (!url) return;
 
       const socket = new WebSocket(url);
@@ -157,7 +159,7 @@ export function NotificationProvider({ children }) {
 
           if (message.event === "notification.created" && message.payload?.notification) {
             setNotifications((current) =>
-              dedupeNotifications([message.payload.notification, ...current]).slice(0, 20)
+              dedupeNotifications([message.payload.notification, ...current]).slice(0, 20),
             );
             setUnreadCount(Number(message.payload.unreadCount) || 0);
           }
@@ -199,50 +201,58 @@ export function NotificationProvider({ children }) {
         socketRef.current = null;
       }
     };
-  }, [session?.accessToken, session?.role]);
+  }, [session?.role]);
 
   const markRead = useCallback(async (notificationId) => {
-    if (!session?.accessToken || !session?.role || !notificationId) return;
+    if (!session?.role || !notificationId) return;
     const basePath = getRoleBasePath(session.role);
     const { data } = await apiClient.patch(
       `${basePath}/notifications/${notificationId}/read`,
       {},
-      authorizedConfig(session.accessToken)
     );
 
     setNotifications((current) =>
-      current.map((item) => (item.id === notificationId ? { ...item, isRead: true, readAt: data.notification?.readAt || item.readAt } : item))
+      current.map((item) =>
+        item.id === notificationId
+          ? { ...item, isRead: true, readAt: data.notification?.readAt || item.readAt }
+          : item,
+      ),
     );
     setUnreadCount(Number(data.unreadCount) || 0);
-  }, [session?.accessToken, session?.role]);
+  }, [session?.role]);
 
   const markAllRead = useCallback(async () => {
-    if (!session?.accessToken || !session?.role) return;
+    if (!session?.role) return;
     const basePath = getRoleBasePath(session.role);
-    await apiClient.post(`${basePath}/notifications/read-all`, {}, authorizedConfig(session.accessToken));
-    setNotifications((current) => current.map((item) => ({ ...item, isRead: true, readAt: item.readAt || new Date().toISOString() })));
+    await apiClient.post(`${basePath}/notifications/read-all`, {});
+    setNotifications((current) =>
+      current.map((item) => ({ ...item, isRead: true, readAt: item.readAt || new Date().toISOString() })),
+    );
     setUnreadCount(0);
-  }, [session?.accessToken, session?.role]);
+  }, [session?.role]);
 
   const savePreferences = useCallback(async (payload) => {
-    if (!session?.accessToken || !session?.role) return null;
+    if (!session?.role) return null;
     const basePath = getRoleBasePath(session.role);
-    const { data } = await apiClient.patch(`${basePath}/me/notifications`, payload, authorizedConfig(session.accessToken));
+    const { data } = await apiClient.patch(`${basePath}/me/notifications`, payload);
     setPreferences(data.preferences || null);
     return data.preferences || null;
-  }, [session?.accessToken, session?.role]);
+  }, [session?.role]);
 
-  const value = useMemo(() => ({
-    notifications,
-    unreadCount,
-    preferences,
-    loading,
-    eventVersion,
-    markRead,
-    markAllRead,
-    savePreferences,
-    setPreferences,
-  }), [notifications, unreadCount, preferences, loading, eventVersion]);
+  const value = useMemo(
+    () => ({
+      notifications,
+      unreadCount,
+      preferences,
+      loading,
+      eventVersion,
+      markRead,
+      markAllRead,
+      savePreferences,
+      setPreferences,
+    }),
+    [notifications, unreadCount, preferences, loading, eventVersion],
+  );
 
   return <NotificationContext.Provider value={value}>{children}</NotificationContext.Provider>;
 }

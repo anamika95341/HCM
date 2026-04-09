@@ -1,4 +1,29 @@
 services:
+  frontend:
+    image: ${FRONTEND_IMAGE:-citizen-portal-frontend:latest}
+    build:
+      context: ../Frontend
+      dockerfile: Dockerfile
+      target: prod
+      args:
+        VITE_API_BASE_URL: /api/v1
+    environment:
+      # server.cjs reverse-proxies /api/ requests to the backend (dev fallback; nginx handles this in production)
+      API_UPSTREAM: http://api:3000
+      PORT: 5173
+    depends_on:
+      api:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:5173/ || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+    cpus: 0.2
+    mem_limit: 128m
+    networks:
+      - frontend-backend-net
+
   nginx:
     image: nginx:1.27-alpine
     ports:
@@ -9,6 +34,8 @@ services:
       - ./nginx/certs:/etc/nginx/certs:ro
     depends_on:
       api:
+        condition: service_healthy
+      frontend:
         condition: service_healthy
     healthcheck:
       test: ["CMD-SHELL", "wget -qO- http://localhost/health || exit 1"]

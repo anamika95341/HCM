@@ -1,16 +1,16 @@
 const jwt = require('jsonwebtoken');
 const redis = require('../config/redis');
 const { getRoleConfig } = require('../config/jwt');
+const env = require('../config/env');
 const authRepository = require('../modules/auth/auth.repository');
 const { publishAuthEvent } = require('../utils/authStream');
+const { sha256 } = require('../utils/crypto');
 const logger = require('../utils/logger');
 
-function getBearerToken(req) {
-  const header = req.headers.authorization || '';
-  if (!header.startsWith('Bearer ')) {
-    return null;
-  }
-  return header.slice(7);
+const PRIVILEGED_ROLES = new Set(['admin', 'masteradmin', 'minister', 'deo']);
+
+function getCookieToken(req) {
+  return req.cookies?.access_token || null;
 }
 
 function getRequestId(req) {
@@ -20,10 +20,10 @@ function getRequestId(req) {
 function authenticate(expectedRole) {
   return async (req, res, next) => {
     try {
-      const token = getBearerToken(req);
+      const token = getCookieToken(req);
       if (!token) {
         logger.warn('Authentication failed', {
-          reason: 'missing_bearer_token',
+          reason: 'missing_access_token_cookie',
           expectedRole,
           path: req.originalUrl,
           method: req.method,
@@ -56,7 +56,7 @@ function authenticate(expectedRole) {
         throw lastError || new Error('Unable to verify token');
       }
 
-      // JTI revocation check — fail-open on Redis error
+      // JTI revocation check — fail-open on Redis error (fail-closed for privileged roles)
       try {
         const revoked = await redis.get(`revoked:jti:${payload.jti}`);
         if (revoked) {
@@ -64,8 +64,6 @@ function authenticate(expectedRole) {
             reason: 'revoked_token',
             expectedRole: matchedRole,
             tokenSub: payload.sub,
-            tokenAud: payload.aud,
-            tokenRole: payload.role,
             path: req.originalUrl,
             method: req.method,
             ip: req.ip,
@@ -73,11 +71,6 @@ function authenticate(expectedRole) {
           return res.status(401).json({ error: 'Unauthorized' });
         }
       } catch (err) {
-        // WHY: Privileged roles must fail CLOSED when Redis is unavailable.
-        // A manually revoked admin/masteradmin/minister/deo token must never slip through.
-        // Citizens fail-open because their tokens are lower-risk and Redis outages
-        // shouldn't lock out citizens from basic services.
-        const PRIVILEGED_ROLES = new Set(['admin', 'masteradmin', 'minister', 'deo']);
         if (PRIVILEGED_ROLES.has(matchedRole)) {
           logger.error('authenticate: Redis unavailable for JTI check on privileged role — denying (fail-closed)', {
             jti: payload.jti,
@@ -87,14 +80,11 @@ function authenticate(expectedRole) {
           });
           return res.status(503).json({ error: 'Service temporarily unavailable. Please try again.' });
         }
-        // Citizen: fail-open (log + continue)
         logger.warn('authenticate: Redis JTI check unavailable for citizen, continuing (fail-open)', {
           jti: payload.jti,
           expectedRole: matchedRole,
           error: err.message,
         });
-        // WHY: publishAuthEvent also uses Redis. If Redis is down this will fail.
-        // Swallow the error — we are already in a Redis-down handler.
         await publishAuthEvent(redis, {
           event: 'token_revoke_check_bypassed',
           role: matchedRole,
@@ -107,9 +97,6 @@ function authenticate(expectedRole) {
 
       // Password-changed invalidation check — fail-open on Redis error
       try {
-        // WHY: Use matchedRole (the verified role), not expectedRole (which may be an array
-        // when authenticate() is called with multiple allowed roles). Using expectedRole would
-        // produce a key like "password_changed:admin,masteradmin:<sub>" that never matches.
         const changedAt = await redis.get(`password_changed:${matchedRole}:${payload.sub}`);
         if (changedAt && Number(changedAt) > payload.iat * 1000) {
           logger.warn('Authentication failed', {
@@ -128,6 +115,86 @@ function authenticate(expectedRole) {
           expectedRole: matchedRole,
           error: err.message,
         });
+      }
+
+      // Absolute session timeout + idle timeout checks (keyed by session ID)
+      if (payload.sid) {
+        try {
+          const [sessionMeta, lastActivity] = await Promise.all([
+            redis.get(`session:meta:${payload.sid}`),
+            redis.get(`lastActivity:${matchedRole}:${payload.sub}:${payload.sid}`),
+          ]);
+
+          if (!sessionMeta) {
+            logger.warn('Authentication failed', {
+              reason: 'session_expired_or_revoked',
+              expectedRole: matchedRole,
+              tokenSub: payload.sub,
+              path: req.originalUrl,
+              ip: req.ip,
+            });
+            return res.status(401).json({ error: 'Unauthorized' });
+          }
+
+          const meta = JSON.parse(sessionMeta);
+          if (Date.now() >= meta.absoluteExpiry) {
+            logger.warn('Authentication failed', {
+              reason: 'absolute_session_timeout',
+              expectedRole: matchedRole,
+              tokenSub: payload.sub,
+              path: req.originalUrl,
+              ip: req.ip,
+            });
+            return res.status(401).json({ error: 'Unauthorized' });
+          }
+
+          if (meta.uaHash) {
+            const requestUaHash = sha256(req.get('user-agent') || '');
+            if (requestUaHash !== meta.uaHash) {
+              logger.warn('authenticate: user-agent mismatch — possible session hijack', {
+                sid: payload.sid,
+                userId: payload.sub,
+                role: matchedRole,
+                path: req.originalUrl,
+                ip: req.ip,
+              });
+            }
+          }
+
+          if (!lastActivity) {
+            logger.warn('Authentication failed', {
+              reason: 'idle_timeout',
+              expectedRole: matchedRole,
+              tokenSub: payload.sub,
+              path: req.originalUrl,
+              ip: req.ip,
+            });
+            return res.status(401).json({ error: 'Unauthorized' });
+          }
+
+          // Reset idle timer on each authenticated request
+          await redis.set(
+            `lastActivity:${matchedRole}:${payload.sub}:${payload.sid}`,
+            String(Date.now()),
+            'EX',
+            env.idleTimeoutSeconds,
+          );
+        } catch (err) {
+          if (PRIVILEGED_ROLES.has(matchedRole)) {
+            logger.error('authenticate: Redis unavailable for session checks on privileged role — denying (fail-closed)', {
+              sid: payload.sid,
+              role: matchedRole,
+              userId: payload.sub,
+              error: err.message,
+            });
+            return res.status(503).json({ error: 'Service temporarily unavailable. Please try again.' });
+          }
+          logger.warn('authenticate: Redis session/idle check unavailable for citizen, continuing (fail-open)', {
+            sid: payload.sid,
+            expectedRole: matchedRole,
+            error: err.message,
+          });
+        }
       }
 
       const user = await authRepository.findActiveUserById(matchedRole, payload.sub);
@@ -156,6 +223,27 @@ function authenticate(expectedRole) {
           ip: req.ip,
         });
         return res.status(401).json({ error: 'Unauthorized' });
+      }
+
+      // CSRF: double-submit cookie validation for state-changing requests.
+      // Soft enforcement: only reject when XSRF-TOKEN cookie is present — backward-compatible rollout.
+      // Axios automatically reads XSRF-TOKEN and sends X-XSRF-TOKEN when withCredentials=true.
+      if (['POST', 'PUT', 'PATCH', 'DELETE'].includes(req.method)) {
+        const cookieToken = req.cookies?.['XSRF-TOKEN'];
+        if (cookieToken) {
+          const headerToken = req.get('x-xsrf-token');
+          if (!headerToken || cookieToken !== headerToken) {
+            logger.warn('Authentication failed', {
+              reason: 'csrf_validation_failed',
+              expectedRole: matchedRole,
+              tokenSub: payload.sub,
+              path: req.originalUrl,
+              method: req.method,
+              ip: req.ip,
+            });
+            return res.status(403).json({ error: 'Forbidden' });
+          }
+        }
       }
 
       req.user = payload;

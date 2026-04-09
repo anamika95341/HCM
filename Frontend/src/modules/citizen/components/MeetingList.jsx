@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Eye, Clock, CheckCircle2, AlertCircle, Calendar, Search, Filter, ChevronLeft, ChevronRight } from "lucide-react";
-import { apiClient, authorizedConfig } from "../../../shared/api/client.js";
+import { apiClient } from "../../../shared/api/client.js";
 import { useAuth } from "../../../shared/auth/AuthContext.jsx";
 import { useNotifications } from "../../../shared/notifications/NotificationContext.jsx";
 import {
@@ -69,7 +69,7 @@ export default function MeetingList() {
 
     async function loadMeetings() {
       try {
-        const { data } = await apiClient.get("/meetings/my", authorizedConfig(session.accessToken));
+        const { data } = await apiClient.get("/meetings/my");
         if (mounted) {
           setMeetings(data.meetings || []);
         }
@@ -84,14 +84,14 @@ export default function MeetingList() {
       }
     }
 
-    if (session?.accessToken) {
+    if (session?.role) {
       loadMeetings();
     }
 
     return () => {
       mounted = false;
     };
-  }, [session?.accessToken, eventVersion]);
+  }, [session?.role, eventVersion]);
 
   // Unified items calculation with filtering and sorting
   const items = useMemo(() => {

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { CalendarDays, Star, ClipboardList, CheckCircle2 } from "lucide-react";
-import { apiClient, authorizedConfig } from "../../shared/api/client.js";
+import { apiClient } from "../../shared/api/client.js";
 import { useAuth } from "../../shared/auth/AuthContext.jsx";
 import {
   WorkspaceButton,
@@ -29,7 +29,7 @@ export default function MinisterDashboard() {
 
     async function loadCalendar() {
       try {
-        const { data } = await apiClient.get("/minister/calendar", authorizedConfig(session.accessToken));
+        const { data } = await apiClient.get("/minister/calendar");
         if (mounted) {
           setEvents(data.events || []);
         }
@@ -44,14 +44,14 @@ export default function MinisterDashboard() {
       }
     }
 
-    if (session?.accessToken) {
+    if (session?.role) {
       loadCalendar();
     }
 
     return () => {
       mounted = false;
     };
-  }, [session?.accessToken]);
+  }, [session?.role]);
 
   const summary = useMemo(() => {
     const now = Date.now();
