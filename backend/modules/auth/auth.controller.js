@@ -10,7 +10,7 @@ function reqMeta(req) {
 }
 
 function setAuthCookies(res, { accessToken, refreshToken, csrfToken }) {
-  const secure = env.nodeEnv === 'production';
+  const secure = env.cookieSecure;
   res.cookie('access_token', accessToken, {
     httpOnly: true,
     secure,
@@ -36,11 +36,11 @@ function setAuthCookies(res, { accessToken, refreshToken, csrfToken }) {
 }
 
 function clearAuthCookies(res) {
-  const secure = env.nodeEnv === 'production';
+  const secure = env.cookieSecure;
   const base = { httpOnly: true, secure, sameSite: 'strict' };
   res.clearCookie('access_token', { ...base, path: '/' });
   res.clearCookie('refresh_token', { ...base, path: '/api/v1/auth' });
-  res.clearCookie('XSRF-TOKEN', { secure, sameSite: 'strict', path: '/' });
+  res.clearCookie('XSRF-TOKEN', { httpOnly: false, secure, sameSite: 'strict', path: '/' });
 }
 
 async function citizenRegister(req, res, next) {

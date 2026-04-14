@@ -39,6 +39,11 @@ const AUTH_ENDPOINTS = [
   "/auth/admin/resend-verification-code",
   "/auth/deo/verify-account",
   "/auth/deo/resend-verification-code",
+  "/auth/citizen/logout",
+  "/auth/admin/logout",
+  "/auth/masteradmin/logout",
+  "/auth/deo/logout",
+  "/auth/minister/logout",
 ];
 
 function looksLikeHtmlDocument(payload) {

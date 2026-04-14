@@ -47,6 +47,7 @@ function createApp() {
     },
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'],
+    allowedHeaders: ['Content-Type', 'X-XSRF-TOKEN', 'X-Request-ID'],
   }));
 
   app.use(express.json({ limit: '50kb' }));

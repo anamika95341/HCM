@@ -22,7 +22,10 @@
       "Bash(node:*)",
       "Bash(node -e \":*)",
       "Bash(python3:*)",
-      "Bash(find /mnt/d/hcmproject/HCM -maxdepth 2 -name docker-compose*.yml -o -name .env*)"
+      "Bash(find /mnt/d/hcmproject/HCM -maxdepth 2 -name docker-compose*.yml -o -name .env*)",
+      "Bash(netstat -ano)",
+      "Bash(docker network:*)",
+      "Bash(awk '$2 ~ /0BB8/')"
     ]
   }
 }
