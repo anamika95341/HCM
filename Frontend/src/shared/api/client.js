@@ -18,6 +18,8 @@ export const apiClient = axios.create({
   baseURL: API_BASE_URL,
   timeout: 15000,
   withCredentials: true,
+  xsrfCookieName: "XSRF-TOKEN",
+  xsrfHeaderName: "X-XSRF-TOKEN",
 });
 
 // Auth endpoints that should NOT trigger the refresh flow on 401
@@ -37,6 +39,11 @@ const AUTH_ENDPOINTS = [
   "/auth/admin/resend-verification-code",
   "/auth/deo/verify-account",
   "/auth/deo/resend-verification-code",
+  "/auth/citizen/logout",
+  "/auth/admin/logout",
+  "/auth/masteradmin/logout",
+  "/auth/deo/logout",
+  "/auth/minister/logout",
 ];
 
 function looksLikeHtmlDocument(payload) {
