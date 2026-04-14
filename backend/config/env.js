@@ -80,4 +80,5 @@ module.exports = {
   authStreamReplayBatchSize: Number(process.env.AUTH_STREAM_REPLAY_BATCH_SIZE || 100),
   idleTimeoutSeconds: Number(process.env.IDLE_TIMEOUT_SECONDS || 1800),
   maxSessionSeconds: Number(process.env.MAX_SESSION_SECONDS || 28800),
+  cookieSecure: process.env.COOKIE_SECURE === 'true',
 };

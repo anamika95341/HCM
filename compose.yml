@@ -53,6 +53,7 @@ services:
     environment:
       NODE_ENV: production
       PORT: 3000
+      COOKIE_SECURE: "false"
       RUN_MIGRATIONS: "true"
       FRONTEND_ORIGINS: ${FRONTEND_ORIGINS:-http://ec2-65-0-92-232.ap-south-1.compute.amazonaws.com}
       DATABASE_URL: postgresql://app_user:${DB_PASSWORD:-change_me}@postgres:5432/citizen_portal
