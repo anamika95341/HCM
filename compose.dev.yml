@@ -139,5 +139,5 @@ volumes:
 networks:
   frontend-backend-net:
   backend-data-net:
-    external: true
-    name: hcm-backend-data
+    # external: true
+    # name: hcm-backend-data
