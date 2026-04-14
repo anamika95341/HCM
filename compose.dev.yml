@@ -3,7 +3,7 @@ services:
     build:
       target: dev
     environment:
-      VITE_API_BASE_URL: http://localhost:3000/api/v1
+      VITE_API_BASE_URL: /api/v1
       VITE_MINIO_PROXY_TARGET: http://minio:9000
     healthcheck:
       test: ["CMD", "node", "-e", "fetch('http://localhost:5173').then((res)=>process.exit(res.ok?0:1)).catch(()=>process.exit(1))"]
@@ -26,6 +26,7 @@ services:
       - ./backend/.env.localhost
     environment:
       NODE_ENV: development
+      COOKIE_SECURE: "false"
       RUN_MIGRATIONS: "true"
       FRONTEND_ORIGINS: http://localhost:5173
       DATABASE_URL: postgresql://app_user:${DB_PASSWORD:-change_me}@postgres:5432/citizen_portal
@@ -139,5 +140,3 @@ volumes:
 networks:
   frontend-backend-net:
   backend-data-net:
-    # external: true
-    # name: hcm-backend-data
