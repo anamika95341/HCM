@@ -158,7 +158,7 @@ export default function MyCases() {
                 }}
                 style={{ paddingLeft: 38 }}
               >
-                <option value="all">All statuses</option>
+                <option value="all">All status</option>
                 {statusOptions.map((status) => (
                   <option key={status} value={status}>
                     {status.replace(/_/g, " ").charAt(0).toUpperCase() + status.replace(/_/g, " ").slice(1)}
