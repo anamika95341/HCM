@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { ChevronLeft, FileText } from "lucide-react";
 import { PATHS } from "../../../routes/paths.js";
@@ -6,6 +6,7 @@ import { apiClient } from "../../../shared/api/client.js";
 import { openDownloadUrl } from "../../../shared/api/downloads.js";
 import { useAuth } from "../../../shared/auth/AuthContext.jsx";
 import {
+  WorkspaceBadge,
   WorkspaceButton,
   WorkspaceCard,
   WorkspaceCardHeader,
@@ -38,16 +39,16 @@ function buildComplaintActions(item, userId) {
   return actions;
 }
 
-function countWords(value) {
-  return String(value || "").trim().split(/\s+/).filter(Boolean).length;
-}
-
-function formatHistoryStatus(status) {
+function statusLabel(status) {
   return String(status || "")
     .split("_")
     .filter(Boolean)
     .map((chunk) => chunk.charAt(0).toUpperCase() + chunk.slice(1))
     .join(" ");
+}
+
+function countWords(value) {
+  return String(value || "").trim().split(/\s+/).filter(Boolean).length;
 }
 
 function buildFutureIso(date, time) {
@@ -119,35 +120,6 @@ export function ErrorText({ children }) {
   return <div style={{ marginTop: 8, fontSize: 12, color: C.danger }}>{children}</div>;
 }
 
-function Timeline({ items = [] }) {
-  const { C } = usePortalTheme();
-  if (!items.length) return <p style={{ fontSize: 13, color: C.t3 }}>No timeline events yet.</p>;
-  return (
-    <div className="space-y-4">
-      {items.map((log, index) => (
-        <div key={`${log.id || log.created_at}-${index}`} className="flex gap-4">
-          <div className="flex flex-col items-center">
-            <div className="w-3 h-3 rounded-full" style={{ background: C.purple, border: `2px solid ${C.card}` }} />
-            {index !== items.length - 1 ? <div className="w-0.5 h-12 mt-2" style={{ background: C.border }} /> : null}
-          </div>
-          <div className="flex-1 pb-4">
-            <div style={{ background: C.bgElevated, border: `1px solid ${C.border}`, borderRadius: 10, padding: 16 }}>
-              <div className="flex items-start justify-between gap-3">
-                <div>
-                  <p style={{ fontWeight: 600, color: C.t1 }}>{formatHistoryStatus(log.new_status)}</p>
-                  <p style={{ fontSize: 12, color: C.t3, marginTop: 4 }}>{log.actor_role}</p>
-                </div>
-                <p style={{ fontSize: 12, color: C.t3, whiteSpace: "nowrap" }}>{new Date(log.created_at).toLocaleDateString("en-IN")}</p>
-              </div>
-              {log.note ? <p style={{ fontSize: 13, color: C.t2, marginTop: 8 }}>{log.note}</p> : null}
-            </div>
-          </div>
-        </div>
-      ))}
-    </div>
-  );
-}
-
 function getAttachedFiles(item) {
   if (Array.isArray(item?.files) && item.files.length > 0) {
     return item.files;
@@ -180,11 +152,33 @@ export function SuccessModal({ open, message, onClose }) {
         <h3 style={{ fontSize: 28, fontWeight: 700, color: C.t1 }}>Success</h3>
         <p style={{ marginTop: 8, fontSize: 14, color: C.t3, maxWidth: 420 }}>{message}</p>
         <WorkspaceButton type="button" onClick={onClose} style={{ width: 220, marginTop: 24, justifySelf: "center" }}>
-          Continue
+          Okay
         </WorkspaceButton>
       </div>
     </CenteredOverlay>
   );
+}
+
+function formatDateTimeLabel(value) {
+  if (!value) return "Not provided";
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return "Not provided";
+  return parsed.toLocaleDateString("en-IN", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+  });
+}
+
+function formatDateLabel(value) {
+  if (!value) return "Not provided";
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return "Not provided";
+  return parsed.toLocaleDateString("en-IN", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+  });
 }
 
 export function WorkspaceTextArea(props) {
@@ -223,6 +217,9 @@ export default function AdminCaseDetail() {
   const [pendingSuccessRedirect, setPendingSuccessRedirect] = useState("");
   const [actionLoading, setActionLoading] = useState(false);
   const [error, setError] = useState("");
+  const [isBackHovered, setIsBackHovered] = useState(false);
+  const complaintInfoRef = useRef(null);
+  const [complaintInfoHeight, setComplaintInfoHeight] = useState(540);
   const [complaintForm, setComplaintForm] = useState({
     logType: "",
     logSummary: "",
@@ -239,10 +236,28 @@ export default function AdminCaseDetail() {
   const focusedAction = searchParams.get("action") || "";
   const activeAction = focusedAction || selectedAction;
   const showAssignToMeOnly = !item?.assignedAdminUserId;
+  const isComplaintPoolDetail = source === "complaint-pool";
+  const isComplaintQueueDetail = source === "complaint-queue";
+  const isMyCasesDetail = source === "my-cases";
+  const isResolvedCompletedDetail = source === "resolved-completed";
+  const isEscalatedOrReassignedDetail = source === "escalated-reassigned";
+  const useComplaintQueueLayout = isComplaintQueueDetail || isMyCasesDetail;
 
   useEffect(() => {
     if (focusedAction) setSelectedAction(focusedAction);
   }, [focusedAction]);
+
+  useEffect(() => {
+    if (!useComplaintQueueLayout || !complaintInfoRef.current || typeof ResizeObserver === "undefined") return undefined;
+    const updateHeight = () => {
+      if (!complaintInfoRef.current) return;
+      setComplaintInfoHeight(Math.max(540, complaintInfoRef.current.offsetHeight));
+    };
+    updateHeight();
+    const observer = new ResizeObserver(() => updateHeight());
+    observer.observe(complaintInfoRef.current);
+    return () => observer.disconnect();
+  }, [history, item, useComplaintQueueLayout]);
 
   useEffect(() => {
     let mounted = true;
@@ -336,7 +351,7 @@ export default function AdminCaseDetail() {
         setHistory(detail.data.history || []);
       }
       if (actionName === "assign") {
-        if (source === "work-queue") {
+        if (isComplaintPoolDetail) {
           setSuccessMessage("Complaint assigned successfully.");
           setPendingSuccessRedirect(PATHS.admin.complaintQueue);
         } else {
@@ -374,18 +389,24 @@ export default function AdminCaseDetail() {
 
   if (!item) {
     return (
-      <WorkspacePage width={1200}>
+      <WorkspacePage
+        width={1280}
+        outerStyle={{ height: "calc(100vh - 73px)", overflow: "auto" }}
+        contentStyle={{ height: "100%", display: "flex", flexDirection: "column", minHeight: 0 }}
+      >
         {error ? <WorkspaceCard style={{ color: C.danger }}>{error}</WorkspaceCard> : <WorkspaceEmptyState title="Loading case details..." />}
       </WorkspacePage>
     );
   }
 
   const backPath =
-    source === "work-queue"
+    isComplaintPoolDetail || isResolvedCompletedDetail || isEscalatedOrReassignedDetail
       ? PATHS.admin.workQueue
       : source === "complaint-queue"
         ? PATHS.admin.complaintQueue
-        : PATHS.admin.cases;
+        : isMyCasesDetail
+          ? PATHS.admin.cases
+          : PATHS.admin.cases;
   const backLabel =
     backPath === PATHS.admin.workQueue
       ? "Back to Work Queue"
@@ -393,70 +414,323 @@ export default function AdminCaseDetail() {
         ? "Back to Complaint Queue"
         : "Back to My Cases";
   const attachedFiles = getAttachedFiles(item);
+  const createdAtLabel = formatDateTimeLabel(item.createdAt);
+  const incidentDateLabel = formatDateLabel(item.incidentDate);
+  const handoffDateLabel = formatDateLabel(item.updatedAt);
+  const complaintStateLabel = item.handoffType || item.status || "";
+  const handoffTypeLabel = complaintStateLabel
+    ? complaintStateLabel.split("_").filter(Boolean).map((chunk) => chunk.charAt(0).toUpperCase() + chunk.slice(1)).join(" ")
+    : "None";
+  const detailValueStyle = { fontSize: 14, fontWeight: 400, color: C.t1, lineHeight: 1.5, whiteSpace: "pre-wrap", wordBreak: "break-word" };
+  const standardGridStyle = { display: "grid", gridTemplateColumns: "repeat(3, minmax(0, 1fr))", gap: 18, alignItems: "start" };
+  const showAssignToMeButton = isComplaintPoolDetail;
+  const showWorkflowActions = !isComplaintPoolDetail && !isEscalatedOrReassignedDetail && !isResolvedCompletedDetail;
+  const complaintStatusLabel = statusLabel(item.status);
+
+  function renderTitleBlock(value) {
+    return <DetailItem label="Title" value={value || "Untitled Complaint"} valueStyle={detailValueStyle} />;
+  }
+
+  function renderDescriptionBlock(value) {
+    return <DetailItem label="Description" value={value || "Not provided"} valueStyle={detailValueStyle} />;
+  }
+
+  function renderComplaintPoolInfo() {
+    if (item.handoffType === "escalated") {
+      return (
+        <>
+          <div style={standardGridStyle}>
+            <DetailItem label="Complaint Id" value={item.complaintId} />
+            <DetailItem label="Handoff Type" value={handoffTypeLabel} />
+            <DetailItem label="Escalation Date" value={handoffDateLabel} />
+          </div>
+          {renderTitleBlock(item.title)}
+          <div style={standardGridStyle}>
+            <DetailItem label="Category" value={item.complaintType || "Not provided"} />
+            <DetailItem label="Citizen Name" value={item.citizenSnapshot?.name || "Not provided"} />
+            <DetailItem label="Citizen Phone Number" value={item.citizenSnapshot?.phoneNumbers?.[0] || "Not provided"} />
+          </div>
+          <div style={standardGridStyle}>
+            <DetailItem label="Created At" value={createdAtLabel} />
+            <DetailItem label="Date of Incident" value={incidentDateLabel} />
+            <DetailItem label="Incident Location" value={item.complaintLocation || "Not provided"} />
+          </div>
+          {renderDescriptionBlock(item.description)}
+          {item.statusReason ? <NoticeBox tone="amber" label="Reason for Escalation" value={item.statusReason} /> : null}
+        </>
+      );
+    }
+
+    return (
+      <>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: 18, alignItems: "start" }}>
+          <DetailItem label="Complaint Id" value={item.complaintId} />
+          <DetailItem label="Created At" value={createdAtLabel} />
+        </div>
+        {renderTitleBlock(item.title)}
+        <div style={standardGridStyle}>
+          <DetailItem label="Category" value={item.complaintType || "Not provided"} />
+          <DetailItem label="Citizen Name" value={item.citizenSnapshot?.name || "Not provided"} />
+          <DetailItem label="Citizen Phone Number" value={item.citizenSnapshot?.phoneNumbers?.[0] || "Not provided"} />
+        </div>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: 18, alignItems: "start" }}>
+          <DetailItem label="Date of Incident" value={incidentDateLabel} />
+          <DetailItem label="Incident Location" value={item.complaintLocation || "Not provided"} />
+        </div>
+        {renderDescriptionBlock(item.description)}
+      </>
+    );
+  }
+
+  function renderEscalatedInfo() {
+    return (
+      <>
+        <div style={standardGridStyle}>
+          <DetailItem label="Complaint Id" value={item.complaintId} />
+          <DetailItem label="Handoff Type" value={handoffTypeLabel} />
+          <DetailItem label={item.handoffType === "reassigned" ? "Reassignation Date" : "Escalation Date"} value={handoffDateLabel} />
+        </div>
+        {renderTitleBlock(item.title)}
+        <div style={standardGridStyle}>
+          <DetailItem label="Category" value={item.complaintType || "Not provided"} />
+          <DetailItem label="Citizen Name" value={item.citizenSnapshot?.name || "Not provided"} />
+          <DetailItem label="Citizen Phone Number" value={item.citizenSnapshot?.phoneNumbers?.[0] || "Not provided"} />
+        </div>
+        <div style={standardGridStyle}>
+          <DetailItem label="Created At" value={createdAtLabel} />
+          <DetailItem label="Date of Incident" value={incidentDateLabel} />
+          <DetailItem label="Incident Location" value={item.complaintLocation || "Not provided"} />
+        </div>
+        {renderDescriptionBlock(item.description)}
+        {item.statusReason ? (
+          <NoticeBox
+            tone={item.handoffType === "reassigned" ? "blue" : "amber"}
+            label={item.handoffType === "reassigned" ? "Reason for Reassignation" : "Reason for Escalation"}
+            value={item.statusReason}
+          />
+        ) : null}
+      </>
+    );
+  }
+
+  function renderResolvedInfo() {
+    return (
+      <>
+        <div style={standardGridStyle}>
+          <DetailItem label="Complaint Id" value={item.complaintId} />
+          <DetailItem label="Handoff Type" value={handoffTypeLabel} />
+          <DetailItem label="Resolved Date" value={handoffDateLabel} />
+        </div>
+        {renderTitleBlock(item.title)}
+        <div style={standardGridStyle}>
+          <DetailItem label="Category" value={item.complaintType || "Not provided"} />
+          <DetailItem label="Citizen Name" value={item.citizenSnapshot?.name || "Not provided"} />
+          <DetailItem label="Citizen Phone Number" value={item.citizenSnapshot?.phoneNumbers?.[0] || "Not provided"} />
+        </div>
+        <div style={standardGridStyle}>
+          <DetailItem label="Created At" value={createdAtLabel} />
+          <DetailItem label="Date of Incident" value={incidentDateLabel} />
+          <DetailItem label="Incident Location" value={item.complaintLocation || "Not provided"} />
+        </div>
+        {renderDescriptionBlock(item.description)}
+        {item.statusReason ? <NoticeBox tone="amber" label="Reason for Escalation" value={item.statusReason} /> : null}
+        {item.resolutionSummary ? <NoticeBox tone="green" label="Summary" value={item.resolutionSummary} /> : null}
+      </>
+    );
+  }
+
+  function renderMyCasesInfo() {
+    return (
+      <>
+        <div style={standardGridStyle}>
+          <DetailItem label="Complaint Id" value={item.complaintId} />
+          <DetailItem label="Status" value={handoffTypeLabel} />
+          <DetailItem label="Updated Date" value={handoffDateLabel} />
+        </div>
+        {renderTitleBlock(item.title)}
+        <div style={standardGridStyle}>
+          <DetailItem label="Category" value={item.complaintType || "Not provided"} />
+          <DetailItem label="Citizen Name" value={item.citizenSnapshot?.name || "Not provided"} />
+          <DetailItem label="Citizen Phone Number" value={item.citizenSnapshot?.phoneNumbers?.[0] || "Not provided"} />
+        </div>
+        <div style={standardGridStyle}>
+          <DetailItem label="Created At" value={createdAtLabel} />
+          <DetailItem label="Date of Incident" value={incidentDateLabel} />
+          <DetailItem label="Incident Location" value={item.complaintLocation || "Not provided"} />
+        </div>
+        {renderDescriptionBlock(item.description)}
+        {item.statusReason ? (
+          <NoticeBox
+            tone={item.handoffType === "reassigned" ? "blue" : "amber"}
+            label={item.handoffType === "reassigned" ? "Reason for Reassignation" : "Reason for Escalation"}
+            value={item.statusReason}
+          />
+        ) : null}
+        {item.resolutionSummary ? <NoticeBox tone="green" label="Summary" value={item.resolutionSummary} /> : null}
+      </>
+    );
+  }
+
+  function renderComplaintQueueInfo() {
+    return (
+      <>
+        <div style={standardGridStyle}>
+          <DetailItem label="Complaint Id" value={item.complaintId} />
+          <DetailItem
+            label="Status"
+            value={(
+              <WorkspaceBadge status={item.status} title={complaintStatusLabel}>
+                {complaintStatusLabel}
+              </WorkspaceBadge>
+            )}
+          />
+          <DetailItem label="Updated Date" value={handoffDateLabel} />
+        </div>
+        {renderTitleBlock(item.title)}
+        <div style={standardGridStyle}>
+          <DetailItem label="Category" value={item.complaintType || "Not provided"} />
+          <DetailItem label="Citizen Name" value={item.citizenSnapshot?.name || "Not provided"} />
+          <DetailItem label="Citizen Phone Number" value={item.citizenSnapshot?.phoneNumbers?.[0] || "Not provided"} />
+        </div>
+        <div style={standardGridStyle}>
+          <DetailItem label="Created At" value={createdAtLabel} />
+          <DetailItem label="Date of Incident" value={incidentDateLabel} />
+          <DetailItem label="Incident Location" value={item.complaintLocation || "Not provided"} />
+        </div>
+        {renderDescriptionBlock(item.description)}
+        {item.statusReason ? (
+          <NoticeBox
+            tone={item.handoffType === "reassigned" ? "blue" : "amber"}
+            label={item.handoffType === "reassigned" ? "Reason for Reassignation" : "Reason for Escalation"}
+            value={item.statusReason}
+          />
+        ) : null}
+        {item.resolutionSummary ? <NoticeBox tone="green" label="Summary" value={item.resolutionSummary} /> : null}
+      </>
+    );
+  }
 
   return (
-    <WorkspacePage width={1200}>
+    <WorkspacePage
+      width={1280}
+      outerStyle={{ height: "calc(100vh - 73px)", overflow: "auto" }}
+      contentStyle={{ height: "100%", display: "flex", flexDirection: "column", minHeight: 0 }}
+    >
       <SuccessModal open={!!successMessage} message={successMessage} onClose={handleSuccessModalClose} />
       <WorkspaceSectionHeader
         title={item.complaintId}
-        subtitle={item.title}
-        action={<WorkspaceButton type="button" variant="ghost" onClick={() => navigate(backPath)}><ChevronLeft size={16} />{backLabel}</WorkspaceButton>}
+        action={
+          <button
+            type="button"
+            onClick={() => navigate(backPath)}
+            onMouseEnter={() => setIsBackHovered(true)}
+            onMouseLeave={() => setIsBackHovered(false)}
+            style={{
+              minHeight: 38,
+              padding: "0 16px",
+              borderRadius: 10,
+              border: `1px solid ${C.purple}`,
+              background: isBackHovered ? C.purple : "transparent",
+              color: isBackHovered ? "#ffffff" : C.purple,
+              display: "inline-flex",
+              alignItems: "center",
+              justifyContent: "center",
+              gap: 8,
+              cursor: "pointer",
+              fontSize: 13,
+              fontWeight: 600,
+              transition: "background var(--portal-duration-fast) ease, color var(--portal-duration-fast) ease",
+            }}
+          >
+            <ChevronLeft size={16} />
+            {backLabel}
+          </button>
+        }
       />
+      <div style={{ display: "grid", gap: 16, flex: 1, minHeight: 0 }}>
 
-      <div style={{ display: "grid", gap: 24 }}>
         {error ? <WorkspaceCard style={{ color: C.danger }}>{error}</WorkspaceCard> : null}
 
-        {showAssignToMeOnly ? (
-          <div style={{ marginBottom: 24 }}>
-            <WorkspaceButton type="button" disabled={actionLoading} onClick={() => runAction("assign", () => apiClient.patch(`/complaints/${id}/assign-self`, {}))}>
+        <WorkspaceCard style={{ padding: 0, marginBottom: 0, border: "none", background: "transparent" }}>
+          {showAssignToMeButton ? (
+            <WorkspaceButton
+              type="button"
+              disabled={actionLoading}
+              onClick={() => runAction("assign", () => apiClient.patch(`/complaints/${id}/assign-self`, {}))}
+              style={{ boxShadow: "none" }}
+            >
               Assign to Me
             </WorkspaceButton>
-          </div>
-        ) : (
-          <WorkspaceCard>
+          ) : showWorkflowActions ? (
             <div className="grid md:grid-cols-[minmax(0,320px)_auto] gap-3 items-start">
               <WorkspaceSelect value={activeAction} onChange={(event) => setSelectedAction(event.target.value)}>
                 <option value="">Select workflow action</option>
                 {availableActions.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
               </WorkspaceSelect>
             </div>
-          </WorkspaceCard>
-        )}
+          ) : null}
+        </WorkspaceCard>
 
-        <div className="grid md:grid-cols-2 gap-6">
-          <WorkspaceCard>
-            <WorkspaceCardHeader title="Complaint Information" />
-            <div className="grid md:grid-cols-2 gap-6" style={{ fontSize: 13, color: C.t2 }}>
-              <DetailItem label="Citizen" value={item.citizenSnapshot?.name} />
-              <DetailItem label="Citizen ID" value={item.citizenSnapshot?.citizenId} />
-              <DetailItem label="Phone" value={item.citizenSnapshot?.phoneNumbers?.[0] || "Not provided"} />
-              <DetailItem label="Status" value={item.statusLabel} />
-              <DetailItem label="Current Owner" value={item.currentOwner || "Admin Pool"} />
-              <DetailItem label="Scheduled Meeting" value={item.callScheduledAt ? new Date(item.callScheduledAt).toLocaleString("en-IN") : "Not scheduled"} />
-              <DetailItem label="Handoff Type" value={item.handoffType ? formatHistoryStatus(item.handoffType) : "None"} />
-              <DetailItem label="Reopened Count" value={String(item.reopenedCount || 0)} />
-            </div>
-            <div className="mt-6">
-              <p style={{ fontSize: 10, fontWeight: 600, color: C.t3, textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 8 }}>Description</p>
-              <p style={{ fontSize: 13, color: C.t2 }}>{item.description}</p>
-            </div>
-            {(item.statusReason || item.callOutcome || item.resolutionSummary) ? (
-              <div className="mt-6 space-y-3">
-                {item.statusReason ? <NoticeBox tone="amber" label="Status Reason" value={item.statusReason} /> : null}
-                {item.callOutcome ? <NoticeBox tone="blue" label="Latest Log" value={item.callOutcome} /> : null}
-                {item.resolutionSummary ? <NoticeBox tone="green" label="Resolution Summary" value={item.resolutionSummary} /> : null}
+        {useComplaintQueueLayout ? (
+          <>
+            <div
+              style={{
+                display: "grid",
+                gap: 24,
+                gridTemplateColumns: "minmax(0, 7fr) minmax(280px, 3fr)",
+                alignItems: "start",
+              }}
+            >
+              <div ref={complaintInfoRef}>
+                <WorkspaceCard style={{ marginBottom: 0, minHeight: 540, display: "flex", flexDirection: "column" }}>
+                  <WorkspaceCardHeader title="Complaint Information" />
+                  <div style={{ display: "grid", gap: 18 }}>
+                    {renderComplaintQueueInfo()}
+                  </div>
+                </WorkspaceCard>
               </div>
-            ) : null}
-            <div className="mt-6">
-              <p style={{ fontSize: 10, fontWeight: 600, color: C.t3, textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 8 }}>Attached Documents</p>
-              <div style={{ padding: 12, borderRadius: 12, border: `1px solid ${C.border}`, background: C.bgElevated }}>
-                {attachedFiles.length > 0 ? (
-                  <div style={{ display: "grid", gap: 10 }}>
-                    {attachedFiles.map((file) => (
-                      <div
-                        key={file.id || file.downloadUrl || file.name}
-                        style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}
-                      >
+
+              <WorkspaceCard style={{ marginBottom: 0, height: complaintInfoHeight, minHeight: 540, display: "flex", flexDirection: "column" }}>
+                <div className="flex items-center gap-2 mb-6">
+                  <FileText size={22} color={C.purple} />
+                  <h2 style={{ fontSize: 24, fontWeight: 700, color: C.t1 }}>Timeline</h2>
+                </div>
+                <div style={{ display: "grid", gap: 18, overflowY: "auto", paddingRight: 6, flex: 1, minHeight: 0 }}>
+                  {history.length === 0 ? (
+                    <p style={{ fontSize: 13, color: C.t3 }}>No timeline events yet.</p>
+                  ) : (
+                    history.map((event, index) => (
+                      <div key={`${event.created_at}-${index}`} className="flex gap-4">
+                        <div className="flex flex-col items-center" style={{ flexShrink: 0 }}>
+                          <div className="h-3 w-3 rounded-full" style={{ background: C.purple, border: `2px solid ${C.card}` }} />
+                          {index !== history.length - 1 ? <div className="mt-2 w-0.5 flex-1 min-h-10" style={{ background: C.purple }} /> : null}
+                        </div>
+                        <div className="flex-1 pb-2">
+                          <div className="flex items-start justify-between gap-3">
+                            <div>
+                              <p style={{ margin: 0, fontWeight: 600, color: C.t1 }}>{statusLabel(event.new_status)}</p>
+                              <p style={{ fontSize: 12, color: C.t3, marginTop: 4, marginBottom: 0 }}>{event.actor_role}</p>
+                            </div>
+                            <p style={{ fontSize: 12, color: C.t3, whiteSpace: "nowrap", margin: 0 }}>{new Date(event.created_at).toLocaleDateString("en-IN")}</p>
+                          </div>
+                          {event.note ? <p style={{ fontSize: 13, color: C.t2, marginTop: 8, marginBottom: 0, whiteSpace: "normal", wordBreak: "break-word" }}>{event.note}</p> : null}
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </WorkspaceCard>
+            </div>
+
+            <WorkspaceCard style={{ marginBottom: 0 }}>
+              <WorkspaceCardHeader title="Meeting Files" subtitle="View the citizen submission files and uploaded complaint artifacts." />
+              {attachedFiles.length === 0 ? (
+                <div style={{ fontSize: 13, color: C.t3, padding: "2px 0" }}>No files attached to this complaint yet.</div>
+              ) : (
+                <div style={{ display: "grid", gap: 10 }}>
+                  {attachedFiles.map((file) => (
+                    <div key={file.id || file.downloadUrl || file.name} style={{ padding: 10, borderRadius: 12, border: `1px solid ${C.border}`, background: C.bgElevated }}>
+                      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
                         <div>
                           <div style={{ fontSize: 13, fontWeight: 700, color: C.t1 }}>{file.name}</div>
                           <div style={{ marginTop: 4, fontSize: 12, color: C.t3 }}>{file.mimeType || "Document"}</div>
@@ -465,23 +739,47 @@ export default function AdminCaseDetail() {
                           Download
                         </WorkspaceButton>
                       </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </WorkspaceCard>
+          </>
+        ) : (
+          <WorkspaceCard style={{ marginBottom: 0, flex: 1, minHeight: 0, display: "flex", flexDirection: "column" }}>
+            <WorkspaceCardHeader title="Complaint Information" />
+            <div style={{ display: "grid", gap: 18, flex: 1, minHeight: 0, overflowY: "auto", paddingRight: 2 }}>
+              {isComplaintPoolDetail
+                ? renderComplaintPoolInfo()
+                : isEscalatedOrReassignedDetail
+                  ? renderEscalatedInfo()
+                  : isResolvedCompletedDetail
+                    ? renderResolvedInfo()
+                    : renderMyCasesInfo()}
+              {attachedFiles.length > 0 ? (
+                <div>
+                  <p style={{ fontSize: 11, color: C.t3, fontWeight: 700, textTransform: "uppercase", letterSpacing: ".08em", margin: "0 0 8px" }}>Attached Documents</p>
+                  <div style={{ padding: 12, borderRadius: 12, border: `1px solid ${C.border}`, background: C.bgElevated, display: "grid", gap: 10 }}>
+                    {attachedFiles.map((file) => (
+                      <div
+                        key={file.id || file.downloadUrl || file.name}
+                        style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}
+                      >
+                        <div style={{ minWidth: 0 }}>
+                          <div style={{ ...detailValueStyle }}>{file.name}</div>
+                          <div style={{ marginTop: 2, fontSize: 12, color: C.t3 }}>{file.mimeType || "Document"}</div>
+                        </div>
+                        <WorkspaceButton type="button" variant="outline" onClick={() => openDownloadUrl(file.downloadUrl)}>
+                          Download
+                        </WorkspaceButton>
+                      </div>
                     ))}
                   </div>
-                ) : (
-                  <div style={{ fontSize: 13, color: C.t3 }}>No documents attached to this complaint.</div>
-                )}
-              </div>
+                </div>
+              ) : null}
             </div>
           </WorkspaceCard>
-
-          <WorkspaceCard>
-            <div className="flex items-center gap-2 mb-6">
-              <FileText size={22} color={C.purple} />
-              <h2 style={{ fontSize: 24, fontWeight: 700, color: C.t1 }}>Activity Timeline</h2>
-            </div>
-            <Timeline items={history} />
-          </WorkspaceCard>
-        </div>
+        )}
       </div>
 
       {activeAction === "reassign" ? (
@@ -698,12 +996,14 @@ export default function AdminCaseDetail() {
   );
 }
 
-function DetailItem({ label, value }) {
+function DetailItem({ label, value, valueStyle }) {
   const { C } = usePortalTheme();
   return (
     <div>
       <p style={{ fontSize: 11, color: C.t3, fontWeight: 700, textTransform: "uppercase", letterSpacing: ".08em", marginBottom: 8 }}>{label}</p>
-      <p style={{ fontSize: 16, fontWeight: 600, color: C.t1 }}>{value}</p>
+      <p style={{ margin: 0, fontSize: 14, fontWeight: 400, color: C.t1, lineHeight: 1.5, whiteSpace: "pre-wrap", wordBreak: "break-word", ...(valueStyle || {}) }}>
+        {value}
+      </p>
     </div>
   );
 }
@@ -719,7 +1019,7 @@ function NoticeBox({ tone, label, value }) {
   return (
     <div style={{ padding: 16, borderRadius: 10, border: `1px solid ${color}33`, background: `${color}12` }}>
       <p style={{ fontSize: 11, fontWeight: 700, color, textTransform: "uppercase", marginBottom: 8 }}>{label}</p>
-      <p style={{ fontSize: 13, color: C.t2 }}>{value}</p>
+      <p style={{ margin: 0, fontSize: 14, fontWeight: 400, color: C.t2, lineHeight: 1.5, whiteSpace: "pre-wrap", wordBreak: "break-word" }}>{value}</p>
     </div>
   );
 }

@@ -25,6 +25,7 @@ export const PATHS = {
     calendar: "/admin/calendar",
     legacyCalendar: "/calendar",
     workQueue: "/admin/work-queue",
+    workQueueMeetingDetail: "/admin/work-item/meetings/:meetingId",
     complaintQueue: "/admin/complaint-queue",
     pool: "/admin/pool",
     legacyPool: "/adminallcases",

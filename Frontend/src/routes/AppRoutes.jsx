@@ -90,6 +90,7 @@ export default function AppRoutes() {
           <Route element={<AppLayout />}>
             <Route path={PATHS.admin.dashboard} element={<AdminDashboard />} />
             <Route path={PATHS.admin.workQueue} element={<AdminCases />} />
+            <Route path={PATHS.admin.workQueueMeetingDetail} element={<AdminMeeting />} />
             <Route path={PATHS.admin.complaintQueue} element={<AdminComplaintQueue />} />
             <Route path={PATHS.admin.calendar} element={<Calendar />} />
             <Route path={PATHS.admin.legacyCalendar} element={<Calendar />} />

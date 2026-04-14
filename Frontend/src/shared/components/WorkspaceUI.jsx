@@ -276,16 +276,22 @@ export function WorkspaceButton({ variant = "primary", children, style, ...props
   );
 }
 
-export function WorkspaceBadge({ children, color, status }) {
+export function WorkspaceBadge({ children, color, status, style, title }) {
   const { C } = usePortalTheme();
   // Auto-color from status string if no explicit color given
   const tone = color || (status ? statusColor(status, C) : C.purple);
   return (
-    <span className="portal-badge" style={{
+    <span className="portal-badge" title={title} style={{
       background: `${tone}18`,
       color: tone,
       border: `1px solid ${tone}28`,
       whiteSpace: "nowrap",
+      display: "inline-block",
+      maxWidth: "100%",
+      overflow: "hidden",
+      textOverflow: "ellipsis",
+      verticalAlign: "middle",
+      ...style,
     }}>
       {children}
     </span>
