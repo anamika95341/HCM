@@ -184,7 +184,7 @@ async function getCitizenComplaintById(id, citizenId) {
 async function getComplaintQueue() {
   const result = await pool.query(
     `${complaintSelect}
-     WHERE c.status NOT IN ('completed', 'rejected', 'resolved', 'escalated_to_meeting')
+     WHERE c.status NOT IN ('rejected', 'escalated_to_meeting')
      ORDER BY c.updated_at DESC, c.created_at DESC`
   );
   return result.rows.map(mapComplaint);

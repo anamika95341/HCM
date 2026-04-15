@@ -447,7 +447,7 @@ function buildMeetingActions(meeting, adminId) {
   if (["pending", "not_verified"].includes(status)) actions.push(["accept", "Accept Meeting"]);
   if (["pending", "accepted", "verification_pending", "verified", "not_verified"].includes(status)) actions.push(["reject", "Reject Meeting"]);
   if (["accepted", "not_verified", "verification_pending", "verified"].includes(status)) actions.push(["sendVerification", "Send for DEO Verification"]);
-  if (["accepted", "verification_pending", "verified"].includes(status)) actions.push(["schedule", "Schedule Meeting"]);
+  if (["accepted", "verified", "VERIFIED_BY_DEO"].includes(status)) actions.push(["schedule", "Schedule Meeting"]);
   if (status === "scheduled") {
     actions.push(["reschedule", "Reschedule Meeting"]);
     actions.push(["complete", "Mark as Completed"]);
@@ -752,10 +752,10 @@ export default function AdminMeeting() {
     const isAssignedToCurrentAdmin = selectedMeeting.assignedAdminUserId === adminId;
     const isUnassignedPoolMeeting = selectedMeeting.status === "pending" && !selectedMeeting.assignedAdminUserId;
     const canSendVerification = isAssignedToCurrentAdmin && ["accepted", "not_verified", "verification_pending", "verified"].includes(selectedMeeting.status);
-    const canSchedule = isAssignedToCurrentAdmin && ["accepted", "verification_pending", "verified", "scheduled"].includes(selectedMeeting.status);
+    const canSchedule = isAssignedToCurrentAdmin && ["accepted", "verified", "VERIFIED_BY_DEO", "scheduled"].includes(selectedMeeting.status);
     const canUploadPhotos = isAssignedToCurrentAdmin && ["scheduled", "completed"].includes(selectedMeeting.status);
-    const verificationPending = selectedMeeting.status === "verification_pending";
-    const verificationDone = selectedMeeting.status === "verified";
+    const verificationPending = ["verification_pending", "SENT_FOR_DEO_VERIFICATION"].includes(selectedMeeting.status);
+    const verificationDone = ["verified", "VERIFIED_BY_DEO"].includes(selectedMeeting.status);
     const isCompletedMeetingDetail = isResolvedCompletedDetail && selectedMeeting.status === "completed";
     const showAssignToMeButton = !selectedMeeting.assignedAdminUserId && (isMeetingPoolDetail || isUnassignedPoolMeeting);
     const showWorkflowActions = !showAssignToMeButton && !isResolvedCompletedDetail;
@@ -948,9 +948,13 @@ export default function AdminMeeting() {
                       <DetailItem
                         label="Status"
                         value={(
-                          <WorkspaceBadge status={selectedMeeting.status} title={meetingStatusLabel}>
-                            {meetingStatusLabel}
-                          </WorkspaceBadge>
+                          <div style={{ display: "grid", gap: 8 }}>
+                            <WorkspaceBadge status={selectedMeeting.status} title={meetingStatusLabel}>
+                              {meetingStatusLabel}
+                            </WorkspaceBadge>
+                            {verificationPending ? <div style={{ fontSize: 13, fontWeight: 700, color: C.danger }}>Sent for DEO verification</div> : null}
+                            {verificationDone ? <div style={{ fontSize: 13, fontWeight: 700, color: C.mint }}>Verified by DEO</div> : null}
+                          </div>
                         )}
                       />
                     </InlineDetailGrid>
@@ -1181,8 +1185,8 @@ export default function AdminMeeting() {
                     </option>
                   ))}
                 </WorkspaceSelect>
-                {verificationPending ? <div style={{ marginTop: 8, fontSize: 13, fontWeight: 700, color: C.danger }}>Sent for verification</div> : null}
-                {verificationDone ? <div style={{ marginTop: 8, fontSize: 13, fontWeight: 700, color: C.mint }}>Verified successfully. You can now schedule the meeting.</div> : null}
+                {verificationPending ? <div style={{ marginTop: 8, fontSize: 13, fontWeight: 700, color: C.danger }}>Sent for DEO verification</div> : null}
+                {verificationDone ? <div style={{ marginTop: 8, fontSize: 13, fontWeight: 700, color: C.mint }}>Verified by DEO</div> : null}
               </div>
               <div style={{ display: "flex", justifyContent: "flex-end", gap: 12 }}>
                 <WorkspaceButton type="button" variant="ghost" onClick={closeActionModal} disabled={actionLoading}>Cancel</WorkspaceButton>
@@ -1267,8 +1271,11 @@ export default function AdminMeeting() {
                   disabled={actionLoading || !scheduleForm.ministerId || !scheduleForm.startDate || !scheduleForm.startTime || !scheduleForm.endDate || !scheduleForm.endTime || !scheduleForm.location.trim()}
                   onClick={() => {
                     setScheduleError("");
-                    if (selectedMeeting.status === "verification_pending") {
-                      setScheduleError("You can schedule after verification");
+                    setActionError("");
+                    if (["verification_pending", "SENT_FOR_DEO_VERIFICATION"].includes(selectedMeeting.status)) {
+                      // Reuse the existing error surfaces instead of adding new UI.
+                      setActionError("You cannot schedule this meeting as it is sent for DEO verification.");
+                      setScheduleError("You cannot schedule this meeting as it is sent for DEO verification.");
                       return;
                     }
                     runAction(
