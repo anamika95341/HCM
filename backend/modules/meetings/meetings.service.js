@@ -475,8 +475,9 @@ async function scheduleMeeting(meetingId, adminId, body, reqMeta) {
     throw createHttpError(404, 'Meeting not found');
   }
   assertMeetingAdminAccess(meeting, adminId, { actionLabel: meeting.status === 'scheduled' ? 'reschedule this meeting' : 'schedule this meeting' });
-  if (meeting.status === 'verification_pending') {
-    throw createHttpError(409, 'After verification by DEO only you can schedule meeting');
+  // Block scheduling while the meeting is still with DEO verification.
+  if (meeting.status === 'verification_pending' || meeting.status === 'SENT_FOR_DEO_VERIFICATION') {
+    throw createHttpError(409, 'You cannot schedule this meeting as it is sent for DEO verification.');
   }
   const minister = await adminRepository.findActiveMinisterById(body.ministerId);
   if (!minister) {

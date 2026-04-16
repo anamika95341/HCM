@@ -92,7 +92,7 @@ describe('workflow integrity', () => {
         },
         { ip: '127.0.0.1', userAgent: 'jest' }
       )
-    ).rejects.toMatchObject({ statusCode: 409, message: 'After verification by DEO only you can schedule meeting' });
+    ).rejects.toMatchObject({ statusCode: 409, message: 'You cannot schedule this meeting as it is sent for DEO verification.' });
 
     expect(meetingsRepository.createCalendarEvent).not.toHaveBeenCalled();
     expect(meetingsRepository.updateMeetingStatus).not.toHaveBeenCalled();
