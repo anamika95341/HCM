@@ -2,7 +2,7 @@ import { NavLink } from "react-router-dom";
 import { useRef, useState } from "react";
 import { usePortalTheme } from "../theme/portalTheme.jsx";
 
-const SidebarItem = ({ children, type = "NavLink", to, icon: Icon, label, collapsed, onClick }) => {
+const SidebarItem = ({ children, type = "NavLink", to, icon: Icon, label, collapsed, onClick, isCitizen = false }) => {
   const ref = useRef(null);
   const { C } = usePortalTheme();
   const [navHover, setNavHover] = useState(false);
@@ -14,13 +14,14 @@ const SidebarItem = ({ children, type = "NavLink", to, icon: Icon, label, collap
     minHeight: 40,
     padding: collapsed ? "var(--portal-space-6)" : "var(--portal-space-6) var(--portal-space-8)",
     borderRadius: 10,
-    fontSize: 13,
-    lineHeight: "16px",
+    fontSize: isCitizen ? 14 : 13,
+    lineHeight: isCitizen ? "1.45" : "16px",
     textDecoration: "none",
     color: C.t3,
     border: "none",
     fontWeight: 500,
     transition: "all 0.2s cubic-bezier(0.4, 0, 0.2, 1)",
+    fontFamily: isCitizen ? "var(--portal-citizen-font)" : "inherit",
   };
 
   return (
@@ -43,10 +44,11 @@ const SidebarItem = ({ children, type = "NavLink", to, icon: Icon, label, collap
               <Icon size={18} style={{ flexShrink: 0, color: isActive ? C.purple : C.t3 }} />
               {!collapsed && (
                 <div
+                  className={isCitizen ? "portal-citizen-value" : undefined}
                   style={{
                     whiteSpace: "nowrap",
-                    fontSize: 13,
-                    lineHeight: "16px",
+                    fontSize: isCitizen ? 14 : 13,
+                    lineHeight: isCitizen ? 1.45 : "16px",
                     overflow: "hidden",
                     textOverflow: "ellipsis",
                   }}
@@ -72,10 +74,11 @@ const SidebarItem = ({ children, type = "NavLink", to, icon: Icon, label, collap
           <Icon size={18} style={{ flexShrink: 0 }} />
           {!collapsed && (
             <div
+              className={isCitizen ? "portal-citizen-value" : undefined}
               style={{
                 whiteSpace: "nowrap",
-                fontSize: 13,
-                lineHeight: "16px",
+                fontSize: isCitizen ? 14 : 13,
+                lineHeight: isCitizen ? 1.45 : "16px",
                 overflow: "hidden",
                 textOverflow: "ellipsis",
               }}
@@ -110,6 +113,9 @@ const Tooltip = ({ label }) => {
         background: C.card,
         color: C.t1,
         border: `1px solid ${C.border}`,
+        fontFamily: "var(--portal-citizen-font)",
+        fontSize: "12px",
+        lineHeight: 1.5,
       }}
     >
       {label}

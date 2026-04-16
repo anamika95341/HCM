@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useEffect, useMemo, useState } from "react";
 
-const FONT_URL = "https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap";
+const FONT_URL = "https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Lora:wght@400;500;600;700&display=swap";
 const THEME_STORAGE_KEY = "portal-theme";
 
 export const LIGHT_THEME = {
@@ -167,6 +167,10 @@ export function PortalGlobalStyles() {
       --portal-content-max: 900px;
       --portal-header-height: 73px;
       --portal-text-on-primary: #ffffff;
+      --portal-citizen-font: 'Lora', Georgia, 'Times New Roman', serif;
+      --portal-citizen-label-size: 12px;
+      --portal-citizen-value-size: 14px;
+      --portal-citizen-caption-size: 12px;
 
       --portal-bg: ${L.bg};
       --portal-bg-elevated: ${L.bgElevated};
@@ -315,6 +319,20 @@ export function PortalGlobalStyles() {
       margin: 0;
       color: var(--portal-text-strong);
       letter-spacing: -0.02em;
+    }
+
+    .portal-shell[data-portal-role='citizen'] .portal-content,
+    .portal-shell[data-portal-role='citizen'] .portal-content button,
+    .portal-shell[data-portal-role='citizen'] .portal-content input,
+    .portal-shell[data-portal-role='citizen'] .portal-content select,
+    .portal-shell[data-portal-role='citizen'] .portal-content textarea,
+    .portal-shell[data-portal-role='citizen'] .portal-content h1,
+    .portal-shell[data-portal-role='citizen'] .portal-content h2,
+    .portal-shell[data-portal-role='citizen'] .portal-content h3,
+    .portal-shell[data-portal-role='citizen'] .portal-content h4,
+    .portal-shell[data-portal-role='citizen'] .portal-content h5,
+    .portal-shell[data-portal-role='citizen'] .portal-content h6 {
+      font-family: var(--portal-citizen-font);
     }
 
     .portal-content p {
@@ -588,6 +606,47 @@ export function PortalGlobalStyles() {
       .portal-btn:active {
         transform: none;
       }
+    }
+
+    .portal-citizen-page {
+      min-height: 100%;
+      overflow-x: hidden;
+      overflow-y: visible;
+    }
+
+    .portal-citizen-label {
+      font-size: var(--portal-citizen-label-size);
+      font-weight: 700;
+      line-height: 1.45;
+      letter-spacing: 0.08em;
+    }
+
+    .portal-citizen-value {
+      font-size: var(--portal-citizen-value-size);
+      font-weight: 500;
+      line-height: 1.6;
+    }
+
+    .portal-citizen-caption {
+      font-size: var(--portal-citizen-caption-size);
+      line-height: 1.5;
+    }
+
+    .portal-citizen-table-footer {
+      padding-bottom: 8px;
+    }
+
+    .portal-citizen-pager {
+      min-width: 0;
+      row-gap: var(--portal-space-3);
+    }
+
+    .portal-citizen-pager-btn {
+      width: auto;
+      min-width: 104px;
+      max-width: 100%;
+      white-space: nowrap;
+      flex: 0 1 auto;
     }
   `;
 

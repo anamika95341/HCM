@@ -15,6 +15,8 @@ import { uploadPrivateFile } from "../../../shared/api/privateFiles.js";
 import { useAuth } from "../../../shared/auth/AuthContext.jsx";
 import { usePortalTheme } from "../../../shared/theme/portalTheme.jsx";
 import { WorkspaceButton, WorkspaceCard, WorkspaceCardHeader, WorkspaceInput, WorkspacePage, WorkspaceSectionHeader, WorkspaceSelect } from "../../../shared/components/WorkspaceUI.jsx";
+import serviceMeetingImage from "../../../assets/citizen/ChatGPT Image Apr 16, 2026, 11_27_23 PM.png";
+import serviceComplaintImage from "../../../assets/citizen/ChatGPT Image Apr 16, 2026, 11_29_03 PM.png";
 
 const FILE_UPLOAD_OPTIONS = {
   maxFiles: 5,
@@ -63,6 +65,7 @@ function CustomDatePicker({ value, onChange, min, max, placeholder = "Select dat
   const { C } = usePortalTheme();
   const [isOpen, setIsOpen] = useState(false);
   const [openDirection, setOpenDirection] = useState("down");
+  const [viewMode, setViewMode] = useState("day");
   const rootRef = useRef(null);
   const [visibleMonth, setVisibleMonth] = useState(() => {
     if (value) return parseDateValue(value);
@@ -88,6 +91,7 @@ function CustomDatePicker({ value, onChange, min, max, placeholder = "Select dat
       const pickerRoot = event.target.closest?.('[data-meeting-date-picker="true"]');
       if (!pickerRoot) {
         setIsOpen(false);
+        setViewMode("day");
       }
     };
 
@@ -113,6 +117,23 @@ function CustomDatePicker({ value, onChange, min, max, placeholder = "Select dat
   const minDate = parseDateValue(min);
   const maxDate = parseDateValue(max);
   const days = buildCalendarDays(monthStart);
+  const yearStart = Math.floor(visibleMonth.getFullYear() / 12) * 12;
+
+  function isMonthDisabled(monthIndex) {
+    const firstDay = new Date(visibleMonth.getFullYear(), monthIndex, 1);
+    const lastDay = new Date(visibleMonth.getFullYear(), monthIndex + 1, 0);
+    if (minDate && lastDay < minDate) return true;
+    if (maxDate && firstDay > maxDate) return true;
+    return false;
+  }
+
+  function isYearDisabled(year) {
+    const firstDay = new Date(year, 0, 1);
+    const lastDay = new Date(year, 11, 31);
+    if (minDate && lastDay < minDate) return true;
+    if (maxDate && firstDay > maxDate) return true;
+    return false;
+  }
 
   return (
     <div ref={rootRef} data-meeting-date-picker="true" style={{ position: "relative" }}>
@@ -156,64 +177,161 @@ function CustomDatePicker({ value, onChange, min, max, placeholder = "Select dat
             boxShadow: "0 16px 36px rgba(15, 23, 42, 0.14)",
           }}
         >
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10, gap: 8 }}>
             <button
               type="button"
-              onClick={() => setVisibleMonth((current) => new Date(current.getFullYear(), current.getMonth() - 1, 1))}
+              onClick={() => {
+                if (viewMode === "year") {
+                  setVisibleMonth((current) => new Date(current.getFullYear() - 12, current.getMonth(), 1));
+                } else {
+                  setVisibleMonth((current) => new Date(current.getFullYear(), current.getMonth() - 1, 1));
+                }
+              }}
               style={calendarNavButtonStyle(C)}
             >
               <ChevronRight size={16} style={{ transform: "rotate(180deg)" }} />
             </button>
-            <div style={{ fontSize: 13, fontWeight: 700, color: C.t1 }}>
-              {monthStart.toLocaleString("en-US", { month: "long", year: "numeric" })}
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 6, flexWrap: "wrap" }}>
+              <button
+                type="button"
+                onClick={() => setViewMode("month")}
+                style={{ border: "none", background: "transparent", color: C.t1, fontSize: 13, fontWeight: 700, cursor: "pointer" }}
+              >
+                {monthStart.toLocaleString("en-US", { month: "long" })}
+              </button>
+              <button
+                type="button"
+                onClick={() => setViewMode("year")}
+                style={{ border: "none", background: "transparent", color: C.t1, fontSize: 13, fontWeight: 700, cursor: "pointer" }}
+              >
+                {monthStart.getFullYear()}
+              </button>
             </div>
             <button
               type="button"
-              onClick={() => setVisibleMonth((current) => new Date(current.getFullYear(), current.getMonth() + 1, 1))}
+              onClick={() => {
+                if (viewMode === "year") {
+                  setVisibleMonth((current) => new Date(current.getFullYear() + 12, current.getMonth(), 1));
+                } else {
+                  setVisibleMonth((current) => new Date(current.getFullYear(), current.getMonth() + 1, 1));
+                }
+              }}
               style={calendarNavButtonStyle(C)}
             >
               <ChevronRight size={16} />
             </button>
           </div>
 
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(7, minmax(0, 1fr))", gap: 4 }}>
-            {["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"].map((day) => (
-              <div key={day} style={{ textAlign: "center", fontSize: 11, fontWeight: 700, color: C.t3, padding: "6px 0" }}>
-                {day}
-              </div>
-            ))}
-            {days.map((day) => {
-              const dayValue = formatDateValue(day);
-              const isCurrentMonth = day.getMonth() === monthStart.getMonth();
-              const isDisabled = (minDate && dayValue < min) || (maxDate && dayValue > max) || !isCurrentMonth;
-              const isSelected = value === dayValue;
+          {viewMode === "day" ? (
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(7, minmax(0, 1fr))", gap: 4 }}>
+              {["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"].map((day) => (
+                <div key={day} style={{ textAlign: "center", fontSize: 11, fontWeight: 700, color: C.t3, padding: "6px 0" }}>
+                  {day}
+                </div>
+              ))}
+              {days.map((day) => {
+                const dayValue = formatDateValue(day);
+                const isCurrentMonth = day.getMonth() === monthStart.getMonth();
+                const isDisabled = (minDate && dayValue < min) || (maxDate && dayValue > max) || !isCurrentMonth;
+                const isSelected = value === dayValue;
 
-              return (
-                <button
-                  key={dayValue}
-                  type="button"
-                  disabled={isDisabled}
-                  onClick={() => {
-                    onChange(dayValue);
-                    setIsOpen(false);
-                  }}
-                  style={{
-                    height: 34,
-                    borderRadius: 8,
-                    border: `1px solid ${isSelected ? C.purple : "transparent"}`,
-                    background: isSelected ? C.purple : "transparent",
-                    color: isSelected ? "#ffffff" : isCurrentMonth ? C.t1 : C.t3,
-                    opacity: isDisabled ? 0.35 : 1,
-                    cursor: isDisabled ? "not-allowed" : "pointer",
-                    fontSize: 12,
-                    fontWeight: 600,
-                  }}
-                >
-                  {day.getDate()}
-                </button>
-              );
-            })}
-          </div>
+                return (
+                  <button
+                    key={dayValue}
+                    type="button"
+                    disabled={isDisabled}
+                    onClick={() => {
+                      onChange(dayValue);
+                      setIsOpen(false);
+                      setViewMode("day");
+                    }}
+                    style={{
+                      height: 34,
+                      borderRadius: 8,
+                      border: `1px solid ${isSelected ? C.purple : "transparent"}`,
+                      background: isSelected ? C.purple : "transparent",
+                      color: isSelected ? "#ffffff" : isCurrentMonth ? C.t1 : C.t3,
+                      opacity: isDisabled ? 0.35 : 1,
+                      cursor: isDisabled ? "not-allowed" : "pointer",
+                      fontSize: 12,
+                      fontWeight: 600,
+                    }}
+                  >
+                    {day.getDate()}
+                  </button>
+                );
+              })}
+            </div>
+          ) : null}
+
+          {viewMode === "month" ? (
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(3, minmax(0, 1fr))", gap: 8 }}>
+              {Array.from({ length: 12 }, (_, monthIndex) => {
+                const disabled = isMonthDisabled(monthIndex);
+                const selected = monthIndex === visibleMonth.getMonth();
+
+                return (
+                  <button
+                    key={monthIndex}
+                    type="button"
+                    disabled={disabled}
+                    onClick={() => {
+                      setVisibleMonth((current) => new Date(current.getFullYear(), monthIndex, 1));
+                      setViewMode("day");
+                    }}
+                    style={{
+                      minHeight: 36,
+                      borderRadius: 8,
+                      border: `1px solid ${selected ? C.purple : C.border}`,
+                      background: selected ? `${C.purple}12` : "transparent",
+                      color: C.t1,
+                      opacity: disabled ? 0.35 : 1,
+                      cursor: disabled ? "not-allowed" : "pointer",
+                      fontSize: 12,
+                      fontWeight: 600,
+                    }}
+                  >
+                    {new Date(2000, monthIndex, 1).toLocaleString("en-US", { month: "short" })}
+                  </button>
+                );
+              })}
+            </div>
+          ) : null}
+
+          {viewMode === "year" ? (
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(3, minmax(0, 1fr))", gap: 8 }}>
+              {Array.from({ length: 12 }, (_, index) => {
+                const year = yearStart + index;
+                const disabled = isYearDisabled(year);
+                const selected = year === visibleMonth.getFullYear();
+
+                return (
+                  <button
+                    key={year}
+                    type="button"
+                    disabled={disabled}
+                    onClick={() => {
+                      setVisibleMonth((current) => new Date(year, current.getMonth(), 1));
+                      setViewMode("month");
+                    }}
+                    style={{
+                      minHeight: 36,
+                      borderRadius: 8,
+                      border: `1px solid ${selected ? C.purple : C.border}`,
+                      background: selected ? `${C.purple}12` : "transparent",
+                      color: C.t1,
+                      opacity: disabled ? 0.35 : 1,
+                      cursor: disabled ? "not-allowed" : "pointer",
+                      fontSize: 12,
+                      fontWeight: 600,
+                    }}
+                  >
+                    {year}
+                  </button>
+                );
+              })}
+            </div>
+          ) : null}
         </div>
       ) : null}
     </div>
@@ -607,11 +725,8 @@ export default function HCMNewCasePage() {
 
   const sectionLabelStyle = {
     display: "block",
-    fontSize: 11,
-    fontWeight: 700,
     color: C.t2,
     textTransform: "uppercase",
-    letterSpacing: ".08em",
     marginBottom: 8,
   };
 
@@ -635,6 +750,12 @@ export default function HCMNewCasePage() {
     fontWeight: 500,
   };
   const backButtonAccent = C.purple;
+  const serviceImageStyle = {
+    width: "100%",
+    height: "100%",
+    objectFit: "cover",
+    display: "block",
+  };
 
   const uploadSelectedFiles = async ({ files, contextType, contextId }) => {
     for (const file of files) {
@@ -845,14 +966,14 @@ export default function HCMNewCasePage() {
             {icon}
           </div>
           <div className="flex-1 min-w-0">
-            <p className="truncate transition-colors" style={{ fontSize: 13, fontWeight: 600, color: C.t1 }} title={file.name}>
+            <p className="portal-citizen-value truncate transition-colors" style={{ fontWeight: 600, color: C.t1 }} title={file.name}>
               {file.name}
             </p>
             <div className="flex items-center gap-2 mt-1">
-              <span style={{ fontSize: 11, background: C.bgElevated, border: `1px solid ${C.borderLight}`, padding: "2px 8px", borderRadius: 6, fontWeight: 500, color: C.t2 }}>
+              <span className="portal-citizen-caption" style={{ background: C.bgElevated, border: `1px solid ${C.borderLight}`, padding: "2px 8px", borderRadius: 6, fontWeight: 500, color: C.t2 }}>
                 {fileType}
               </span>
-              <span style={{ fontSize: 11, color: C.t3 }}>
+              <span className="portal-citizen-caption" style={{ color: C.t3 }}>
                 {formatFileSize(file.size)}
               </span>
             </div>
@@ -879,9 +1000,14 @@ export default function HCMNewCasePage() {
     !meetingForm.preferredDate ||
     !meetingForm.preferredTime ||
     meetingForm.companions.some(c => c.phone.length > 0 && (!/^[6-9]/.test(c.phone) || c.phone.length < 10));
+  const landingViewportHeight = "calc(100vh - 112px)";
 
   return (
-    <WorkspacePage width={1320}>
+    <WorkspacePage
+      width={1440}
+      outerStyle={!activeTab ? { minHeight: "calc(100vh - var(--portal-header-height))", overflow: "hidden" } : undefined}
+      contentStyle={!activeTab ? { height: "100%" } : undefined}
+    >
       <SuccessModal
         open={successModal.open}
         title={successModal.title}
@@ -891,8 +1017,7 @@ export default function HCMNewCasePage() {
           setActiveTab("");
         }}
       />
-
-      <div style={{ width: "100%", paddingTop: 8, paddingBottom: 8 }}>
+      <div style={{ width: "100%", paddingTop: activeTab ? 8 : 0, paddingBottom: activeTab ? 8 : 0, overflow: !activeTab ? "hidden" : "visible", height: !activeTab ? "100%" : "auto" }}>
 
         {/* HEADER */}
         {activeTab && (
@@ -940,92 +1065,98 @@ export default function HCMNewCasePage() {
 
         {/* SERVICE SELECTION */}
         {!activeTab ? (
-          <div className="grid md:grid-cols-2 gap-6 mb-12">
-            {/* MEETING REQUEST */}
-            <button
-              onClick={() => {
-                setIsBackHovered(false);
-                setActiveTab("meeting");
-              }}
-              className="group relative rounded-xl border overflow-hidden text-left transition-all duration-300 hover:-translate-y-1 hover:scale-[1.01] hover:opacity-[0.99]"
-              style={{
-                background: C.card,
-                borderColor: C.border,
-                boxShadow: `0 18px 36px rgba(15, 23, 42, 0.08), 0 0 0 0 ${C.purple}00`,
-                minHeight: 340,
-              }}
-              onMouseEnter={(event) => {
-                event.currentTarget.style.boxShadow = `0 22px 44px rgba(15, 23, 42, 0.12), 0 0 28px ${C.purple}55`;
-              }}
-              onMouseLeave={(event) => {
-                event.currentTarget.style.boxShadow = `0 18px 36px rgba(15, 23, 42, 0.08), 0 0 0 0 ${C.purple}00`;
-              }}
-            >
-              <div className="relative p-10" style={{ minHeight: 340, display: "flex", flexDirection: "column", justifyContent: "space-between" }}>
-                <div
-                  className="h-14 w-14 rounded-xl flex items-center justify-center mb-5"
-                  style={{ background: C.purpleDim }}
-                >
-                  <Calendar size={26} style={{ color: C.purple }} />
+          <div
+            style={{
+              height: landingViewportHeight,
+              display: "grid",
+              gridTemplateRows: "minmax(0, 1fr) auto",
+              gap: 12,
+              overflow: "hidden",
+            }}
+          >
+            <div className="grid md:grid-cols-2 gap-4" style={{ minHeight: 0 }}>
+              {/* MEETING REQUEST */}
+              <button
+                onClick={() => {
+                  setIsBackHovered(false);
+                  setActiveTab("meeting");
+                }}
+                className="group relative rounded-xl border overflow-hidden text-left transition-all duration-300 hover:-translate-y-1 hover:scale-[1.01] hover:opacity-[0.99]"
+                style={{
+                  background: C.card,
+                  borderColor: C.border,
+                  boxShadow: `0 18px 36px rgba(15, 23, 42, 0.08), 0 0 0 0 ${C.purple}00`,
+                  height: "100%",
+                  minHeight: 0,
+                }}
+                onMouseEnter={(event) => {
+                  event.currentTarget.style.boxShadow = `0 22px 44px rgba(15, 23, 42, 0.12), 0 0 28px ${C.purple}55`;
+                }}
+                onMouseLeave={(event) => {
+                  event.currentTarget.style.boxShadow = `0 18px 36px rgba(15, 23, 42, 0.08), 0 0 0 0 ${C.purple}00`;
+                }}
+              >
+                <div className="relative" style={{ height: "100%", display: "flex", flexDirection: "column" }}>
+                  <div style={{ flex: "0 0 80%", minHeight: 0 }}>
+                    <img
+                      src={serviceMeetingImage}
+                      alt="Government officers and citizens in a formal meeting discussion"
+                      style={serviceImageStyle}
+                    />
+                  </div>
+                  <div className="p-8" style={{ flex: "0 0 20%", display: "flex", alignItems: "center" }}>
+                    <h3 style={{ fontSize: 22, fontWeight: 600, color: C.t1, margin: 0 }}>Request a Meeting</h3>
+                  </div>
                 </div>
-                <div>
-                  <h3 style={{ fontSize: 22, fontWeight: 600, color: C.t1, marginBottom: 10 }}>Request a Meeting</h3>
-                  <p style={{ color: C.t2, fontSize: 14, lineHeight: 1.7, marginBottom: 28, maxWidth: 520 }}>
-                    Schedule a meeting with an administration desk. You can specify purpose, add supporting documents, and invite companions.
-                  </p>
-                </div>
-                <div
-                  className="flex items-center gap-2 font-medium group-hover:gap-3 group-hover:translate-x-1 transition-all duration-300"
-                  style={{ color: C.purple, marginTop: 12 }}
-                >
-                  <span>Get Started</span>
-                  <ArrowRight size={18} className="group-hover:scale-110 transition-transform duration-300" />
-                </div>
-              </div>
-            </button>
+              </button>
 
-            {/* SUBMIT COMPLAINT */}
-            <button
-              onClick={() => {
-                setIsBackHovered(false);
-                setActiveTab("complaint");
-              }}
-              className="group relative rounded-xl border overflow-hidden text-left transition-all duration-300 hover:-translate-y-1 hover:scale-[1.01] hover:opacity-[0.99]"
-              style={{
-                background: C.card,
-                borderColor: C.border,
-                boxShadow: `0 18px 36px rgba(15, 23, 42, 0.08), 0 0 0 0 ${C.mint}00`,
-                minHeight: 340,
-              }}
-              onMouseEnter={(event) => {
-                event.currentTarget.style.boxShadow = `0 22px 44px rgba(15, 23, 42, 0.12), 0 0 28px ${C.mint}55`;
-              }}
-              onMouseLeave={(event) => {
-                event.currentTarget.style.boxShadow = `0 18px 36px rgba(15, 23, 42, 0.08), 0 0 0 0 ${C.mint}00`;
-              }}
-            >
-              <div className="relative p-10" style={{ minHeight: 340, display: "flex", flexDirection: "column", justifyContent: "space-between" }}>
-                <div
-                  className="h-14 w-14 rounded-xl flex items-center justify-center mb-5"
-                  style={{ background: `${C.mint}20` }}
-                >
-                  <FileText size={26} style={{ color: C.mint }} />
+              {/* SUBMIT COMPLAINT */}
+              <button
+                onClick={() => {
+                  setIsBackHovered(false);
+                  setActiveTab("complaint");
+                }}
+                className="group relative rounded-xl border overflow-hidden text-left transition-all duration-300 hover:-translate-y-1 hover:scale-[1.01] hover:opacity-[0.99]"
+                style={{
+                  background: C.card,
+                  borderColor: C.border,
+                  boxShadow: `0 18px 36px rgba(15, 23, 42, 0.08), 0 0 0 0 ${C.mint}00`,
+                  height: "100%",
+                  minHeight: 0,
+                }}
+                onMouseEnter={(event) => {
+                  event.currentTarget.style.boxShadow = `0 22px 44px rgba(15, 23, 42, 0.12), 0 0 28px ${C.mint}55`;
+                }}
+                onMouseLeave={(event) => {
+                  event.currentTarget.style.boxShadow = `0 18px 36px rgba(15, 23, 42, 0.08), 0 0 0 0 ${C.mint}00`;
+                }}
+              >
+                <div className="relative" style={{ height: "100%", display: "flex", flexDirection: "column" }}>
+                  <div style={{ flex: "0 0 80%", minHeight: 0 }}>
+                    <img
+                      src={serviceComplaintImage}
+                      alt="Citizen writing a formal complaint document at an office desk"
+                      style={serviceImageStyle}
+                    />
+                  </div>
+                  <div className="p-8" style={{ flex: "0 0 20%", display: "flex", alignItems: "center" }}>
+                    <h3 style={{ fontSize: 22, fontWeight: 600, color: C.t1, margin: 0 }}>Submit a Complaint</h3>
+                  </div>
                 </div>
-                <div>
-                  <h3 style={{ fontSize: 22, fontWeight: 600, color: C.t1, marginBottom: 10 }}>Submit a Complaint</h3>
-                  <p style={{ color: C.t2, fontSize: 14, lineHeight: 1.7, marginBottom: 28, maxWidth: 520 }}>
-                    File a formal complaint regarding any civic or government issue. Supports multiple document formats and categories.
-                  </p>
-                </div>
-                <div
-                  className="flex items-center gap-2 font-medium group-hover:gap-3 group-hover:translate-x-1 transition-all duration-300"
-                  style={{ color: C.mint, marginTop: 12 }}
-                >
-                  <span>Get Started</span>
-                  <ArrowRight size={18} className="group-hover:scale-110 transition-transform duration-300" />
-                </div>
-              </div>
-            </button>
+              </button>
+            </div>
+
+            <div className="rounded-xl p-5 text-center" style={{ background: C.purpleDim, border: `1px solid ${C.purple}33` }}>
+              <p style={{ color: C.t2, marginBottom: 12 }}>Already submitted a request or complaint?</p>
+              <Link
+                to={PATHS.citizen.cases}
+                className="inline-flex items-center gap-2 px-6 py-3 text-white font-semibold rounded-lg transition-colors"
+                style={{ background: C.purple, color: "#fff" }}
+              >
+                Track Your Cases
+                <ArrowRight size={18} />
+              </Link>
+            </div>
           </div>
         ) : activeTab === "meeting" ? (
           // MEETING FORM
@@ -1035,7 +1166,7 @@ export default function HCMNewCasePage() {
 
               {/* TITLE */}
               <div>
-                <label style={sectionLabelStyle}>
+                <label className="portal-citizen-label" style={sectionLabelStyle}>
                   Meeting Title <span style={{ color: C.danger }}>*</span>
                 </label>
                 <WorkspaceInput
@@ -1062,7 +1193,7 @@ export default function HCMNewCasePage() {
 
               {/* PURPOSE */}
               <div>
-                <label style={sectionLabelStyle}>
+                <label className="portal-citizen-label" style={sectionLabelStyle}>
                   Purpose of Meeting <span style={{ color: C.danger }}>*</span>
                 </label>
                 <textarea
@@ -1088,7 +1219,7 @@ export default function HCMNewCasePage() {
               <div className="grid lg:grid-cols-2 gap-3 items-start">
                 <div className="grid md:grid-cols-2 gap-3">
                   <div>
-                    <label className="flex items-center gap-2" style={{ ...sectionLabelStyle, display: "flex", alignItems: "center" }}>
+                    <label className="portal-citizen-label flex items-center gap-2" style={{ ...sectionLabelStyle, display: "flex", alignItems: "center" }}>
                       <Calendar size={16} />
                       <span>Preferred Date <span style={{ color: C.danger }}>*</span></span>
                     </label>
@@ -1103,7 +1234,7 @@ export default function HCMNewCasePage() {
                   </div>
 
                   <div>
-                    <label className="flex items-center gap-2" style={{ ...sectionLabelStyle, display: "flex", alignItems: "center" }}>
+                    <label className="portal-citizen-label flex items-center gap-2" style={{ ...sectionLabelStyle, display: "flex", alignItems: "center" }}>
                       <Clock size={16} />
                       <span>Preferred Time <span style={{ color: C.danger }}>*</span></span>
                     </label>
@@ -1118,7 +1249,7 @@ export default function HCMNewCasePage() {
                 </div>
 
                 <div>
-                  <label style={sectionLabelStyle}>
+                  <label className="portal-citizen-label" style={sectionLabelStyle}>
                     Admin Desk (Optional)
                   </label>
                   <WorkspaceSelect
@@ -1140,7 +1271,7 @@ export default function HCMNewCasePage() {
 
               {/* FILE UPLOAD */}
               <div>
-                <label style={sectionLabelStyle}>
+                <label className="portal-citizen-label" style={sectionLabelStyle}>
                   Supporting Documents (Optional)
                 </label>
                 <label className="border-2 border-dashed rounded-xl p-6 cursor-pointer transition-colors block" style={{ borderColor: C.border, background: C.bgElevated }}>
@@ -1154,7 +1285,7 @@ export default function HCMNewCasePage() {
                           ? `${meetingForm.files.length} file(s) selected`
                           : "Click to upload or drag and drop"}
                       </div>
-                      <p style={{ fontSize: 11, color: C.t3, marginTop: 4 }}>PDF, images, or office documents</p>
+                      <p className="portal-citizen-caption" style={{ color: C.t3, marginTop: 4 }}>PDF, images, or office documents</p>
                     </div>
                   </div>
 
@@ -1178,7 +1309,7 @@ export default function HCMNewCasePage() {
 
               {/* COMPANIONS */}
 
-                <label className="flex items-center gap-2" style={{ ...sectionLabelStyle, display: "flex", alignItems: "center" }}>
+                <label className="portal-citizen-label flex items-center gap-2" style={{ ...sectionLabelStyle, display: "flex", alignItems: "center" }}>
                   <Users size={18} />
                   <span>Additional Attendees</span>
                 </label>
@@ -1311,7 +1442,7 @@ export default function HCMNewCasePage() {
               
               {/* TITLE */}
               <div>
-                <label style={sectionLabelStyle}>
+                <label className="portal-citizen-label" style={sectionLabelStyle}>
                   Complaint Title <span style={{ color: C.danger }}>*</span>
                 </label>
                 <WorkspaceInput
@@ -1335,7 +1466,7 @@ export default function HCMNewCasePage() {
 
               {/* DETAILS */}
               <div>
-                <label style={sectionLabelStyle}>
+                <label className="portal-citizen-label" style={sectionLabelStyle}>
                   Complaint Details <span style={{ color: C.danger }}>*</span>
                 </label>
                 <textarea
@@ -1361,7 +1492,7 @@ export default function HCMNewCasePage() {
               {/* LOCATION */}
               <div className="grid md:grid-cols-3 gap-6">
                 <div>
-                  <label className="flex items-center gap-2" style={{ ...sectionLabelStyle, display: "flex", alignItems: "center" }}>
+                  <label className="portal-citizen-label flex items-center gap-2" style={{ ...sectionLabelStyle, display: "flex", alignItems: "center" }}>
                     <Briefcase size={16} />
                     <span>Category <span style={{ color: C.danger }}>*</span></span>
                   </label>
@@ -1383,7 +1514,7 @@ export default function HCMNewCasePage() {
                 </div>
 
                 <div>
-                  <label className="flex items-center gap-2" style={{ ...sectionLabelStyle, display: "flex", alignItems: "center" }}>
+                  <label className="portal-citizen-label flex items-center gap-2" style={{ ...sectionLabelStyle, display: "flex", alignItems: "center" }}>
                     <MapPin size={16} />
                     <span>Location <span style={{ color: C.danger }}>*</span></span>
                   </label>
@@ -1399,7 +1530,7 @@ export default function HCMNewCasePage() {
                 </div>
 
                 <div>
-                  <label className="flex items-center gap-2" style={{ ...sectionLabelStyle, display: "flex", alignItems: "center" }}>
+                  <label className="portal-citizen-label flex items-center gap-2" style={{ ...sectionLabelStyle, display: "flex", alignItems: "center" }}>
                     <Calendar size={16} />
                     <span>Date of Incident <span style={{ color: C.danger }}>*</span></span>
                   </label>
@@ -1416,7 +1547,7 @@ export default function HCMNewCasePage() {
 
               {/* FILE UPLOAD */}
               <div>
-                <label style={sectionLabelStyle}>
+                <label className="portal-citizen-label" style={sectionLabelStyle}>
                   Supporting Documents
                 </label>
                 <label className="border-2 border-dashed rounded-xl p-6 cursor-pointer transition-colors block" style={{ borderColor: C.border, background: C.bgElevated }}>
@@ -1430,7 +1561,7 @@ export default function HCMNewCasePage() {
                           ? `${complaintForm.files.length} file(s) selected`
                           : "Click to upload or drag and drop"}
                       </div>
-                      <p style={{ fontSize: 11, color: C.t3, marginTop: 4 }}>PDF, images, Excel (max 50 MB per file)</p>
+                      <p className="portal-citizen-caption" style={{ color: C.t3, marginTop: 4 }}>PDF, images, Excel (max 50 MB per file)</p>
                     </div>
                   </div>
 
@@ -1463,21 +1594,6 @@ export default function HCMNewCasePage() {
               </WorkspaceButton>
             </form>
           </WorkspaceCard>
-        )}
-
-        {/* TRACK CASES LINK */}
-        {!activeTab && (
-          <div className="rounded-xl p-8 text-center" style={{ background: C.purpleDim, border: `1px solid ${C.purple}33` }}>
-            <p style={{ color: C.t2, marginBottom: 16 }}>Already submitted a request or complaint?</p>
-            <Link
-              to={PATHS.citizen.cases}
-              className="inline-flex items-center gap-2 px-6 py-3 text-white font-semibold rounded-lg transition-colors"
-              style={{ background: C.purple, color: "#fff" }}
-            >
-              Track Your Cases
-              <ArrowRight size={18} />
-            </Link>
-          </div>
         )}
       </div>
     </WorkspacePage>

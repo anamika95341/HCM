@@ -33,24 +33,22 @@ function DetailBlock({ icon, label, value, multiline = false, compact = false })
       }}
     >
       <div
+        className="portal-citizen-label"
         style={{
           display: "flex",
           alignItems: "center",
           gap: 8,
           marginBottom: 8,
-          fontSize: 11,
-          fontWeight: 700,
           color: C.t3,
           textTransform: "uppercase",
-          letterSpacing: ".08em",
         }}
       >
         {icon}
         {label}
       </div>
       <div
+        className="portal-citizen-value"
         style={{
-          fontSize: 14,
           color: C.t1,
           fontWeight: 500,
           lineHeight: multiline ? 1.6 : 1.45,
@@ -84,8 +82,6 @@ export default function CaseDetailsPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [isBackHovered, setIsBackHovered] = useState(false);
-  const pageHeight = "calc(100vh - 73px)";
-
   useEffect(() => {
     let mounted = true;
 
@@ -117,7 +113,7 @@ export default function CaseDetailsPage() {
 
   if (loading) {
     return (
-      <div style={{ height: pageHeight, overflow: "hidden", padding: "16px 20px 12px" }}>
+      <div className="portal-citizen-page" style={{ minHeight: "100%", padding: "16px 20px 12px" }}>
         <div style={{ width: "100%", maxWidth: 1320, margin: "0 auto" }}>
           <WorkspaceEmptyState title="Loading complaint details..." />
         </div>
@@ -127,7 +123,7 @@ export default function CaseDetailsPage() {
 
   if (error || !caseData) {
     return (
-      <div style={{ height: pageHeight, overflow: "hidden", padding: "16px 20px 12px" }}>
+      <div className="portal-citizen-page" style={{ minHeight: "100%", padding: "16px 20px 12px" }}>
         <div style={{ width: "100%", maxWidth: 1320, margin: "0 auto" }}>
           <WorkspaceCard style={{ textAlign: "center" }}>
             <p style={{ color: C.t2, fontWeight: 600, marginBottom: 16 }}>{error || "Case details not found"}</p>
@@ -151,9 +147,9 @@ export default function CaseDetailsPage() {
 
   return (
     <div
+      className="portal-citizen-page"
       style={{
-        height: pageHeight,
-        overflow: "hidden",
+        minHeight: "100%",
         padding: "16px 20px 12px",
         display: "flex",
         flexDirection: "column",
@@ -191,7 +187,7 @@ export default function CaseDetailsPage() {
 
           <div className="grid lg:grid-cols-[7fr_3fr] gap-6" style={{ flex: 1, minHeight: 0, alignItems: "stretch" }}>
             <div style={{ minHeight: 0 }}>
-              <WorkspaceCard style={{ height: "100%" }}>
+              <WorkspaceCard>
                 <div className="grid sm:grid-cols-2 gap-4">
                   <DetailBlock icon={<Hash size={14} />} label="Complaint ID" value={complaintId} compact />
                   <div style={{ padding: "0 0 14px" }}>
@@ -201,12 +197,10 @@ export default function CaseDetailsPage() {
                         alignItems: "center",
                         gap: 8,
                         marginBottom: 8,
-                        fontSize: 11,
-                        fontWeight: 700,
                         color: C.t3,
                         textTransform: "uppercase",
-                        letterSpacing: ".08em",
                       }}
+                      className="portal-citizen-label"
                     >
                       <Calendar size={14} />
                       Status
@@ -272,8 +266,8 @@ export default function CaseDetailsPage() {
                             style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}
                           >
                             <div>
-                              <div style={{ fontSize: 14, color: C.t1, fontWeight: 600, lineHeight: 1.5 }}>{file.name}</div>
-                              <div style={{ marginTop: 4, fontSize: 12, color: C.t3 }}>{file.mimeType || "Document"}</div>
+                              <div className="portal-citizen-value" style={{ color: C.t1, fontWeight: 600 }}>{file.name}</div>
+                              <div className="portal-citizen-caption" style={{ marginTop: 4, color: C.t3 }}>{file.mimeType || "Document"}</div>
                             </div>
                             <WorkspaceButton
                               type="button"
@@ -286,7 +280,7 @@ export default function CaseDetailsPage() {
                         ))}
                       </div>
                     ) : (
-                      <div style={{ fontSize: 14, color: C.t1, fontWeight: 500, lineHeight: 1.5 }}>
+                      <div className="portal-citizen-value" style={{ color: C.t1, fontWeight: 500 }}>
                         No documents uploaded
                       </div>
                     )}
@@ -296,14 +290,14 @@ export default function CaseDetailsPage() {
             </div>
 
             <div style={{ minHeight: 0 }}>
-              <WorkspaceCard style={{ height: "100%", display: "flex", flexDirection: "column", minHeight: 0 }}>
+              <WorkspaceCard style={{ display: "flex", flexDirection: "column", minHeight: 0 }}>
                 <div style={{ fontSize: 16, fontWeight: 700, color: C.t1, marginBottom: 16, flexShrink: 0 }}>
                   Timeline
                 </div>
 
-                <div style={{ flex: 1, minHeight: 0, overflowY: "auto", paddingRight: 0, marginRight: -8 }}>
+                <div style={{ flex: 1, minHeight: 0, paddingRight: 0 }}>
                   {history.length === 0 ? (
-                    <p style={{ color: C.t3, fontSize: 13 }}>No timeline entries yet.</p>
+                    <p className="portal-citizen-caption" style={{ color: C.t3 }}>No timeline entries yet.</p>
                   ) : (
                     <div className="space-y-4">
                       {history.map((entry, index) => (
@@ -315,11 +309,11 @@ export default function CaseDetailsPage() {
                           <div className="flex-1 pb-3">
                             <div>
                               <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 12 }}>
-                                <p style={{ fontSize: 13, fontWeight: 600, color: C.t2, margin: 0, whiteSpace: "normal", wordBreak: "break-word" }}>{formatStatus(entry.new_status)}</p>
-                                <p style={{ fontSize: 12, color: C.t3, margin: 0, paddingRight: 10, whiteSpace: "normal", wordBreak: "break-word", textAlign: "right" }}>{formatActorRole(entry.actor_role)}</p>
+                                <p className="portal-citizen-value" style={{ fontWeight: 600, color: C.t2, margin: 0, whiteSpace: "normal", wordBreak: "break-word" }}>{formatStatus(entry.new_status)}</p>
+                                <p className="portal-citizen-caption" style={{ color: C.t3, margin: 0, paddingRight: 10, whiteSpace: "normal", wordBreak: "break-word", textAlign: "right" }}>{formatActorRole(entry.actor_role)}</p>
                               </div>
-                              {entry.note ? <p style={{ fontSize: 13, color: C.t2, marginTop: 8, marginBottom: 0, whiteSpace: "normal", wordBreak: "break-word", lineHeight: 1.5 }}>{entry.note}</p> : null}
-                              <p style={{ fontSize: 12, color: C.t3, marginTop: 8, marginBottom: 0 }}>{new Date(entry.created_at).toLocaleString("en-IN")}</p>
+                              {entry.note ? <p className="portal-citizen-value" style={{ color: C.t2, marginTop: 8, marginBottom: 0, whiteSpace: "normal", wordBreak: "break-word" }}>{entry.note}</p> : null}
+                              <p className="portal-citizen-caption" style={{ color: C.t3, marginTop: 8, marginBottom: 0 }}>{new Date(entry.created_at).toLocaleString("en-IN")}</p>
                             </div>
                           </div>
                         </div>

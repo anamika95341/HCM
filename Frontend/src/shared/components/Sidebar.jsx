@@ -22,6 +22,7 @@ function Sidebar({ collapsed, onToggle }) {
   const { C } = usePortalTheme();
   const { session, logout } = useAuth();
   const role = session?.role || "citizen";
+  const isCitizen = role === "citizen";
 
   const handleLogout = async (e) => {
     e.preventDefault();
@@ -80,18 +81,19 @@ function Sidebar({ collapsed, onToggle }) {
           padding: "var(--portal-space-10) var(--portal-space-8)",
           borderBottom: `1px solid ${C.border}`,
           gap: 10,
+          fontFamily: isCitizen ? "var(--portal-citizen-font)" : "inherit",
         }}
       >
-        <SidebarItem type="" collapsed={collapsed} label="Toggle Navigation">
+        <SidebarItem type="" collapsed={collapsed} label="Toggle Navigation" isCitizen={isCitizen}>
           <button
             onClick={onToggle}
             style={{
               width: 36,
               height: 36,
               borderRadius: 10,
-              background: C.bgElevated,
+              background: isCitizen ? "transparent" : C.bgElevated,
               color: C.t2,
-              border: `1px solid ${C.border}`,
+              border: isCitizen ? "none" : `1px solid ${C.border}`,
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
@@ -108,13 +110,13 @@ function Sidebar({ collapsed, onToggle }) {
        
         <ul style={{ width: "100%", display: "grid", gap: 2, margin: 0, padding: 0, listStyle: "none" }}>
           {navByRole[role].map((item) => (
-            <SidebarItem key={item.to} type="NavLink" to={item.to} icon={item.icon} label={item.label} collapsed={collapsed} />
+            <SidebarItem key={item.to} type="NavLink" to={item.to} icon={item.icon} label={item.label} collapsed={collapsed} isCitizen={isCitizen} />
           ))}
         </ul>
       </div>
 
       <div style={{ padding: "12px", borderTop: `1px solid ${C.border}` }}>
-        <SidebarItem type="" collapsed={collapsed} label="Logout">
+        <SidebarItem type="" collapsed={collapsed} label="Logout" isCitizen={isCitizen}>
           <button
             onClick={handleLogout}
             style={{
@@ -130,12 +132,14 @@ function Sidebar({ collapsed, onToggle }) {
               background: "transparent",
               borderRadius: 10,
               border: `1px solid ${C.danger}`,
-              fontSize: 13,
+              fontSize: isCitizen ? 14 : 13,
               fontWeight: 600,
+              lineHeight: isCitizen ? 1.45 : 1.4,
+              fontFamily: isCitizen ? "var(--portal-citizen-font)" : "inherit",
             }}
           >
             <FiLogOut size={18} />
-            {!collapsed && <div style={{ whiteSpace: "nowrap" }}>Logout</div>}
+            {!collapsed && <div className={isCitizen ? "portal-citizen-value" : undefined} style={{ whiteSpace: "nowrap", fontWeight: 600 }}>Logout</div>}
           </button>
         </SidebarItem>
       </div>

@@ -2,17 +2,20 @@ import { useState } from "react";
 import { Outlet } from "react-router-dom";
 import Sidebar from "../shared/components/Sidebar.jsx";
 import Header from "../shared/components/Header.jsx";
+import { useAuth } from "../shared/auth/AuthContext.jsx";
 import { usePortalTheme } from "../shared/theme/portalTheme.jsx";
 
 function Layout() {
   const [collapsed, setCollapsed] = useState(false);
   const { C } = usePortalTheme();
+  const { session } = useAuth();
   const sidebarWidth = collapsed ? 84 : 200;
   const modalOffsetLeft = collapsed ? 0 : sidebarWidth;
 
   return (
     <div
       className="portal-shell"
+      data-portal-role={session?.role || "guest"}
       style={{
         width: "100%",
         height: "100vh",
