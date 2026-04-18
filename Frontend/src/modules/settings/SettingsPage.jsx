@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
+import { useSearchParams } from "react-router-dom";
 import { usePortalTheme, PORTAL_THEME_PREVIEW_LIGHT, PORTAL_THEME_PREVIEW_DARK } from "../../shared/theme/portalTheme.jsx";
 import { useAuth } from "../../shared/auth/AuthContext.jsx";
 import { useNotifications } from "../../shared/notifications/NotificationContext.jsx";
@@ -65,13 +66,13 @@ const PillSegmented = ({ options, value, onChange }) => {
             onClick={() => onChange(opt.id)}
             style={{
               display: 'inline-flex', alignItems: 'center', gap: 8, padding: '6px 10px', borderRadius: 999,
-              border: 'none', cursor: 'pointer', background: active ? C.card : 'transparent',
-              color: active ? C.t1 : C.t3, fontSize: 12, fontWeight: 500,
+              border: 'none', cursor: 'pointer', background: active ? C.purple : 'transparent',
+              color: active ? '#FFFFFF' : C.t3, fontSize: 12, fontWeight: 500,
               boxShadow: active ? C.activePillShadow : 'none',
               transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
             }}
           >
-            {opt.icon && <Ico n={opt.icon} s={14} c={active ? C.t1 : C.t3} w={1.5} />}
+            {opt.icon && <Ico n={opt.icon} s={14} c={active ? '#FFFFFF' : C.t3} w={1.5} />}
             {opt.label}
             {opt.badge && <span style={{ marginLeft: 4, padding: '1px 6px', borderRadius: 999, fontSize: 10, fontWeight: 700, background: C.mintDim, color: C.mint }}>{opt.badge}</span>}
           </button>
@@ -89,13 +90,14 @@ const Toggle = ({ on, set }) => {
       onClick={() => set(!on)}
       style={{
         width: 44, height: 24, borderRadius: 999, cursor: 'pointer', position: 'relative', flexShrink: 0,
-        background: C.bgElevated, boxShadow: C.insetShadow,
-        transition: 'background 0.3s ease',
+        background: on ? `${C.mint}26` : C.bgElevated, boxShadow: C.insetShadow,
+        border: on ? `1px solid ${C.mint}40` : 'none',
+        transition: 'background 0.3s ease, border-color 0.3s ease',
       }}
     >
       <div style={{
         position: 'absolute', top: 3, left: on ? 23 : 3, width: 18, height: 18, borderRadius: 999,
-        background: on ? C.purple : C.t3, boxShadow: on ? C.activeGlow : C.knobShadow,
+        background: on ? C.mint : C.t3, boxShadow: on ? `0 4px 12px ${C.mint}40` : C.knobShadow,
         transition: 'left 0.3s cubic-bezier(0.4, 0, 0.2, 1), background 0.3s ease, box-shadow 0.3s ease',
       }} />
     </div>
@@ -115,10 +117,10 @@ const Card = ({ children, style = {} }) => {
   );
 };
 
-const CH = ({ title, sub, action }) => {
+const CH = ({ title, sub, action, divider = true }) => {
   const { C } = useTheme();
   return (
-    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: sub ? 'flex-start' : 'center', marginBottom: 20, paddingBottom: 16, borderBottom: `1px solid ${C.border}` }}>
+    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: sub ? 'flex-start' : 'center', marginBottom: 20, paddingBottom: divider ? 16 : 0, borderBottom: divider ? `1px solid ${C.border}` : 'none' }}>
       <div>
         <div style={{ fontSize: 14, fontWeight: 600, color: C.t1 }}>{title}</div>
         {sub && <div style={{ fontSize: 12, color: C.t3, marginTop: 4 }}>{sub}</div>}
@@ -128,10 +130,10 @@ const CH = ({ title, sub, action }) => {
   );
 };
 
-const TR = ({ label, note, on, set }) => {
+const TR = ({ label, note, on, set, divider = true }) => {
   const { C } = useTheme();
   return (
-    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '14px 0', borderBottom: `1px solid ${C.borderLight}`, transition: 'background 0.2s ease' }}>
+    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '14px 0', borderBottom: divider ? `1px solid ${C.borderLight}` : 'none', transition: 'background 0.2s ease' }}>
       <div style={{ paddingRight: 20 }}>
         <div style={{ fontSize: 13, color: C.t1, fontWeight: 500 }}>{label}</div>
         {note && <div style={{ fontSize: 11, color: C.t3, marginTop: 4, lineHeight: 1.5 }}>{note}</div>}
@@ -169,15 +171,22 @@ const Sel = ({ label, value, onChange, children }) => {
 
 const Btn = ({ label, variant = 'primary', icon, onClick, sm }) => {
   const { C } = useTheme();
+  const [hovered, setHovered] = useState(false);
   const v = {
     primary: { bg: C.purple, color: '#ffffff', border: 'none' },
     outline: { bg: 'transparent', color: C.purple, border: `1px solid ${C.purple}` },
     ghost: { bg: C.bgElevated, color: C.t2, border: `1px solid ${C.border}` },
     danger: { bg: 'transparent', color: C.danger, border: `1px solid ${C.danger}` },
   }[variant];
+  const buttonColor = hovered ? '#ffffff' : v.color;
   return (
-    <button onClick={onClick} style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: sm ? '6px 12px' : '10px 18px', borderRadius: 10, fontSize: sm ? 12 : 13, fontWeight: 600, cursor: 'pointer', background: v.bg, color: v.color, border: v.border || 'none', transition: 'all 0.2s ease', whiteSpace: 'nowrap' }}>
-      {icon && <Ico n={icon} s={sm ? 13 : 15} c={v.color} w={1.5} />}
+    <button
+      onClick={onClick}
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+      style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: sm ? '6px 12px' : '10px 18px', borderRadius: 10, fontSize: sm ? 12 : 13, fontWeight: 600, cursor: 'pointer', background: hovered ? C.purple : v.bg, color: buttonColor, border: hovered ? `1px solid ${C.purple}` : (v.border || 'none'), transition: 'all 0.2s ease', whiteSpace: 'nowrap' }}
+    >
+      {icon && <Ico n={icon} s={sm ? 13 : 15} c={buttonColor} w={1.5} />}
       {label}
     </button>
   );
@@ -239,6 +248,9 @@ const ProfileSection = ({ permissions, profile, role, onProfileSaved }) => {
   const [passwordSaving, setPasswordSaving] = useState(false);
   const [passwordError, setPasswordError] = useState(null);
   const [passwordSuccess, setPasswordSuccess] = useState(null);
+  const [currentPasswordError, setCurrentPasswordError] = useState(null);
+  const [newPasswordError, setNewPasswordError] = useState(null);
+  const [confirmPasswordError, setConfirmPasswordError] = useState(null);
 
   useEffect(() => {
     if (!profile) return;
@@ -278,6 +290,24 @@ const ProfileSection = ({ permissions, profile, role, onProfileSaved }) => {
     setConfirmPassword('');
     setPasswordError(null);
     setPasswordSuccess(null);
+    setCurrentPasswordError(null);
+    setNewPasswordError(null);
+    setConfirmPasswordError(null);
+  }
+
+  function validatePasswordComplexity(value) {
+    return value.length >= 7 && /[A-Z]/.test(value) && /[a-z]/.test(value) && /\d/.test(value) && /[^A-Za-z0-9]/.test(value);
+  }
+
+  function handlePasswordFieldChange(setter, errorSetter, value) {
+    if (value.length > 25) {
+      errorSetter('Max 25 characters allowed');
+      return;
+    }
+    errorSetter(null);
+    setter(value);
+    setPasswordError(null);
+    setPasswordSuccess(null);
   }
 
   async function handleSave() {
@@ -308,6 +338,9 @@ const ProfileSection = ({ permissions, profile, role, onProfileSaved }) => {
     setPasswordSaving(true);
     setPasswordError(null);
     setPasswordSuccess(null);
+    setCurrentPasswordError(null);
+    setNewPasswordError(null);
+    setConfirmPasswordError(null);
 
     if (!currentPassword || !newPassword || !confirmPassword) {
       setPasswordSaving(false);
@@ -315,9 +348,23 @@ const ProfileSection = ({ permissions, profile, role, onProfileSaved }) => {
       return;
     }
 
+    if (currentPassword.length > 25 || newPassword.length > 25 || confirmPassword.length > 25) {
+      if (currentPassword.length > 25) setCurrentPasswordError('Max 25 characters allowed');
+      if (newPassword.length > 25) setNewPasswordError('Max 25 characters allowed');
+      if (confirmPassword.length > 25) setConfirmPasswordError('Max 25 characters allowed');
+      setPasswordSaving(false);
+      return;
+    }
+
+    if (!validatePasswordComplexity(currentPassword) || !validatePasswordComplexity(newPassword) || !validatePasswordComplexity(confirmPassword)) {
+      setPasswordSaving(false);
+      setPasswordError('Password should include uppercase, lowercase, number, and special character.');
+      return;
+    }
+
     if (newPassword !== confirmPassword) {
       setPasswordSaving(false);
-      setPasswordError('New password and confirmation do not match.');
+      setConfirmPasswordError('Incorrect password');
       return;
     }
 
@@ -336,7 +383,11 @@ const ProfileSection = ({ permissions, profile, role, onProfileSaved }) => {
         err?.response?.data?.message ??
         err?.response?.data?.error ??
         'Failed to update password. Please try again.';
-      setPasswordError(msg);
+      if (/incorrect password|current password/i.test(msg)) {
+        setCurrentPasswordError('Incorrect password');
+      } else {
+        setPasswordError(msg);
+      }
     } finally {
       setPasswordSaving(false);
     }
@@ -344,9 +395,8 @@ const ProfileSection = ({ permissions, profile, role, onProfileSaved }) => {
 
   return (
     <div style={{ animation: 'fadeIn 0.3s ease' }}>
-      <SH icon="person" title="Profile & Account Settings" sub="Manage your personal information and account security." />
+      <SH icon="person" title="Profile & Account Settings" />
 
-      {/* Personal Information */}
       <Card>
         <CH title="Personal Information" />
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0 24px' }}>
@@ -413,11 +463,125 @@ const ProfileSection = ({ permissions, profile, role, onProfileSaved }) => {
           <Btn label="Discard" variant="ghost" onClick={handleDiscard} />
           <Btn
             label={saving ? 'Saving…' : 'Save Changes'}
-            variant="primary"
+            variant="outline"
             icon="check"
             onClick={handleSave}
           />
         </div>
+        {(permissions.show2FA || permissions.showSmsOtp || permissions.showChangePassword) && (
+          <div style={{ marginTop: 28, paddingTop: 24, borderTop: `1px solid ${C.border}` }}>
+          <CH title="Security Settings" />
+          {permissions.show2FA && (
+            <TR
+              label="Two-Factor Authentication (2FA)"
+              note="Require OTP verification at every login session"
+              on={twoFA}
+              set={setTwoFA}
+            />
+          )}
+          {permissions.showSmsOtp && (
+            <TR
+              label="SMS OTP Configuration"
+              note="Receive one-time passwords via registered mobile number"
+              on={smsOTP}
+              set={setSmsOTP}
+            />
+          )}
+          {permissions.showChangePassword && (
+            <>
+              {!passwordOpen && (
+                <div style={{ display: 'flex', gap: 12, marginTop: 20 }}>
+                  <Btn
+                    label="Change Password"
+                    variant="outline"
+                    icon="lock"
+                    onClick={() => {
+                      setPasswordOpen(true);
+                    }}
+                  />
+                </div>
+              )}
+              {passwordOpen && (
+                <div style={{ marginTop: 20 }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '0 24px' }}>
+                    <div>
+                      <Inp
+                        label="Current Password"
+                        value={currentPassword}
+                        set={(value) => handlePasswordFieldChange(setCurrentPassword, setCurrentPasswordError, value)}
+                        type="password"
+                        icon="lock"
+                        placeholder="Enter current password"
+                      />
+                      {currentPasswordError && (
+                        <div style={{ fontSize: 12, color: C.danger, marginTop: -8, marginBottom: 12 }}>
+                          {currentPasswordError}
+                        </div>
+                      )}
+                    </div>
+                    <div>
+                      <Inp
+                        label="New Password"
+                        value={newPassword}
+                        set={(value) => handlePasswordFieldChange(setNewPassword, setNewPasswordError, value)}
+                        type="password"
+                        icon="lock"
+                        placeholder="Enter new password"
+                      />
+                      {newPasswordError && (
+                        <div style={{ fontSize: 12, color: C.danger, marginTop: -8, marginBottom: 12 }}>
+                          {newPasswordError}
+                        </div>
+                      )}
+                    </div>
+                    <div>
+                      <Inp
+                        label="Confirm New Password"
+                        value={confirmPassword}
+                        set={(value) => handlePasswordFieldChange(setConfirmPassword, setConfirmPasswordError, value)}
+                        type="password"
+                        icon="lock"
+                        placeholder="Confirm new password"
+                      />
+                      {confirmPasswordError && (
+                        <div style={{ fontSize: 12, color: C.danger, marginTop: -8, marginBottom: 12 }}>
+                          {confirmPasswordError}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                  {passwordError && (
+                    <div style={{ fontSize: 12, color: C.danger, marginTop: 4 }}>
+                      {passwordError}
+                    </div>
+                  )}
+                  {passwordSuccess && (
+                    <div style={{ fontSize: 12, color: C.mint, marginTop: 14 }}>
+                      {passwordSuccess}
+                    </div>
+                  )}
+                  <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 12, marginTop: 18 }}>
+                    <Btn
+                      label="Discard"
+                      variant="ghost"
+                      onClick={() => {
+                        resetPasswordForm();
+                        setPasswordOpen(false);
+                      }}
+                    />
+                    <Btn
+                      label={passwordSaving ? 'Updating…' : 'Update Password'}
+                      variant="outline"
+                      icon="check"
+                      onClick={handlePasswordSave}
+                    />
+                  </div>
+                </div>
+              )}
+            </>
+          )}
+          </div>
+        )}
       </Card>
 
       {/* Digital Signature — minister only */}
@@ -474,109 +638,6 @@ const ProfileSection = ({ permissions, profile, role, onProfileSaved }) => {
                 <span style={{ fontSize: 12, color: C.t3 }}>Enable to temporarily assign approval rights to an OSD or subordinate officer during absence.</span>
               </div>
             </div>
-          )}
-        </Card>
-      )}
-
-      {/* Security Settings */}
-      {(permissions.show2FA || permissions.showSmsOtp || permissions.showChangePassword) && (
-        <Card>
-          <CH title="Security Settings" />
-          {permissions.show2FA && (
-            <TR
-              label="Two-Factor Authentication (2FA)"
-              note="Require OTP verification at every login session"
-              on={twoFA}
-              set={setTwoFA}
-            />
-          )}
-          {permissions.showSmsOtp && (
-            <TR
-              label="SMS OTP Configuration"
-              note="Receive one-time passwords via registered mobile number"
-              on={smsOTP}
-              set={setSmsOTP}
-            />
-          )}
-          {permissions.showChangePassword && (
-            <>
-              <div style={{ display: 'flex', gap: 12, marginTop: 20 }}>
-                <Btn
-                  label={passwordOpen ? "Hide Password Form" : "Change Password"}
-                  variant="outline"
-                  icon="lock"
-                  onClick={() => {
-                    setPasswordOpen((current) => {
-                      const next = !current;
-                      if (!next) {
-                        resetPasswordForm();
-                      }
-                      return next;
-                    });
-                  }}
-                />
-              </div>
-              {passwordOpen && (
-                <div style={{ marginTop: 20, paddingTop: 20, borderTop: `1px solid ${C.border}` }}>
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0 24px' }}>
-                    <Inp
-                      label="Current Password"
-                      value={currentPassword}
-                      set={setCurrentPassword}
-                      type="password"
-                      icon="lock"
-                      placeholder="Enter current password"
-                    />
-                    <div />
-                    <Inp
-                      label="New Password"
-                      value={newPassword}
-                      set={setNewPassword}
-                      type="password"
-                      icon="lock"
-                      placeholder="Enter new password"
-                    />
-                    <Inp
-                      label="Confirm New Password"
-                      value={confirmPassword}
-                      set={setConfirmPassword}
-                      type="password"
-                      icon="lock"
-                      placeholder="Confirm new password"
-                    />
-                  </div>
-                  <div style={{ fontSize: 11, color: C.t3, marginTop: 2, lineHeight: 1.6 }}>
-                    Password must be 12-128 characters and include uppercase, lowercase, number, and special character.
-                  </div>
-                  {passwordError && (
-                    <div style={{ fontSize: 12, color: C.danger, marginTop: 14 }}>
-                      {passwordError}
-                    </div>
-                  )}
-                  {passwordSuccess && (
-                    <div style={{ fontSize: 12, color: C.mint, marginTop: 14 }}>
-                      {passwordSuccess}
-                    </div>
-                  )}
-                  <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 12, marginTop: 18 }}>
-                    <Btn
-                      label="Discard"
-                      variant="ghost"
-                      onClick={() => {
-                        resetPasswordForm();
-                        setPasswordOpen(false);
-                      }}
-                    />
-                    <Btn
-                      label={passwordSaving ? 'Updating…' : 'Update Password'}
-                      variant="primary"
-                      icon="check"
-                      onClick={handlePasswordSave}
-                    />
-                  </div>
-                </div>
-              )}
-            </>
           )}
         </Card>
       )}
@@ -651,36 +712,35 @@ const NotificationsSection = ({ permissions }) => {
 
   return (
     <div style={{ animation: 'fadeIn 0.3s ease' }}>
-      <SH icon="bell" title="Notification & Alert Preferences" sub="Control how and when you receive updates from the system." />
+      <SH icon="bell" title="Notification & Alert Preferences" />
 
-      {/* Notification Channels */}
       <Card>
-        <CH title="Notification Channels" sub="Toggle which delivery channels are active for your account." />
+        <CH title="Notification Channels" divider={false} />
         <div style={{ display: 'grid', gridTemplateColumns: permissions.showSmsChannel ? '1fr 1fr 1fr' : '1fr 1fr', gap: 16 }}>
           {[
-            { k: 'app', icon: 'bell', label: 'In-App Notifications', sub: 'Bell icon in the top navigation bar', color: C.purple },
-            { k: 'email', icon: 'mail', label: 'Email Alerts', sub: 'Sent to your registered email address', color: C.purple },
+            { k: 'app', icon: 'bell', label: 'In-App Notifications', sub: 'Bell icon in the top navigation bar', color: C.mint },
+            { k: 'email', icon: 'mail', label: 'Email Alerts', sub: 'Sent to your registered email address', color: C.mint },
             permissions.showSmsChannel
               ? { k: 'sms', icon: 'phone', label: 'SMS Alerts', sub: 'Sent to your registered mobile number', color: C.mint }
               : null,
           ].filter(Boolean).map(item => (
-            <div key={item.k} style={{ border: `1px solid ${ch[item.k] ? item.color + '40' : C.border}`, borderRadius: 12, padding: 18, background: ch[item.k] ? item.color + '0a' : C.bgElevated, transition: 'all 0.2s ease' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 14 }}>
-                <div style={{ width: 38, height: 38, borderRadius: 10, background: item.color + '20', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                  <Ico n={item.icon} s={18} c={item.color} />
+            <div key={item.k} style={{ border: `1px solid ${ch[item.k] ? item.color + '40' : C.border}`, borderRadius: 12, padding: 14, background: ch[item.k] ? item.color + '0a' : C.bgElevated, transition: 'all 0.2s ease' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0 }}>
+                  <div style={{ width: 34, height: 34, borderRadius: 10, background: item.color + '20', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                    <Ico n={item.icon} s={17} c={item.color} />
+                  </div>
+                  <div style={{ fontSize: 13, fontWeight: 600, color: C.t1, lineHeight: 1.35 }}>{item.label}</div>
                 </div>
                 <Toggle on={ch[item.k]} set={v => setCh(p => ({ ...p, [item.k]: v }))} />
               </div>
-              <div style={{ fontSize: 13, fontWeight: 600, color: C.t1 }}>{item.label}</div>
-              <div style={{ fontSize: 11, color: C.t3, marginTop: 4 }}>{item.sub}</div>
+              <div style={{ fontSize: 11, color: C.t3, marginTop: 8, lineHeight: 1.45 }}>{item.sub}</div>
             </div>
           ))}
         </div>
-      </Card>
 
-      {/* Trigger Configurations */}
-      <Card>
-        <CH title="Trigger Configurations" sub="Select which events generate a notification for your account." />
+        <div style={{ marginTop: 28, paddingTop: 24, borderTop: `1px solid ${C.border}` }}>
+        <CH title="Trigger Configurations" divider={false} />
         {permissions.triggers.map(item => (
           <TR
             key={item.k}
@@ -697,6 +757,7 @@ const NotificationsSection = ({ permissions }) => {
             }
             on={tr[item.k] ?? true}
             set={v => setTr(p => ({ ...p, [item.k]: v }))}
+            divider={item.k === 'complaintStatus'}
           />
         ))}
         {hasDeadlineTrigger && tr[deadlineTriggerKey] && (
@@ -713,20 +774,20 @@ const NotificationsSection = ({ permissions }) => {
             <span style={{ fontSize: 13, color: C.t2 }}>days before the due date</span>
           </div>
         )}
-      </Card>
 
-      {/* Email Digest Frequency */}
-      <Card>
-        <CH title="Email Digest Frequency" sub="Choose how often email summaries are delivered to your inbox." />
+        <div style={{ marginTop: 28 }}>
+        <CH title="Email Digest Frequency" divider={false} />
         <PillSegmented
           options={digestOptions}
           value={digest}
           onChange={setDigest}
         />
-        <div style={{ fontSize: 11, color: C.t3, marginTop: 12 }}>
+        <div style={{ fontSize: 12, color: C.t3, marginTop: 12, lineHeight: 1.5 }}>
           {digest === 'realtime' && 'Instant alert for every update'}
           {digest === 'daily' && 'Morning pendency report at 8:00 AM'}
           {digest === 'weekly' && 'Comprehensive overview every Monday'}
+        </div>
+        </div>
         </div>
       </Card>
     </div>
@@ -739,13 +800,12 @@ const NotificationsSection = ({ permissions }) => {
 function SettingsPortalContent() {
   const { C } = useTheme();
   const { session } = useAuth();
-  const { unreadCount } = useNotifications();
+  const [searchParams, setSearchParams] = useSearchParams();
 
   const role = session?.role ?? 'citizen';
   const { profile: profilePermissions, notifications: notifPermissions } = getRoleSettings(role);
-
-  const [activeTab, setActiveTab] = useState('profile');
-  const [search, setSearch] = useState('');
+  const requestedTab = searchParams.get('tab');
+  const activeTab = requestedTab === 'notifications' ? 'notifications' : 'profile';
   const [profile, setProfile] = useState(null);
 
   useEffect(() => {
@@ -757,56 +817,17 @@ function SettingsPortalContent() {
     return () => { cancelled = true; };
   }, [role, session?.role]);
 
-  const tabs = [
-    { id: 'profile', icon: 'person', label: 'Profile & Account' },
-    { id: 'notifications', icon: 'bell', label: 'Notifications', badge: unreadCount > 0 ? String(unreadCount) : null },
-  ];
+  useEffect(() => {
+    if (requestedTab === 'profile' || requestedTab === 'notifications') return;
+    const nextParams = new URLSearchParams(searchParams);
+    nextParams.set('tab', 'profile');
+    setSearchParams(nextParams, { replace: true });
+  }, [requestedTab, searchParams, setSearchParams]);
 
   return (
-    <div className="settings-portal" style={{ display: 'flex', flexDirection: 'column', height: '100%', background: C.bg, overflow: 'hidden', transition: 'background 0.3s ease' }}>
-
-      {/* HEADER */}
-      <header style={{ padding: '16px 24px', borderBottom: `1px solid ${C.border}`, display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12, flexShrink: 0, background: C.bgElevated }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-          <div style={{ width: 36, height: 36, borderRadius: 10, background: C.purpleDim, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <Ico n="settings" s={18} c={C.purple} />
-          </div>
-          <h1 style={{ fontSize: 24, fontWeight: 700, lineHeight: 1.25, color: C.t1 }}>Settings</h1>
-        </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          <div style={{ position: 'relative' }}>
-            <Ico n="search" s={14} c={C.t3} style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none' }} />
-            <input type="text" value={search} onChange={e => setSearch(e.target.value)} placeholder="Search settings..."
-              style={{ width: 200, padding: '10px 14px 10px 38px', border: `1px solid ${C.border}`, borderRadius: 10, fontSize: 13, fontWeight: 500, color: C.t1, background: C.inp, transition: 'border-color 0.2s ease, box-shadow 0.2s ease' }} />
-          </div>
-        </div>
-      </header>
-
-      <div style={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
-        {/* SETTINGS SIDEBAR */}
-        <div style={{ width: 260, borderRight: `1px solid ${C.border}`, background: C.bgElevated, padding: '20px 12px', display: 'flex', flexDirection: 'column', gap: 6, overflowY: 'auto', flexShrink: 0 }}>
-          {tabs.map(t => (
-            <button
-              key={t.id}
-              onClick={() => setActiveTab(t.id)}
-              style={{
-                display: 'flex', alignItems: 'center', gap: 12, padding: '12px 16px', cursor: 'pointer',
-                background: activeTab === t.id ? C.card : 'transparent', border: 'none', borderRadius: 10,
-                color: activeTab === t.id ? C.t1 : C.t3,
-                fontSize: 13, fontWeight: activeTab === t.id ? 600 : 500,
-                transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)', textAlign: 'left',
-              }}
-            >
-              <Ico n={t.icon} s={16} c={activeTab === t.id ? C.purple : C.t3} />
-              <span style={{ flex: 1 }}>{t.label}</span>
-              {t.badge && <span style={{ padding: '2px 8px', borderRadius: 999, fontSize: 10, fontWeight: 700, background: C.mintDim, color: C.mint }}>{t.badge}</span>}
-            </button>
-          ))}
-        </div>
-
-        {/* MAIN CONTENT */}
-        <div style={{ flex: 1, overflowY: 'auto', padding: '32px 40px', background: C.bg }}>
-          <div style={{ maxWidth: 900, margin: '0 auto' }}>
+    <div className="settings-portal" style={{ background: C.bg, transition: 'background 0.3s ease' }}>
+      <div style={{ width: '100%', padding: '24px 32px 32px', background: C.bg }}>
+          <div style={{ width: '100%', maxWidth: 'none', margin: 0 }}>
             {activeTab === 'profile' && (
               <ProfileSection
                 permissions={profilePermissions}
@@ -822,7 +843,6 @@ function SettingsPortalContent() {
               />
             )}
           </div>
-        </div>
       </div>
     </div>
   );

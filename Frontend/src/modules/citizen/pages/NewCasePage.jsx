@@ -6,17 +6,14 @@ import {
   FileVideo, FileArchive, FileCode, FileCheck, FileX, FileBarChart,
   Database, Presentation
 } from "lucide-react";
-import { Link, useNavigate } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import { FaFilePdf } from "react-icons/fa";
 import { sanitizeSelectedFiles as sanitizeUploadedFiles } from "../../../shared/security/files.js";
-import { PATHS } from "../../../routes/paths.js";
 import { apiClient } from "../../../shared/api/client.js";
 import { uploadPrivateFile } from "../../../shared/api/privateFiles.js";
 import { useAuth } from "../../../shared/auth/AuthContext.jsx";
 import { usePortalTheme } from "../../../shared/theme/portalTheme.jsx";
 import { WorkspaceButton, WorkspaceCard, WorkspaceCardHeader, WorkspaceInput, WorkspacePage, WorkspaceSectionHeader, WorkspaceSelect } from "../../../shared/components/WorkspaceUI.jsx";
-import serviceMeetingImage from "../../../assets/citizen/ChatGPT Image Apr 16, 2026, 11_27_23 PM.png";
-import serviceComplaintImage from "../../../assets/citizen/ChatGPT Image Apr 16, 2026, 11_29_03 PM.png";
 
 const FILE_UPLOAD_OPTIONS = {
   maxFiles: 5,
@@ -750,12 +747,6 @@ export default function HCMNewCasePage() {
     fontWeight: 500,
   };
   const backButtonAccent = C.purple;
-  const serviceImageStyle = {
-    width: "100%",
-    height: "100%",
-    objectFit: "cover",
-    display: "block",
-  };
 
   const uploadSelectedFiles = async ({ files, contextType, contextId }) => {
     for (const file of files) {
@@ -1000,13 +991,11 @@ export default function HCMNewCasePage() {
     !meetingForm.preferredDate ||
     !meetingForm.preferredTime ||
     meetingForm.companions.some(c => c.phone.length > 0 && (!/^[6-9]/.test(c.phone) || c.phone.length < 10));
-  const landingViewportHeight = "calc(100vh - 112px)";
-
+  const landingViewportHeight = "calc(100vh - 172px)";
   return (
     <WorkspacePage
       width={1440}
-      outerStyle={!activeTab ? { minHeight: "calc(100vh - var(--portal-header-height))", overflow: "hidden" } : undefined}
-      contentStyle={!activeTab ? { height: "100%" } : undefined}
+      outerStyle={!activeTab ? { minHeight: "calc(100vh - var(--portal-header-height))" } : undefined}
     >
       <SuccessModal
         open={successModal.open}
@@ -1017,7 +1006,7 @@ export default function HCMNewCasePage() {
           setActiveTab("");
         }}
       />
-      <div style={{ width: "100%", paddingTop: activeTab ? 8 : 0, paddingBottom: activeTab ? 8 : 0, overflow: !activeTab ? "hidden" : "visible", height: !activeTab ? "100%" : "auto" }}>
+      <div style={{ width: "100%", paddingTop: activeTab ? 8 : 0, paddingBottom: activeTab ? 8 : 0 }}>
 
         {/* HEADER */}
         {activeTab && (
@@ -1067,14 +1056,13 @@ export default function HCMNewCasePage() {
         {!activeTab ? (
           <div
             style={{
-              height: landingViewportHeight,
-              display: "grid",
-              gridTemplateRows: "minmax(0, 1fr) auto",
-              gap: 12,
-              overflow: "hidden",
+              minHeight: landingViewportHeight,
+              display: "flex",
+              flexDirection: "column",
+              justifyContent: "space-between",
             }}
           >
-            <div className="grid md:grid-cols-2 gap-4" style={{ minHeight: 0 }}>
+            <div className="grid md:grid-cols-2 gap-6">
               {/* MEETING REQUEST */}
               <button
                 onClick={() => {
@@ -1086,8 +1074,7 @@ export default function HCMNewCasePage() {
                   background: C.card,
                   borderColor: C.border,
                   boxShadow: `0 18px 36px rgba(15, 23, 42, 0.08), 0 0 0 0 ${C.purple}00`,
-                  height: "100%",
-                  minHeight: 0,
+                  minHeight: 340,
                 }}
                 onMouseEnter={(event) => {
                   event.currentTarget.style.boxShadow = `0 22px 44px rgba(15, 23, 42, 0.12), 0 0 28px ${C.purple}55`;
@@ -1096,16 +1083,25 @@ export default function HCMNewCasePage() {
                   event.currentTarget.style.boxShadow = `0 18px 36px rgba(15, 23, 42, 0.08), 0 0 0 0 ${C.purple}00`;
                 }}
               >
-                <div className="relative" style={{ height: "100%", display: "flex", flexDirection: "column" }}>
-                  <div style={{ flex: "0 0 80%", minHeight: 0 }}>
-                    <img
-                      src={serviceMeetingImage}
-                      alt="Government officers and citizens in a formal meeting discussion"
-                      style={serviceImageStyle}
-                    />
+                <div className="relative p-10" style={{ minHeight: 340, display: "flex", flexDirection: "column", justifyContent: "space-between" }}>
+                  <div
+                    className="h-14 w-14 rounded-xl flex items-center justify-center mb-5"
+                    style={{ background: C.purpleDim }}
+                  >
+                    <Calendar size={26} style={{ color: C.purple }} />
                   </div>
-                  <div className="p-8" style={{ flex: "0 0 20%", display: "flex", alignItems: "center" }}>
-                    <h3 style={{ fontSize: 22, fontWeight: 600, color: C.t1, margin: 0 }}>Request a Meeting</h3>
+                  <div>
+                    <h3 style={{ fontSize: 22, fontWeight: 600, color: C.t1, marginBottom: 10 }}>Request a Meeting</h3>
+                    <p style={{ color: C.t2, fontSize: 14, lineHeight: 1.7, marginBottom: 28, maxWidth: 520 }}>
+                      Schedule a meeting with an administration desk. You can specify purpose, add supporting documents, and invite companions.
+                    </p>
+                  </div>
+                  <div
+                    className="flex items-center gap-2 font-medium group-hover:gap-3 group-hover:translate-x-1 transition-all duration-300"
+                    style={{ color: C.purple, marginTop: 12 }}
+                  >
+                    <span>Get Started</span>
+                    <ArrowRight size={18} className="group-hover:scale-110 transition-transform duration-300" />
                   </div>
                 </div>
               </button>
@@ -1121,8 +1117,7 @@ export default function HCMNewCasePage() {
                   background: C.card,
                   borderColor: C.border,
                   boxShadow: `0 18px 36px rgba(15, 23, 42, 0.08), 0 0 0 0 ${C.mint}00`,
-                  height: "100%",
-                  minHeight: 0,
+                  minHeight: 340,
                 }}
                 onMouseEnter={(event) => {
                   event.currentTarget.style.boxShadow = `0 22px 44px rgba(15, 23, 42, 0.12), 0 0 28px ${C.mint}55`;
@@ -1131,31 +1126,66 @@ export default function HCMNewCasePage() {
                   event.currentTarget.style.boxShadow = `0 18px 36px rgba(15, 23, 42, 0.08), 0 0 0 0 ${C.mint}00`;
                 }}
               >
-                <div className="relative" style={{ height: "100%", display: "flex", flexDirection: "column" }}>
-                  <div style={{ flex: "0 0 80%", minHeight: 0 }}>
-                    <img
-                      src={serviceComplaintImage}
-                      alt="Citizen writing a formal complaint document at an office desk"
-                      style={serviceImageStyle}
-                    />
+                <div className="relative p-10" style={{ minHeight: 340, display: "flex", flexDirection: "column", justifyContent: "space-between" }}>
+                  <div
+                    className="h-14 w-14 rounded-xl flex items-center justify-center mb-5"
+                    style={{ background: `${C.mint}20` }}
+                  >
+                    <FileText size={26} style={{ color: C.mint }} />
                   </div>
-                  <div className="p-8" style={{ flex: "0 0 20%", display: "flex", alignItems: "center" }}>
-                    <h3 style={{ fontSize: 22, fontWeight: 600, color: C.t1, margin: 0 }}>Submit a Complaint</h3>
+                  <div>
+                    <h3 style={{ fontSize: 22, fontWeight: 600, color: C.t1, marginBottom: 10 }}>Submit a Complaint</h3>
+                    <p style={{ color: C.t2, fontSize: 14, lineHeight: 1.7, marginBottom: 28, maxWidth: 520 }}>
+                      File a formal complaint regarding any civic or government issue. Supports multiple document formats and categories.
+                    </p>
+                  </div>
+                  <div
+                    className="flex items-center gap-2 font-medium group-hover:gap-3 group-hover:translate-x-1 transition-all duration-300"
+                    style={{ color: C.mint, marginTop: 12 }}
+                  >
+                    <span>Get Started</span>
+                    <ArrowRight size={18} className="group-hover:scale-110 transition-transform duration-300" />
                   </div>
                 </div>
               </button>
             </div>
 
-            <div className="rounded-xl p-5 text-center" style={{ background: C.purpleDim, border: `1px solid ${C.purple}33` }}>
-              <p style={{ color: C.t2, marginBottom: 12 }}>Already submitted a request or complaint?</p>
-              <Link
-                to={PATHS.citizen.cases}
-                className="inline-flex items-center gap-2 px-6 py-3 text-white font-semibold rounded-lg transition-colors"
-                style={{ background: C.purple, color: "#fff" }}
-              >
-                Track Your Cases
-                <ArrowRight size={18} />
-              </Link>
+            <div
+              style={{
+                marginTop: 32,
+                borderRadius: 18,
+                padding: "20px 24px",
+                background: `linear-gradient(135deg, ${C.purpleDim} 0%, ${C.card} 46%, ${`${C.mint}12`} 100%)`,
+                border: `1px solid ${C.border}`,
+                display: "grid",
+                gap: 16,
+                gridTemplateColumns: "minmax(0, 1.5fr) minmax(280px, 0.9fr)",
+              }}
+            >
+              <div>
+                <h2 style={{ margin: 0, fontSize: 28, lineHeight: 1.12, fontWeight: 700, color: C.t1, maxWidth: 640 }}>
+                  Start a request, attach proof, and track every update from one place.
+                </h2>
+                <p style={{ margin: "12px 0 0", maxWidth: 680, color: C.t2, fontSize: 13, lineHeight: 1.65 }}>
+                  Use meeting requests for appointments with officials, or file a complaint for civic issues that need action. Both services keep your details, documents, and status updates organized inside the portal.
+                </p>
+              </div>
+              <div style={{ display: "grid", gap: 12, alignContent: "start" }}>
+                {[
+                  { icon: Clock, title: "Fast intake", text: "Submit in a few steps with guided fields and required validations." },
+                  { icon: Upload, title: "Documents supported", text: "Attach supporting files for faster verification and review." },
+                ].map((item) => (
+                  <div key={item.title} style={{ display: "flex", gap: 12, padding: "14px 16px", borderRadius: 14, background: C.bgElevated, border: `1px solid ${C.border}` }}>
+                    <div style={{ width: 38, height: 38, borderRadius: 10, display: "flex", alignItems: "center", justifyContent: "center", background: C.card, flexShrink: 0 }}>
+                      <item.icon size={18} style={{ color: C.purple }} />
+                    </div>
+                    <div>
+                      <div style={{ color: C.t1, fontSize: 13, fontWeight: 700 }}>{item.title}</div>
+                      <div style={{ color: C.t3, fontSize: 12, lineHeight: 1.6, marginTop: 3 }}>{item.text}</div>
+                    </div>
+                  </div>
+                ))}
+              </div>
             </div>
           </div>
         ) : activeTab === "meeting" ? (
@@ -1595,6 +1625,7 @@ export default function HCMNewCasePage() {
             </form>
           </WorkspaceCard>
         )}
+
       </div>
     </WorkspacePage>
   );

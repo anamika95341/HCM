@@ -86,6 +86,7 @@ function formatTableDate(value) {
 function CustomDateFilter({ value, onChange, placeholder, max }) {
   const { C } = usePortalTheme();
   const [isOpen, setIsOpen] = useState(false);
+  const [focused, setFocused] = useState(false);
   const [openDirection, setOpenDirection] = useState("down");
   const [viewMode, setViewMode] = useState("day");
   const rootRef = useRef(null);
@@ -147,15 +148,18 @@ function CustomDateFilter({ value, onChange, placeholder, max }) {
       <button
         type="button"
         onClick={() => setIsOpen((current) => !current)}
+        onFocus={() => setFocused(true)}
+        onBlur={() => setFocused(false)}
         style={{
           width: "100%",
-          minHeight: 42,
-          padding: "10px 14px",
-          border: `1px solid ${C.border}`,
+          minHeight: 34,
+          padding: "6px 14px",
+          border: `1px solid ${focused ? C.purple : C.border}`,
           background: C.inp,
           color: value ? C.t1 : C.t3,
           fontSize: 13,
           outline: "none",
+          boxShadow: focused ? `0 0 0 3px ${C.purpleDim}` : "none",
           borderRadius: "var(--portal-radius-sm, 10px)",
           display: "flex",
           alignItems: "center",
@@ -163,6 +167,7 @@ function CustomDateFilter({ value, onChange, placeholder, max }) {
           gap: 12,
           cursor: "pointer",
           textAlign: "left",
+          transition: "border-color var(--portal-duration-fast) ease, box-shadow var(--portal-duration-fast) ease",
         }}
       >
         <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{value ? formatDisplayDate(value) : placeholder}</span>
@@ -420,16 +425,18 @@ export default function MeetingList() {
   const tableHeaderBackground = C.purple;
   const tableHeaderText = "#FFFFFF";
   const alternateRowBackground = C.name === "dark" ? C.card : "#F7F1FF";
+  const pageHeight = "calc(100vh - 73px)";
   const [meetings, setMeetings] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [hoveredActionId, setHoveredActionId] = useState(null);
   const [hoveredPagerButton, setHoveredPagerButton] = useState(null);
+  const [showEntriesFocused, setShowEntriesFocused] = useState(false);
   
   // Pagination and Filter State
   const [filters, setFilters] = useState({ q: "", status: "all", createdAt: "" });
   const [currentPage, setCurrentPage] = useState(1);
-  const itemsPerPage = 8;
+  const [itemsPerPage, setItemsPerPage] = useState(8);
   const todayDate = formatDateValue(new Date());
 
   useEffect(() => {
@@ -490,73 +497,118 @@ export default function MeetingList() {
   // Pagination Math
   const totalPages = Math.ceil(items.length / itemsPerPage) || 1;
   const paginatedItems = items.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
-
+  const pageNumbers = useMemo(() => {
+    if (totalPages <= 1) return [1];
+    const pages = new Set([1, totalPages, currentPage - 1, currentPage, currentPage + 1]);
+    return Array.from(pages).filter((page) => page >= 1 && page <= totalPages).sort((a, b) => a - b);
+  }, [currentPage, totalPages]);
   // Dynamic Status Options for the dropdown
   const statusOptions = useMemo(() => {
     return Array.from(new Set(meetings.map((item) => item.status).filter(Boolean))).sort();
   }, [meetings]);
 
+  useEffect(() => {
+    setCurrentPage((page) => Math.min(page, totalPages));
+  }, [totalPages]);
+
   return (
     <div
       className="portal-citizen-page"
       style={{
-        minHeight: "100%",
-        padding: "20px 20px 12px",
+        height: pageHeight,
+        overflow: "auto",
+        padding: "16px 20px 8px",
         display: "flex",
         flexDirection: "column",
       }}
     >
         <div style={{ width: "100%", display: "flex", flexDirection: "column", flex: 1, minHeight: 0 }}>
-        <div style={{ marginBottom: 24, display: "flex", alignItems: "center", gap: 10 }}>
+        <div style={{ marginBottom: 18, display: "flex", alignItems: "center", gap: 10 }}>
           <Calendar size={20} style={{ color: C.purple, flexShrink: 0 }} />
           <h1 style={{ margin: 0, fontSize: 20, lineHeight: 1.3, fontWeight: 600, color: C.t1 }}>MY MEETINGS</h1>
         </div>
 
-        <div style={{ marginBottom: 20 }}>
-          <div className="grid gap-3 md:grid-cols-[3fr_1fr_1fr]">
-            <div className="relative">
-              <Search className="absolute left-3 top-3" size={18} style={{ color: C.t3 }} />
-              <WorkspaceInput
-                value={filters.q}
+        <div style={{ marginBottom: 14, display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              <span className="portal-citizen-caption" style={{ color: C.t2, whiteSpace: "nowrap" }}>
+                Show
+              </span>
+              <input
+                type="number"
+                min={1}
+                max={25}
+                value={itemsPerPage}
                 onChange={(event) => {
-                  setFilters((current) => ({ ...current, q: event.target.value }));
+                  const nextValue = Number(event.target.value);
+                  if (!Number.isFinite(nextValue)) return;
+                  setItemsPerPage(Math.min(25, Math.max(1, nextValue)));
                   setCurrentPage(1);
                 }}
-                placeholder="Search by Meeting Id , Title and Location"
-                style={{ paddingLeft: 38 }}
+                onFocus={() => setShowEntriesFocused(true)}
+                onBlur={() => setShowEntriesFocused(false)}
+                style={{
+                  width: 64,
+                  minHeight: 34,
+                  padding: "6px 14px",
+                  border: `1px solid ${showEntriesFocused ? C.purple : C.border}`,
+                  borderRadius: "var(--portal-radius-sm, 10px)",
+                  background: C.inp,
+                  color: C.t1,
+                  fontSize: 13,
+                  fontWeight: 500,
+                  outline: "none",
+                  boxShadow: showEntriesFocused ? `0 0 0 3px ${C.purpleDim}` : "none",
+                  transition: "border-color var(--portal-duration-fast) ease, box-shadow var(--portal-duration-fast) ease",
+                }}
               />
+              <span className="portal-citizen-caption" style={{ color: C.t2, whiteSpace: "nowrap" }}>
+                Entries
+              </span>
             </div>
-            <div className="relative">
-              <Filter className="absolute left-3 top-3" size={18} style={{ color: C.t3 }} />
-              <WorkspaceSelect
-                value={filters.status}
+            <div style={{ marginLeft: "auto", width: "50%", minWidth: 520, display: "grid", gap: 12, gridTemplateColumns: "minmax(280px, 3fr) minmax(140px, 1fr) minmax(140px, 1fr)" }}>
+              <div className="relative">
+                <Search className="absolute left-3 top-2.5" size={17} style={{ color: C.t3 }} />
+                <WorkspaceInput
+                  value={filters.q}
+                  onChange={(event) => {
+                    setFilters((current) => ({ ...current, q: event.target.value }));
+                    setCurrentPage(1);
+                  }}
+                  placeholder="Search by Meeting Id , Title and Location"
+                  style={{ paddingLeft: 36, minHeight: 34, paddingTop: 6, paddingBottom: 6 }}
+                />
+              </div>
+              <CustomDateFilter
+                value={filters.createdAt}
+                onChange={(nextValue) => {
+                  setFilters((current) => ({ ...current, createdAt: nextValue }));
+                  setCurrentPage(1);
+                }}
+                placeholder="Created At"
+                max={todayDate}
+              />
+              <div className="relative">
+                <Filter className="absolute left-3 top-2.5" size={17} style={{ color: C.t3 }} />
+                <WorkspaceSelect
+                  value={filters.status}
                 onChange={(event) => {
                   setFilters((current) => ({ ...current, status: event.target.value }));
                   setCurrentPage(1);
                 }}
-                style={{ paddingLeft: 38 }}
+                style={{ paddingLeft: 36, minHeight: 34, paddingTop: 6, paddingBottom: 6 }}
               >
-                <option value="all">All status</option>
-                {statusOptions.map((status) => (
-                  <option key={status} value={status}>
-                    {status.replace(/_/g, " ").charAt(0).toUpperCase() + status.replace(/_/g, " ").slice(1)}
-                  </option>
-                ))}
-              </WorkspaceSelect>
+                  <option value="all">All status</option>
+                  {statusOptions.map((status) => (
+                    <option key={status} value={status}>
+                      {status.replace(/_/g, " ").charAt(0).toUpperCase() + status.replace(/_/g, " ").slice(1)}
+                    </option>
+                  ))}
+                </WorkspaceSelect>
+              </div>
             </div>
-            <CustomDateFilter
-              value={filters.createdAt}
-              onChange={(nextValue) => {
-                setFilters((current) => ({ ...current, createdAt: nextValue }));
-                setCurrentPage(1);
-              }}
-              placeholder="Filter by Created At"
-              max={todayDate}
-            />
-          </div>
         </div>
 
-        <div style={{ flex: 1, minHeight: 0, display: "flex", flexDirection: "column" }}>
+        <div style={{ display: "flex", flexDirection: "column" }}>
           {loading && <WorkspaceEmptyState title="Loading your meetings..." />}
           {error && <div style={{ color: C.danger, padding: "12px 0" }}>{error}</div>}
 
@@ -566,7 +618,7 @@ export default function MeetingList() {
                 <WorkspaceEmptyState title="No meeting requests found" subtitle="Try adjusting your filters." />
               ) : (
                 <>
-                  <div className="hidden lg:block" style={{ border: `1px solid ${C.border}`, borderRadius: 12, overflow: "hidden", display: "flex", flexDirection: "column", flex: 1, minHeight: 0 }}>
+                  <div className="hidden lg:block" style={{ border: `1px solid ${C.border}`, borderRadius: 12, overflow: "hidden", display: "flex", flexDirection: "column", marginBottom: 10 }}>
                     <table className="w-full text-sm" style={{ borderCollapse: "collapse", tableLayout: "fixed" }}>
                           <colgroup>
                             <col style={idColumnStyle} />
@@ -579,13 +631,13 @@ export default function MeetingList() {
                           </colgroup>
                           <thead>
                             <tr>
-                              <th style={{ padding: "13px 16px", fontSize: 10, fontWeight: 600, color: tableHeaderText, textTransform: "uppercase", letterSpacing: "0.06em", textAlign: "left", whiteSpace: "nowrap", background: tableHeaderBackground, borderBottom: `1px solid ${C.border}`, verticalAlign: "middle" }}>Meeting ID</th>
+                              <th style={{ padding: "13px 16px", fontSize: 10, fontWeight: 600, color: tableHeaderText, textTransform: "uppercase", letterSpacing: "0.06em", textAlign: "left", whiteSpace: "nowrap", background: tableHeaderBackground, borderBottom: `1px solid ${C.border}`, verticalAlign: "middle", borderTopLeftRadius: 12 }}>Meeting ID</th>
                               <th style={{ padding: "13px 16px", fontSize: 10, fontWeight: 600, color: tableHeaderText, textTransform: "uppercase", letterSpacing: "0.06em", textAlign: "left", whiteSpace: "nowrap", background: tableHeaderBackground, borderBottom: `1px solid ${C.border}`, verticalAlign: "middle" }}>Title</th>
                               <th style={{ padding: "13px 16px", fontSize: 10, fontWeight: 600, color: tableHeaderText, textTransform: "uppercase", letterSpacing: "0.06em", textAlign: "left", whiteSpace: "nowrap", background: tableHeaderBackground, borderBottom: `1px solid ${C.border}`, verticalAlign: "middle" }}>Created At</th>
                               <th style={{ padding: "13px 16px", fontSize: 10, fontWeight: 600, color: tableHeaderText, textTransform: "uppercase", letterSpacing: "0.06em", textAlign: "left", whiteSpace: "nowrap", background: tableHeaderBackground, borderBottom: `1px solid ${C.border}`, verticalAlign: "middle" }}>Scheduled Date</th>
                               <th style={{ padding: "13px 16px", fontSize: 10, fontWeight: 600, color: tableHeaderText, textTransform: "uppercase", letterSpacing: "0.06em", textAlign: "left", whiteSpace: "nowrap", background: tableHeaderBackground, borderBottom: `1px solid ${C.border}`, verticalAlign: "middle" }}>Scheduled Location</th>
                               <th style={{ width: "1%", padding: "13px 16px", fontSize: 10, fontWeight: 600, color: tableHeaderText, textTransform: "uppercase", letterSpacing: "0.06em", textAlign: "left", whiteSpace: "nowrap", background: tableHeaderBackground, borderBottom: `1px solid ${C.border}`, verticalAlign: "middle" }}>Status</th>
-                              <th style={{ width: "1%", padding: "13px 16px", fontSize: 10, fontWeight: 600, color: tableHeaderText, textTransform: "uppercase", letterSpacing: "0.06em", textAlign: "center", whiteSpace: "nowrap", background: tableHeaderBackground, borderBottom: `1px solid ${C.border}`, verticalAlign: "middle" }}>Action</th>
+                              <th style={{ width: "1%", padding: "13px 16px", fontSize: 10, fontWeight: 600, color: tableHeaderText, textTransform: "uppercase", letterSpacing: "0.06em", textAlign: "center", whiteSpace: "nowrap", background: tableHeaderBackground, borderBottom: `1px solid ${C.border}`, verticalAlign: "middle", borderTopRightRadius: 12 }}>Action</th>
                             </tr>
                           </thead>
                           <tbody>
@@ -647,14 +699,14 @@ export default function MeetingList() {
                                         minWidth: 0,
                                         padding: 7,
                                         borderRadius: 10,
-                                        border: `1px solid ${C.purple}`,
+                                        border: "none",
                                         background: isActionHovered ? C.purple : "transparent",
                                         color: isActionHovered ? "#ffffff" : C.purple,
                                         display: "inline-flex",
                                         alignItems: "center",
                                         justifyContent: "center",
                                         cursor: "pointer",
-                                        transition: "background var(--portal-duration-fast) ease, color var(--portal-duration-fast) ease, border-color var(--portal-duration-fast) ease",
+                                        transition: "background var(--portal-duration-fast) ease, color var(--portal-duration-fast) ease",
                                       }}
                                     >
                                       <Eye size={18} />
@@ -667,7 +719,7 @@ export default function MeetingList() {
                     </table>
 
                     <div className="portal-citizen-table-footer" style={{ background: C.bgElevated, borderTop: `1px solid ${C.border}` }}>
-                      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 px-6 py-3.5">
+                      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-2 py-1.5" style={{ width: "calc(100% - 24px)", margin: "0 auto" }}>
                         <p className="portal-citizen-caption" style={{ color: C.t2, margin: 0 }}>
                           Showing <span className="font-semibold">{Math.min((currentPage - 1) * itemsPerPage + 1, items.length)}</span>-<span className="font-semibold">{Math.min(currentPage * itemsPerPage, items.length)}</span> of <span className="font-semibold">{items.length}</span> requests
                         </p>
@@ -681,14 +733,47 @@ export default function MeetingList() {
                               onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
                               disabled={currentPage === 1}
                               variant="outline"
-                              style={{ minHeight: 34, padding: "8px 12px", fontSize: 12, background: hoveredPagerButton === "previous" && currentPage !== 1 ? C.purple : "transparent", color: hoveredPagerButton === "previous" && currentPage !== 1 ? "#ffffff" : C.purple, border: `1px solid ${C.purple}`, opacity: currentPage === 1 ? 0.4 : 1, display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 6 }}
+                              style={{ minWidth: 30, minHeight: 30, padding: "6px", fontSize: 12, background: hoveredPagerButton === "previous" && currentPage !== 1 ? C.purple : "transparent", color: hoveredPagerButton === "previous" && currentPage !== 1 ? "#ffffff" : C.purple, border: "none", opacity: currentPage === 1 ? 0.4 : 1, display: "inline-flex", alignItems: "center", justifyContent: "center", borderRadius: 8 }}
                             >
-                              <ChevronLeft size={16} /> Previous
+                              <ChevronLeft size={16} />
                             </WorkspaceButton>
 
-                            <span className="portal-citizen-caption" style={{ padding: "6px 10px", color: C.t3 }}>
-                              Page <span className="font-semibold">{currentPage}</span> of <span className="font-semibold">{totalPages}</span>
-                            </span>
+                            {pageNumbers.map((pageNumber, index) => {
+                              const previousPage = pageNumbers[index - 1];
+                              const showGap = index > 0 && previousPage !== undefined && pageNumber - previousPage > 1;
+                              return (
+                                <div key={pageNumber} className="flex items-center gap-2">
+                                  {showGap ? (
+                                    <span className="portal-citizen-caption" style={{ color: C.t3, padding: "0 2px" }}>
+                                      ...
+                                    </span>
+                                  ) : null}
+                                  <WorkspaceButton
+                                    className="portal-citizen-pager-btn"
+                                    onMouseEnter={() => setHoveredPagerButton(`page-${pageNumber}`)}
+                                    onMouseLeave={() => setHoveredPagerButton(null)}
+                                    onClick={() => setCurrentPage(pageNumber)}
+                                    variant="outline"
+                                    style={{
+                                      minWidth: 30,
+                                      minHeight: 30,
+                                      padding: "6px",
+                                      fontSize: 12,
+                                      background: currentPage === pageNumber || hoveredPagerButton === `page-${pageNumber}` ? C.purple : "transparent",
+                                      color: currentPage === pageNumber || hoveredPagerButton === `page-${pageNumber}` ? "#ffffff" : C.purple,
+                                      border: "none",
+                                      display: "inline-flex",
+                                      alignItems: "center",
+                                      justifyContent: "center",
+                                      fontWeight: 600,
+                                      borderRadius: 8,
+                                    }}
+                                  >
+                                    {pageNumber}
+                                  </WorkspaceButton>
+                                </div>
+                              );
+                            })}
 
                             <WorkspaceButton
                               className="portal-citizen-pager-btn"
@@ -697,9 +782,9 @@ export default function MeetingList() {
                               onClick={() => setCurrentPage(Math.min(totalPages, currentPage + 1))}
                               disabled={currentPage === totalPages}
                               variant="outline"
-                              style={{ minHeight: 34, padding: "8px 12px", fontSize: 12, background: hoveredPagerButton === "next" && currentPage !== totalPages ? C.purple : "transparent", color: hoveredPagerButton === "next" && currentPage !== totalPages ? "#ffffff" : C.purple, border: `1px solid ${C.purple}`, opacity: currentPage === totalPages ? 0.4 : 1, display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 6 }}
+                              style={{ minWidth: 30, minHeight: 30, padding: "6px", fontSize: 12, background: hoveredPagerButton === "next" && currentPage !== totalPages ? C.purple : "transparent", color: hoveredPagerButton === "next" && currentPage !== totalPages ? "#ffffff" : C.purple, border: "none", opacity: currentPage === totalPages ? 0.4 : 1, display: "inline-flex", alignItems: "center", justifyContent: "center", borderRadius: 8 }}
                             >
-                              Next <ChevronRight size={16} />
+                              <ChevronRight size={16} />
                             </WorkspaceButton>
                           </div>
                         )}

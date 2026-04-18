@@ -1,12 +1,7 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import {
   ChevronRight,
-  Calendar,
-  Clock,
-  MapPin,
-  FileText,
-  Hash,
 } from "lucide-react";
 import { apiClient } from "../../../shared/api/client.js";
 import { openDownloadUrl } from "../../../shared/api/downloads.js";
@@ -50,7 +45,7 @@ function valueTone(status, C) {
   return C.purple;
 }
 
-function DetailBlock({ icon, label, value, multiline = false, compact = false, valueColor }) {
+function DetailBlock({ label, value, multiline = false, compact = false, valueColor }) {
   const { C } = usePortalTheme();
   return (
     <div
@@ -63,13 +58,11 @@ function DetailBlock({ icon, label, value, multiline = false, compact = false, v
         style={{
           display: "flex",
           alignItems: "center",
-          gap: 8,
           marginBottom: 8,
           color: C.t3,
           textTransform: "uppercase",
         }}
       >
-        {icon}
         {label}
       </div>
       <div
@@ -107,6 +100,9 @@ export default function MeetingDetail() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [isBackHovered, setIsBackHovered] = useState(false);
+  const informationCardRef = useRef(null);
+  const [timelineCardHeight, setTimelineCardHeight] = useState(null);
+  const [isDesktopLayout, setIsDesktopLayout] = useState(false);
   useEffect(() => {
     let mounted = true;
 
@@ -138,6 +134,38 @@ export default function MeetingDetail() {
       mounted = false;
     };
   }, [id, session?.role, eventVersion]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return undefined;
+
+    const updateLayout = () => {
+      setIsDesktopLayout(window.innerWidth >= 1024);
+    };
+
+    updateLayout();
+    window.addEventListener("resize", updateLayout);
+    return () => window.removeEventListener("resize", updateLayout);
+  }, []);
+
+  useEffect(() => {
+    if (!isDesktopLayout) {
+      setTimelineCardHeight(null);
+      return undefined;
+    }
+
+    const cardElement = informationCardRef.current;
+    if (!cardElement || typeof ResizeObserver === "undefined") return undefined;
+
+    const updateHeight = () => {
+      setTimelineCardHeight(cardElement.getBoundingClientRect().height);
+    };
+
+    updateHeight();
+    const observer = new ResizeObserver(() => updateHeight());
+    observer.observe(cardElement);
+
+    return () => observer.disconnect();
+  }, [isDesktopLayout, meeting, history]);
 
   if (loading) {
     return (
@@ -180,6 +208,9 @@ export default function MeetingDetail() {
   const preferredTimeLabel = meeting.preferred_time
     ? new Date(meeting.preferred_time).toLocaleString("en-IN", { dateStyle: "long", timeStyle: "short" })
     : null;
+  const createdAtLabel = meeting.createdAt || meeting.created_at
+    ? new Date(meeting.createdAt || meeting.created_at).toLocaleDateString("en-GB")
+    : "Not provided";
   const scheduledTimeLabel = meeting.scheduled_at
     ? new Date(meeting.scheduled_at).toLocaleString("en-IN", { dateStyle: "long", timeStyle: "short" })
     : "Pending";
@@ -236,24 +267,23 @@ export default function MeetingDetail() {
             <div />
           </div>
 
-          <div className="grid lg:grid-cols-[7fr_3fr] gap-6" style={{ flex: 1, minHeight: 0, alignItems: "stretch" }}>
-            <div style={{ minHeight: 0 }}>
-              <WorkspaceCard>
-                <div className="grid sm:grid-cols-2 gap-4">
-                  <DetailBlock icon={<Hash size={14} />} label="Meeting ID" value={meeting.requestId || meeting.id} compact />
+          <div className="grid lg:grid-cols-[7fr_3fr] gap-6" style={{ flex: 1, minHeight: 0, alignItems: "start" }}>
+            <div ref={informationCardRef} style={{ minHeight: 0 }}>
+              <WorkspaceCard style={{ marginBottom: 0 }}>
+                <div className="grid md:grid-cols-3 gap-4">
+                  <DetailBlock label="Meeting ID" value={meeting.requestId || meeting.id} compact />
+                  <DetailBlock label="Created At" value={createdAtLabel} compact />
                   <div style={{ padding: "0 0 14px" }}>
                     <div
                       style={{
                         display: "flex",
                         alignItems: "center",
-                        gap: 8,
                         marginBottom: 8,
                         color: C.t3,
                         textTransform: "uppercase",
                       }}
                       className="portal-citizen-label"
                     >
-                      <Clock size={14} />
                       Status
                     </div>
                     <WorkspaceBadge status={meeting.status}>{statusLabel}</WorkspaceBadge>
@@ -262,7 +292,6 @@ export default function MeetingDetail() {
 
                 <div style={{ marginTop: 16 }}>
                   <DetailBlock
-                    icon={<FileText size={14} />}
                     label="Meeting Title"
                     value={meeting.title || meeting.primaryTitle}
                     multiline
@@ -271,13 +300,12 @@ export default function MeetingDetail() {
                 </div>
 
                 <div className="grid md:grid-cols-3 gap-4" style={{ marginTop: 16 }}>
-                  <DetailBlock icon={<Calendar size={14} />} label="Preferred Time" value={preferredTimeLabel} compact />
+                  <DetailBlock label="Preferred Date/Time" value={preferredTimeLabel} compact />
                   <div style={{ padding: "0 0 14px" }}>
                     <div
                       style={{
                         display: "flex",
                         alignItems: "center",
-                        gap: 8,
                         marginBottom: 8,
                         fontSize: 11,
                         fontWeight: 700,
@@ -286,7 +314,6 @@ export default function MeetingDetail() {
                         letterSpacing: ".08em",
                       }}
                     >
-                      <Clock size={14} />
                       Scheduled Time
                     </div>
                     <span style={{
@@ -310,14 +337,12 @@ export default function MeetingDetail() {
                       style={{
                         display: "flex",
                         alignItems: "center",
-                        gap: 8,
                         marginBottom: 8,
                         color: C.t3,
                         textTransform: "uppercase",
                       }}
                       className="portal-citizen-label"
                     >
-                      <MapPin size={14} />
                       Location
                     </div>
                     <span style={{
@@ -340,7 +365,6 @@ export default function MeetingDetail() {
 
                 <div style={{ marginTop: 16 }}>
                   <DetailBlock
-                    icon={<FileText size={14} />}
                     label="Meeting Description"
                     value={meeting.purpose}
                     multiline
@@ -355,14 +379,12 @@ export default function MeetingDetail() {
                     style={{
                       display: "flex",
                       alignItems: "center",
-                      gap: 8,
                       marginBottom: 8,
                         color: C.t3,
                         textTransform: "uppercase",
                       }}
                       className="portal-citizen-label"
                     >
-                    <FileText size={14} />
                     Documents
                   </div>
                   <div
@@ -404,8 +426,21 @@ export default function MeetingDetail() {
               </WorkspaceCard>
             </div>
 
-            <div style={{ minHeight: 0 }}>
-              <WorkspaceCard style={{ display: "flex", flexDirection: "column", minHeight: 0 }}>
+            <div
+              style={{
+                minHeight: 0,
+                height: isDesktopLayout && timelineCardHeight ? timelineCardHeight : "auto",
+              }}
+            >
+              <WorkspaceCard
+                style={{
+                  display: "flex",
+                  flexDirection: "column",
+                  minHeight: 0,
+                  height: "100%",
+                  marginBottom: 0,
+                }}
+              >
                 <div
                   style={{
                     fontSize: 16,
@@ -418,7 +453,7 @@ export default function MeetingDetail() {
                   Timeline
                 </div>
 
-                <div style={{ flex: 1, minHeight: 0, paddingRight: 0 }}>
+                <div style={{ flex: 1, minHeight: 0, paddingRight: 0, overflowY: isDesktopLayout && timelineCardHeight ? "auto" : "visible" }}>
                   {history.length === 0 ? (
                     <p className="portal-citizen-caption" style={{ color: C.t3 }}>No timeline entries yet.</p>
                   ) : (

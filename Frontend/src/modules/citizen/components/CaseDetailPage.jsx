@@ -1,6 +1,6 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
-import { ChevronRight, MapPin, Calendar, FileText, Hash, Briefcase } from "lucide-react";
+import { ChevronRight } from "lucide-react";
 import { apiClient } from "../../../shared/api/client.js";
 import { openDownloadUrl } from "../../../shared/api/downloads.js";
 import { useAuth } from "../../../shared/auth/AuthContext.jsx";
@@ -24,7 +24,7 @@ function formatActorRole(role) {
     .join(" ");
 }
 
-function DetailBlock({ icon, label, value, multiline = false, compact = false }) {
+function DetailBlock({ label, value, multiline = false, compact = false }) {
   const { C } = usePortalTheme();
   return (
     <div
@@ -37,13 +37,11 @@ function DetailBlock({ icon, label, value, multiline = false, compact = false })
         style={{
           display: "flex",
           alignItems: "center",
-          gap: 8,
           marginBottom: 8,
           color: C.t3,
           textTransform: "uppercase",
         }}
       >
-        {icon}
         {label}
       </div>
       <div
@@ -82,6 +80,9 @@ export default function CaseDetailsPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [isBackHovered, setIsBackHovered] = useState(false);
+  const informationCardRef = useRef(null);
+  const [timelineCardHeight, setTimelineCardHeight] = useState(null);
+  const [isDesktopLayout, setIsDesktopLayout] = useState(false);
   useEffect(() => {
     let mounted = true;
 
@@ -111,6 +112,38 @@ export default function CaseDetailsPage() {
     };
   }, [id, session?.role, eventVersion]);
 
+  useEffect(() => {
+    if (typeof window === "undefined") return undefined;
+
+    const updateLayout = () => {
+      setIsDesktopLayout(window.innerWidth >= 1024);
+    };
+
+    updateLayout();
+    window.addEventListener("resize", updateLayout);
+    return () => window.removeEventListener("resize", updateLayout);
+  }, []);
+
+  useEffect(() => {
+    if (!isDesktopLayout) {
+      setTimelineCardHeight(null);
+      return undefined;
+    }
+
+    const cardElement = informationCardRef.current;
+    if (!cardElement || typeof ResizeObserver === "undefined") return undefined;
+
+    const updateHeight = () => {
+      setTimelineCardHeight(cardElement.getBoundingClientRect().height);
+    };
+
+    updateHeight();
+    const observer = new ResizeObserver(() => updateHeight());
+    observer.observe(cardElement);
+
+    return () => observer.disconnect();
+  }, [isDesktopLayout, caseData, history]);
+
   if (loading) {
     return (
       <div className="portal-citizen-page" style={{ minHeight: "100%", padding: "16px 20px 12px" }}>
@@ -139,7 +172,7 @@ export default function CaseDetailsPage() {
   const attachedFiles = getAttachedFiles(caseData);
   const hasUploadedDocument = attachedFiles.length > 0;
   const createdLabel = caseData.createdAt || caseData.created_at
-    ? new Date(caseData.createdAt || caseData.created_at).toLocaleString("en-IN")
+    ? new Date(caseData.createdAt || caseData.created_at).toLocaleDateString("en-GB")
     : "Not provided";
   const incidentDateLabel = caseData.incidentDate
     ? new Date(caseData.incidentDate).toLocaleDateString("en-IN", { dateStyle: "medium" })
@@ -185,24 +218,23 @@ export default function CaseDetailsPage() {
             <div />
           </div>
 
-          <div className="grid lg:grid-cols-[7fr_3fr] gap-6" style={{ flex: 1, minHeight: 0, alignItems: "stretch" }}>
-            <div style={{ minHeight: 0 }}>
-              <WorkspaceCard>
-                <div className="grid sm:grid-cols-2 gap-4">
-                  <DetailBlock icon={<Hash size={14} />} label="Complaint ID" value={complaintId} compact />
+          <div className="grid lg:grid-cols-[7fr_3fr] gap-6" style={{ flex: 1, minHeight: 0, alignItems: "start" }}>
+            <div ref={informationCardRef} style={{ minHeight: 0 }}>
+              <WorkspaceCard style={{ marginBottom: 0 }}>
+                <div className="grid md:grid-cols-3 gap-4">
+                  <DetailBlock label="Complaint ID" value={complaintId} compact />
+                  <DetailBlock label="Created At" value={createdLabel} compact />
                   <div style={{ padding: "0 0 14px" }}>
                     <div
                       style={{
                         display: "flex",
                         alignItems: "center",
-                        gap: 8,
                         marginBottom: 8,
                         color: C.t3,
                         textTransform: "uppercase",
                       }}
                       className="portal-citizen-label"
                     >
-                      <Calendar size={14} />
                       Status
                     </div>
                     <WorkspaceBadge status={caseData.status}>{formatStatus(caseData.status)}</WorkspaceBadge>
@@ -210,22 +242,17 @@ export default function CaseDetailsPage() {
                 </div>
 
                 <div style={{ marginTop: 16 }}>
-                  <DetailBlock icon={<FileText size={14} />} label="Complaint Title" value={complaintTitle} multiline compact />
+                  <DetailBlock label="Complaint Title" value={complaintTitle} multiline compact />
                 </div>
 
                 <div className="grid md:grid-cols-3 gap-4" style={{ marginTop: 16 }}>
-                  <DetailBlock icon={<MapPin size={14} />} label="Complaint Location" value={caseData.complaintLocation || "Not provided"} compact />
-                  <DetailBlock icon={<Calendar size={14} />} label="Date of Incident" value={incidentDateLabel} compact />
-                  <DetailBlock icon={<Calendar size={14} />} label="Complaint Filed Date" value={createdLabel} compact />
-                </div>
-
-                <div style={{ marginTop: 16 }}>
-                  <DetailBlock icon={<Briefcase size={14} />} label="Category" value={caseData.complaintType || "Not provided"} compact />
+                  <DetailBlock label="Complaint Location" value={caseData.complaintLocation || "Not provided"} compact />
+                  <DetailBlock label="Date of Incident" value={incidentDateLabel} compact />
+                  <DetailBlock label="Category" value={caseData.complaintType || "Not provided"} compact />
                 </div>
 
                 <div style={{ marginTop: 16 }}>
                   <DetailBlock
-                    icon={<FileText size={14} />}
                     label="Complaint Description"
                     value={caseData.description || "No description available"}
                     multiline
@@ -238,7 +265,6 @@ export default function CaseDetailsPage() {
                     style={{
                       display: "flex",
                       alignItems: "center",
-                      gap: 8,
                       marginBottom: 8,
                       fontSize: 11,
                       fontWeight: 700,
@@ -247,7 +273,6 @@ export default function CaseDetailsPage() {
                       letterSpacing: ".08em",
                     }}
                   >
-                    <FileText size={14} />
                     Documents
                   </div>
                   <div
@@ -289,13 +314,26 @@ export default function CaseDetailsPage() {
               </WorkspaceCard>
             </div>
 
-            <div style={{ minHeight: 0 }}>
-              <WorkspaceCard style={{ display: "flex", flexDirection: "column", minHeight: 0 }}>
+            <div
+              style={{
+                minHeight: 0,
+                height: isDesktopLayout && timelineCardHeight ? timelineCardHeight : "auto",
+              }}
+            >
+              <WorkspaceCard
+                style={{
+                  display: "flex",
+                  flexDirection: "column",
+                  minHeight: 0,
+                  height: "100%",
+                  marginBottom: 0,
+                }}
+              >
                 <div style={{ fontSize: 16, fontWeight: 700, color: C.t1, marginBottom: 16, flexShrink: 0 }}>
                   Timeline
                 </div>
 
-                <div style={{ flex: 1, minHeight: 0, paddingRight: 0 }}>
+                <div style={{ flex: 1, minHeight: 0, paddingRight: 0, overflowY: isDesktopLayout && timelineCardHeight ? "auto" : "visible" }}>
                   {history.length === 0 ? (
                     <p className="portal-citizen-caption" style={{ color: C.t3 }}>No timeline entries yet.</p>
                   ) : (

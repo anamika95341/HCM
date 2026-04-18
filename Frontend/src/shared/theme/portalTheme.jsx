@@ -321,6 +321,11 @@ export function PortalGlobalStyles() {
       letter-spacing: -0.02em;
     }
 
+    .portal-shell[data-portal-role='citizen'],
+    .portal-shell[data-portal-role='citizen'] button,
+    .portal-shell[data-portal-role='citizen'] input,
+    .portal-shell[data-portal-role='citizen'] select,
+    .portal-shell[data-portal-role='citizen'] textarea,
     .portal-shell[data-portal-role='citizen'] .portal-content,
     .portal-shell[data-portal-role='citizen'] .portal-content button,
     .portal-shell[data-portal-role='citizen'] .portal-content input,

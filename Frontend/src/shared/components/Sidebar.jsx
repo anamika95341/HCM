@@ -22,7 +22,7 @@ function Sidebar({ collapsed, onToggle }) {
   const { C } = usePortalTheme();
   const { session, logout } = useAuth();
   const role = session?.role || "citizen";
-  const isCitizen = role === "citizen";
+  const useCitizenNavUi = role === "citizen";
 
   const handleLogout = async (e) => {
     e.preventDefault();
@@ -34,7 +34,6 @@ function Sidebar({ collapsed, onToggle }) {
             { to: PATHS.citizen.newCase, icon: FiHome, label: "Services" },
             { to: PATHS.citizen.meetings, icon: RiTeamLine, label: "My Meetings" },
             { to: PATHS.citizen.cases, icon: LuBox, label: "My Complaints" },
-            { to: PATHS.settings, icon: BsFillGearFill, label: "Settings" },
         ],
         admin: [
             { to: PATHS.admin.dashboard, icon: FiHome, label: "Dashboard" },
@@ -81,19 +80,19 @@ function Sidebar({ collapsed, onToggle }) {
           padding: "var(--portal-space-10) var(--portal-space-8)",
           borderBottom: `1px solid ${C.border}`,
           gap: 10,
-          fontFamily: isCitizen ? "var(--portal-citizen-font)" : "inherit",
+          fontFamily: useCitizenNavUi ? "var(--portal-citizen-font)" : "inherit",
         }}
       >
-        <SidebarItem type="" collapsed={collapsed} label="Toggle Navigation" isCitizen={isCitizen}>
+        <SidebarItem type="" collapsed={collapsed} label="Toggle Navigation" isCitizen={useCitizenNavUi}>
           <button
             onClick={onToggle}
             style={{
               width: 36,
               height: 36,
               borderRadius: 10,
-              background: isCitizen ? "transparent" : C.bgElevated,
+              background: useCitizenNavUi ? "transparent" : C.bgElevated,
               color: C.t2,
-              border: isCitizen ? "none" : `1px solid ${C.border}`,
+              border: useCitizenNavUi ? "none" : `1px solid ${C.border}`,
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
@@ -111,39 +110,41 @@ function Sidebar({ collapsed, onToggle }) {
        
         <ul style={{ width: "100%", display: "grid", gap: 2, margin: 0, padding: 0, listStyle: "none" }}>
           {navByRole[role].map((item) => (
-            <SidebarItem key={item.to} type="NavLink" to={item.to} icon={item.icon} label={item.label} collapsed={collapsed} isCitizen={isCitizen} />
+            <SidebarItem key={item.to} type="NavLink" to={item.to} icon={item.icon} label={item.label} collapsed={collapsed} isCitizen={useCitizenNavUi} />
           ))}
         </ul>
       </div>
 
-      <div style={{ padding: "12px", borderTop: `1px solid ${C.border}` }}>
-        <SidebarItem type="" collapsed={collapsed} label="Logout" isCitizen={isCitizen}>
-          <button
-            onClick={handleLogout}
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: 8,
-              width: "100%",
-              minHeight: 40,
-              padding: collapsed ? "var(--portal-space-6)" : "var(--portal-space-6) var(--portal-space-8)",
-              justifyContent: collapsed ? "center" : "flex-start",
-              cursor: "pointer",
-              color: C.danger,
-              background: "transparent",
-              borderRadius: 10,
-              border: `1px solid ${C.danger}`,
-              fontSize: isCitizen ? 14 : 13,
-              fontWeight: 600,
-              lineHeight: isCitizen ? 1.45 : 1.4,
-              fontFamily: isCitizen ? "var(--portal-citizen-font)" : "inherit",
-            }}
-          >
-            <FiLogOut size={18} />
-            {!collapsed && <div className={isCitizen ? "portal-citizen-value" : undefined} style={{ whiteSpace: "nowrap", fontWeight: 600 }}>Logout</div>}
-          </button>
-        </SidebarItem>
-      </div>
+      {role !== "citizen" && (
+        <div style={{ padding: "12px", borderTop: `1px solid ${C.border}` }}>
+          <SidebarItem type="" collapsed={collapsed} label="Logout" isCitizen={useCitizenNavUi}>
+            <button
+              onClick={handleLogout}
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 8,
+                width: "100%",
+                minHeight: 40,
+                padding: collapsed ? "var(--portal-space-6)" : "var(--portal-space-6) var(--portal-space-8)",
+                justifyContent: collapsed ? "center" : "flex-start",
+                cursor: "pointer",
+                color: C.danger,
+                background: "transparent",
+                borderRadius: 10,
+                border: `1px solid ${C.danger}`,
+                fontSize: useCitizenNavUi ? 14 : 13,
+                fontWeight: 600,
+                lineHeight: useCitizenNavUi ? 1.45 : 1.4,
+                fontFamily: useCitizenNavUi ? "var(--portal-citizen-font)" : "inherit",
+              }}
+            >
+              <FiLogOut size={18} />
+              {!collapsed && <div className={useCitizenNavUi ? "portal-citizen-value" : undefined} style={{ whiteSpace: "nowrap", fontWeight: 600 }}>Logout</div>}
+            </button>
+          </SidebarItem>
+        </div>
+      )}
     </div>
   );
 }

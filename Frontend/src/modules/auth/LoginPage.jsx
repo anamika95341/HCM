@@ -30,8 +30,6 @@ import parliamentArt from "../../assets/citizen/parliament.svg";
 import aboutInteractionArt from "../../assets/citizen/about-interaction.svg";
 import aboutServicesArt from "../../assets/citizen/about-services.svg";
 import aboutEngagementArt from "../../assets/citizen/about-engagement.svg";
-import serviceIndiaArt from "../../assets/citizen/service-india.svg";
-import serviceGovernanceArt from "../../assets/citizen/service-governance.svg";
 import serviceSupportArt from "../../assets/citizen/service-support.svg";
 
 const ROLE_COPY = {
@@ -100,14 +98,14 @@ const ABOUT_CARDS = [
 const SERVICE_SLIDES = [
   [
     {
-      image: serviceIndiaArt,
-      title: "India",
-      description: "A national-facing digital entry point designed for clarity and trust.",
+      icon: Landmark,
+      title: "Request a Meeting",
+      description: "Citizens can request meetings with ministers through a structured, trackable process inside the portal.",
     },
     {
-      image: serviceGovernanceArt,
-      title: "Government",
-      description: "Formal routing and review patterns presented through a calm, modern interface.",
+      icon: Shield,
+      title: "Submit a Complaint",
+      description: "Citizens can submit complaints, attach supporting documents, and follow progress through the official workflow.",
     },
     {
       image: serviceSupportArt,
@@ -755,32 +753,6 @@ export default function LoginPage({ defaultRole = "citizen" }) {
               >
                 {SERVICE_SLIDES[serviceSlideIndex].slice(0, isMobile ? 1 : isTablet ? 2 : 3).map((item) => (
                   <InfoCard key={`${serviceSlideIndex}-${item.title}`} C={C} theme={theme} {...item} compact />
-                ))}
-              </div>
-
-              <div
-                style={{
-                  display: "flex",
-                  justifyContent: "center",
-                  gap: 8,
-                  marginTop: 18,
-                }}
-              >
-                {SERVICE_SLIDES.map((_, index) => (
-                  <button
-                    key={index}
-                    type="button"
-                    aria-label={`Open slide ${index + 1}`}
-                    onClick={() => setServiceSlideIndex(index)}
-                    style={{
-                      width: index === serviceSlideIndex ? 28 : 10,
-                      height: 10,
-                      borderRadius: 999,
-                      border: "none",
-                      background: index === serviceSlideIndex ? C.purple : `${C.t3}40`,
-                      cursor: "pointer",
-                    }}
-                  />
                 ))}
               </div>
             </div>
@@ -1463,7 +1435,7 @@ function PortalSection({ id, C, title, subtitle, children }) {
   );
 }
 
-function InfoCard({ C, theme, image, title, description, compact = false }) {
+function InfoCard({ C, theme, image, icon: Icon, title, description, compact = false }) {
   return (
     <article
       style={{
@@ -1474,25 +1446,44 @@ function InfoCard({ C, theme, image, title, description, compact = false }) {
         minHeight: compact ? 100 : 420,
       }}
     >
-      <div
-        style={{
-          padding: compact ? 14 : 16,
-          background: theme === "dark" ? "rgba(255,255,255,0.02)" : "rgba(124,58,237,0.03)",
-          borderBottom: `1px solid ${C.border}`,
-        }}
-      >
-        <img
-          src={image}
-          alt={title}
+      {image ? (
+        <div
           style={{
-            width: "100%",
-            height: compact ? 180 : 220,
-            objectFit: "cover",
-            borderRadius: 16,
+            padding: compact ? 14 : 16,
+            background: theme === "dark" ? "rgba(255,255,255,0.02)" : "rgba(124,58,237,0.03)",
+            borderBottom: `1px solid ${C.border}`,
           }}
-        />
-      </div>
+        >
+          <img
+            src={image}
+            alt={title}
+            style={{
+              width: "100%",
+              height: compact ? 180 : 220,
+              objectFit: "cover",
+              borderRadius: 16,
+            }}
+          />
+        </div>
+      ) : null}
       <div style={{ padding: compact ? 18 : 20 }}>
+        {!image && Icon ? (
+          <div
+            style={{
+              width: 44,
+              height: 44,
+              borderRadius: 14,
+              display: "inline-flex",
+              alignItems: "center",
+              justifyContent: "center",
+              background: theme === "dark" ? "rgba(255,255,255,0.04)" : "rgba(124,58,237,0.08)",
+              border: `1px solid ${C.border}`,
+              marginBottom: 14,
+            }}
+          >
+            <Icon size={20} color={C.purple} />
+          </div>
+        ) : null}
         <h3 style={{ fontSize: 18, lineHeight: 1.25, fontWeight: 700, color: C.t1 }}>{title}</h3>
         <p style={{ marginTop: 10, fontSize: 14, lineHeight: 1.75, color: C.t2 }}>{description}</p>
       </div>

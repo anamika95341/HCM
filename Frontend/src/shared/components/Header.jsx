@@ -1,8 +1,8 @@
 import { useEffect, useRef, useState } from "react";
-import { FiBell, FiCalendar, FiLogOut, FiMaximize, FiMinimize, FiMoon, FiSettings, FiSun, FiUser } from "react-icons/fi";
+import { FiBell, FiLogOut, FiMoon, FiSettings, FiSun, FiUser } from "react-icons/fi";
 import { useLocation, useNavigate } from "react-router-dom";
 import { usePortalTheme } from "../theme/portalTheme.jsx";
-import { getHomePathForRole, PATHS } from "../../routes/paths.js";
+import { PATHS } from "../../routes/paths.js";
 import { sanitizeImageSrc } from "../security/url.js";
 import { useAuth } from "../auth/AuthContext.jsx";
 import { useNotifications } from "../notifications/NotificationContext.jsx";
@@ -25,11 +25,10 @@ const Header = () => {
   const { C, theme, toggleTheme } = usePortalTheme();
   const { session, logout } = useAuth();
   const { notifications, unreadCount, markRead, markAllRead } = useNotifications();
-  const isCitizen = session?.role === "citizen";
+  const useCitizenNavUi = session?.role === "citizen";
 
   const [open, setOpen] = useState(false);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
-  const [isFullscreen, setIsFullscreen] = useState(false);
 
   const currentUser = {
     name: session?.user?.firstName || session?.user?.username || "Portal User",
@@ -40,16 +39,6 @@ const Header = () => {
 
   const safeAvatar = sanitizeImageSrc(currentUser.avatar);
   const workspaceTitle = WORKSPACE_TITLES.find((item) => location.pathname.startsWith(item.match))?.title || "Unified Portal";
-
-
-  useEffect(() => {
-    const handleFullscreenChange = () => {
-      setIsFullscreen(!!document.fullscreenElement);
-    };
-
-    document.addEventListener("fullscreenchange", handleFullscreenChange);
-    return () => document.removeEventListener("fullscreenchange", handleFullscreenChange);
-  }, []);
 
   useEffect(() => {
     const handler = (event) => {
@@ -62,15 +51,6 @@ const Header = () => {
     document.addEventListener("mousedown", handler);
     return () => document.removeEventListener("mousedown", handler);
   }, []);
-
-  const toggleFullscreen = () => {
-    if (!document.fullscreenElement) {
-      document.documentElement.requestFullscreen();
-      return;
-    }
-
-    document.exitFullscreen();
-  };
 
   const userInitial = currentUser.name.charAt(0).toUpperCase();
 
@@ -89,7 +69,7 @@ const Header = () => {
         position: "sticky",
         top: 0,
         zIndex: 30,
-        fontFamily: isCitizen ? "var(--portal-citizen-font)" : "inherit",
+        fontFamily: useCitizenNavUi ? "var(--portal-citizen-font)" : "inherit",
       }}
     >
       <div style={{ display: "flex", alignItems: "center", gap: 12, minWidth: 0, flexWrap: "wrap" }}>
@@ -101,34 +81,35 @@ const Header = () => {
           icon={theme === "dark" ? FiSun : FiMoon}
           onClick={toggleTheme}
           title={theme === "dark" ? "Switch to Light Mode" : "Switch to Dark Mode"}
-          isCitizen={isCitizen}
+          isCitizen={useCitizenNavUi}
         />
-        <HeaderIcon icon={isFullscreen ? FiMinimize : FiMaximize} onClick={toggleFullscreen} title="Toggle Fullscreen" isCitizen={isCitizen} />
         <HeaderIcon
           icon={FiBell}
-          badge={unreadCount > 0 ? unreadCount : null}
           dot={unreadCount > 0}
           onClick={() => {
             setOpen(false);
             setNotificationsOpen((value) => !value);
           }}
           title="Notifications"
-          isCitizen={isCitizen}
+          isCitizen={useCitizenNavUi}
         />
 
         <button
           type="button"
-          onClick={() => setOpen((value) => !value)}
+          onClick={() => {
+            setNotificationsOpen(false);
+            setOpen((value) => !value);
+          }}
           title="User Menu"
           style={{
-            width: 40,
-            height: 40,
+            width: 36,
+            height: 36,
             borderRadius: 999,
             cursor: "pointer",
-            border: isCitizen ? "none" : open ? `2px solid ${C.purple}` : `1px solid ${C.border}`,
+            border: useCitizenNavUi ? "none" : open ? `2px solid ${C.purple}` : `1px solid ${C.border}`,
             overflow: "hidden",
-            background: isCitizen ? C.purple : C.purpleDim,
-            color: isCitizen ? "#FFFFFF" : C.purple,
+            background: useCitizenNavUi ? C.purple : C.purpleDim,
+            color: useCitizenNavUi ? "#FFFFFF" : C.purple,
             transition: "background var(--portal-duration-fast) ease, border-color var(--portal-duration-fast) ease, transform var(--portal-duration-fast) ease",
             flexShrink: 0,
           }}
@@ -147,11 +128,11 @@ const Header = () => {
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
-                background: isCitizen ? C.purple : C.purpleDim,
-                color: isCitizen ? "#FFFFFF" : C.purple,
+                background: useCitizenNavUi ? C.purple : C.purpleDim,
+                color: useCitizenNavUi ? "#FFFFFF" : C.purple,
                 fontWeight: 700,
-                fontSize: isCitizen ? 14 : 14,
-                fontFamily: isCitizen ? "var(--portal-citizen-font)" : "inherit",
+                fontSize: 13,
+                fontFamily: useCitizenNavUi ? "var(--portal-citizen-font)" : "inherit",
               }}
             >
               {userInitial}
@@ -186,8 +167,8 @@ const Header = () => {
               }}
             >
               <div>
-                <p className={isCitizen ? "portal-citizen-value" : undefined} style={{ color: C.t1, fontWeight: 700, fontSize: isCitizen ? 14 : 13 }}>Notifications</p>
-                <p className={isCitizen ? "portal-citizen-caption" : undefined} style={{ color: C.t3, fontSize: 12, marginTop: 2 }}>
+                <p className={useCitizenNavUi ? "portal-citizen-value" : undefined} style={{ color: C.t1, fontWeight: 700, fontSize: useCitizenNavUi ? 14 : 13 }}>Notifications</p>
+                <p className={useCitizenNavUi ? "portal-citizen-caption" : undefined} style={{ color: C.t3, fontSize: 12, marginTop: 2 }}>
                   {unreadCount > 0 ? `${unreadCount} unread` : "All caught up"}
                 </p>
               </div>
@@ -200,10 +181,10 @@ const Header = () => {
                   border: "none",
                   background: "transparent",
                   color: C.purple,
-                  fontSize: isCitizen ? 12 : 12,
+                  fontSize: useCitizenNavUi ? 12 : 12,
                   fontWeight: 600,
                   cursor: "pointer",
-                  fontFamily: isCitizen ? "var(--portal-citizen-font)" : "inherit",
+                  fontFamily: useCitizenNavUi ? "var(--portal-citizen-font)" : "inherit",
                 }}
               >
                 Mark all read
@@ -212,11 +193,11 @@ const Header = () => {
 
             <div style={{ maxHeight: 360, overflowY: "auto", padding: 8 }}>
               {notifications.length === 0 ? (
-                <div className={isCitizen ? "portal-citizen-caption" : undefined} style={{ padding: 16, color: C.t3, fontSize: 12, textAlign: "center" }}>
+                <div className={useCitizenNavUi ? "portal-citizen-caption" : undefined} style={{ padding: 16, color: C.t3, fontSize: 12, textAlign: "center" }}>
                   No notifications yet.
                 </div>
               ) : (
-                notifications.slice(0, 8).map((item) => (
+                notifications.slice(0, 8).map((item, index) => (
                   <button
                     key={item.id}
                     type="button"
@@ -228,24 +209,24 @@ const Header = () => {
                     style={{
                       width: "100%",
                       textAlign: "left",
-                      border: `1px solid ${item.isRead ? C.border : `${C.purple}30`}`,
-                      background: item.isRead ? "transparent" : C.purpleDim,
-                      borderRadius: 10,
+                      border: "none",
+                      borderBottom: index === Math.min(notifications.length, 8) - 1 ? "none" : `1px solid ${C.border}`,
+                      background: "transparent",
+                      borderRadius: 0,
                       padding: 12,
-                      marginBottom: 8,
                       cursor: "pointer",
                     }}
                   >
                     <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 12 }}>
                       <div>
-                        <p className={isCitizen ? "portal-citizen-value" : undefined} style={{ color: C.t1, fontWeight: 700, fontSize: isCitizen ? 14 : 12 }}>{item.title}</p>
-                        <p className={isCitizen ? "portal-citizen-caption" : undefined} style={{ color: C.t2, fontSize: 12, marginTop: 4, lineHeight: 1.5 }}>{item.body}</p>
+                        <p className={useCitizenNavUi ? "portal-citizen-value" : undefined} style={{ color: C.t1, fontWeight: 700, fontSize: useCitizenNavUi ? 14 : 12 }}>{item.title}</p>
+                        <p className={useCitizenNavUi ? "portal-citizen-caption" : undefined} style={{ color: C.t2, fontSize: 12, marginTop: 4, lineHeight: 1.5 }}>{item.body}</p>
                       </div>
                       {!item.isRead && (
                         <span style={{ width: 8, height: 8, borderRadius: 999, background: C.danger, flexShrink: 0, marginTop: 4 }} />
                       )}
                     </div>
-                    <p className={isCitizen ? "portal-citizen-caption" : undefined} style={{ color: C.t3, fontSize: 12, marginTop: 8 }}>
+                    <p className={useCitizenNavUi ? "portal-citizen-caption" : undefined} style={{ color: C.t3, fontSize: 12, marginTop: 8 }}>
                       {item.createdAt ? new Date(item.createdAt).toLocaleString("en-IN", { dateStyle: "medium", timeStyle: "short" }) : ""}
                     </p>
                   </button>
@@ -297,7 +278,7 @@ const Header = () => {
                     color: C.purple,
                     border: `1px solid ${C.border}`,
                     flexShrink: 0,
-                    fontFamily: isCitizen ? "var(--portal-citizen-font)" : "inherit",
+                    fontFamily: useCitizenNavUi ? "var(--portal-citizen-font)" : "inherit",
                   }}
                 >
                   {userInitial}
@@ -305,20 +286,19 @@ const Header = () => {
               )}
 
               <div style={{ display: "flex", flexDirection: "column", overflow: "hidden" }}>
-                <p className={isCitizen ? "portal-citizen-value" : undefined} style={{ color: C.t1, fontWeight: 700, fontSize: isCitizen ? 14 : 13, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                <p className={useCitizenNavUi ? "portal-citizen-value" : undefined} style={{ color: C.t1, fontWeight: 700, fontSize: useCitizenNavUi ? 14 : 13, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
                   {currentUser.name}
                 </p>
              
-                <p className={isCitizen ? "portal-citizen-caption" : undefined} style={{ color: C.t3, fontSize: 12, marginTop: 2, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                <p className={useCitizenNavUi ? "portal-citizen-caption" : undefined} style={{ color: C.t3, fontSize: 12, marginTop: 2, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
                   {currentUser.email}
                 </p>
               </div>
             </div>
 
             <ul style={{ padding: "8px 0", margin: 0, listStyle: "none" }}>
-              <MenuItem icon={FiUser} label="Profile" onClick={() => setOpen(false)} />
-              <MenuItem icon={FiSettings} label="Settings" onClick={() => { navigate(PATHS.settings); setOpen(false); }} />
-              <MenuItem icon={FiCalendar} label="Workspace" onClick={() => { navigate(getHomePathForRole(session?.role || "citizen")); setOpen(false); }} />
+              <MenuItem icon={FiUser} label="Profile & Account" onClick={() => { navigate(`${PATHS.settings}?tab=profile`); setOpen(false); }} />
+              <MenuItem icon={FiSettings} label="Notifications" onClick={() => { navigate(`${PATHS.settings}?tab=notifications`); setOpen(false); }} />
               <MenuItem icon={FiLogOut} label="Logout" danger onClick={async () => { setOpen(false); await logout(); navigate(PATHS.login); }} />
             </ul>
           </div>
@@ -328,7 +308,7 @@ const Header = () => {
   );
 };
 
-const HeaderIcon = ({ icon: Icon, badge, dot, onClick, title, isCitizen = false }) => {
+const HeaderIcon = ({ icon: Icon, dot, onClick, title, isCitizen = false }) => {
   const { C } = usePortalTheme();
   const [hovered, setHovered] = useState(false);
 
@@ -356,12 +336,6 @@ const HeaderIcon = ({ icon: Icon, badge, dot, onClick, title, isCitizen = false 
     >
       <Icon size={17} />
 
-      {badge && badge > 0 && (
-        <span style={{ position: "absolute", top: -8, right: -8, fontSize: 10, fontWeight: 700, padding: "2px 8px", lineHeight: "14px", borderRadius: 999, background: C.mintDim, color: C.mint }}>
-          {badge}
-        </span>
-      )}
-
       {dot && (
         <span style={{ position: "absolute", top: -3, right: -3, width: 8, height: 8, borderRadius: 999, background: C.danger }} />
       )}
@@ -372,7 +346,7 @@ const HeaderIcon = ({ icon: Icon, badge, dot, onClick, title, isCitizen = false 
 const MenuItem = ({ icon: Icon, label, danger, onClick }) => {
   const { C } = usePortalTheme();
   const [hovered, setHovered] = useState(false);
-  const isCitizen = typeof document !== "undefined" && document.querySelector(".portal-shell")?.dataset?.portalRole === "citizen";
+  const useCitizenNavUi = typeof document !== "undefined" && document.querySelector(".portal-shell")?.dataset?.portalRole === "citizen";
 
   return (
     <li
@@ -390,9 +364,9 @@ const MenuItem = ({ icon: Icon, label, danger, onClick }) => {
         margin: "0 8px",
         background: hovered ? (danger ? `${C.danger}12` : C.navHover) : "transparent",
         transition: "background 0.15s ease, color 0.15s ease",
-        fontFamily: isCitizen ? "var(--portal-citizen-font)" : "inherit",
-        fontSize: isCitizen ? 14 : 13,
-        lineHeight: isCitizen ? 1.45 : 1.4,
+        fontFamily: useCitizenNavUi ? "var(--portal-citizen-font)" : "inherit",
+        fontSize: useCitizenNavUi ? 14 : 13,
+        lineHeight: useCitizenNavUi ? 1.45 : 1.4,
         fontWeight: 500,
       }}
     >
