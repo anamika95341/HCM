@@ -1,0 +1,226 @@
+:root {
+  --ep-r-xs: 4px;
+  --ep-r-sm: 8px;
+  --ep-r-md: 12px;
+  --ep-r-lg: 16px;
+  --ep-r-xl: 20px;
+  --ep-r-full: 9999px;
+
+  --ep-s-1: 2px;
+  --ep-s-2: 4px;
+  --ep-s-3: 8px;
+  --ep-s-4: 12px;
+  --ep-s-5: 16px;
+  --ep-s-6: 20px;
+  --ep-s-7: 24px;
+  --ep-s-8: 32px;
+  --ep-s-9: 40px;
+  --ep-s-10: 48px;
+  --ep-s-11: 64px;
+  --ep-s-12: 80px;
+
+  --ep-dur-fast: 150ms;
+  --ep-dur-med: 220ms;
+  --ep-dur-slow: 320ms;
+  --ep-ease: cubic-bezier(.4, 0, .2, 1);
+
+  --ep-sidebar-w: 280px;
+  --ep-content-max: 1200px;
+  --ep-modal-max: 560px;
+
+  --ep-font-sans: "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --ep-font-serif: "Lora", "Source Serif Pro", Georgia, serif;
+  --ep-font-mono: "JetBrains Mono", ui-monospace, monospace;
+
+  --ep-fs-10: 10px;
+  --ep-fs-11: 11px;
+  --ep-fs-12: 12px;
+  --ep-fs-13: 13px;
+  --ep-fs-14: 14px;
+  --ep-fs-16: 16px;
+  --ep-fs-18: 18px;
+  --ep-fs-20: 20px;
+  --ep-fs-24: 24px;
+  --ep-fs-32: 32px;
+
+  --ep-lh-tight: 1.2;
+  --ep-lh-norm: 1.5;
+  --ep-lh-loose: 1.7;
+
+  --ep-fw-regular: 400;
+  --ep-fw-medium: 500;
+  --ep-fw-semibold: 600;
+  --ep-fw-bold: 700;
+
+  --portal-space-0: 0px;
+  --portal-space-1: 2px;
+  --portal-space-2: 4px;
+  --portal-space-3: 6px;
+  --portal-space-4: 8px;
+  --portal-space-5: 10px;
+  --portal-space-6: 12px;
+  --portal-space-7: 14px;
+  --portal-space-8: 16px;
+  --portal-space-9: 18px;
+  --portal-space-10: 20px;
+  --portal-space-11: 24px;
+  --portal-space-12: 28px;
+  --portal-space-13: 32px;
+  --portal-space-14: 40px;
+  --portal-radius-sm: 10px;
+  --portal-radius-md: 12px;
+  --portal-radius-lg: 16px;
+  --portal-radius-full: 999px;
+  --portal-duration-fast: var(--ep-dur-fast);
+  --portal-duration-med: var(--ep-dur-med);
+  --portal-duration-slow: var(--ep-dur-slow);
+  --portal-ease-standard: var(--ep-ease);
+  --portal-sidebar-width: var(--ep-sidebar-w);
+  --portal-content-max: 900px;
+  --portal-header-height: 73px;
+  --portal-text-on-primary: var(--ep-text-inverse);
+  --portal-citizen-font: var(--ep-font-serif);
+  --portal-font: var(--ep-font-sans);
+  --portal-citizen-label-size: 12px;
+  --portal-citizen-value-size: 14px;
+  --portal-citizen-caption-size: 12px;
+}
+
+:root,
+:root[data-theme="light"] {
+  --ep-bg: #F5F6F8;
+  --ep-surface: #FFFFFF;
+  --ep-surface-hover: #FAFBFC;
+  --ep-surface-active: #F0F2F5;
+  --ep-elevated: #FFFFFF;
+  --ep-overlay: rgba(15,17,23,.6);
+  --ep-border: #E8EBF0;
+  --ep-border-subtle: #F0F1F4;
+  --ep-border-strong: #D4D8E0;
+
+  --ep-text: #111827;
+  --ep-text-2: #4B5563;
+  --ep-text-3: #9CA3AF;
+  --ep-text-inverse: #FFFFFF;
+
+  --ep-accent: #1B3D6D;
+  --ep-accent-hover: #2A5A9E;
+  --ep-accent-bg: #EFF4FB;
+  --ep-accent-bright: #7C3AED;
+  --ep-accent-bright-bg: #F5F3FF;
+  --ep-gold: #B8860B;
+  --ep-gold-bg: #FDF8ED;
+
+  --ep-success: #059669;
+  --ep-success-bg: #ECFDF5;
+  --ep-warning: #D97706;
+  --ep-warning-bg: #FFFBEB;
+  --ep-danger: #DC2626;
+  --ep-danger-bg: #FEF2F2;
+  --ep-info: #2563EB;
+  --ep-info-bg: #EFF6FF;
+
+  --ep-shadow-sm: 0 1px 2px rgba(0,0,0,.04), 0 1px 3px rgba(0,0,0,.06);
+  --ep-shadow-md: 0 4px 6px rgba(0,0,0,.04), 0 2px 4px rgba(0,0,0,.06);
+  --ep-shadow-lg: 0 10px 25px rgba(0,0,0,.06), 0 4px 10px rgba(0,0,0,.04);
+  --ep-shadow-xl: 0 20px 50px rgba(0,0,0,.08), 0 8px 20px rgba(0,0,0,.04);
+  --ep-shadow-inset: inset 0 1px 3px rgba(0,0,0,.08);
+  --ep-shadow-focus: 0 0 0 3px rgba(124,58,237,.25);
+
+  --portal-bg: var(--ep-bg);
+  --portal-bg-elevated: var(--ep-elevated);
+  --portal-card: var(--ep-surface);
+  --portal-card-hover: var(--ep-surface-hover);
+  --portal-input: var(--ep-surface);
+  --portal-border: var(--ep-border);
+  --portal-border-light: var(--ep-border-subtle);
+  --portal-purple: var(--ep-accent-bright);
+  --portal-purple-dim: var(--ep-accent-bright-bg);
+  --portal-mint: var(--ep-success);
+  --portal-mint-dim: var(--ep-success-bg);
+  --portal-text-strong: var(--ep-text);
+  --portal-text: var(--ep-text-2);
+  --portal-text-muted: var(--ep-text-3);
+  --portal-danger: var(--ep-danger);
+  --portal-warn: var(--ep-warning);
+  --portal-success: var(--ep-success);
+  --portal-scrollbar: #D4D8E0;
+  --portal-scrollbar-hover: #AAB2C1;
+  --portal-nav-hover: rgba(17, 24, 39, 0.04);
+  --portal-inset-shadow: var(--ep-shadow-inset);
+  --portal-active-pill-shadow: var(--ep-shadow-sm);
+  --portal-active-glow: var(--ep-shadow-focus);
+  --portal-knob-shadow: var(--ep-shadow-sm);
+  --portal-status-glow: 0 0 6px var(--ep-success);
+  --portal-dialog-shadow: var(--ep-shadow-lg);
+  --portal-dropdown-shadow: var(--ep-shadow-md);
+}
+
+:root[data-theme="dark"] {
+  --ep-bg: #0F1117;
+  --ep-surface: #1A1D27;
+  --ep-surface-hover: #22252F;
+  --ep-surface-active: #2A2D38;
+  --ep-elevated: #1E2130;
+  --ep-overlay: rgba(0,0,0,.7);
+  --ep-border: #2E3241;
+  --ep-border-subtle: #252836;
+  --ep-border-strong: #3B404F;
+
+  --ep-text: #E8EBF0;
+  --ep-text-2: #A0A8B8;
+  --ep-text-3: #6B7280;
+  --ep-text-inverse: #111827;
+
+  --ep-accent: #4A7CC9;
+  --ep-accent-hover: #6B9BE0;
+  --ep-accent-bg: #1B2A45;
+  --ep-accent-bright: #A78BFA;
+  --ep-accent-bright-bg: #1E1535;
+  --ep-gold: #D4A843;
+  --ep-gold-bg: #2A2415;
+
+  --ep-success: #34D399;
+  --ep-success-bg: #0D2818;
+  --ep-warning: #FBBF24;
+  --ep-warning-bg: #2A2415;
+  --ep-danger: #F87171;
+  --ep-danger-bg: #2D1515;
+  --ep-info: #60A5FA;
+  --ep-info-bg: #152040;
+
+  --ep-shadow-sm: 0 1px 2px rgba(0,0,0,.3), 0 1px 3px rgba(0,0,0,.2);
+  --ep-shadow-md: 0 4px 6px rgba(0,0,0,.3), 0 2px 4px rgba(0,0,0,.2);
+  --ep-shadow-lg: 0 10px 25px rgba(0,0,0,.4), 0 4px 10px rgba(0,0,0,.3);
+  --ep-shadow-xl: 0 20px 50px rgba(0,0,0,.5), 0 8px 20px rgba(0,0,0,.3);
+  --ep-shadow-inset: inset 0 2px 4px rgba(0,0,0,.3);
+  --ep-shadow-focus: 0 0 0 3px rgba(167,139,250,.35);
+
+  --portal-bg: var(--ep-bg);
+  --portal-bg-elevated: var(--ep-elevated);
+  --portal-card: var(--ep-surface);
+  --portal-card-hover: var(--ep-surface-hover);
+  --portal-input: var(--ep-surface);
+  --portal-border: var(--ep-border);
+  --portal-border-light: var(--ep-border-subtle);
+  --portal-purple: var(--ep-accent-bright);
+  --portal-purple-dim: var(--ep-accent-bright-bg);
+  --portal-mint: var(--ep-success);
+  --portal-mint-dim: var(--ep-success-bg);
+  --portal-text-strong: var(--ep-text);
+  --portal-text: var(--ep-text-2);
+  --portal-text-muted: var(--ep-text-3);
+  --portal-danger: var(--ep-danger);
+  --portal-warn: var(--ep-warning);
+  --portal-success: var(--ep-success);
+  --portal-scrollbar: #3B404F;
+  --portal-scrollbar-hover: #525867;
+  --portal-nav-hover: rgba(232, 235, 240, 0.05);
+  --portal-inset-shadow: var(--ep-shadow-inset);
+  --portal-active-pill-shadow: var(--ep-shadow-sm);
+  --portal-active-glow: var(--ep-shadow-focus);
+  --portal-knob-shadow: var(--ep-shadow-sm);
+  --portal-status-glow: 0 0 6px var(--ep-success);
+  --portal-dialog-shadow: var(--ep-shadow-lg);
+  --portal-dropdown-shadow: var(--ep-shadow-md);
+}

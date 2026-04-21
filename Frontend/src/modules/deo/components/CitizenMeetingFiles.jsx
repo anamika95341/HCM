@@ -424,7 +424,7 @@ export default function CitizenMeetingFiles() {
   };
 
   return (
-    <div className="min-h-screen bg-[var(--portal-bg)] w-full box-border" style={{ fontFamily: "'Inter', system-ui, sans-serif" }}>
+    <div className="min-h-screen bg-[var(--portal-bg)] w-full box-border" style={{ fontFamily: "var(--portal-font, 'Lora', Georgia, 'Times New Roman', serif)" }}>
       <div className="bg-[var(--portal-card)] border-b border-[var(--portal-border)] px-7 py-3.5 flex items-center justify-between">
         <h1 className="text-xl font-semibold text-[var(--portal-text-strong)] m-0">Citizen Meeting Files</h1>
         <div className="flex items-center gap-2.5">

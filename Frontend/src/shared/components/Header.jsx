@@ -25,7 +25,7 @@ const Header = () => {
   const { C, theme, toggleTheme } = usePortalTheme();
   const { session, logout } = useAuth();
   const { notifications, unreadCount, markRead, markAllRead } = useNotifications();
-  const useCitizenNavUi = session?.role === "citizen";
+  const useCitizenNavUi = session?.role === "citizen" || session?.role === "admin";
 
   const [open, setOpen] = useState(false);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
@@ -346,7 +346,8 @@ const HeaderIcon = ({ icon: Icon, dot, onClick, title, isCitizen = false }) => {
 const MenuItem = ({ icon: Icon, label, danger, onClick }) => {
   const { C } = usePortalTheme();
   const [hovered, setHovered] = useState(false);
-  const useCitizenNavUi = typeof document !== "undefined" && document.querySelector(".portal-shell")?.dataset?.portalRole === "citizen";
+  const portalRole = typeof document !== "undefined" ? document.querySelector(".portal-shell")?.dataset?.portalRole : undefined;
+  const useCitizenNavUi = portalRole === "citizen" || portalRole === "admin";
 
   return (
     <li

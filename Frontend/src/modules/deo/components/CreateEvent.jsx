@@ -137,7 +137,7 @@ export default function CreateEvent() {
   });
 
   return (
-    <div style={{ minHeight: "100vh", backgroundColor: C.bg, fontFamily: "'Inter', system-ui, sans-serif", padding: "32px 28px 40px", boxSizing: "border-box", width: "100%" }}>
+    <div style={{ minHeight: "100vh", backgroundColor: C.bg, fontFamily: "var(--portal-font, 'Lora', Georgia, 'Times New Roman', serif)", padding: "32px 28px 40px", boxSizing: "border-box", width: "100%" }}>
       <div style={{ width: "100%", maxWidth: 1320, margin: "0 auto" }}>
         <h1 style={{ fontSize: 20, fontWeight: 600, color: C.t1, textAlign: "center", marginBottom: 24, marginTop: 0 }}>Create Event</h1>
 

@@ -28,7 +28,7 @@ export default class AppErrorBoundary extends React.Component {
             padding: "var(--portal-space-11, 24px)",
             background: "var(--portal-bg, #F5F5F5)",
             color: "var(--portal-text-strong, #171717)",
-            fontFamily: "'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
+            fontFamily: "var(--portal-font, 'Lora', Georgia, 'Times New Roman', serif)",
             transition: "background-color 0.3s ease, color 0.3s ease",
           }}
         >

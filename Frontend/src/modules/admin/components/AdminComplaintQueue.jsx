@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Calendar, ChevronLeft, ChevronRight, Eye, Search } from "lucide-react";
+import { Calendar, ChevronLeft, ChevronRight, Eye, Filter, Search } from "lucide-react";
+import { FiFileText } from "react-icons/fi";
 import { useNavigate } from "react-router-dom";
 import { PATHS } from "../../../routes/paths.js";
 import { apiClient } from "../../../shared/api/client.js";
@@ -9,8 +10,6 @@ import {
   WorkspaceCard,
   WorkspaceEmptyState,
   WorkspaceInput,
-  WorkspacePage,
-  WorkspaceSectionHeader,
   WorkspaceSelect,
 } from "../../../shared/components/WorkspaceUI.jsx";
 import { usePortalTheme } from "../../../shared/theme/portalTheme.jsx";
@@ -22,8 +21,6 @@ function statusLabel(status) {
     .map((chunk) => chunk.charAt(0).toUpperCase() + chunk.slice(1))
     .join(" ");
 }
-
-const ITEMS_PER_PAGE = 6;
 
 const tableCellTextStyle = {
   display: "block",
@@ -172,8 +169,8 @@ function CustomDateFilter({ value, onChange, placeholder, min, max }) {
         onClick={() => setIsOpen((current) => !current)}
         style={{
           width: "100%",
-          minHeight: 42,
-          padding: "10px 14px",
+          minHeight: 34,
+          padding: "6px 14px",
           border: `1px solid ${C.border}`,
           background: C.inp,
           color: value ? C.t1 : C.t3,
@@ -418,6 +415,8 @@ export default function AdminComplaintQueue() {
   const [currentPage, setCurrentPage] = useState(1);
   const [hoveredPagerButton, setHoveredPagerButton] = useState(null);
   const [hoveredActionId, setHoveredActionId] = useState(null);
+  const [itemsPerPage, setItemsPerPage] = useState(7);
+  const [showEntriesFocused, setShowEntriesFocused] = useState(false);
 
   useEffect(() => {
     let active = true;
@@ -481,13 +480,6 @@ export default function AdminComplaintQueue() {
     [personalComplaintQueue]
   );
 
-  useEffect(() => {
-    setCurrentPage(1);
-  }, [query, statusFilter, incidentDateFilter, personalComplaintQueue.length]);
-
-  const totalPages = Math.max(1, Math.ceil(filteredComplaintQueue.length / ITEMS_PER_PAGE));
-  const paginatedComplaintQueue = filteredComplaintQueue.slice((currentPage - 1) * ITEMS_PER_PAGE, currentPage * ITEMS_PER_PAGE);
-
   const queueStats = useMemo(() => {
     const inReview = personalComplaintQueue.filter((complaint) => complaint.status === "in_review").length;
     const followup = personalComplaintQueue.filter((complaint) => complaint.status === "followup_in_progress").length;
@@ -498,25 +490,46 @@ export default function AdminComplaintQueue() {
     ];
   }, [personalComplaintQueue]);
 
-  return (
-    <WorkspacePage
-      width={1280}
-      outerStyle={{ height: "calc(100vh - 73px)", overflow: "hidden" }}
-      contentStyle={{ height: "100%", display: "flex", flexDirection: "column" }}
-    >
-      <div style={{ height: "100%", display: "flex", flexDirection: "column", minHeight: 0 }}>
-        <WorkspaceSectionHeader
-          
-          title="COMPLAINT QUEUE"
-          
-        />
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [query, statusFilter, incidentDateFilter, personalComplaintQueue.length, itemsPerPage]);
 
-        <div style={{ display: "grid", gap: 12, flex: 1, minHeight: 0 }}>
+  const totalPages = Math.max(1, Math.ceil(filteredComplaintQueue.length / itemsPerPage));
+  const paginatedComplaintQueue = filteredComplaintQueue.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
+  const pageNumbers = useMemo(() => {
+    if (totalPages <= 1) return [1];
+    const pages = new Set([1, totalPages, currentPage - 1, currentPage, currentPage + 1]);
+    return Array.from(pages).filter((page) => page >= 1 && page <= totalPages).sort((a, b) => a - b);
+  }, [currentPage, totalPages]);
+
+  useEffect(() => {
+    setCurrentPage((page) => Math.min(page, totalPages));
+  }, [totalPages]);
+
+  return (
+    <div
+      className="portal-citizen-page"
+      style={{
+        height: "calc(100vh - 73px)",
+        overflow: "auto",
+        padding: "16px 20px 8px",
+        display: "flex",
+        flexDirection: "column",
+      }}
+    >
+      <div style={{ width: "100%", display: "flex", flexDirection: "column", flex: 1, minHeight: 0 }}>
+        <div style={{ marginBottom: 18, display: "flex", alignItems: "center", gap: 14 }}>
+          <FiFileText size={18} color={C.purple} />
+          <h1 style={{ margin: 0, fontSize: 20, lineHeight: 1.3, fontWeight: 600, color: C.t1 }}>MY COMPLAINTS</h1>
+        </div>
+
+        <div style={{ display: "flex", flexDirection: "column", flex: 1, minHeight: 0 }}>
           <div
             style={{
               display: "grid",
               gridTemplateColumns: "repeat(3, max-content)",
               gap: 14,
+              marginBottom: 14,
               alignItems: "stretch",
               justifyContent: "start",
             }}
@@ -544,33 +557,77 @@ export default function AdminComplaintQueue() {
             ))}
           </div>
 
-          
-          <div style={{ display: "grid", gridTemplateColumns: "minmax(0, 2.8fr) minmax(0, 1fr) minmax(0, 1.1fr)", gap: 16, marginTop: -2 }}>
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2" size={18} style={{ color: C.t3 }} />
-              <WorkspaceInput
-                type="text"
-                value={query}
-                onChange={(event) => setQuery(event.target.value)}
-                placeholder="Search by Complaint Id , Title , Category , Citizen and Location"
-                style={{ paddingLeft: 40 }}
-              />
+          <div style={{ marginBottom: 6 }}>
+            <div style={{ marginBottom: 8, display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                <span style={{ fontSize: 12, color: C.t2, whiteSpace: "nowrap" }}>
+                  Show
+                </span>
+                <input
+                  type="number"
+                  min={1}
+                  max={25}
+                  value={itemsPerPage}
+                  onChange={(event) => {
+                    const nextValue = Number(event.target.value);
+                    if (!Number.isFinite(nextValue)) return;
+                    setItemsPerPage(Math.min(25, Math.max(1, nextValue)));
+                    setCurrentPage(1);
+                  }}
+                  onFocus={() => setShowEntriesFocused(true)}
+                  onBlur={() => setShowEntriesFocused(false)}
+                  style={{
+                    width: 64,
+                    minHeight: 34,
+                    padding: "6px 14px",
+                    border: `1px solid ${showEntriesFocused ? C.purple : C.border}`,
+                    borderRadius: "var(--portal-radius-sm, 10px)",
+                    background: C.inp,
+                    color: C.t1,
+                    fontSize: 13,
+                    fontWeight: 500,
+                    outline: "none",
+                    boxShadow: showEntriesFocused ? `0 0 0 3px ${C.purple}1f` : "none",
+                    transition: "border-color var(--portal-duration-fast) ease, box-shadow var(--portal-duration-fast) ease",
+                  }}
+                />
+                <span style={{ fontSize: 12, color: C.t2, whiteSpace: "nowrap" }}>
+                  Entries
+                </span>
+              </div>
+
+              <div style={{ marginLeft: "auto", width: "50%", minWidth: 520, display: "grid", gap: 12, gridTemplateColumns: "minmax(280px, 3fr) minmax(140px, 1fr) minmax(140px, 1fr)" }}>
+                <div className="relative">
+                  <Search className="absolute left-3 top-2.5" size={17} style={{ color: C.t3 }} />
+                  <WorkspaceInput
+                    type="text"
+                    value={query}
+                    onChange={(event) => setQuery(event.target.value)}
+                    placeholder="Search by Complaint Id , Title , Category , Citizen and Location"
+                    style={{ paddingLeft: 36, minHeight: 34, paddingTop: 6, paddingBottom: 6 }}
+                  />
+                </div>
+                <CustomDateFilter
+                  value={incidentDateFilter}
+                  onChange={setIncidentDateFilter}
+                  placeholder="Date of incident"
+                  max={formatDateValue(new Date())}
+                />
+                <div className="relative">
+                  <Filter className="absolute left-3 top-2.5" size={17} style={{ color: C.t3 }} />
+                  <WorkspaceSelect value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)} style={{ paddingLeft: 36, minHeight: 34, paddingTop: 6, paddingBottom: 6 }}>
+                    <option value="all">All statuses</option>
+                    {statusOptions.map((status) => (
+                      <option key={status} value={status}>{statusLabel(status)}</option>
+                    ))}
+                  </WorkspaceSelect>
+                </div>
+              </div>
             </div>
-            <WorkspaceSelect value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)}>
-              <option value="all">All statuses</option>
-              {statusOptions.map((status) => (
-                <option key={status} value={status}>{statusLabel(status)}</option>
-              ))}
-            </WorkspaceSelect>
-            <CustomDateFilter
-              value={incidentDateFilter}
-              onChange={setIncidentDateFilter}
-              placeholder="Date of incident"
-              max={formatDateValue(new Date())}
-            />
           </div>
           
 
+          <div style={{ display: "flex", flexDirection: "column" }}>
           {loading ? (
             <WorkspaceEmptyState title="Loading complaint queue..." />
           ) : error ? (
@@ -578,116 +635,126 @@ export default function AdminComplaintQueue() {
           ) : filteredComplaintQueue.length === 0 ? (
             <WorkspaceEmptyState title="No assigned complaints found" subtitle="Complaints you assign to yourself will appear here." />
           ) : (
-            <WorkspaceCard style={{ padding: 0, overflow: "hidden", display: "flex", flexDirection: "column", flex: 1, minHeight: 0, marginBottom: 0 }}>
-              <div
-                style={{
-                  display: "grid",
-                  gridTemplateColumns: complaintQueueGridTemplate,
-                  gap: 12,
-                  padding: "12px 12px",
-                  background: tableHeaderBackground,
-                  borderBottom: `1px solid ${C.border}`,
-                }}
-              >
-                {["Complaint Id", "Title", "Category", "Citizen", "Location", "Date of Incident", "Status", "Action"].map((column) => (
-                  <div
-                    key={column}
-                    style={{
-                      fontSize: 10,
-                      fontWeight: 700,
-                      color: tableHeaderText,
-                      textTransform: "uppercase",
-                      letterSpacing: "0.06em",
-                      textAlign: column === "Status" || column === "Action" ? "center" : "left",
-                      whiteSpace: "nowrap",
-                    }}
-                  >
-                    {column}
-                  </div>
-                ))}
-              </div>
-
-              <div style={{ flex: 1, minHeight: 0 }}>
-                {paginatedComplaintQueue.map((complaint, index) => {
-                  const isActionHovered = hoveredActionId === complaint.id;
-                  return (
-                  <div
-                    key={complaint.id}
-                    style={{
-                      display: "grid",
-                      gridTemplateColumns: complaintQueueGridTemplate,
-                      gap: 12,
-                      padding: "14px 12px",
-                      alignItems: "center",
-                      background: index % 2 === 0 ? C.card : alternateRowBackground,
-                      borderBottom: `1px solid ${C.borderLight}`,
-                    }}
-                  >
-                    <div style={{ fontSize: 13, fontWeight: 600, color: C.purple, whiteSpace: "nowrap" }}>
-                      {complaint.complaintId || complaint.id}
-                    </div>
-                    <div title={toTooltipText(complaint.title || "Untitled Complaint")} style={{ fontSize: 13, fontWeight: 600, color: C.t1, minWidth: 0, ...tableCellTextStyle }}>
-                        {complaint.title || "Untitled Complaint"}
-                    </div>
-                    <div title={toTooltipText(complaint.complaintType || "Not provided")} style={{ fontSize: 13, color: C.t2, minWidth: 0, ...tableCellTextStyle }}>
-                      {complaint.complaintType || "Not provided"}
-                    </div>
-                    <div title={toTooltipText(complaint.citizenSnapshot?.name || "Unknown Citizen")} style={{ fontSize: 13, color: C.t2, minWidth: 0, ...tableCellTextStyle }}>
-                      {complaint.citizenSnapshot?.name || "Unknown Citizen"}
-                    </div>
-                    <div title={toTooltipText(complaint.complaintLocation || "Not provided")} style={{ fontSize: 13, color: C.t2, minWidth: 0, ...tableCellTextStyle }}>
-                      {complaint.complaintLocation || "Not provided"}
-                    </div>
-                    <div style={{ fontSize: 13, color: C.t2, minWidth: 0 }}>
-                      <span title={toTooltipText(formatDateOnly(complaint.incidentDate))} style={tableCellTextStyle}>
-                        {formatDateOnly(complaint.incidentDate)}
-                      </span>
-                    </div>
-                    <div style={{ textAlign: "center", whiteSpace: "nowrap" }}>
-                      <div style={{ maxWidth: "100%", overflow: "hidden" }}>
-                        <WorkspaceBadge status={complaint.status} title={statusLabel(complaint.status)} style={{ maxWidth: "100%" }}>
-                          {statusLabel(complaint.status)}
-                        </WorkspaceBadge>
-                      </div>
-                    </div>
-                    <div style={{ textAlign: "center", whiteSpace: "nowrap" }}>
-                      <button
-                        type="button"
-                        onMouseEnter={() => setHoveredActionId(complaint.id)}
-                        onMouseLeave={() => setHoveredActionId(null)}
-                        onClick={() => navigate(`${PATHS.admin.cases}/${complaint.id}?source=complaint-queue`)}
-                        title="View details"
+            <div className="hidden lg:block" style={{ border: `1px solid ${C.border}`, borderRadius: 12, overflow: "hidden", display: "flex", flexDirection: "column", marginBottom: 10 }}>
+              <table className="w-full text-sm" style={{ borderCollapse: "collapse", tableLayout: "fixed" }}>
+                <colgroup>
+                  <col style={{ width: 180, minWidth: 180, maxWidth: 180 }} />
+                  <col style={{ width: "27%" }} />
+                  <col style={{ width: "16%" }} />
+                  <col style={{ width: "15%" }} />
+                  <col style={{ width: "14%" }} />
+                  <col style={{ width: 118, minWidth: 118, maxWidth: 118 }} />
+                  <col style={{ width: 96, minWidth: 96, maxWidth: 96 }} />
+                  <col style={{ width: 84, minWidth: 84, maxWidth: 84 }} />
+                </colgroup>
+                <thead>
+                  <tr>
+                    {["Complaint Id", "Title", "Category", "Citizen", "Location", "Date of Incident", "Status", "Action"].map((column, index, all) => (
+                      <th
+                        key={column}
                         style={{
-                          minWidth: 0,
-                          padding: 7,
-                          borderRadius: 10,
-                          border: `1px solid ${C.purple}`,
-                          background: isActionHovered ? C.purple : "transparent",
-                          color: isActionHovered ? "#ffffff" : C.purple,
-                          display: "inline-flex",
-                          alignItems: "center",
-                          justifyContent: "center",
-                          cursor: "pointer",
-                          transition: "background var(--portal-duration-fast) ease, color var(--portal-duration-fast) ease, border-color var(--portal-duration-fast) ease",
+                          padding: "13px 16px",
+                          fontSize: 10,
+                          fontWeight: 600,
+                          color: tableHeaderText,
+                          textTransform: "uppercase",
+                          letterSpacing: "0.06em",
+                          textAlign: column === "Status" || column === "Action" ? "center" : "left",
+                          whiteSpace: "nowrap",
+                          background: tableHeaderBackground,
+                          borderBottom: `1px solid ${C.border}`,
+                          verticalAlign: "middle",
+                          borderTopLeftRadius: index === 0 ? 12 : undefined,
+                          borderTopRightRadius: index === all.length - 1 ? 12 : undefined,
                         }}
                       >
-                        <Eye size={18} />
-                      </button>
-                    </div>
-                  </div>
-                );
-                })}
-              </div>
+                        {column}
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {paginatedComplaintQueue.map((complaint, index) => {
+                    const isActionHovered = hoveredActionId === complaint.id;
+                    return (
+                      <tr key={complaint.id} style={{ background: index % 2 === 0 ? C.card : alternateRowBackground, borderBottom: `1px solid ${C.borderLight}`, verticalAlign: "middle" }}>
+                        <td style={{ padding: "10px 16px", fontSize: 13, fontWeight: 600, color: C.t2, verticalAlign: "middle" }}>
+                          <span title={complaint.complaintId || complaint.id} style={{ ...tableCellTextStyle, fontWeight: 600 }}>
+                            {complaint.complaintId || complaint.id}
+                          </span>
+                        </td>
+                        <td style={{ padding: "10px 16px", verticalAlign: "middle", maxWidth: 0 }}>
+                          <div title={toTooltipText(complaint.title || "Untitled Complaint")} style={{ fontSize: 13, fontWeight: 600, color: C.t1, ...tableCellTextStyle }}>
+                            {complaint.title || "Untitled Complaint"}
+                          </div>
+                        </td>
+                        <td style={{ padding: "10px 16px", fontSize: 13, color: C.t2, verticalAlign: "middle", maxWidth: 0 }}>
+                          <div title={toTooltipText(complaint.complaintType || "Not provided")} style={tableCellTextStyle}>
+                            {complaint.complaintType || "Not provided"}
+                          </div>
+                        </td>
+                        <td style={{ padding: "10px 16px", fontSize: 13, color: C.t2, verticalAlign: "middle", maxWidth: 0 }}>
+                          <div title={toTooltipText(complaint.citizenSnapshot?.name || "Unknown Citizen")} style={tableCellTextStyle}>
+                            {complaint.citizenSnapshot?.name || "Unknown Citizen"}
+                          </div>
+                        </td>
+                        <td style={{ padding: "10px 16px", fontSize: 13, color: C.t2, verticalAlign: "middle", maxWidth: 0 }}>
+                          <div title={toTooltipText(complaint.complaintLocation || "Not provided")} style={tableCellTextStyle}>
+                            {complaint.complaintLocation || "Not provided"}
+                          </div>
+                        </td>
+                        <td style={{ padding: "10px 16px", fontSize: 13, color: C.t2, verticalAlign: "middle", whiteSpace: "nowrap" }}>
+                          <span title={toTooltipText(formatDateOnly(complaint.incidentDate))} style={tableCellTextStyle}>
+                            {formatDateOnly(complaint.incidentDate)}
+                          </span>
+                        </td>
+                        <td style={{ padding: "10px 16px 10px 8px", textAlign: "center", verticalAlign: "middle", whiteSpace: "nowrap" }}>
+                          <div style={{ maxWidth: "100%", overflow: "hidden" }}>
+                            <WorkspaceBadge status={complaint.status} title={statusLabel(complaint.status)} style={{ maxWidth: "100%" }}>
+                              {statusLabel(complaint.status)}
+                            </WorkspaceBadge>
+                          </div>
+                        </td>
+                        <td style={{ padding: "10px 16px", textAlign: "center", verticalAlign: "middle", whiteSpace: "nowrap" }}>
+                          <button
+                            type="button"
+                            onMouseEnter={() => setHoveredActionId(complaint.id)}
+                            onMouseLeave={() => setHoveredActionId(null)}
+                            onClick={() => navigate(`${PATHS.admin.cases}/${complaint.id}?source=complaint-queue`)}
+                            title="View details"
+                            style={{
+                              minWidth: 0,
+                              padding: 7,
+                              borderRadius: 10,
+                              border: "none",
+                              background: isActionHovered ? C.purple : "transparent",
+                              color: isActionHovered ? "#ffffff" : C.purple,
+                              display: "inline-flex",
+                              alignItems: "center",
+                              justifyContent: "center",
+                              cursor: "pointer",
+                              transition: "background var(--portal-duration-fast) ease, color var(--portal-duration-fast) ease",
+                            }}
+                          >
+                            <Eye size={18} />
+                          </button>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
 
-              <div style={{ background: C.bgElevated, borderTop: `1px solid ${C.border}` }}>
-                <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 px-6 py-3.5">
+              <div className="portal-citizen-table-footer" style={{ background: C.bgElevated, borderTop: `1px solid ${C.border}` }}>
+                <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-2 py-1.5" style={{ width: "calc(100% - 24px)", margin: "0 auto" }}>
                   <p style={{ fontSize: 12, color: C.t2, margin: 0 }}>
-                    Showing <span style={{ fontWeight: 600 }}>{Math.min((currentPage - 1) * ITEMS_PER_PAGE + 1, filteredComplaintQueue.length)}</span>-<span style={{ fontWeight: 600 }}>{Math.min(currentPage * ITEMS_PER_PAGE, filteredComplaintQueue.length)}</span> of{" "}
+                    Showing <span style={{ fontWeight: 600 }}>{Math.min((currentPage - 1) * itemsPerPage + 1, filteredComplaintQueue.length)}</span>-<span style={{ fontWeight: 600 }}>{Math.min(currentPage * itemsPerPage, filteredComplaintQueue.length)}</span> of{" "}
                     <span style={{ fontWeight: 600 }}>{filteredComplaintQueue.length}</span> requests
                   </p>
 
-                  {totalPages > 1 && (
-                    <div className="flex items-center gap-2 flex-wrap">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    {totalPages > 1 ? (
+                      <>
                       <button
                         type="button"
                         disabled={currentPage === 1}
@@ -695,28 +762,60 @@ export default function AdminComplaintQueue() {
                         onMouseLeave={() => setHoveredPagerButton(null)}
                         onClick={() => setCurrentPage((page) => Math.max(1, page - 1))}
                         style={{
-                          width: 92,
-                          minHeight: 34,
-                          padding: "8px 12px",
+                          minWidth: 30,
+                          minHeight: 30,
+                          padding: "6px",
                           fontSize: 12,
-                          background: hoveredPagerButton === "previous" && currentPage !== 1 ? C.purple : "transparent",
+                          background: "transparent",
                           color: hoveredPagerButton === "previous" && currentPage !== 1 ? "#ffffff" : C.purple,
-                          border: `1px solid ${C.purple}`,
-                          borderRadius: 12,
-                          opacity: currentPage === 1 ? 0.4 : 1,
+                          border: "none",
+                          borderRadius: 8,
+                          opacity: currentPage === 1 ? 0.35 : 1,
                           display: "inline-flex",
                           alignItems: "center",
                           justifyContent: "center",
-                          gap: 6,
                           cursor: currentPage === 1 ? "default" : "pointer",
+                          textShadow: hoveredPagerButton === "previous" && currentPage !== 1 ? "0 0 10px rgba(255,255,255,0.9)" : "none",
+                          transition: "text-shadow 0.18s ease, color 0.18s ease",
                         }}
                       >
-                        <ChevronLeft size={16} /> Previous
+                        <ChevronLeft size={16} />
                       </button>
 
-                      <span style={{ padding: "6px 10px", fontSize: 12, color: C.t3 }}>
-                        Page <span style={{ fontWeight: 600 }}>{currentPage}</span> of <span style={{ fontWeight: 600 }}>{totalPages}</span>
-                      </span>
+                      {pageNumbers.map((pageNumber, index) => {
+                        const previousPage = pageNumbers[index - 1];
+                        const showGap = index > 0 && previousPage !== undefined && pageNumber - previousPage > 1;
+                        return (
+                          <div key={pageNumber} className="flex items-center gap-2">
+                            {showGap ? <span style={{ fontSize: 12, color: C.t3, padding: "0 2px" }}>...</span> : null}
+                            <button
+                              type="button"
+                              onMouseEnter={() => setHoveredPagerButton(`page-${pageNumber}`)}
+                              onMouseLeave={() => setHoveredPagerButton(null)}
+                              onClick={() => setCurrentPage(pageNumber)}
+                              style={{
+                                minWidth: 30,
+                                minHeight: 30,
+                                padding: "6px",
+                                fontSize: 12,
+                                background: "transparent",
+                                color: currentPage === pageNumber || hoveredPagerButton === `page-${pageNumber}` ? "#ffffff" : C.purple,
+                                border: "none",
+                                display: "inline-flex",
+                                alignItems: "center",
+                                justifyContent: "center",
+                                fontWeight: currentPage === pageNumber ? 700 : 600,
+                                borderRadius: 8,
+                                cursor: "pointer",
+                                textShadow: currentPage === pageNumber || hoveredPagerButton === `page-${pageNumber}` ? "0 0 10px rgba(255,255,255,0.9)" : "none",
+                                transition: "text-shadow 0.18s ease, color 0.18s ease",
+                              }}
+                            >
+                              {pageNumber}
+                            </button>
+                          </div>
+                        );
+                      })}
 
                       <button
                         type="button"
@@ -725,32 +824,39 @@ export default function AdminComplaintQueue() {
                         onMouseLeave={() => setHoveredPagerButton(null)}
                         onClick={() => setCurrentPage((page) => Math.min(totalPages, page + 1))}
                         style={{
-                          width: 92,
-                          minHeight: 34,
-                          padding: "8px 12px",
+                          minWidth: 30,
+                          minHeight: 30,
+                          padding: "6px",
                           fontSize: 12,
-                          background: hoveredPagerButton === "next" && currentPage !== totalPages ? C.purple : "transparent",
+                          background: "transparent",
                           color: hoveredPagerButton === "next" && currentPage !== totalPages ? "#ffffff" : C.purple,
-                          border: `1px solid ${C.purple}`,
-                          borderRadius: 12,
-                          opacity: currentPage === totalPages ? 0.4 : 1,
+                          border: "none",
+                          borderRadius: 8,
+                          opacity: currentPage === totalPages ? 0.35 : 1,
                           display: "inline-flex",
                           alignItems: "center",
                           justifyContent: "center",
-                          gap: 6,
                           cursor: currentPage === totalPages ? "default" : "pointer",
+                          textShadow: hoveredPagerButton === "next" && currentPage !== totalPages ? "0 0 10px rgba(255,255,255,0.9)" : "none",
+                          transition: "text-shadow 0.18s ease, color 0.18s ease",
                         }}
                       >
-                        Next <ChevronRight size={16} />
+                        <ChevronRight size={16} />
                       </button>
-                    </div>
-                  )}
+                      </>
+                    ) : (
+                      <span style={{ color: "#ffffff", fontSize: 14, fontWeight: 700, textShadow: "0 0 10px rgba(255,255,255,0.9)", lineHeight: 1 }}>
+                        1
+                      </span>
+                    )}
+                  </div>
                 </div>
               </div>
-            </WorkspaceCard>
+            </div>
           )}
+          </div>
         </div>
       </div>
-    </WorkspacePage>
+    </div>
   );
 }

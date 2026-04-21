@@ -1,11 +1,12 @@
-import { NavLink } from "react-router-dom";
+import { NavLink, useLocation } from "react-router-dom";
 import { useRef, useState } from "react";
 import { usePortalTheme } from "../theme/portalTheme.jsx";
 
-const SidebarItem = ({ children, type = "NavLink", to, icon: Icon, label, collapsed, onClick, isCitizen = false }) => {
+const SidebarItem = ({ children, type = "NavLink", to, icon: Icon, label, collapsed, onClick, isCitizen = false, activeMatch }) => {
   const ref = useRef(null);
   const { C } = usePortalTheme();
   const [navHover, setNavHover] = useState(false);
+  const location = useLocation();
 
   const baseItemStyle = {
     display: "flex",
@@ -31,17 +32,24 @@ const SidebarItem = ({ children, type = "NavLink", to, icon: Icon, label, collap
           to={to}
           onMouseEnter={() => setNavHover(true)}
           onMouseLeave={() => setNavHover(false)}
-          style={({ isActive }) => ({
+          style={({ isActive }) => {
+            const matchesCustomActive = typeof activeMatch === "function" ? activeMatch(location) : true;
+            const isCurrent = isActive && matchesCustomActive;
+            return ({
             ...baseItemStyle,
             justifyContent: collapsed ? "center" : "flex-start",
-            background: isActive ? C.card : navHover ? C.navHover : "transparent",
-            color: isActive ? C.t1 : C.t3,
-            fontWeight: isActive ? 600 : 500,
-          })}
+            background: isCurrent ? C.card : navHover ? C.navHover : "transparent",
+            color: isCurrent ? C.t1 : C.t3,
+            fontWeight: isCurrent ? 600 : 500,
+          });
+          }}
         >
-          {({ isActive }) => (
+          {({ isActive }) => {
+            const matchesCustomActive = typeof activeMatch === "function" ? activeMatch(location) : true;
+            const isCurrent = isActive && matchesCustomActive;
+            return (
             <>
-              <Icon size={18} style={{ flexShrink: 0, color: isActive ? C.purple : C.t3 }} />
+              <Icon size={18} style={{ flexShrink: 0, color: isCurrent ? C.purple : C.t3 }} />
               {!collapsed && (
                 <div
                   className={isCitizen ? "portal-citizen-value" : undefined}
@@ -57,7 +65,8 @@ const SidebarItem = ({ children, type = "NavLink", to, icon: Icon, label, collap
                 </div>
               )}
             </>
-          )}
+          );
+          }}
         </NavLink>
       ) : type === "Button" ? (
         <button

@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { ChevronLeft, ChevronRight, Eye, FileText, Search } from "lucide-react";
+import { Calendar, ChevronLeft, ChevronRight, Clock, Eye, FileText, Filter, Search } from "lucide-react";
+import { RiTeamLine } from "react-icons/ri";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { PATHS } from "../../../routes/paths.js";
 import { apiClient } from "../../../shared/api/client.js";
@@ -13,7 +14,6 @@ import {
   WorkspaceEmptyState,
   WorkspaceInput,
   WorkspacePage,
-  WorkspaceSectionHeader,
   WorkspaceSelect,
 } from "../../../shared/components/WorkspaceUI.jsx";
 import { usePortalTheme } from "../../../shared/theme/portalTheme.jsx";
@@ -174,8 +174,8 @@ function CustomDateFilter({ value, onChange, placeholder, min, max }) {
         onClick={() => setIsOpen((current) => !current)}
         style={{
           width: "100%",
-          minHeight: 42,
-          padding: "10px 14px",
+          minHeight: 34,
+          padding: "6px 14px",
           border: `1px solid ${C.border}`,
           background: C.inp,
           color: value ? C.t1 : C.t3,
@@ -438,6 +438,419 @@ function combineDateAndTime(date, time) {
   return new Date(`${date}T${time}`).toISOString();
 }
 
+function addMinutesToDateTime(date, time, minutes) {
+  const iso = combineDateAndTime(date, time);
+  if (!iso) return "";
+  const parsed = new Date(iso);
+  if (Number.isNaN(parsed.getTime())) return "";
+  return new Date(parsed.getTime() + minutes * 60 * 1000).toISOString();
+}
+
+function formatTimeOptionLabel(value) {
+  const [hourPart, minutePart] = String(value || "").split(":");
+  const hour = Number(hourPart);
+  const minute = Number(minutePart);
+  if (!Number.isFinite(hour) || !Number.isFinite(minute)) return value;
+  const suffix = hour >= 12 ? "PM" : "AM";
+  const normalizedHour = hour % 12 || 12;
+  return `${normalizedHour}:${String(minute).padStart(2, "0")} ${suffix}`;
+}
+
+const HALF_HOUR_TIME_OPTIONS = Array.from({ length: 48 }, (_, index) => {
+  const hour = String(Math.floor(index / 2)).padStart(2, "0");
+  const minute = index % 2 === 0 ? "00" : "30";
+  const value = `${hour}:${minute}`;
+  return { value, label: formatTimeOptionLabel(value) };
+});
+
+function ScheduleDatePicker({ value, onChange, min, placeholder = "Select start date" }) {
+  const { C } = usePortalTheme();
+  const [isOpen, setIsOpen] = useState(false);
+  const [openDirection, setOpenDirection] = useState("down");
+  const [viewMode, setViewMode] = useState("day");
+  const rootRef = useRef(null);
+  const [visibleMonth, setVisibleMonth] = useState(() => {
+    if (value) return parseDateValue(value);
+    return parseDateValue(min) || new Date();
+  });
+
+  useEffect(() => {
+    if (!isOpen) return undefined;
+
+    const updateDirection = () => {
+      const root = rootRef.current;
+      if (!root) return;
+      const rect = root.getBoundingClientRect();
+      const dropdownHeight = 340;
+      const spaceBelow = window.innerHeight - rect.bottom;
+      const spaceAbove = rect.top;
+      setOpenDirection(spaceBelow < dropdownHeight && spaceAbove > spaceBelow ? "up" : "down");
+    };
+
+    updateDirection();
+
+    const handlePointerDown = (event) => {
+      const pickerRoot = event.target.closest?.('[data-admin-schedule-date-picker="true"]');
+      if (!pickerRoot) {
+        setIsOpen(false);
+        setViewMode("day");
+      }
+    };
+
+    window.addEventListener("resize", updateDirection);
+    window.addEventListener("scroll", updateDirection, true);
+    document.addEventListener("mousedown", handlePointerDown);
+    return () => {
+      window.removeEventListener("resize", updateDirection);
+      window.removeEventListener("scroll", updateDirection, true);
+      document.removeEventListener("mousedown", handlePointerDown);
+    };
+  }, [isOpen]);
+
+  useEffect(() => {
+    if (!value) return;
+    const parsedValue = parseDateValue(value);
+    if (parsedValue) setVisibleMonth(parsedValue);
+  }, [value]);
+
+  const monthStart = new Date(visibleMonth.getFullYear(), visibleMonth.getMonth(), 1);
+  const minDate = parseDateValue(min);
+  const days = buildCalendarDays(monthStart);
+  const yearStart = Math.floor(visibleMonth.getFullYear() / 12) * 12;
+
+  function isMonthDisabled(monthIndex) {
+    const firstDay = new Date(visibleMonth.getFullYear(), monthIndex, 1);
+    const lastDay = new Date(visibleMonth.getFullYear(), monthIndex + 1, 0);
+    if (minDate && lastDay < minDate) return true;
+    return false;
+  }
+
+  function isYearDisabled(year) {
+    const lastDay = new Date(year, 11, 31);
+    if (minDate && lastDay < minDate) return true;
+    return false;
+  }
+
+  return (
+    <div ref={rootRef} data-admin-schedule-date-picker="true" style={{ position: "relative" }}>
+      <button
+        type="button"
+        onClick={() => setIsOpen((current) => !current)}
+        style={{
+          width: "100%",
+          minHeight: 42,
+          padding: "10px 14px",
+          border: `1px solid ${C.border}`,
+          background: C.inp,
+          color: value ? C.t1 : C.t3,
+          fontSize: 13,
+          outline: "none",
+          borderRadius: "var(--portal-radius-sm, 10px)",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          cursor: "pointer",
+        }}
+      >
+        <span>{value ? formatDisplayDate(value) : placeholder}</span>
+        <Calendar size={16} style={{ color: C.t3 }} />
+      </button>
+
+      {isOpen ? (
+        <div
+          style={{
+            position: "absolute",
+            top: openDirection === "down" ? "calc(100% + 6px)" : "auto",
+            bottom: openDirection === "up" ? "calc(100% + 6px)" : "auto",
+            left: 0,
+            width: "100%",
+            minWidth: 280,
+            zIndex: 30,
+            padding: 12,
+            borderRadius: 12,
+            border: `1px solid ${C.border}`,
+            background: C.card,
+            boxShadow: "0 16px 36px rgba(15, 23, 42, 0.14)",
+          }}
+        >
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10, gap: 8 }}>
+            <button
+              type="button"
+              onClick={() => {
+                if (viewMode === "year") setVisibleMonth((current) => new Date(current.getFullYear() - 12, current.getMonth(), 1));
+                else setVisibleMonth((current) => new Date(current.getFullYear(), current.getMonth() - 1, 1));
+              }}
+              style={calendarNavButtonStyle(C)}
+            >
+              <ChevronRight size={16} style={{ transform: "rotate(180deg)" }} />
+            </button>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 6, flexWrap: "wrap" }}>
+              <button type="button" onClick={() => setViewMode("month")} style={{ border: "none", background: "transparent", color: C.t1, fontSize: 13, fontWeight: 700, cursor: "pointer" }}>
+                {monthStart.toLocaleString("en-US", { month: "long" })}
+              </button>
+              <button type="button" onClick={() => setViewMode("year")} style={{ border: "none", background: "transparent", color: C.t1, fontSize: 13, fontWeight: 700, cursor: "pointer" }}>
+                {monthStart.getFullYear()}
+              </button>
+            </div>
+            <button
+              type="button"
+              onClick={() => {
+                if (viewMode === "year") setVisibleMonth((current) => new Date(current.getFullYear() + 12, current.getMonth(), 1));
+                else setVisibleMonth((current) => new Date(current.getFullYear(), current.getMonth() + 1, 1));
+              }}
+              style={calendarNavButtonStyle(C)}
+            >
+              <ChevronRight size={16} />
+            </button>
+          </div>
+
+          {viewMode === "day" ? (
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(7, minmax(0, 1fr))", gap: 4 }}>
+              {["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"].map((day) => (
+                <div key={day} style={{ textAlign: "center", fontSize: 11, fontWeight: 700, color: C.t3, padding: "6px 0" }}>{day}</div>
+              ))}
+              {days.map((day) => {
+                const dayValue = formatDateValue(day);
+                const isCurrentMonth = day.getMonth() === monthStart.getMonth();
+                const isDisabled = (minDate && dayValue < min) || !isCurrentMonth;
+                const isSelected = value === dayValue;
+
+                return (
+                  <button
+                    key={dayValue}
+                    type="button"
+                    disabled={isDisabled}
+                    onClick={() => {
+                      onChange(dayValue);
+                      setIsOpen(false);
+                      setViewMode("day");
+                    }}
+                    style={{
+                      height: 34,
+                      borderRadius: 8,
+                      border: `1px solid ${isSelected ? C.purple : "transparent"}`,
+                      background: isSelected ? C.purple : "transparent",
+                      color: isSelected ? "#ffffff" : isCurrentMonth ? C.t1 : C.t3,
+                      opacity: isDisabled ? 0.35 : 1,
+                      cursor: isDisabled ? "not-allowed" : "pointer",
+                      fontSize: 12,
+                      fontWeight: 600,
+                    }}
+                  >
+                    {day.getDate()}
+                  </button>
+                );
+              })}
+            </div>
+          ) : null}
+
+          {viewMode === "month" ? (
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(3, minmax(0, 1fr))", gap: 8 }}>
+              {Array.from({ length: 12 }, (_, monthIndex) => {
+                const disabled = isMonthDisabled(monthIndex);
+                const selected = monthIndex === visibleMonth.getMonth();
+                return (
+                  <button
+                    key={monthIndex}
+                    type="button"
+                    disabled={disabled}
+                    onClick={() => {
+                      setVisibleMonth((current) => new Date(current.getFullYear(), monthIndex, 1));
+                      setViewMode("day");
+                    }}
+                    style={{
+                      minHeight: 36,
+                      borderRadius: 8,
+                      border: `1px solid ${selected ? C.purple : C.border}`,
+                      background: selected ? `${C.purple}12` : "transparent",
+                      color: C.t1,
+                      opacity: disabled ? 0.35 : 1,
+                      cursor: disabled ? "not-allowed" : "pointer",
+                      fontSize: 12,
+                      fontWeight: 600,
+                    }}
+                  >
+                    {new Date(2000, monthIndex, 1).toLocaleString("en-US", { month: "short" })}
+                  </button>
+                );
+              })}
+            </div>
+          ) : null}
+
+          {viewMode === "year" ? (
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(3, minmax(0, 1fr))", gap: 8 }}>
+              {Array.from({ length: 12 }, (_, index) => {
+                const year = yearStart + index;
+                const disabled = isYearDisabled(year);
+                const selected = year === visibleMonth.getFullYear();
+                return (
+                  <button
+                    key={year}
+                    type="button"
+                    disabled={disabled}
+                    onClick={() => {
+                      setVisibleMonth((current) => new Date(year, current.getMonth(), 1));
+                      setViewMode("month");
+                    }}
+                    style={{
+                      minHeight: 36,
+                      borderRadius: 8,
+                      border: `1px solid ${selected ? C.purple : C.border}`,
+                      background: selected ? `${C.purple}12` : "transparent",
+                      color: C.t1,
+                      opacity: disabled ? 0.35 : 1,
+                      cursor: disabled ? "not-allowed" : "pointer",
+                      fontSize: 12,
+                      fontWeight: 600,
+                    }}
+                  >
+                    {year}
+                  </button>
+                );
+              })}
+            </div>
+          ) : null}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+function ScheduleTimePicker({ value, onChange, options }) {
+  const { C } = usePortalTheme();
+  const [isOpen, setIsOpen] = useState(false);
+  const [openDirection, setOpenDirection] = useState("down");
+  const rootRef = useRef(null);
+
+  useEffect(() => {
+    if (!isOpen) return undefined;
+
+    const updateDirection = () => {
+      const root = rootRef.current;
+      if (!root) return;
+      const rect = root.getBoundingClientRect();
+      const dropdownHeight = 232;
+      const spaceBelow = window.innerHeight - rect.bottom;
+      const spaceAbove = rect.top;
+      setOpenDirection(spaceBelow < dropdownHeight && spaceAbove > spaceBelow ? "up" : "down");
+    };
+
+    updateDirection();
+
+    const handlePointerDown = (event) => {
+      const pickerRoot = event.target.closest?.('[data-admin-schedule-time-picker="true"]');
+      if (!pickerRoot) setIsOpen(false);
+    };
+
+    window.addEventListener("resize", updateDirection);
+    window.addEventListener("scroll", updateDirection, true);
+    document.addEventListener("mousedown", handlePointerDown);
+    return () => {
+      window.removeEventListener("resize", updateDirection);
+      window.removeEventListener("scroll", updateDirection, true);
+      document.removeEventListener("mousedown", handlePointerDown);
+    };
+  }, [isOpen]);
+
+  const selectedOption = options.find((option) => option.value === value);
+
+  return (
+    <div ref={rootRef} data-admin-schedule-time-picker="true" style={{ position: "relative" }}>
+      <button
+        type="button"
+        onClick={() => setIsOpen((current) => !current)}
+        style={{
+          width: "100%",
+          minHeight: 42,
+          padding: "10px 14px",
+          border: `1px solid ${C.border}`,
+          background: C.inp,
+          color: value ? C.t1 : C.t3,
+          fontSize: 13,
+          outline: "none",
+          borderRadius: "var(--portal-radius-sm, 10px)",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          cursor: "pointer",
+        }}
+      >
+        <span>{selectedOption?.label || "Select time slot"}</span>
+        <Clock size={16} style={{ color: C.t3 }} />
+      </button>
+
+      {isOpen ? (
+        <div
+          style={{
+            position: "absolute",
+            top: openDirection === "down" ? "calc(100% + 6px)" : "auto",
+            bottom: openDirection === "up" ? "calc(100% + 6px)" : "auto",
+            left: 0,
+            width: "100%",
+            zIndex: 30,
+            maxHeight: 220,
+            overflowY: "auto",
+            padding: 6,
+            borderRadius: 12,
+            border: `1px solid ${C.border}`,
+            background: C.card,
+            boxShadow: "0 16px 36px rgba(15, 23, 42, 0.14)",
+          }}
+        >
+          <button
+            type="button"
+            onClick={() => {
+              onChange("");
+              setIsOpen(false);
+            }}
+            style={{
+              width: "100%",
+              minHeight: 34,
+              borderRadius: 8,
+              border: "none",
+              background: "transparent",
+              color: C.t3,
+              textAlign: "left",
+              padding: "8px 10px",
+              fontSize: 12,
+              cursor: "pointer",
+            }}
+          >
+            Select time slot
+          </button>
+          {options.map((option) => {
+            const isSelected = value === option.value;
+            return (
+              <button
+                key={option.value}
+                type="button"
+                onClick={() => {
+                  onChange(option.value);
+                  setIsOpen(false);
+                }}
+                style={{
+                  width: "100%",
+                  minHeight: 34,
+                  borderRadius: 8,
+                  border: `1px solid ${isSelected ? C.purple : "transparent"}`,
+                  background: isSelected ? C.purple : "transparent",
+                  color: isSelected ? "#ffffff" : C.t1,
+                  textAlign: "left",
+                  padding: "8px 10px",
+                  fontSize: 12,
+                  cursor: "pointer",
+                }}
+              >
+                {option.label}
+              </button>
+            );
+          })}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
 function buildMeetingActions(meeting, adminId) {
   if (!meeting?.status) return [];
   const { status, assignedAdminUserId } = meeting;
@@ -446,12 +859,11 @@ function buildMeetingActions(meeting, adminId) {
   const actions = [];
   if (["pending", "not_verified"].includes(status)) actions.push(["accept", "Accept Meeting"]);
   if (["pending", "accepted", "verification_pending", "verified", "not_verified"].includes(status)) actions.push(["reject", "Reject Meeting"]);
-  if (["accepted", "not_verified", "verification_pending", "verified"].includes(status)) actions.push(["sendVerification", "Send for DEO Verification"]);
+  if (["accepted", "not_verified"].includes(status)) actions.push(["sendVerification", "Send for DEO Verification"]);
   if (["accepted", "verified", "VERIFIED_BY_DEO"].includes(status)) actions.push(["schedule", "Schedule Meeting"]);
   if (status === "scheduled") {
-    actions.push(["reschedule", "Reschedule Meeting"]);
     actions.push(["complete", "Mark as Completed"]);
-    actions.push(["scheduledReject", "Reject Scheduled Meeting"]);
+    actions.push(["scheduledReject", "Cancel Meeting"]);
   }
   return actions;
 }
@@ -491,6 +903,58 @@ function NoticeBox({ tone, label, value }) {
   );
 }
 
+function PurpleOutlineButton({ children, style, ...props }) {
+  const { C } = usePortalTheme();
+  const [isHovered, setIsHovered] = useState(false);
+  const [isPressed, setIsPressed] = useState(false);
+  const isDisabled = Boolean(props.disabled);
+
+  return (
+    <button
+      {...props}
+      type={props.type || "button"}
+      onMouseEnter={(event) => {
+        setIsHovered(true);
+        props.onMouseEnter?.(event);
+      }}
+      onMouseLeave={(event) => {
+        setIsHovered(false);
+        setIsPressed(false);
+        props.onMouseLeave?.(event);
+      }}
+      onMouseDown={(event) => {
+        setIsPressed(true);
+        props.onMouseDown?.(event);
+      }}
+      onMouseUp={(event) => {
+        setIsPressed(false);
+        props.onMouseUp?.(event);
+      }}
+      style={{
+        minHeight: 38,
+        padding: "0 16px",
+        borderRadius: 10,
+        border: `1px solid ${C.purple}`,
+        background: isHovered && !isDisabled ? C.purple : "transparent",
+        color: isHovered && !isDisabled ? "#ffffff" : C.purple,
+        display: "inline-flex",
+        alignItems: "center",
+        justifyContent: "center",
+        cursor: isDisabled ? "not-allowed" : "pointer",
+        fontSize: 13,
+        fontWeight: 600,
+        lineHeight: 1.2,
+        opacity: isDisabled ? 0.4 : 1,
+        transform: isPressed && !isDisabled ? "scale(0.98)" : "none",
+        transition: "background var(--portal-duration-fast) ease, color var(--portal-duration-fast) ease, transform var(--portal-duration-fast) ease",
+        ...style,
+      }}
+    >
+      {children}
+    </button>
+  );
+}
+
 export default function AdminMeeting() {
   const { C } = usePortalTheme();
   const navigate = useNavigate();
@@ -503,9 +967,11 @@ export default function AdminMeeting() {
   const adminId = session?.user?.id;
   const source = searchParams.get("source") || "";
   const isMeetingPoolDetail = source === "meeting-pool";
+  const isMeetingQueueDetail = source === "meeting-queue";
   const isMyCasesDetail = source === "my-cases";
-  const isResolvedCompletedDetail = source === "resolved-completed";
+  const isResolvedCompletedDetail = source === "resolved-completed" || source === "completed-meetings";
   const isWorkQueueDetail = isMeetingPoolDetail || isResolvedCompletedDetail;
+  const meetingPoolBackPath = `${PATHS.admin.workQueue}?tab=meeting-pool`;
 
   const [meetings, setMeetings] = useState([]);
   const [workflowDirectory, setWorkflowDirectory] = useState({ deos: [], ministers: [] });
@@ -544,7 +1010,8 @@ export default function AdminMeeting() {
   const [hoveredActionId, setHoveredActionId] = useState(null);
   const [currentPage, setCurrentPage] = useState(1);
   const [hoveredPagerButton, setHoveredPagerButton] = useState(null);
-  const ITEMS_PER_PAGE = 7;
+  const [itemsPerPage, setItemsPerPage] = useState(7);
+  const [showEntriesFocused, setShowEntriesFocused] = useState(false);
 
   async function loadMeetingPool() {
     const [queueResponse, directoryResponse] = await Promise.all([
@@ -624,7 +1091,7 @@ export default function AdminMeeting() {
 
   const personalMeetingQueue = useMemo(
     () => meetings.filter(
-      (meeting) => meeting.assignedAdminUserId === adminId && !["completed", "cancelled", "rejected"].includes(meeting.status)
+      (meeting) => meeting.assignedAdminUserId === adminId && meeting.status !== "completed"
     ),
     [adminId, meetings]
   );
@@ -648,26 +1115,38 @@ export default function AdminMeeting() {
   }, [createdAtFilter, personalMeetingQueue, query, statusFilter]);
 
   const meetingStatusOptions = useMemo(
-    () => Array.from(new Set(personalMeetingQueue.map((meeting) => meeting.status).filter(Boolean))).sort(),
+    () => {
+      const statuses = new Set(personalMeetingQueue.map((meeting) => meeting.status).filter((status) => status && status !== "pending"));
+      statuses.add("rejected");
+      statuses.add("cancelled");
+      return Array.from(statuses).sort();
+    },
     [personalMeetingQueue]
   );
 
-  useEffect(() => {
-    setCurrentPage(1);
-  }, [query, statusFilter, createdAtFilter]);
-
-  const totalPages = Math.max(1, Math.ceil(filteredMeetingQueue.length / ITEMS_PER_PAGE));
-  const paginatedMeetingQueue = filteredMeetingQueue.slice((currentPage - 1) * ITEMS_PER_PAGE, currentPage * ITEMS_PER_PAGE);
-
   const queueStats = useMemo(() => {
-    const accepted = meetings.filter((meeting) => meeting.status === "accepted").length;
     const scheduled = meetings.filter((meeting) => meeting.status === "scheduled").length;
     return [
-      { label: "My Meeting Queue", value: personalMeetingQueue.length },
-      { label: "Accepted", value: accepted },
+      { label: "Total Meetings", value: personalMeetingQueue.length },
       { label: "Scheduled", value: scheduled },
     ];
   }, [meetings, personalMeetingQueue.length]);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [query, statusFilter, createdAtFilter, itemsPerPage]);
+
+  const totalPages = Math.max(1, Math.ceil(filteredMeetingQueue.length / itemsPerPage));
+  const paginatedMeetingQueue = filteredMeetingQueue.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
+  const pageNumbers = useMemo(() => {
+    if (totalPages <= 1) return [1];
+    const pages = new Set([1, totalPages, currentPage - 1, currentPage, currentPage + 1]);
+    return Array.from(pages).filter((page) => page >= 1 && page <= totalPages).sort((a, b) => a - b);
+  }, [currentPage, totalPages]);
+
+  useEffect(() => {
+    setCurrentPage((page) => Math.min(page, totalPages));
+  }, [totalPages]);
 
   const availableActions = useMemo(
     () => buildMeetingActions(selectedMeeting || {}, adminId),
@@ -692,7 +1171,7 @@ export default function AdminMeeting() {
       setPendingSuccessRedirect(options.successRedirect || "");
       if (options.navigateToPool) {
         await loadMeetingPool();
-        navigate(isWorkQueueDetail ? PATHS.admin.workQueue : PATHS.admin.meetings);
+        navigate(isMeetingPoolDetail ? meetingPoolBackPath : isWorkQueueDetail ? PATHS.admin.workQueue : PATHS.admin.meetings);
         return true;
       }
       if (options.navigateToMeetingQueue) {
@@ -756,17 +1235,37 @@ export default function AdminMeeting() {
     const canUploadPhotos = isAssignedToCurrentAdmin && ["scheduled", "completed"].includes(selectedMeeting.status);
     const verificationPending = ["verification_pending", "SENT_FOR_DEO_VERIFICATION"].includes(selectedMeeting.status);
     const verificationDone = ["verified", "VERIFIED_BY_DEO"].includes(selectedMeeting.status);
-    const isCompletedMeetingDetail = isResolvedCompletedDetail && selectedMeeting.status === "completed";
+    const meetingScheduled = selectedMeeting.status === "scheduled";
+    const workflowDisplayLabel =
+      verificationPending || verificationDone
+        ? "Send for DEO Verification"
+        : meetingScheduled
+          ? "Schedule Meeting"
+          : "Select workflow action";
+    const isCompletedMeetingDetail = selectedMeeting.status === "completed";
     const showAssignToMeButton = !selectedMeeting.assignedAdminUserId && (isMeetingPoolDetail || isUnassignedPoolMeeting);
-    const showWorkflowActions = !showAssignToMeButton && !isResolvedCompletedDetail;
+    const showWorkflowActions = !showAssignToMeButton && !isResolvedCompletedDetail && selectedMeeting.status !== "completed";
 
     const backPath = isMyCasesDetail
       ? PATHS.admin.cases
       : source === "meeting-queue"
           ? PATHS.admin.meetings
-          : isMeetingPoolDetail || isResolvedCompletedDetail || isUnassignedPoolMeeting
+          : isMeetingPoolDetail
+            ? meetingPoolBackPath
+          : isResolvedCompletedDetail
+            ? `${PATHS.admin.workQueue}?tab=completed-meetings`
+          : isUnassignedPoolMeeting
             ? PATHS.admin.workQueue
             : PATHS.admin.meetings;
+    const backLabel = isMeetingPoolDetail
+      ? "Back to Meeting Pool"
+      : isResolvedCompletedDetail
+        ? "Back to Completed Meettings"
+      : isWorkQueueDetail
+        ? "Back to Work Queue"
+      : isMeetingQueueDetail
+        ? "Back to Meetings"
+        : "Back to Meeting Queue";
     const citizenName = [selectedMeeting.first_name, selectedMeeting.last_name].filter(Boolean).join(" ") || "Unknown";
     const citizenPhone = selectedMeeting.mobile_number || "Not provided";
     const createdAtLabel = formatDateOnly(selectedMeeting.createdAt || selectedMeeting.created_at);
@@ -789,17 +1288,55 @@ export default function AdminMeeting() {
     return (
       <WorkspacePage
         width={1280}
-        outerStyle={isWorkQueueDetail ? { height: "calc(100vh - 73px)", overflow: "hidden" } : undefined}
-        contentStyle={isWorkQueueDetail ? { height: "100%", display: "flex", flexDirection: "column", minHeight: 0 } : undefined}
+        outerStyle={isWorkQueueDetail && !isCompletedMeetingDetail ? { height: "calc(100vh - 73px)", overflow: "hidden" } : undefined}
+        contentStyle={isWorkQueueDetail && !isCompletedMeetingDetail ? { height: "100%", display: "flex", flexDirection: "column", minHeight: 0 } : undefined}
       >
         <SuccessModal open={!!successMessage} message={successMessage} onClose={handleSuccessModalClose} />
 
-        <WorkspaceSectionHeader
-          title={selectedMeeting.requestId || selectedMeeting.id}
-          action={
+        {isMeetingPoolDetail || isMeetingQueueDetail || isResolvedCompletedDetail ? (
+          <div style={{ display: "grid", gridTemplateColumns: "1fr auto 1fr", alignItems: "center", marginBottom: 16, gap: 12 }}>
+            <div style={{ justifySelf: "start" }}>
+              <button
+                type="button"
+                onClick={() => {
+                  setIsBackHovered(false);
+                  navigate(backPath);
+                }}
+                onMouseEnter={() => setIsBackHovered(true)}
+                onMouseLeave={() => setIsBackHovered(false)}
+                style={{
+                  minHeight: 38,
+                  padding: "0 16px",
+                  borderRadius: 10,
+                  border: `1px solid ${C.purple}`,
+                  background: isBackHovered ? C.purple : "transparent",
+                  color: isBackHovered ? "#ffffff" : C.purple,
+                  display: "inline-flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  gap: 8,
+                  cursor: "pointer",
+                  fontSize: 13,
+                  fontWeight: 600,
+                  transition: "background var(--portal-duration-fast) ease, color var(--portal-duration-fast) ease",
+                }}
+              >
+                <ChevronLeft size={16} />
+                {backLabel}
+              </button>
+            </div>
+            <h2 style={{ margin: 0, fontSize: 20, fontWeight: 600, color: C.t1, textAlign: "center" }}>MEETING DETAILS</h2>
+            <div />
+          </div>
+        ) : (
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16, gap: 12 }}>
+            <h2 style={{ margin: 0, fontSize: 20, fontWeight: 600, color: C.t1 }}>{selectedMeeting.requestId || selectedMeeting.id}</h2>
             <button
               type="button"
-              onClick={() => navigate(backPath)}
+              onClick={() => {
+                setIsBackHovered(false);
+                navigate(backPath);
+              }}
               onMouseEnter={() => setIsBackHovered(true)}
               onMouseLeave={() => setIsBackHovered(false)}
               style={{
@@ -819,17 +1356,18 @@ export default function AdminMeeting() {
                 transition: "background var(--portal-duration-fast) ease, color var(--portal-duration-fast) ease",
               }}
             >
-              <ChevronLeft size={16} />{isWorkQueueDetail ? "Back to Work Queue" : "Back to Meeting Queue"}
+              <ChevronLeft size={16} />
+              {backLabel}
             </button>
-          }
-        />
+          </div>
+        )}
 
         <div style={{ display: "grid", gap: isWorkQueueDetail ? 16 : 24, flex: isWorkQueueDetail ? 1 : undefined, minHeight: isWorkQueueDetail ? 0 : undefined, overflow: isWorkQueueDetail ? "hidden" : undefined }}>
           {error ? <WorkspaceCard style={{ color: C.danger }}>{error}</WorkspaceCard> : null}
           {actionError ? <WorkspaceCard style={{ color: C.danger }}>{actionError}</WorkspaceCard> : null}
 
           <div style={isWorkQueueDetail ? undefined : { maxWidth: 320 }}>
-            {showAssignToMeButton ? (
+            {showAssignToMeButton && !isMeetingPoolDetail ? (
               <WorkspaceButton
                 type="button"
                 disabled={actionLoading}
@@ -841,7 +1379,7 @@ export default function AdminMeeting() {
               >
                 Assign to Me
               </WorkspaceButton>
-            ) : showWorkflowActions ? (
+            ) : showWorkflowActions && isWorkQueueDetail ? (
               <div>
                 <WorkspaceSelect
                   value={selectedAction}
@@ -857,78 +1395,164 @@ export default function AdminMeeting() {
           </div>
 
           {isWorkQueueDetail ? (
-            <WorkspaceCard style={{ marginBottom: 0, flex: 1, minHeight: 0, display: "flex", flexDirection: "column" }}>
-              <WorkspaceCardHeader title="Meeting Information" />
-              <div style={{ display: "grid", gap: 18, flex: 1, minHeight: 0, overflowY: "auto", paddingRight: 2 }}>
-                {isCompletedMeetingDetail ? (
-                  <>
-                    <div className="grid md:grid-cols-3 gap-6">
-                      <DetailItem label="Meeting Id" value={selectedMeeting.requestId || selectedMeeting.id} />
-                      <DetailItem label="Handoff Type" value="Mark as Completed" />
-                      <DetailItem label="Completed Date" value={formatDateOnly(selectedMeeting.updated_at || selectedMeeting.updatedAt)} />
+            isCompletedMeetingDetail ? (
+              <div
+                style={{
+                  display: "grid",
+                  gap: 24,
+                  gridTemplateColumns: "minmax(0, 7fr) minmax(280px, 3fr)",
+                  alignItems: "stretch",
+                  flex: 1,
+                  minHeight: 0,
+                }}
+              >
+                <WorkspaceCard style={{ marginBottom: 0, minHeight: 540, display: "flex", flexDirection: "column" }}>
+                  <div style={{ paddingBottom: 16, marginBottom: 20, borderBottom: `1px solid ${C.border}` }}>
+                    <div
+                      style={{
+                        display: "inline-flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        gap: 8,
+                        minHeight: 38,
+                        padding: "0 16px",
+                        borderRadius: 10,
+                        background: C.mint,
+                        color: "#ffffff",
+                        fontSize: 13,
+                        fontWeight: 600,
+                        lineHeight: 1.2,
+                        cursor: "default",
+                        userSelect: "none",
+                      }}
+                    >
+                      <span aria-hidden="true">✓</span>
+                      Completed
                     </div>
+                  </div>
+                  <div style={{ display: "grid", gap: 18, flex: 1, minHeight: 0, overflowY: "auto", paddingRight: 2 }}>
+                    <InlineDetailGrid columns={3}>
+                      <DetailItem label="Meeting Id" value={selectedMeeting.requestId || selectedMeeting.id} />
+                      <DetailItem label="Citizen Name" value={citizenName} />
+                      <DetailItem label="Completed Date" value={formatDateOnly(selectedMeeting.completedAt || selectedMeeting.updated_at || selectedMeeting.updatedAt)} />
+                    </InlineDetailGrid>
                     <div>
                       <p style={{ fontSize: 11, color: C.t3, fontWeight: 700, textTransform: "uppercase", letterSpacing: ".08em", marginBottom: 8 }}>Title</p>
-                      <p style={{ margin: 0, fontSize: 14, fontWeight: 400, color: C.t1, lineHeight: 1.6, whiteSpace: "normal", wordBreak: "break-word" }}>
+                      <p style={{ margin: 0, fontSize: 14, fontWeight: 400, color: C.t1, lineHeight: 1.6, whiteSpace: "pre-wrap", wordBreak: "break-word" }}>
                         {selectedMeeting.title || selectedMeeting.purpose || "Untitled Meeting"}
                       </p>
                     </div>
-                    <div className="grid md:grid-cols-3 gap-6">
+                    <InlineDetailGrid columns={3}>
                       <DetailItem label="Created At" value={createdAtLabel} />
-                      <DetailItem label="Citizen Name" value={citizenName} />
-                      <DetailItem label="Citizen Phone Number" value={citizenPhone} />
-                    </div>
-                    <div className="grid md:grid-cols-2 gap-6">
-                      <DetailItem label="Preferred Date" value={preferredMeetingDateLabel} />
                       <DetailItem label="Preferred Time" value={preferredMeetingTimeLabel} />
-                    </div>
+                      <DetailItem label="Scheduled Location" value={scheduledLocationLabel} />
+                    </InlineDetailGrid>
+                    <InlineDetailGrid columns={3}>
+                      <DetailItem label="Citizen Phone Number" value={citizenPhone} />
+                      <DetailItem label="Preferred Date" value={preferredMeetingDateLabel} />
+                      <DetailItem label="Scheduled At" value={scheduledAtLabel} />
+                    </InlineDetailGrid>
                     <div>
                       <p style={{ fontSize: 11, color: C.t3, fontWeight: 700, textTransform: "uppercase", letterSpacing: ".08em", marginBottom: 8 }}>Description</p>
                       <p style={{ margin: 0, fontSize: 14, fontWeight: 400, color: C.t1, lineHeight: 1.6, whiteSpace: "pre-wrap", wordBreak: "break-word" }}>
                         {selectedMeeting.purpose || selectedMeeting.description || "Not provided"}
                       </p>
                     </div>
-                    {selectedMeeting.completionNote ? <NoticeBox tone="green" label="Summary" value={selectedMeeting.completionNote} /> : null}
-                  </>
-                ) : (
-                  <>
-                    <div className="grid md:grid-cols-2 gap-6">
-                      <DetailItem label="Meeting Id" value={selectedMeeting.requestId || selectedMeeting.id} />
-                      <DetailItem label="Created At" value={createdAtLabel} />
-                    </div>
-                    <div>
-                      <p style={{ fontSize: 11, color: C.t3, fontWeight: 700, textTransform: "uppercase", letterSpacing: ".08em", marginBottom: 8 }}>Title</p>
-                      <p style={{ margin: 0, fontSize: 14, fontWeight: 400, color: C.t1, lineHeight: 1.6, whiteSpace: "normal", wordBreak: "break-word" }}>
-                        {selectedMeeting.title || selectedMeeting.purpose || "Untitled Meeting"}
-                      </p>
-                    </div>
-                    <div className="grid md:grid-cols-2 gap-6">
-                      <DetailItem label="Citizen Name" value={citizenName} />
-                      <DetailItem label="Citizen Phone Number" value={citizenPhone} />
-                    </div>
-                    <div className="grid md:grid-cols-2 gap-6">
-                      <DetailItem label="Preferred Date" value={preferredMeetingDateLabel} />
-                      <DetailItem label="Preferred Time" value={preferredMeetingTimeLabel} />
-                    </div>
-                    <div>
-                      <p style={{ fontSize: 11, color: C.t3, fontWeight: 700, textTransform: "uppercase", letterSpacing: ".08em", marginBottom: 8 }}>Description</p>
-                      <p style={{ margin: 0, fontSize: 14, fontWeight: 400, color: C.t1, lineHeight: 1.6, whiteSpace: "pre-wrap", wordBreak: "break-word" }}>
-                        {selectedMeeting.purpose || selectedMeeting.description || "Not provided"}
-                      </p>
-                    </div>
-                  </>
-                )}
+                    {selectedMeeting.completionNote ? <NoticeBox tone="green" label="MARK AS COMPLETED SUMMARY" value={selectedMeeting.completionNote} /> : null}
+                  </div>
+                </WorkspaceCard>
+
+                <WorkspaceCard style={{ marginBottom: 0, minHeight: 540, display: "flex", flexDirection: "column" }}>
+                  <div className="flex items-center gap-2 mb-6">
+                    <FileText size={22} color={C.purple} />
+                    <h2 style={{ fontSize: 24, fontWeight: 700, color: C.t1 }}>Timeline</h2>
+                  </div>
+                  <div style={{ display: "grid", gap: 18, overflowY: "auto", paddingRight: 6, flex: 1, minHeight: 0 }}>
+                    {history.length === 0 ? (
+                      <p style={{ fontSize: 13, color: C.t3 }}>No timeline events yet.</p>
+                    ) : (
+                      history.map((event, index) => (
+                        <div key={`${event.created_at}-${index}`} className="flex gap-4">
+                          <div className="flex flex-col items-center" style={{ flexShrink: 0 }}>
+                            <div className="h-3 w-3 rounded-full" style={{ background: C.purple, border: `2px solid ${C.card}` }} />
+                            {index !== history.length - 1 ? <div className="mt-2 w-0.5 flex-1 min-h-10" style={{ background: C.purple }} /> : null}
+                          </div>
+                          <div className="flex-1 pb-2">
+                            <div className="flex items-start justify-between gap-3">
+                              <div>
+                                <p style={{ margin: 0, fontWeight: 600, color: C.t1 }}>{statusLabel(event.new_status)}</p>
+                                <p style={{ fontSize: 12, color: C.t3, marginTop: 4, marginBottom: 0 }}>{event.actor_role}</p>
+                              </div>
+                              <p style={{ fontSize: 12, color: C.t3, whiteSpace: "nowrap", margin: 0 }}>{new Date(event.created_at).toLocaleDateString("en-IN")}</p>
+                            </div>
+                            {(!isCompletedMeetingDetail && (event.new_status === "verification_pending" ? "Sent to DEO for Verification" : event.note)) ? (
+                              <p style={{ fontSize: 13, color: C.t2, marginTop: 8, marginBottom: 0, whiteSpace: "normal", wordBreak: "break-word" }}>
+                                {event.new_status === "verification_pending" ? "Sent to DEO for Verification" : event.note}
+                              </p>
+                            ) : null}
+                          </div>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                </WorkspaceCard>
               </div>
-              {(!isCompletedMeetingDetail && (selectedMeeting.rejection_reason || selectedMeeting.verification_reason || selectedMeeting.admin_comments || selectedMeeting.completionNote || selectedMeeting.cancellationReason)) ? (
-                <div className="mt-6 space-y-3">
-                  {selectedMeeting.rejection_reason ? <NoticeBox tone="red" label="Rejection Reason" value={selectedMeeting.rejection_reason} /> : null}
-                  {selectedMeeting.verification_reason ? <NoticeBox tone="amber" label="Verification Reason" value={selectedMeeting.verification_reason} /> : null}
-                  {selectedMeeting.admin_comments ? <NoticeBox tone="blue" label="Admin Comments" value={selectedMeeting.admin_comments} /> : null}
-                  {selectedMeeting.completionNote ? <NoticeBox tone="blue" label="Completion Note" value={selectedMeeting.completionNote} /> : null}
-                  {selectedMeeting.cancellationReason ? <NoticeBox tone="red" label="Cancellation Reason" value={selectedMeeting.cancellationReason} /> : null}
+            ) : (
+              <WorkspaceCard style={{ marginBottom: 0, flex: 1, minHeight: 0, display: "flex", flexDirection: "column", paddingTop: isMeetingPoolDetail ? 14 : 24 }}>
+                {isMeetingPoolDetail ? (
+                  <div style={{ padding: "0 0 14px 0", marginLeft: 2, borderBottom: `1px solid ${C.border}`, marginBottom: 18 }}>
+                    <WorkspaceButton
+                      type="button"
+                      disabled={actionLoading}
+                      onClick={() => runAction(
+                        () => apiClient.patch(`/meetings/${meetingId}/assign-self`, {}),
+                        { successMessage: "Meeting successfully assigned to you.", successRedirect: PATHS.admin.meetings }
+                      )}
+                      style={{ boxShadow: "none" }}
+                    >
+                      Assign to Me
+                    </WorkspaceButton>
+                  </div>
+                ) : (
+                  <WorkspaceCardHeader title="Meeting Information" />
+                )}
+                <div style={{ display: "grid", gap: 18, flex: 1, minHeight: 0, overflowY: "auto", paddingRight: 2 }}>
+                  <div className="grid md:grid-cols-2 gap-6">
+                    <DetailItem label="Meeting Id" value={selectedMeeting.requestId || selectedMeeting.id} />
+                    <DetailItem label="Created At" value={createdAtLabel} />
+                  </div>
+                  <div>
+                    <p style={{ fontSize: 11, color: C.t3, fontWeight: 700, textTransform: "uppercase", letterSpacing: ".08em", marginBottom: 8 }}>Title</p>
+                    <p style={{ margin: 0, fontSize: 14, fontWeight: 400, color: C.t1, lineHeight: 1.6, whiteSpace: "normal", wordBreak: "break-word" }}>
+                      {selectedMeeting.title || selectedMeeting.purpose || "Untitled Meeting"}
+                    </p>
+                  </div>
+                  <div className="grid md:grid-cols-2 gap-6">
+                    <DetailItem label="Citizen Name" value={citizenName} />
+                    <DetailItem label="Citizen Phone Number" value={citizenPhone} />
+                  </div>
+                  <div className="grid md:grid-cols-2 gap-6">
+                    <DetailItem label="Preferred Date" value={preferredMeetingDateLabel} />
+                    <DetailItem label="Preferred Time" value={preferredMeetingTimeLabel} />
+                  </div>
+                  <div>
+                    <p style={{ fontSize: 11, color: C.t3, fontWeight: 700, textTransform: "uppercase", letterSpacing: ".08em", marginBottom: 8 }}>Description</p>
+                    <p style={{ margin: 0, fontSize: 14, fontWeight: 400, color: C.t1, lineHeight: 1.6, whiteSpace: "pre-wrap", wordBreak: "break-word" }}>
+                      {selectedMeeting.purpose || selectedMeeting.description || "Not provided"}
+                    </p>
+                  </div>
                 </div>
-              ) : null}
-            </WorkspaceCard>
+                {(selectedMeeting.rejection_reason || selectedMeeting.verification_reason || selectedMeeting.admin_comments || selectedMeeting.completionNote || selectedMeeting.cancellationReason) ? (
+                  <div className="mt-6 space-y-3">
+                    {selectedMeeting.rejection_reason ? <NoticeBox tone="red" label="Rejection Reason" value={selectedMeeting.rejection_reason} /> : null}
+                    {selectedMeeting.verification_reason ? <NoticeBox tone="amber" label="Verification Reason" value={selectedMeeting.verification_reason} /> : null}
+                    {selectedMeeting.admin_comments ? <NoticeBox tone="blue" label="Admin Comments" value={selectedMeeting.admin_comments} /> : null}
+                    {selectedMeeting.completionNote ? <NoticeBox tone="blue" label="Completion Note" value={selectedMeeting.completionNote} /> : null}
+                    {selectedMeeting.cancellationReason ? <NoticeBox tone="red" label="Cancellation Reason" value={selectedMeeting.cancellationReason} /> : null}
+                  </div>
+                ) : null}
+              </WorkspaceCard>
+            )
           ) : (
             <>
               <div
@@ -940,7 +1564,45 @@ export default function AdminMeeting() {
                 }}
               >
                 <WorkspaceCard style={{ marginBottom: 0, minHeight: 540, height: detailPanelHeight, display: "flex", flexDirection: "column" }}>
-                  <WorkspaceCardHeader title="Meeting Information" />
+                  {showWorkflowActions ? (
+                    <div style={{ paddingBottom: 16, marginBottom: 20, borderBottom: `1px solid ${C.border}` }}>
+                      <WorkspaceSelect
+                        value={selectedAction}
+                        onChange={(event) => setSelectedAction(event.target.value)}
+                        style={{ maxWidth: 320 }}
+                      >
+                        <option value="">{workflowDisplayLabel}</option>
+                        {availableActions.map(([value, label]) => (
+                          <option key={value} value={value}>{label}</option>
+                        ))}
+                      </WorkspaceSelect>
+                      {verificationPending ? <div style={{ marginTop: 8, fontSize: 13, fontWeight: 700, color: C.danger }}>Sent for DEO verification</div> : null}
+                      {verificationDone ? <div style={{ marginTop: 8, fontSize: 13, fontWeight: 700, color: C.mint }}>DEO verification successful</div> : null}
+                      {meetingScheduled ? <div style={{ marginTop: 8, fontSize: 13, fontWeight: 700, color: C.mint }}>Meeting has been Scheduled</div> : null}
+                    </div>
+                  ) : isCompletedMeetingDetail ? (
+                    <div style={{ paddingBottom: 16, marginBottom: 20, borderBottom: `1px solid ${C.border}` }}>
+                      <div
+                        style={{
+                          display: "inline-flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          minHeight: 38,
+                          padding: "0 16px",
+                          borderRadius: 10,
+                          background: C.mint,
+                          color: "#ffffff",
+                          fontSize: 13,
+                          fontWeight: 600,
+                          lineHeight: 1.2,
+                          cursor: "default",
+                          userSelect: "none",
+                        }}
+                      >
+                        Completed
+                      </div>
+                    </div>
+                  ) : null}
                   <div style={{ display: "grid", gap: 18, flex: 1 }}>
                     <InlineDetailGrid columns={3}>
                       <DetailItem label="Meeting Id" value={selectedMeeting.requestId || selectedMeeting.id} />
@@ -948,12 +1610,10 @@ export default function AdminMeeting() {
                       <DetailItem
                         label="Status"
                         value={(
-                          <div style={{ display: "grid", gap: 8 }}>
+                          <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-start", gap: 8 }}>
                             <WorkspaceBadge status={selectedMeeting.status} title={meetingStatusLabel}>
                               {meetingStatusLabel}
                             </WorkspaceBadge>
-                            {verificationPending ? <div style={{ fontSize: 13, fontWeight: 700, color: C.danger }}>Sent for DEO verification</div> : null}
-                            {verificationDone ? <div style={{ fontSize: 13, fontWeight: 700, color: C.mint }}>Verified by DEO</div> : null}
                           </div>
                         )}
                       />
@@ -1111,7 +1771,6 @@ export default function AdminMeeting() {
             <div style={{ display: "grid", gap: 16 }}>
               <div style={{ fontSize: 13, color: C.t3 }}>This will move the meeting to the accepted state.</div>
               <div style={{ display: "flex", justifyContent: "flex-end", gap: 12 }}>
-                <WorkspaceButton type="button" variant="ghost" onClick={closeActionModal} disabled={actionLoading}>Cancel</WorkspaceButton>
                 <WorkspaceButton
                   type="button"
                   disabled={actionLoading}
@@ -1143,10 +1802,7 @@ export default function AdminMeeting() {
                 <WorkspaceTextArea rows={6} value={rejectReason} onChange={(event) => setRejectReason(event.target.value)} placeholder="Enter the rejection reason" />
               </div>
               <div style={{ display: "flex", justifyContent: "flex-end", gap: 12 }}>
-                <WorkspaceButton type="button" variant="ghost" onClick={closeActionModal} disabled={actionLoading}>Cancel</WorkspaceButton>
-                <WorkspaceButton
-                  type="button"
-                  variant="danger"
+                <PurpleOutlineButton
                   disabled={actionLoading || rejectReason.trim().length < 5}
                   onClick={() =>
                     runAction(
@@ -1155,8 +1811,8 @@ export default function AdminMeeting() {
                     ).then((ok) => { if (ok) setSelectedAction(""); })
                   }
                 >
-                  Confirm Reject
-                </WorkspaceButton>
+                  Confirm
+                </PurpleOutlineButton>
               </div>
             </div>
           </ModalShell>
@@ -1189,10 +1845,9 @@ export default function AdminMeeting() {
                 {verificationDone ? <div style={{ marginTop: 8, fontSize: 13, fontWeight: 700, color: C.mint }}>Verified by DEO</div> : null}
               </div>
               <div style={{ display: "flex", justifyContent: "flex-end", gap: 12 }}>
-                <WorkspaceButton type="button" variant="ghost" onClick={closeActionModal} disabled={actionLoading}>Cancel</WorkspaceButton>
-                <WorkspaceButton
-                  type="button"
+                <PurpleOutlineButton
                   disabled={actionLoading || !verificationForm.deoId || verificationPending || verificationDone}
+                  style={{ minHeight: 30, padding: "0 10px" }}
                   onClick={() =>
                     runAction(
                       () => apiClient.patch(`/meetings/${meetingId}/assign-verification`, { deoId: verificationForm.deoId }),
@@ -1201,7 +1856,7 @@ export default function AdminMeeting() {
                   }
                 >
                   Send For Verification
-                </WorkspaceButton>
+                </PurpleOutlineButton>
               </div>
             </div>
           </ModalShell>
@@ -1243,32 +1898,39 @@ export default function AdminMeeting() {
               </div>
               <div className="grid gap-3 md:grid-cols-2">
                 <div style={{ display: "grid", gap: 8 }}>
-                  <div style={{ fontSize: 11, fontWeight: 700, color: C.t3, textTransform: "uppercase", letterSpacing: ".08em" }}>Start</div>
-                  <div className="grid gap-3" style={{ gridTemplateColumns: "minmax(0,1fr) minmax(0,1fr)" }}>
-                    <WorkspaceInput type="date" value={scheduleForm.startDate} onChange={(event) => { setScheduleError(""); setScheduleForm((current) => ({ ...current, startDate: event.target.value })); }} />
-                    <WorkspaceInput type="time" value={scheduleForm.startTime} onChange={(event) => { setScheduleError(""); setScheduleForm((current) => ({ ...current, startTime: event.target.value })); }} />
-                  </div>
+                  <div style={{ fontSize: 11, fontWeight: 700, color: C.t3, textTransform: "uppercase", letterSpacing: ".08em" }}>Start Date</div>
+                  <ScheduleDatePicker
+                    value={scheduleForm.startDate}
+                    onChange={(nextDate) => {
+                      setScheduleError("");
+                      setScheduleForm((current) => ({ ...current, startDate: nextDate }));
+                    }}
+                    min={formatDateValue(new Date())}
+                    placeholder="Select start date"
+                  />
                 </div>
                 <div style={{ display: "grid", gap: 8 }}>
-                  <div style={{ fontSize: 11, fontWeight: 700, color: C.t3, textTransform: "uppercase", letterSpacing: ".08em" }}>End</div>
-                  <div className="grid gap-3" style={{ gridTemplateColumns: "minmax(0,1fr) minmax(0,1fr)" }}>
-                    <WorkspaceInput type="date" value={scheduleForm.endDate} onChange={(event) => { setScheduleError(""); setScheduleForm((current) => ({ ...current, endDate: event.target.value })); }} />
-                    <WorkspaceInput type="time" value={scheduleForm.endTime} onChange={(event) => { setScheduleError(""); setScheduleForm((current) => ({ ...current, endTime: event.target.value })); }} />
-                  </div>
+                  <div style={{ fontSize: 11, fontWeight: 700, color: C.t3, textTransform: "uppercase", letterSpacing: ".08em" }}>Start Time</div>
+                  <ScheduleTimePicker
+                    value={scheduleForm.startTime}
+                    onChange={(nextTime) => {
+                      setScheduleError("");
+                      setScheduleForm((current) => ({ ...current, startTime: nextTime }));
+                    }}
+                    options={HALF_HOUR_TIME_OPTIONS}
+                  />
                 </div>
               </div>
               <div>
-                <div style={{ fontSize: 11, fontWeight: 700, color: C.t3, textTransform: "uppercase", letterSpacing: ".08em", marginBottom: 8 }}>
-                  Comments
+                <div style={{ display: "grid", gap: 8 }}>
+                  <div style={{ fontSize: 11, fontWeight: 700, color: C.t3, textTransform: "uppercase", letterSpacing: ".08em" }}>Comments</div>
+                  <WorkspaceTextArea rows={6} value={scheduleForm.comments} onChange={(event) => setScheduleForm((current) => ({ ...current, comments: event.target.value }))} placeholder="Comments" />
                 </div>
-                <WorkspaceTextArea rows={6} value={scheduleForm.comments} onChange={(event) => setScheduleForm((current) => ({ ...current, comments: event.target.value }))} placeholder="Comments" />
                 <ErrorText>{scheduleError}</ErrorText>
               </div>
               <div style={{ display: "flex", justifyContent: "flex-end", gap: 12 }}>
-                <WorkspaceButton type="button" variant="ghost" onClick={closeActionModal} disabled={actionLoading}>Cancel</WorkspaceButton>
-                <WorkspaceButton
-                  type="button"
-                  disabled={actionLoading || !scheduleForm.ministerId || !scheduleForm.startDate || !scheduleForm.startTime || !scheduleForm.endDate || !scheduleForm.endTime || !scheduleForm.location.trim()}
+                <PurpleOutlineButton
+                  disabled={actionLoading || !scheduleForm.ministerId || !scheduleForm.startDate || !scheduleForm.startTime || !scheduleForm.location.trim()}
                   onClick={() => {
                     setScheduleError("");
                     setActionError("");
@@ -1282,7 +1944,7 @@ export default function AdminMeeting() {
                       () => apiClient.patch(`/meetings/${meetingId}/schedule`, {
                         ministerId: scheduleForm.ministerId,
                         startsAt: combineDateAndTime(scheduleForm.startDate, scheduleForm.startTime),
-                        endsAt: combineDateAndTime(scheduleForm.endDate, scheduleForm.endTime),
+                        endsAt: addMinutesToDateTime(scheduleForm.startDate, scheduleForm.startTime, 30),
                         location: scheduleForm.location.trim(),
                         isVip: scheduleForm.isVip,
                         comments: scheduleForm.comments,
@@ -1292,7 +1954,7 @@ export default function AdminMeeting() {
                   }}
                 >
                   {selectedAction === "reschedule" ? "Update Schedule" : "Schedule Meeting"}
-                </WorkspaceButton>
+                </PurpleOutlineButton>
               </div>
             </div>
           </ModalShell>
@@ -1312,7 +1974,6 @@ export default function AdminMeeting() {
                 <WorkspaceTextArea rows={6} value={completeNote} onChange={(event) => setCompleteNote(event.target.value)} placeholder="Enter comments" />
               </div>
               <div style={{ display: "flex", justifyContent: "flex-end", gap: 12 }}>
-                <WorkspaceButton type="button" variant="ghost" onClick={closeActionModal} disabled={actionLoading}>Cancel</WorkspaceButton>
                 <WorkspaceButton
                   type="button"
                   disabled={actionLoading || completeNote.trim().length < 3}
@@ -1332,8 +1993,8 @@ export default function AdminMeeting() {
 
         {selectedAction === "scheduledReject" ? (
           <ModalShell
-            title="Reject Scheduled Meeting"
-            subtitle="Write rejection comments before confirming."
+            title="Cancel Meeting"
+            subtitle="Write cancellation comments before confirming."
             onClose={closeActionModal}
           >
             <div style={{ display: "grid", gap: 16 }}>
@@ -1344,7 +2005,6 @@ export default function AdminMeeting() {
                 <WorkspaceTextArea rows={6} value={scheduledRejectNote} onChange={(event) => setScheduledRejectNote(event.target.value)} placeholder="Enter comments" />
               </div>
               <div style={{ display: "flex", justifyContent: "flex-end", gap: 12 }}>
-                <WorkspaceButton type="button" variant="ghost" onClick={closeActionModal} disabled={actionLoading}>Cancel</WorkspaceButton>
                 <WorkspaceButton
                   type="button"
                   variant="danger"
@@ -1352,11 +2012,11 @@ export default function AdminMeeting() {
                   onClick={() =>
                     runAction(
                       () => apiClient.patch(`/meetings/${meetingId}/cancel`, { reason: scheduledRejectNote.trim() }),
-                      { successMessage: "Meeting rejected successfully." }
+                      { successMessage: "Meeting cancelled successfully." }
                     ).then((ok) => { if (ok) setSelectedAction(""); })
                   }
                 >
-                  Confirm Reject
+                  Confirm Cancel
                 </WorkspaceButton>
               </div>
             </div>
@@ -1367,24 +2027,29 @@ export default function AdminMeeting() {
   }
 
   return (
-    <WorkspacePage
-      width={1280}
-      outerStyle={{ height: "calc(100vh - 73px)", overflow: "hidden" }}
-      contentStyle={{ height: "100%", display: "flex", flexDirection: "column" }}
+    <div
+      className="portal-citizen-page"
+      style={{
+        height: "calc(100vh - 73px)",
+        overflow: "auto",
+        padding: "16px 20px 8px",
+        display: "flex",
+        flexDirection: "column",
+      }}
     >
-      <div style={{ height: "100%", display: "flex", flexDirection: "column", minHeight: 0 }}>
-        <WorkspaceSectionHeader
-          
-          title="MEETING QUEUE"
-        
-        />
+      <div style={{ width: "100%", display: "flex", flexDirection: "column", flex: 1, minHeight: 0 }}>
+        <div style={{ marginBottom: 18, display: "flex", alignItems: "center", gap: 14 }}>
+          <RiTeamLine size={18} color={C.purple} />
+          <h1 style={{ margin: 0, fontSize: 20, lineHeight: 1.3, fontWeight: 600, color: C.t1 }}>MY MEETINGS</h1>
+        </div>
 
-        <div style={{ display: "grid", gap: 12, flex: 1, minHeight: 0 }}>
+        <div style={{ display: "flex", flexDirection: "column", flex: 1, minHeight: 0 }}>
           <div
             style={{
               display: "grid",
               gridTemplateColumns: "repeat(3, max-content)",
               gap: 14,
+              marginBottom: 14,
               alignItems: "stretch",
               justifyContent: "start",
             }}
@@ -1412,32 +2077,77 @@ export default function AdminMeeting() {
             ))}
           </div>
 
-          <div style={{ display: "grid", gridTemplateColumns: "minmax(0, 2.8fr) minmax(0, 1fr) minmax(0, 1.1fr)", gap: 16, marginTop: -2 }}>
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2" size={18} style={{ color: C.t3 }} />
-              <WorkspaceInput
-                type="text"
-                value={query}
-                onChange={(event) => setQuery(event.target.value)}
-                placeholder="Search by Meeting Id , Title and Citizen"
-                style={{ paddingLeft: 40 }}
-              />
+          <div style={{ marginBottom: 6 }}>
+            <div style={{ marginBottom: 8, display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                <span style={{ fontSize: 12, color: C.t2, whiteSpace: "nowrap" }}>
+                  Show
+                </span>
+                <input
+                  type="number"
+                  min={1}
+                  max={25}
+                  value={itemsPerPage}
+                  onChange={(event) => {
+                    const nextValue = Number(event.target.value);
+                    if (!Number.isFinite(nextValue)) return;
+                    setItemsPerPage(Math.min(25, Math.max(1, nextValue)));
+                    setCurrentPage(1);
+                  }}
+                  onFocus={() => setShowEntriesFocused(true)}
+                  onBlur={() => setShowEntriesFocused(false)}
+                  style={{
+                    width: 64,
+                    minHeight: 34,
+                    padding: "6px 14px",
+                    border: `1px solid ${showEntriesFocused ? C.purple : C.border}`,
+                    borderRadius: "var(--portal-radius-sm, 10px)",
+                    background: C.inp,
+                    color: C.t1,
+                    fontSize: 13,
+                    fontWeight: 500,
+                    outline: "none",
+                    boxShadow: showEntriesFocused ? `0 0 0 3px ${C.purple}1f` : "none",
+                    transition: "border-color var(--portal-duration-fast) ease, box-shadow var(--portal-duration-fast) ease",
+                  }}
+                />
+                <span style={{ fontSize: 12, color: C.t2, whiteSpace: "nowrap" }}>
+                  Entries
+                </span>
+              </div>
+
+              <div style={{ marginLeft: "auto", width: "50%", minWidth: 520, display: "grid", gap: 12, gridTemplateColumns: "minmax(280px, 3fr) minmax(140px, 1fr) minmax(140px, 1fr)" }}>
+                <div className="relative">
+                  <Search className="absolute left-3 top-2.5" size={17} style={{ color: C.t3 }} />
+                  <WorkspaceInput
+                    type="text"
+                    value={query}
+                    onChange={(event) => setQuery(event.target.value)}
+                    placeholder="Search by Meeting Id , Title and Citizen"
+                    style={{ paddingLeft: 36, minHeight: 34, paddingTop: 6, paddingBottom: 6 }}
+                  />
+                </div>
+                <CustomDateFilter
+                  value={createdAtFilter}
+                  onChange={setCreatedAtFilter}
+                  placeholder="Created at"
+                  max={formatDateValue(new Date())}
+                />
+                <div className="relative">
+                  <Filter className="absolute left-3 top-2.5" size={17} style={{ color: C.t3 }} />
+                  <WorkspaceSelect value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)} style={{ paddingLeft: 36, minHeight: 34, paddingTop: 6, paddingBottom: 6 }}>
+                    <option value="all">All Status</option>
+                    {meetingStatusOptions.map((status) => (
+                      <option key={status} value={status}>{statusLabel(status)}</option>
+                    ))}
+                  </WorkspaceSelect>
+                </div>
+              </div>
             </div>
-            <WorkspaceSelect value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)}>
-              <option value="all">All statuses</option>
-              {meetingStatusOptions.map((status) => (
-                <option key={status} value={status}>{statusLabel(status)}</option>
-              ))}
-            </WorkspaceSelect>
-            <CustomDateFilter
-              value={createdAtFilter}
-              onChange={setCreatedAtFilter}
-              placeholder="Created at"
-              max={formatDateValue(new Date())}
-            />
           </div>
           
 
+          <div style={{ display: "flex", flexDirection: "column" }}>
           {loading ? (
             <WorkspaceEmptyState title="Loading meeting queue..." />
           ) : error ? (
@@ -1445,9 +2155,8 @@ export default function AdminMeeting() {
           ) : filteredMeetingQueue.length === 0 ? (
             <WorkspaceEmptyState title="No assigned meetings found" subtitle="Meetings you assign to yourself from the Meeting Pool will appear here." />
           ) : (
-            <WorkspaceCard style={{ padding: 0, overflow: "hidden", display: "flex", flexDirection: "column", flex: 1, minHeight: 0, marginBottom: 0 }}>
-              <div className="overflow-x-auto">
-                <table className="w-full" style={{ tableLayout: "fixed" }}>
+            <div className="hidden lg:block" style={{ border: `1px solid ${C.border}`, borderRadius: 12, overflow: "hidden", display: "flex", flexDirection: "column", marginBottom: 10 }}>
+                <table className="w-full text-sm" style={{ borderCollapse: "collapse", tableLayout: "fixed" }}>
                   <colgroup>
                     <col style={{ width: 180, minWidth: 180, maxWidth: 180 }} />
                     <col style={{ width: "46%" }} />
@@ -1456,15 +2165,15 @@ export default function AdminMeeting() {
                     <col style={{ width: 128, minWidth: 128, maxWidth: 128 }} />
                     <col style={{ width: 84, minWidth: 84, maxWidth: 84 }} />
                   </colgroup>
-                  <thead style={{ background: tableHeaderBackground, borderBottom: `1px solid ${C.border}` }}>
+                  <thead>
                     <tr>
-                      {["Meeting Id", "Title", "Citizen", "Created At", "Status", "Action"].map((column) => (
+                      {["Meeting Id", "Title", "Citizen", "Created At", "Status", "Action"].map((column, index, all) => (
                         <th
                           key={column}
                           style={{
                             minWidth: 0,
                             maxWidth: 0,
-                            padding: column === "Action" ? "13px 10px" : "13px 12px",
+                            padding: "13px 16px",
                             fontSize: 10,
                             fontWeight: 600,
                             color: tableHeaderText,
@@ -1473,7 +2182,10 @@ export default function AdminMeeting() {
                             whiteSpace: "nowrap",
                             textAlign: column === "Status" || column === "Action" ? "center" : "left",
                             background: tableHeaderBackground,
+                            borderBottom: `1px solid ${C.border}`,
                             verticalAlign: "middle",
+                            borderTopLeftRadius: index === 0 ? 12 : undefined,
+                            borderTopRightRadius: index === all.length - 1 ? 12 : undefined,
                           }}
                         >
                           <span title={column} style={{ display: "block", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
@@ -1492,52 +2204,55 @@ export default function AdminMeeting() {
                       const isActionHovered = hoveredActionId === meeting.id;
                       return (
                         <tr key={meeting.id} style={{ background: index % 2 === 0 ? C.card : alternateRowBackground, borderBottom: `1px solid ${C.borderLight}`, verticalAlign: "middle" }}>
-                          <td style={{ padding: "10px 12px", fontSize: 13, fontWeight: 600, color: C.purple, borderBottom: `1px solid ${C.borderLight}`, verticalAlign: "middle" }}>
+                          <td style={{ padding: "10px 16px", fontSize: 13, fontWeight: 600, color: C.t2, verticalAlign: "middle" }}>
                             <span title={meeting.requestId || meeting.id} style={{ display: "block", whiteSpace: "nowrap" }}>
                               {meeting.requestId || meeting.id}
                             </span>
                           </td>
-                          <td style={{ padding: "10px 12px", borderBottom: `1px solid ${C.borderLight}`, verticalAlign: "middle", maxWidth: 0 }}>
+                          <td style={{ padding: "10px 16px", verticalAlign: "middle", maxWidth: 0 }}>
                             <div title={meetingTitle} style={{ fontSize: 13, fontWeight: 600, color: C.t1, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
                               {meetingTitle}
                             </div>
                           </td>
-                          <td style={{ padding: "10px 12px", fontSize: 13, color: C.t2, borderBottom: `1px solid ${C.borderLight}`, verticalAlign: "middle", maxWidth: 0 }}>
+                          <td style={{ padding: "10px 16px", fontSize: 13, color: C.t2, verticalAlign: "middle", maxWidth: 0 }}>
                             <span title={citizenLabel} style={{ display: "block", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                               {citizenLabel}
                             </span>
                           </td>
-                          <td style={{ padding: "10px 12px", fontSize: 13, color: C.t2, borderBottom: `1px solid ${C.borderLight}`, verticalAlign: "middle", maxWidth: 0 }}>
+                          <td style={{ padding: "10px 16px", fontSize: 13, color: C.t2, verticalAlign: "middle", maxWidth: 0 }}>
                             <span title={createdAtLabel} style={{ display: "block", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                               {createdAtLabel}
                             </span>
                           </td>
-                          <td style={{ padding: "10px 12px", textAlign: "center", borderBottom: `1px solid ${C.borderLight}`, verticalAlign: "middle", maxWidth: 0 }}>
+                          <td style={{ padding: "10px 16px 10px 8px", textAlign: "center", verticalAlign: "middle", maxWidth: 0 }}>
                             <div style={{ maxWidth: "100%", overflow: "hidden" }}>
                               <WorkspaceBadge status={meeting.status} title={meetingStatusLabel} style={{ maxWidth: "100%" }}>
                                 {meetingStatusLabel}
                               </WorkspaceBadge>
                             </div>
                           </td>
-                          <td style={{ width: "1%", padding: "10px 10px", textAlign: "center", borderBottom: `1px solid ${C.borderLight}`, verticalAlign: "middle", whiteSpace: "nowrap" }}>
+                          <td style={{ width: "1%", padding: "10px 16px", textAlign: "center", verticalAlign: "middle", whiteSpace: "nowrap" }}>
                             <button
                               type="button"
                               onMouseEnter={() => setHoveredActionId(meeting.id)}
                               onMouseLeave={() => setHoveredActionId(null)}
-                              onClick={() => navigate(`${PATHS.admin.meetings}/${meeting.id}?source=meeting-queue`)}
+                              onClick={() => {
+                                setHoveredActionId(null);
+                                navigate(`${PATHS.admin.meetings}/${meeting.id}?source=meeting-queue`);
+                              }}
                               title="View details"
                               style={{
                                 minWidth: 0,
                                 padding: 7,
                                 borderRadius: 10,
-                                border: `1px solid ${C.purple}`,
+                                border: "none",
                                 background: isActionHovered ? C.purple : "transparent",
                                 color: isActionHovered ? "#ffffff" : C.purple,
                                 display: "inline-flex",
                                 alignItems: "center",
                                 justifyContent: "center",
                                 cursor: "pointer",
-                                transition: "background var(--portal-duration-fast) ease, color var(--portal-duration-fast) ease, border-color var(--portal-duration-fast) ease",
+                                transition: "background var(--portal-duration-fast) ease, color var(--portal-duration-fast) ease",
                               }}
                             >
                               <Eye size={18} />
@@ -1548,17 +2263,16 @@ export default function AdminMeeting() {
                     })}
                   </tbody>
                 </table>
-              </div>
-
-              <div style={{ background: C.bgElevated, borderTop: `1px solid ${C.border}` }}>
-                <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 px-6 py-3.5">
+              <div className="portal-citizen-table-footer" style={{ background: C.bgElevated, borderTop: `1px solid ${C.border}` }}>
+                <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-2 py-1.5" style={{ width: "calc(100% - 24px)", margin: "0 auto" }}>
                   <p style={{ fontSize: 12, color: C.t2, margin: 0 }}>
-                    Showing <span style={{ fontWeight: 600 }}>{Math.min((currentPage - 1) * ITEMS_PER_PAGE + 1, filteredMeetingQueue.length)}</span>-<span style={{ fontWeight: 600 }}>{Math.min(currentPage * ITEMS_PER_PAGE, filteredMeetingQueue.length)}</span> of{" "}
+                    Showing <span style={{ fontWeight: 600 }}>{Math.min((currentPage - 1) * itemsPerPage + 1, filteredMeetingQueue.length)}</span>-<span style={{ fontWeight: 600 }}>{Math.min(currentPage * itemsPerPage, filteredMeetingQueue.length)}</span> of{" "}
                     <span style={{ fontWeight: 600 }}>{filteredMeetingQueue.length}</span> requests
                   </p>
 
-                  {totalPages > 1 ? (
-                    <div className="flex items-center gap-2 flex-wrap">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    {totalPages > 1 ? (
+                      <>
                       <WorkspaceButton
                         type="button"
                         variant="outline"
@@ -1567,26 +2281,59 @@ export default function AdminMeeting() {
                         onMouseLeave={() => setHoveredPagerButton(null)}
                         onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
                         style={{
-                          width: 92,
-                          minHeight: 34,
-                          padding: "8px 12px",
+                          minWidth: 30,
+                          minHeight: 30,
+                          padding: "6px",
                           fontSize: 12,
-                          background: hoveredPagerButton === "previous" && currentPage !== 1 ? C.purple : "transparent",
+                          background: "transparent",
                           color: hoveredPagerButton === "previous" && currentPage !== 1 ? "#ffffff" : C.purple,
-                          border: `1px solid ${C.purple}`,
-                          opacity: currentPage === 1 ? 0.4 : 1,
+                          border: "none",
+                          opacity: currentPage === 1 ? 0.35 : 1,
                           display: "inline-flex",
                           alignItems: "center",
                           justifyContent: "center",
-                          gap: 6,
+                          borderRadius: 8,
+                          textShadow: hoveredPagerButton === "previous" && currentPage !== 1 ? "0 0 10px rgba(255,255,255,0.9)" : "none",
+                          transition: "text-shadow 0.18s ease, color 0.18s ease",
                         }}
                       >
-                        <ChevronLeft size={16} /> Previous
+                        <ChevronLeft size={16} />
                       </WorkspaceButton>
 
-                      <span style={{ padding: "6px 10px", fontSize: 12, color: C.t3 }}>
-                        Page <span style={{ fontWeight: 600 }}>{currentPage}</span> of <span style={{ fontWeight: 600 }}>{totalPages}</span>
-                      </span>
+                      {pageNumbers.map((pageNumber, index) => {
+                        const previousPage = pageNumbers[index - 1];
+                        const showGap = index > 0 && previousPage !== undefined && pageNumber - previousPage > 1;
+                        return (
+                          <div key={pageNumber} className="flex items-center gap-2">
+                            {showGap ? <span style={{ fontSize: 12, color: C.t3, padding: "0 2px" }}>...</span> : null}
+                            <WorkspaceButton
+                              type="button"
+                              variant="outline"
+                              onMouseEnter={() => setHoveredPagerButton(`page-${pageNumber}`)}
+                              onMouseLeave={() => setHoveredPagerButton(null)}
+                              onClick={() => setCurrentPage(pageNumber)}
+                              style={{
+                                minWidth: 30,
+                                minHeight: 30,
+                                padding: "6px",
+                                fontSize: 12,
+                                background: "transparent",
+                                color: currentPage === pageNumber || hoveredPagerButton === `page-${pageNumber}` ? "#ffffff" : C.purple,
+                                border: "none",
+                                display: "inline-flex",
+                                alignItems: "center",
+                                justifyContent: "center",
+                                fontWeight: currentPage === pageNumber ? 700 : 600,
+                                borderRadius: 8,
+                                textShadow: currentPage === pageNumber || hoveredPagerButton === `page-${pageNumber}` ? "0 0 10px rgba(255,255,255,0.9)" : "none",
+                                transition: "text-shadow 0.18s ease, color 0.18s ease",
+                              }}
+                            >
+                              {pageNumber}
+                            </WorkspaceButton>
+                          </div>
+                        );
+                      })}
 
                       <WorkspaceButton
                         type="button"
@@ -1596,30 +2343,38 @@ export default function AdminMeeting() {
                         onMouseLeave={() => setHoveredPagerButton(null)}
                         onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
                         style={{
-                          width: 92,
-                          minHeight: 34,
-                          padding: "8px 12px",
+                          minWidth: 30,
+                          minHeight: 30,
+                          padding: "6px",
                           fontSize: 12,
-                          background: hoveredPagerButton === "next" && currentPage !== totalPages ? C.purple : "transparent",
+                          background: "transparent",
                           color: hoveredPagerButton === "next" && currentPage !== totalPages ? "#ffffff" : C.purple,
-                          border: `1px solid ${C.purple}`,
-                          opacity: currentPage === totalPages ? 0.4 : 1,
+                          border: "none",
+                          opacity: currentPage === totalPages ? 0.35 : 1,
                           display: "inline-flex",
                           alignItems: "center",
                           justifyContent: "center",
-                          gap: 6,
+                          borderRadius: 8,
+                          textShadow: hoveredPagerButton === "next" && currentPage !== totalPages ? "0 0 10px rgba(255,255,255,0.9)" : "none",
+                          transition: "text-shadow 0.18s ease, color 0.18s ease",
                         }}
                       >
-                        Next <ChevronRight size={16} />
+                        <ChevronRight size={16} />
                       </WorkspaceButton>
-                    </div>
-                  ) : null}
+                      </>
+                    ) : (
+                      <span style={{ color: "#ffffff", fontSize: 14, fontWeight: 700, textShadow: "0 0 10px rgba(255,255,255,0.9)", lineHeight: 1 }}>
+                        1
+                      </span>
+                    )}
+                  </div>
                 </div>
               </div>
-            </WorkspaceCard>
+            </div>
           )}
+          </div>
         </div>
       </div>
-    </WorkspacePage>
+    </div>
   );
 }

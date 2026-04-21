@@ -76,6 +76,7 @@ function mapMeeting(row) {
     meetingDocket: row.meeting_docket,
     completionNote: row.completion_note,
     cancellationReason: row.cancellation_reason,
+    completedAt: row.completed_at,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
     first_name: row.first_name,

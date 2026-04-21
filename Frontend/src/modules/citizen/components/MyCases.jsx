@@ -719,8 +719,9 @@ export default function MyCases() {
                           Showing <span className="font-semibold">{Math.min((currentPage - 1) * itemsPerPage + 1, items.length)}</span>-<span className="font-semibold">{Math.min(currentPage * itemsPerPage, items.length)}</span> of <span className="font-semibold">{items.length}</span> requests
                         </p>
 
-                        {totalPages > 1 && (
-                          <div className="portal-citizen-pager flex items-center gap-2 flex-wrap">
+                        <div className="portal-citizen-pager flex items-center gap-2 flex-wrap">
+                          {totalPages > 1 ? (
+                            <>
                             <WorkspaceButton
                               className="portal-citizen-pager-btn"
                               onMouseEnter={() => setHoveredPagerButton("previous")}
@@ -728,7 +729,23 @@ export default function MyCases() {
                               onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
                               disabled={currentPage === 1}
                               variant="outline"
-                              style={{ minWidth: 30, minHeight: 30, padding: "6px", fontSize: 12, background: hoveredPagerButton === "previous" && currentPage !== 1 ? C.purple : "transparent", color: hoveredPagerButton === "previous" && currentPage !== 1 ? "#ffffff" : C.purple, border: "none", opacity: currentPage === 1 ? 0.4 : 1, display: "inline-flex", alignItems: "center", justifyContent: "center", borderRadius: 8 }}
+                              style={{
+                                minWidth: 30,
+                                minHeight: 30,
+                                padding: "6px",
+                                fontSize: 12,
+                                background: "transparent",
+                                color: hoveredPagerButton === "previous" && currentPage !== 1 ? "#ffffff" : C.purple,
+                                border: "none",
+                                opacity: currentPage === 1 ? 0.35 : 1,
+                                display: "inline-flex",
+                                alignItems: "center",
+                                justifyContent: "center",
+                                borderRadius: 8,
+                                textShadow: hoveredPagerButton === "previous" && currentPage !== 1 ? "0 0 10px rgba(255,255,255,0.9)" : "none",
+                                transform: hoveredPagerButton === "previous" && currentPage !== 1 ? "scale(1.08)" : "scale(1)",
+                                transition: "transform 0.18s ease, text-shadow 0.18s ease",
+                              }}
                             >
                               <ChevronLeft size={16} />
                             </WorkspaceButton>
@@ -757,11 +774,13 @@ export default function MyCases() {
                                       borderRadius: 8,
                                       fontSize: 12,
                                       fontWeight: pageNumber === currentPage ? 700 : 600,
-                                      background: pageNumber === currentPage ? C.purple : hoveredPagerButton === `page-${pageNumber}` ? `${C.purple}14` : "transparent",
-                                      color: pageNumber === currentPage ? "#ffffff" : C.purple,
+                                      background: "transparent",
+                                      color: pageNumber === currentPage || hoveredPagerButton === `page-${pageNumber}` ? "#ffffff" : C.purple,
                                       display: "inline-flex",
                                       alignItems: "center",
                                       justifyContent: "center",
+                                      textShadow: pageNumber === currentPage || hoveredPagerButton === `page-${pageNumber}` ? "0 0 10px rgba(255,255,255,0.9)" : "none",
+                                      transition: "text-shadow 0.18s ease, color 0.18s ease",
                                     }}
                                   >
                                     {pageNumber}
@@ -777,12 +796,32 @@ export default function MyCases() {
                               onClick={() => setCurrentPage(Math.min(totalPages, currentPage + 1))}
                               disabled={currentPage === totalPages}
                               variant="outline"
-                              style={{ minWidth: 30, minHeight: 30, padding: "6px", fontSize: 12, background: hoveredPagerButton === "next" && currentPage !== totalPages ? C.purple : "transparent", color: hoveredPagerButton === "next" && currentPage !== totalPages ? "#ffffff" : C.purple, border: "none", opacity: currentPage === totalPages ? 0.4 : 1, display: "inline-flex", alignItems: "center", justifyContent: "center", borderRadius: 8 }}
+                              style={{
+                                minWidth: 30,
+                                minHeight: 30,
+                                padding: "6px",
+                                fontSize: 12,
+                                background: "transparent",
+                                color: hoveredPagerButton === "next" && currentPage !== totalPages ? "#ffffff" : C.purple,
+                                border: "none",
+                                opacity: currentPage === totalPages ? 0.35 : 1,
+                                display: "inline-flex",
+                                alignItems: "center",
+                                justifyContent: "center",
+                                borderRadius: 8,
+                                textShadow: hoveredPagerButton === "next" && currentPage !== totalPages ? "0 0 10px rgba(255,255,255,0.9)" : "none",
+                                transition: "text-shadow 0.18s ease, color 0.18s ease",
+                              }}
                             >
                               <ChevronRight size={16} />
                             </WorkspaceButton>
-                          </div>
-                        )}
+                            </>
+                          ) : (
+                            <span style={{ color: "#ffffff", fontSize: 14, fontWeight: 700, textShadow: "0 0 10px rgba(255,255,255,0.9)", lineHeight: 1 }}>
+                              1
+                            </span>
+                          )}
+                        </div>
                       </div>
                     </div>
                   </div>

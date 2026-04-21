@@ -1005,7 +1005,7 @@ export default function ManageEvent() {
 
   return (
     // ── CHANGED: h-screen + flex-col so the layout fills the full viewport height
-    <div className="h-screen flex flex-col bg-[var(--portal-bg)] w-full box-border overflow-hidden" style={{ fontFamily: "'Inter', system-ui, sans-serif" }}>
+    <div className="h-screen flex flex-col bg-[var(--portal-bg)] w-full box-border overflow-hidden" style={{ fontFamily: "var(--portal-font, 'Lora', Georgia, 'Times New Roman', serif)" }}>
 
       {/* Toast */}
       {toast && (

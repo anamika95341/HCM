@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Eye, ChevronLeft, ChevronRight, Calendar } from "lucide-react";
-import { useNavigate } from "react-router-dom";
+import { Eye, ChevronLeft, ChevronRight, Calendar, Search } from "lucide-react";
+import { FiClipboard } from "react-icons/fi";
+import { useLocation, useNavigate } from "react-router-dom";
 import { apiClient } from "../../../shared/api/client.js";
 import { useAuth } from "../../../shared/auth/AuthContext.jsx";
 import {
@@ -9,7 +10,6 @@ import {
   WorkspaceCard,
   WorkspaceEmptyState,
   WorkspaceInput,
-  WorkspacePage,
   WorkspaceSectionHeader,
 } from "../../../shared/components/WorkspaceUI.jsx";
 import { usePortalTheme } from "../../../shared/theme/portalTheme.jsx";
@@ -63,6 +63,7 @@ function meetingRow(item) {
     owner: item.currentOwner || "Admin Queue",
     reference: item.relatedComplaint?.complaintId || item.visitorId || item.meetingDocket || "-",
     createdAt: item.createdAt || item.created_at,
+    updatedAt: item.completedAt || item.completed_at || item.updatedAt || item.updated_at,
     preferredTime: item.preferred_time || "",
     status: item.status,
     statusLabel: humanizeStatus(item.status),
@@ -75,11 +76,24 @@ function buildItemRoute(item, tab) {
     complaintPool: "complaint-pool",
     meetingPool: "meeting-pool",
     myCases: "my-cases",
-    resolved: "resolved-completed",
+    resolvedComplaints: "resolved-complaints",
+    completedMeetings: "completed-meetings",
     escalated: "escalated-reassigned",
   };
   const source = sourceMap[tab];
   return source ? `${item.route}?source=${source}` : item.route;
+}
+
+function buildWorkQueueTabSearch(tab) {
+  const tabMap = {
+    complaintPool: "complaint-pool",
+    meetingPool: "meeting-pool",
+    resolvedComplaints: "resolved-complaints",
+    completedMeetings: "completed-meetings",
+    escalated: "escalated",
+  };
+  const routeTab = tabMap[tab];
+  return routeTab ? `?tab=${routeTab}` : "";
 }
 
 const tableCellTextStyle = {
@@ -118,14 +132,22 @@ const escalatedColumnStyles = {
   action: { width: 84, minWidth: 84, maxWidth: 84 },
 };
 
-const resolvedColumnStyles = {
+const resolvedComplaintsColumnStyles = {
   primaryId: { width: 180, minWidth: 180, maxWidth: 180 },
-  itemType: { width: 100, minWidth: 100, maxWidth: 100 },
-  handoffType: { width: 130, minWidth: 130, maxWidth: 130 },
-  title: { width: "32%" },
+  title: { width: "38%" },
+  category: { width: "18%" },
   citizen: { width: "18%" },
   createdAt: { width: 118, minWidth: 118, maxWidth: 118 },
   handoffDate: { width: 118, minWidth: 118, maxWidth: 118 },
+  action: { width: 84, minWidth: 84, maxWidth: 84 },
+};
+
+const completedMeetingsColumnStyles = {
+  primaryId: { width: 180, minWidth: 180, maxWidth: 180 },
+  title: { width: "40%" },
+  citizen: { width: "16%" },
+  createdAt: { width: 132, minWidth: 132, maxWidth: 132 },
+  handoffDate: { width: 132, minWidth: 132, maxWidth: 132 },
   action: { width: 84, minWidth: 84, maxWidth: 84 },
 };
 
@@ -283,8 +305,8 @@ function CustomDateFilter({ value, onChange, placeholder, min, max }) {
         onClick={() => setIsOpen((current) => !current)}
         style={{
           width: "100%",
-          minHeight: 42,
-          padding: "10px 14px",
+          minHeight: 34,
+          padding: "6px 14px",
           border: `1px solid ${C.border}`,
           background: C.inp,
           color: value ? C.t1 : C.t3,
@@ -532,6 +554,7 @@ function CustomDateFilter({ value, onChange, placeholder, min, max }) {
 export default function AdminCases() {
   const { C } = usePortalTheme();
   const navigate = useNavigate();
+  const location = useLocation();
   const { session } = useAuth();
   const tableHeaderBackground = C.purple;
   const tableHeaderText = "#FFFFFF";
@@ -543,8 +566,6 @@ export default function AdminCases() {
   const [tab, setTab] = useState("complaintPool");
   const [query, setQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
-  const [myCasesTypeFilter, setMyCasesTypeFilter] = useState("");
-  const [resolvedTypeFilter, setResolvedTypeFilter] = useState("");
   const [preferredDateFilter, setPreferredDateFilter] = useState("");
   const [incidentDateFilter, setIncidentDateFilter] = useState("");
   const [createdAtFilter, setCreatedAtFilter] = useState("");
@@ -555,7 +576,9 @@ export default function AdminCases() {
   const [hoveredCard, setHoveredCard] = useState(null);
   const [hoveredActionId, setHoveredActionId] = useState(null);
   const [hoveredPagerButton, setHoveredPagerButton] = useState(null);
-  const ITEMS_PER_PAGE = 6;
+  const [itemsPerPage, setItemsPerPage] = useState(7);
+  const [showEntriesFocused, setShowEntriesFocused] = useState(false);
+  const requestedTab = new URLSearchParams(location.search).get("tab");
 
   useEffect(() => {
     let active = true;
@@ -583,28 +606,25 @@ export default function AdminCases() {
 
   const complaintPool = complaints.filter((item) => !item.assignedAdminUserId && !isResolvedComplaint(item.status)).map(complaintRow);
   const meetingPool = meetings.filter((item) => !item.assignedAdminUserId && !isResolvedMeeting(item.status)).map(meetingRow);
-  const myCases = [
-    ...complaints.filter((item) => item.assignedAdminUserId === session?.user?.id && !isResolvedComplaint(item.status) && item.status !== "escalated_to_meeting").map(complaintRow),
-    ...meetings.filter((item) => item.assignedAdminUserId === session?.user?.id && !isResolvedMeeting(item.status)).map(meetingRow),
-  ];
-  const resolved  = [...complaints.filter((item) => isResolvedComplaint(item.status)).map(complaintRow), ...meetings.filter((item) => isResolvedMeeting(item.status)).map(meetingRow)];
+  const resolvedComplaints = complaints.filter((item) => item.status === "resolved").map(complaintRow);
+  const completedMeetings = meetings.filter((item) => item.status === "completed").map(meetingRow);
   const escalated = complaints.filter((item) => item.handoffByAdminUserId === session?.user?.id && ["escalated", "reassigned"].includes(item.handoffType) && !isResolvedComplaint(item.status)).map(complaintRow);
 
-  const sections = { complaintPool, meetingPool, myCases, resolved, escalated };
+  const sections = { complaintPool, meetingPool, escalated, resolvedComplaints, completedMeetings };
   const today = formatDateValue(new Date());
   const isMeetingPoolTab = tab === "meetingPool";
   const isComplaintPoolTab = tab === "complaintPool";
   const isEscalatedTab = tab === "escalated";
-  const isResolvedTab = tab === "resolved";
-  const isMyCasesTab = tab === "myCases";
+  const isResolvedComplaintsTab = tab === "resolvedComplaints";
+  const isCompletedMeetingsTab = tab === "completedMeetings";
 
   const activeRows = (sections[tab] || []).filter((item) => {
-    const matchesStatus = isMeetingPoolTab || isComplaintPoolTab || isEscalatedTab || isResolvedTab ? true : statusFilter === "all" || item.status === statusFilter;
+    const matchesStatus = isMeetingPoolTab || isComplaintPoolTab || isEscalatedTab || isResolvedComplaintsTab || isCompletedMeetingsTab ? true : statusFilter === "all" || item.status === statusFilter;
     const haystack = isComplaintPoolTab || isEscalatedTab
       ? [item.primaryId, item.title, item.category, item.citizenName, item.citizenId].filter(Boolean).join(" ").toLowerCase()
-      : isResolvedTab
-        ? [item.primaryId, item.title, item.citizenName].filter(Boolean).join(" ").toLowerCase()
-      : isMyCasesTab
+      : isResolvedComplaintsTab
+        ? [item.primaryId, item.title, item.category, item.citizenName].filter(Boolean).join(" ").toLowerCase()
+      : isCompletedMeetingsTab
         ? [item.primaryId, item.title, item.citizenName].filter(Boolean).join(" ").toLowerCase()
       : [item.primaryId, item.itemType, item.title, item.citizenName, item.citizenId, item.owner, item.reference, item.statusLabel].filter(Boolean).join(" ").toLowerCase();
     const search = query.trim().toLowerCase();
@@ -612,42 +632,59 @@ export default function AdminCases() {
     const matchesIncidentDate = !incidentDateFilter || getDateOnlyValue(item.incidentDate) === incidentDateFilter;
     const matchesCreatedAt = !createdAtFilter || getDateOnlyValue(item.createdAt) === createdAtFilter;
     const matchesHandoffDate = !handoffDateFilter || getDateOnlyValue(item.updatedAt) === handoffDateFilter;
-    const matchesMyCasesType = !myCasesTypeFilter || item.itemType === myCasesTypeFilter;
-    const matchesResolvedType = !resolvedTypeFilter || item.itemType === resolvedTypeFilter;
-    const matchesHandoffType = isResolvedTab
-      ? !handoffTypeFilter || (handoffTypeFilter === "resolved" ? item.itemType === "complaint" : item.itemType === "meeting")
-      : !handoffTypeFilter || item.handoffType === handoffTypeFilter;
+    const matchesHandoffType = !isEscalatedTab || !handoffTypeFilter || item.handoffType === handoffTypeFilter;
     const matchesDateFilters = isMeetingPoolTab
       ? matchesPreferredDate && matchesCreatedAt
       : isComplaintPoolTab
         ? matchesIncidentDate && matchesCreatedAt
         : isEscalatedTab
           ? matchesIncidentDate && matchesCreatedAt && matchesHandoffDate
-          : isResolvedTab
+          : isResolvedComplaintsTab || isCompletedMeetingsTab
             ? matchesCreatedAt && matchesHandoffDate
             : true;
-    return matchesStatus && matchesMyCasesType && matchesResolvedType && (!search || haystack.includes(search)) && matchesDateFilters && matchesHandoffType;
+    return matchesStatus && (!search || haystack.includes(search)) && matchesDateFilters && matchesHandoffType;
   });
 
-  useEffect(() => { setCurrentPage(1); }, [tab, query, statusFilter, myCasesTypeFilter, resolvedTypeFilter, preferredDateFilter, incidentDateFilter, createdAtFilter, handoffDateFilter, handoffTypeFilter]);
+  useEffect(() => { setCurrentPage(1); }, [tab, query, statusFilter, preferredDateFilter, incidentDateFilter, createdAtFilter, handoffDateFilter, handoffTypeFilter, itemsPerPage]);
 
-  const totalPages    = Math.max(1, Math.ceil(activeRows.length / ITEMS_PER_PAGE));
-  const paginatedRows = activeRows.slice((currentPage - 1) * ITEMS_PER_PAGE, currentPage * ITEMS_PER_PAGE);
+  const totalPages    = Math.max(1, Math.ceil(activeRows.length / itemsPerPage));
+  const paginatedRows = activeRows.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
+  const pageNumbers = useMemo(() => {
+    if (totalPages <= 1) return [1];
+    const pages = new Set([1, totalPages, currentPage - 1, currentPage, currentPage + 1]);
+    return Array.from(pages).filter((page) => page >= 1 && page <= totalPages).sort((a, b) => a - b);
+  }, [currentPage, totalPages]);
   const statusOptions = Array.from(new Set((sections[tab] || []).map((item) => item.status).filter(Boolean))).sort();
 
   const tabs = [
     { id: "complaintPool", label: "Complaint Pool",       count: complaintPool.length },
     { id: "meetingPool",   label: "Meeting Pool",         count: meetingPool.length   },
-    { id: "myCases",       label: "My Cases",             count: myCases.length       },
-    { id: "resolved",      label: "Resolved / Completed", count: resolved.length      },
     { id: "escalated",     label: "Escalated / Reassigned", count: escalated.length },
+    { id: "resolvedComplaints", label: "Resolved Complaints", count: resolvedComplaints.length },
+    { id: "completedMeetings", label: "Completed Meetings", count: completedMeetings.length },
   ];
+  const workPoolTabs = tabs.filter((item) => item.id === "complaintPool" || item.id === "meetingPool");
+  const isResolvedComplaintsPage = requestedTab === "resolved-complaints";
+  const isCompletedMeetingsPage = requestedTab === "completed-meetings";
+  const isEscalatedPage = requestedTab === "escalated";
+  const showWorkPoolCards = !isResolvedComplaintsPage && !isCompletedMeetingsPage && !isEscalatedPage;
+
+  const handleTabChange = (nextTab) => {
+    if (nextTab === tab) return;
+    setTab(nextTab);
+
+    const nextSearch = buildWorkQueueTabSearch(nextTab);
+    if (location.search !== nextSearch) {
+      navigate({
+        pathname: location.pathname,
+        search: nextSearch,
+      });
+    }
+  };
 
   useEffect(() => {
     setQuery("");
     setStatusFilter("all");
-    setMyCasesTypeFilter("");
-    setResolvedTypeFilter("");
     setPreferredDateFilter("");
     setIncidentDateFilter("");
     setCreatedAtFilter("");
@@ -656,17 +693,51 @@ export default function AdminCases() {
   }, [tab]);
 
   useEffect(() => {
+    if (requestedTab === "complaint-pool" && tab !== "complaintPool") {
+      setTab("complaintPool");
+      setTabInitialized(true);
+      return;
+    }
+    if (requestedTab === "meeting-pool" && tab !== "meetingPool") {
+      setTab("meetingPool");
+      setTabInitialized(true);
+      return;
+    }
+    if (requestedTab === "resolved-complaints" && tab !== "resolvedComplaints") {
+      setTab("resolvedComplaints");
+      setTabInitialized(true);
+      return;
+    }
+    if (requestedTab === "completed-meetings" && tab !== "completedMeetings") {
+      setTab("completedMeetings");
+      setTabInitialized(true);
+      return;
+    }
+    if (requestedTab === "escalated" && tab !== "escalated") {
+      setTab("escalated");
+      setTabInitialized(true);
+      return;
+    }
+    if (!requestedTab && !tabInitialized) {
+      if (tab !== "complaintPool") {
+        setTab("complaintPool");
+      }
+      setTabInitialized(true);
+      return;
+    }
+    if (!requestedTab && (tab === "resolvedComplaints" || tab === "completedMeetings" || tab === "escalated")) {
+      setTab("complaintPool");
+    }
+  }, [requestedTab, tab, tabInitialized]);
+
+  useEffect(() => {
     if (tabInitialized || loading) return;
-    const preferredTab =
-      tabs.find((t) => t.id === "myCases"       && t.count > 0)?.id ||
-      tabs.find((t) => t.id === "complaintPool" && t.count > 0)?.id ||
-      tabs.find((t) => t.id === "meetingPool"   && t.count > 0)?.id ||
-      tabs.find((t) => t.id === "escalated"     && t.count > 0)?.id ||
-      tabs.find((t) => t.id === "resolved"      && t.count > 0)?.id ||
-      "complaintPool";
-    if (preferredTab !== tab) setTab(preferredTab);
     setTabInitialized(true);
-  }, [loading, tab, tabInitialized, tabs]);
+  }, [loading, tabInitialized]);
+
+  useEffect(() => {
+    setCurrentPage((page) => Math.min(page, totalPages));
+  }, [totalPages]);
 
   const columns = useMemo(() => {
     if (isComplaintPoolTab) {
@@ -695,27 +766,25 @@ export default function AdminCases() {
       ];
     }
 
-    if (isResolvedTab) {
+    if (isResolvedComplaintsTab) {
       return [
-        { key: "primaryId", label: "ID", align: "left" },
-        { key: "itemType", label: "Type", align: "left" },
-        { key: "handoffType", label: "Handoff Type", align: "left" },
+        { key: "primaryId", label: "Complaint Id", align: "left" },
         { key: "title", label: "Title", align: "left" },
+        { key: "category", label: "Category", align: "left" },
         { key: "citizen", label: "Citizen Name", align: "left" },
         { key: "createdAt", label: "Created At", align: "left" },
-        { key: "handoffDate", label: "Resolved/Completed Date", align: "left" },
+        { key: "handoffDate", label: "Resolved Date", align: "left" },
         { key: "action", label: "Action", align: "center" },
       ];
     }
 
-    if (isMyCasesTab) {
+    if (isCompletedMeetingsTab) {
       return [
-        { key: "primaryId", label: "ID", align: "left" },
-        { key: "itemType", label: "Type", align: "left" },
+        { key: "primaryId", label: "Meeting Id", align: "left" },
         { key: "title", label: "Title", align: "left" },
-        { key: "citizen", label: "Citizen", align: "left" },
+        { key: "citizen", label: "Citizen Name", align: "left" },
         { key: "createdAt", label: "Created At", align: "left" },
-        { key: "status", label: "Status", align: "center" },
+        { key: "handoffDate", label: "Completed Date", align: "left" },
         { key: "action", label: "Action", align: "center" },
       ];
     }
@@ -735,13 +804,13 @@ export default function AdminCases() {
     const hiddenColumns = {
       complaintPool: new Set(["itemType", "owner", "status"]),
       meetingPool: new Set(["itemType", "owner", "status"]),
-      myCases: new Set(["owner", "reference"]),
-      resolved: new Set(["owner"]),
+      resolvedComplaints: new Set(["owner"]),
+      completedMeetings: new Set(["owner"]),
       escalated: new Set(["owner", "reference"]),
     };
 
     return baseColumns.filter((column) => !hiddenColumns[tab]?.has(column.key));
-  }, [isComplaintPoolTab, isEscalatedTab, isResolvedTab, isMyCasesTab, tab]);
+  }, [isComplaintPoolTab, isEscalatedTab, isResolvedComplaintsTab, isCompletedMeetingsTab, tab]);
 
   const meetingPoolColumns = useMemo(() => ([
     { key: "primaryId", label: "Meeting Id" },
@@ -753,72 +822,127 @@ export default function AdminCases() {
   ]), []);
 
   return (
-    <WorkspacePage
-      width={1280}
-      outerStyle={{ height: "calc(100vh - 73px)", overflow: "hidden" }}
-      contentStyle={{ height: "100%", display: "flex", flexDirection: "column" }}
+    <div
+      className="portal-citizen-page"
+      style={{
+        height: "calc(100vh - 73px)",
+        overflow: "auto",
+        padding: "16px 20px 8px",
+        display: "flex",
+        flexDirection: "column",
+      }}
     >
-      <div style={{ height: "100%", display: "flex", flexDirection: "column", minHeight: 0 }}>
+      <div style={{ width: "100%", display: "flex", flexDirection: "column", flex: 1, minHeight: 0 }}>
         {/* HEADER */}
-        <WorkspaceSectionHeader
-          
-          title="WORK  QUEUE"
-        />
+        {isResolvedComplaintsPage || isCompletedMeetingsPage || isEscalatedPage ? (
+          <WorkspaceSectionHeader
+            title={
+              isResolvedComplaintsPage
+                ? "RESOLVED COMPLAINTS"
+                : isCompletedMeetingsPage
+                  ? "COMPLETED MEETINGS"
+                  : "ESCALATED CASES"
+            }
+          />
+        ) : (
+          <div style={{ marginBottom: 18, display: "flex", alignItems: "center", gap: 14 }}>
+            <FiClipboard size={18} color={C.purple} />
+            <h1 style={{ margin: 0, fontSize: 20, lineHeight: 1.3, fontWeight: 600, color: C.t1 }}>WORK POOL</h1>
+          </div>
+        )}
 
-        {/* STAT CARDS — 5 in one row, clickable to switch tab */}
-        <div
-          style={{
-            display: "grid",
-            gridTemplateColumns: "repeat(5, 1fr)",
-            gap: 18,
-            marginBottom: 20,
-            alignItems: "stretch",
-          }}
-        >
-          {tabs.map((item) => (
-            <div
-              key={item.id}
-              onClick={() => setTab(item.id)}
-              onMouseEnter={() => setHoveredCard(item.id)}
-              onMouseLeave={() => setHoveredCard(null)}
-              style={{
-                background: tab === item.id ? C.purple : C.card,
-                border: `1px solid ${tab === item.id ? C.purple : C.border}`,
-                borderRadius: 14,
-                padding: "11px 14px",
-                minHeight: 74,
-                width: "calc(100% - 8px)",
-                justifySelf: "center",
-                cursor: "pointer",
-                transform: hoveredCard === item.id && tab !== item.id ? "perspective(900px) translateY(-3px) scale(1.02)" : "perspective(900px) translateY(0) scale(1)",
-                boxShadow:
-                  tab === item.id
-                    ? `0 16px 32px ${C.purple}2f`
-                    : hoveredCard === item.id
-                      ? `0 14px 28px ${C.purple}26, 0 0 0 1px ${C.purple}1f inset`
-                      : "0 8px 18px rgba(15, 23, 42, 0.06)",
-                transition: "transform 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease, background 0.18s ease",
-              }}
-            >
-              <div style={{ fontSize: 20, fontWeight: 800, color: tab === item.id ? "#fff" : C.t1, lineHeight: 1 }}>
-                {item.count}
+        {showWorkPoolCards ? (
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "repeat(2, max-content)",
+              gap: 14,
+              marginBottom: 14,
+              alignItems: "stretch",
+              justifyContent: "start",
+            }}
+          >
+            {workPoolTabs.map((item) => (
+              <div
+                key={item.id}
+                onClick={() => handleTabChange(item.id)}
+                onMouseEnter={() => setHoveredCard(item.id)}
+                onMouseLeave={() => setHoveredCard(null)}
+                style={{
+                  background: tab === item.id ? C.purple : C.card,
+                  border: `1px solid ${tab === item.id ? C.purple : C.border}`,
+                  borderRadius: 14,
+                  padding: "9px 15px",
+                  minHeight: 40,
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  whiteSpace: "nowrap",
+                  cursor: "pointer",
+                  boxShadow:
+                    tab === item.id
+                      ? `0 8px 18px ${C.purple}26`
+                      : hoveredCard === item.id
+                        ? "0 6px 14px rgba(15, 23, 42, 0.08)"
+                        : "0 6px 14px rgba(15, 23, 42, 0.05)",
+                }}
+              >
+                <span style={{ fontSize: 12, fontWeight: 700, color: tab === item.id ? "#fff" : C.t1 }}>
+                  {item.label} <span style={{ color: tab === item.id ? "rgba(255,255,255,0.82)" : C.t3 }}>({item.count})</span>
+                </span>
               </div>
-              <div style={{ fontSize: 10, fontWeight: 700, color: tab === item.id ? "rgba(255,255,255,0.82)" : C.t3, marginTop: 5 }}>
-                {item.label}
-              </div>
-            </div>
-          ))}
-        </div>
+            ))}
+          </div>
+        ) : null}
 
         {/* QUEUE FILTERS */}
-        <div style={{ marginBottom: 20 }}>
-          {/* <WorkspaceCard> */}
-            <div style={{ display: "grid", gridTemplateColumns: isEscalatedTab ? "minmax(0, 3fr) repeat(4, minmax(0, 1fr))" : isResolvedTab ? "minmax(0, 2.25fr) minmax(0, 0.9fr) minmax(0, 1fr) minmax(0, 1.35fr) minmax(0, 1.35fr)" : isMyCasesTab ? "minmax(0, 2.7fr) minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1.15fr)" : isMeetingPoolTab || isComplaintPoolTab ? "minmax(0, 3fr) minmax(0, 1fr) minmax(0, 1fr)" : "minmax(0, 1.6fr) minmax(220px, 0.8fr)", gap: 16 }}>
-              <div>
+        <div style={{ marginBottom: 6 }}>
+            <div style={{ marginBottom: 8, display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                <span style={{ fontSize: 12, color: C.t2, whiteSpace: "nowrap" }}>
+                  Show
+                </span>
+                <input
+                  type="number"
+                  min={1}
+                  max={25}
+                  value={itemsPerPage}
+                  onChange={(event) => {
+                    const nextValue = Number(event.target.value);
+                    if (!Number.isFinite(nextValue)) return;
+                    setItemsPerPage(Math.min(25, Math.max(1, nextValue)));
+                    setCurrentPage(1);
+                  }}
+                  onFocus={() => setShowEntriesFocused(true)}
+                  onBlur={() => setShowEntriesFocused(false)}
+                  style={{
+                    width: 64,
+                    minHeight: 34,
+                    padding: "6px 14px",
+                    border: `1px solid ${showEntriesFocused ? C.purple : C.border}`,
+                    borderRadius: "var(--portal-radius-sm, 10px)",
+                    background: C.inp,
+                    color: C.t1,
+                    fontSize: 13,
+                    fontWeight: 500,
+                    outline: "none",
+                    boxShadow: showEntriesFocused ? `0 0 0 3px ${C.purple}1f` : "none",
+                    transition: "border-color var(--portal-duration-fast) ease, box-shadow var(--portal-duration-fast) ease",
+                  }}
+                />
+                <span style={{ fontSize: 12, color: C.t2, whiteSpace: "nowrap" }}>
+                  Entries
+                </span>
+              </div>
+
+              <div style={{ marginLeft: "auto", width: "50%", minWidth: 520, display: "grid", gap: 12, gridTemplateColumns: isEscalatedTab ? "minmax(0, 3fr) repeat(4, minmax(0, 1fr))" : isResolvedComplaintsTab || isCompletedMeetingsTab ? "minmax(0, 3fr) minmax(0, 1.35fr) minmax(0, 1.35fr)" : isComplaintPoolTab || isMeetingPoolTab ? "minmax(280px, 3fr) minmax(140px, 1fr) minmax(140px, 1fr)" : "minmax(0, 1.6fr) minmax(220px, 0.8fr)" }}>
+              <div className={isComplaintPoolTab || isMeetingPoolTab ? "relative" : undefined}>
+                {isComplaintPoolTab || isMeetingPoolTab ? <Search className="absolute left-3 top-2.5" size={17} style={{ color: C.t3 }} /> : null}
                 <WorkspaceInput
                   value={query}
                   onChange={(e) => setQuery(e.target.value)}
-                  placeholder={isMeetingPoolTab ? "Search by Meeting ID , Title , Citizen" : isComplaintPoolTab ? "Search by Complaint ID , Title , Category and Citizen" : isEscalatedTab ? "Search by Complaint Id , Title , Category and Citizen name" : isResolvedTab ? "Search by ID , Title and Citizen Name" : isMyCasesTab ? "Search by ID , Title and Citizen" : "Search by ID, title, citizen name..."}
+                  placeholder={isMeetingPoolTab ? "Search by Meeting ID , Title , Citizen" : isComplaintPoolTab ? "Search by Complaint ID , Title , Category and Citizen" : isEscalatedTab ? "Search by Complaint Id , Title , Category and Citizen name" : isResolvedComplaintsTab ? "Search by Complaint ID , Title , Category and Citizen" : isCompletedMeetingsTab ? "Search by Meeting ID , Title and Citizen" : "Search by ID, title, citizen name..."}
+                  style={isComplaintPoolTab || isMeetingPoolTab ? { paddingLeft: 36, minHeight: 34, paddingTop: 6, paddingBottom: 6 } : undefined}
                 />
               </div>
               {isEscalatedTab ? (
@@ -863,50 +987,8 @@ export default function AdminCases() {
                     max={today}
                   />
                 </>
-              ) : isResolvedTab ? (
+              ) : isResolvedComplaintsTab || isCompletedMeetingsTab ? (
                 <>
-                  <div>
-                    <select
-                      value={resolvedTypeFilter}
-                      onChange={(e) => setResolvedTypeFilter(e.target.value)}
-                      style={{
-                        width: "100%",
-                        padding: "10px 14px",
-                        border: `1px solid ${C.border}`,
-                        background: C.inp,
-                        color: C.t1,
-                        fontSize: 13,
-                        outline: "none",
-                        cursor: "pointer",
-                        borderRadius: "var(--portal-radius-sm, 10px)",
-                      }}
-                    >
-                      <option value="">Type</option>
-                      <option value="complaint">Complaint</option>
-                      <option value="meeting">Meeting</option>
-                    </select>
-                  </div>
-                  <div>
-                    <select
-                      value={handoffTypeFilter}
-                      onChange={(e) => setHandoffTypeFilter(e.target.value)}
-                      style={{
-                        width: "100%",
-                        padding: "10px 14px",
-                        border: `1px solid ${C.border}`,
-                        background: C.inp,
-                        color: C.t1,
-                        fontSize: 13,
-                        outline: "none",
-                        cursor: "pointer",
-                        borderRadius: "var(--portal-radius-sm, 10px)",
-                      }}
-                    >
-                      <option value="">Handoff Type</option>
-                      <option value="resolved">Resolved</option>
-                      <option value="completed">Completed</option>
-                    </select>
-                  </div>
                   <CustomDateFilter
                     value={createdAtFilter}
                     onChange={setCreatedAtFilter}
@@ -916,59 +998,7 @@ export default function AdminCases() {
                   <CustomDateFilter
                     value={handoffDateFilter}
                     onChange={setHandoffDateFilter}
-                    placeholder="Resolved/Completed date"
-                    max={today}
-                  />
-                </>
-              ) : isMyCasesTab ? (
-                <>
-                  <div>
-                    <select
-                      value={myCasesTypeFilter}
-                      onChange={(e) => setMyCasesTypeFilter(e.target.value)}
-                      style={{
-                        width: "100%",
-                        padding: "10px 14px",
-                        border: `1px solid ${C.border}`,
-                        background: C.inp,
-                        color: C.t1,
-                        fontSize: 13,
-                        outline: "none",
-                        cursor: "pointer",
-                        borderRadius: "var(--portal-radius-sm, 10px)",
-                      }}
-                    >
-                      <option value="">Type</option>
-                      <option value="complaint">Complaint</option>
-                      <option value="meeting">Meeting</option>
-                    </select>
-                  </div>
-                  <div>
-                    <select
-                      value={statusFilter}
-                      onChange={(e) => setStatusFilter(e.target.value)}
-                      style={{
-                        width: "100%",
-                        padding: "10px 14px",
-                        border: `1px solid ${C.border}`,
-                        background: C.inp,
-                        color: C.t1,
-                        fontSize: 13,
-                        outline: "none",
-                        cursor: "pointer",
-                        borderRadius: "var(--portal-radius-sm, 10px)",
-                      }}
-                    >
-                      <option value="all">All statuses</option>
-                      {statusOptions.map((status) => (
-                        <option key={status} value={status}>{humanizeStatus(status)}</option>
-                      ))}
-                    </select>
-                  </div>
-                  <CustomDateFilter
-                    value={createdAtFilter}
-                    onChange={setCreatedAtFilter}
-                    placeholder="Created at"
+                    placeholder={isResolvedComplaintsTab ? "Resolved date" : "Completed date"}
                     max={today}
                   />
                 </>
@@ -980,12 +1010,21 @@ export default function AdminCases() {
                     placeholder={isMeetingPoolTab ? "Preferred meeting date" : "Date of incident"}
                     max={today}
                   />
-                  <CustomDateFilter
-                    value={createdAtFilter}
-                    onChange={setCreatedAtFilter}
-                    placeholder="Created at"
-                    max={today}
-                  />
+                  {isComplaintPoolTab ? (
+                    <CustomDateFilter
+                      value={createdAtFilter}
+                      onChange={setCreatedAtFilter}
+                      placeholder="Created at"
+                      max={today}
+                    />
+                  ) : (
+                    <CustomDateFilter
+                      value={createdAtFilter}
+                      onChange={setCreatedAtFilter}
+                      placeholder="Created at"
+                      max={today}
+                    />
+                  )}
                 </>
               ) : (
                 <div>
@@ -1012,11 +1051,11 @@ export default function AdminCases() {
                 </div>
               )}
             </div>
-          {/* </WorkspaceCard> */}
+          </div>
         </div>
 
         {/* TABLE / STATES */}
-        <div style={{ flex: 1, minHeight: 0, display: "flex", flexDirection: "column" }}>
+        <div style={{ display: "flex", flexDirection: "column" }}>
           {loading ? (
             <WorkspaceEmptyState title="Loading work queue..." />
           ) : error ? (
@@ -1027,10 +1066,9 @@ export default function AdminCases() {
           ) : activeRows.length === 0 ? (
             <WorkspaceEmptyState title="No items found" subtitle="Try adjusting your current search or status filters." />
           ) : (
-            <WorkspaceCard style={{ padding: 0, overflow: "hidden", display: "flex", flexDirection: "column", flex: 1, minHeight: 0, marginBottom: 0 }}>
-              <div className="overflow-x-auto" style={{ flex: 1, minHeight: 0 }}>
+            <div className="hidden lg:block" style={{ border: `1px solid ${C.border}`, borderRadius: 12, overflow: "hidden", display: "flex", flexDirection: "column", marginBottom: 10 }}>
                 {isMeetingPoolTab ? (
-                  <table className="w-full" style={{ tableLayout: "fixed" }}>
+                  <table className="w-full text-sm" style={{ borderCollapse: "collapse", tableLayout: "fixed" }}>
                     <colgroup>
                       <col style={{ width: 180, minWidth: 180, maxWidth: 180 }} />
                       <col style={{ width: "54%" }} />
@@ -1039,15 +1077,15 @@ export default function AdminCases() {
                       <col style={{ width: 118, minWidth: 118, maxWidth: 118 }} />
                       <col style={{ width: 84, minWidth: 84, maxWidth: 84 }} />
                     </colgroup>
-                    <thead style={{ background: tableHeaderBackground, borderBottom: `1px solid ${C.border}` }}>
+                    <thead>
                       <tr>
-                        {meetingPoolColumns.map((column) => (
+                        {meetingPoolColumns.map((column, index) => (
                           <th
                             key={column.key}
                             style={{
                               minWidth: 0,
                               maxWidth: 0,
-                              padding: column.key === "action" ? "13px 10px" : "13px 12px",
+                              padding: column.key === "action" ? "13px 16px" : "13px 16px",
                               fontSize: 10,
                               fontWeight: 600,
                               color: tableHeaderText,
@@ -1056,7 +1094,10 @@ export default function AdminCases() {
                               whiteSpace: "nowrap",
                               textAlign: column.key === "action" ? "center" : "left",
                               background: tableHeaderBackground,
+                              borderBottom: `1px solid ${C.border}`,
                               verticalAlign: "middle",
+                              borderTopLeftRadius: index === 0 ? 12 : undefined,
+                              borderTopRightRadius: index === meetingPoolColumns.length - 1 ? 12 : undefined,
                             }}
                           >
                             <span
@@ -1078,51 +1119,54 @@ export default function AdminCases() {
                       {paginatedRows.map((item, index) => {
                         const isActionHovered = hoveredActionId === `${item.itemType}-${item.id}`;
                         return (
-                          <tr key={`${item.itemType}-${item.id}`} style={{ background: index % 2 === 0 ? C.card : alternateRowBackground, verticalAlign: "middle" }}>
-                            <td style={{ padding: "10px 12px", fontSize: 13, fontWeight: 600, color: C.purple, borderBottom: `1px solid ${C.borderLight}`, verticalAlign: "middle" }}>
+                          <tr key={`${item.itemType}-${item.id}`} style={{ borderBottom: `1px solid ${C.borderLight}`, background: index % 2 === 0 ? C.card : alternateRowBackground, verticalAlign: "middle" }}>
+                            <td style={{ padding: "10px 16px", fontSize: 13, fontWeight: 600, color: C.t2, verticalAlign: "middle" }}>
                               <span title={toTooltipText(item.primaryId)} style={{ display: "block", whiteSpace: "nowrap" }}>
                                 {item.primaryId}
                               </span>
                             </td>
-                            <td style={{ padding: "10px 12px", borderBottom: `1px solid ${C.borderLight}`, verticalAlign: "middle", minWidth: 0 }}>
+                            <td style={{ padding: "10px 16px", verticalAlign: "middle", minWidth: 0 }}>
                               <div title={toTooltipText(item.title)} style={{ fontSize: 13, fontWeight: 600, color: C.t1, ...tableCellTextStyle }}>
                                 {item.title}
                               </div>
                             </td>
-                            <td style={{ padding: "10px 12px", fontSize: 13, color: C.t2, borderBottom: `1px solid ${C.borderLight}`, verticalAlign: "middle", minWidth: 0 }}>
+                            <td style={{ padding: "10px 16px", fontSize: 13, color: C.t2, verticalAlign: "middle", minWidth: 0 }}>
                               <div title={toTooltipText(item.citizenName)} style={tableCellTextStyle}>
                                 {item.citizenName}
                               </div>
                             </td>
-                            <td style={{ padding: "10px 12px", fontSize: 13, color: C.t2, borderBottom: `1px solid ${C.borderLight}`, verticalAlign: "middle", minWidth: 0, maxWidth: 0 }}>
+                            <td style={{ padding: "10px 16px", fontSize: 13, color: C.t2, verticalAlign: "middle", minWidth: 0, maxWidth: 0 }}>
                               <span title={toTooltipText(formatDateCell(item.preferredTime))} style={tableCellTextStyle}>
                                 {formatDateCell(item.preferredTime)}
                               </span>
                             </td>
-                            <td style={{ padding: "10px 12px", fontSize: 13, color: C.t2, borderBottom: `1px solid ${C.borderLight}`, verticalAlign: "middle", minWidth: 0, maxWidth: 0 }}>
+                            <td style={{ padding: "10px 16px", fontSize: 13, color: C.t2, verticalAlign: "middle", minWidth: 0, maxWidth: 0 }}>
                               <span title={toTooltipText(formatDateCell(item.createdAt))} style={tableCellTextStyle}>
                                 {formatDateCell(item.createdAt)}
                               </span>
                             </td>
-                            <td style={{ width: "1%", padding: "10px 10px", textAlign: "center", borderBottom: `1px solid ${C.borderLight}`, verticalAlign: "middle", whiteSpace: "nowrap" }}>
+                            <td style={{ width: "1%", padding: "10px 16px", textAlign: "center", verticalAlign: "middle", whiteSpace: "nowrap" }}>
                               <button
                                 type="button"
                                 onMouseEnter={() => setHoveredActionId(`${item.itemType}-${item.id}`)}
                                 onMouseLeave={() => setHoveredActionId(null)}
-                                onClick={() => navigate(buildItemRoute(item, tab))}
+                                onClick={() => {
+                                  setHoveredActionId(null);
+                                  navigate(buildItemRoute(item, tab));
+                                }}
                                 title="View details"
                                 style={{
                                   minWidth: 0,
                                   padding: 7,
                                   borderRadius: 10,
-                                  border: `1px solid ${C.purple}`,
+                                  border: "none",
                                   background: isActionHovered ? C.purple : "transparent",
                                   color: isActionHovered ? "#ffffff" : C.purple,
                                   display: "inline-flex",
                                   alignItems: "center",
                                   justifyContent: "center",
                                   cursor: "pointer",
-                                  transition: "background var(--portal-duration-fast) ease, color var(--portal-duration-fast) ease, border-color var(--portal-duration-fast) ease",
+                                  transition: "background var(--portal-duration-fast) ease, color var(--portal-duration-fast) ease",
                                 }}
                               >
                                 <Eye size={18} />
@@ -1134,26 +1178,26 @@ export default function AdminCases() {
                     </tbody>
                   </table>
                 ) : (
-                  <table className="w-full" style={isComplaintPoolTab || isEscalatedTab || isResolvedTab || isMyCasesTab ? { tableLayout: "fixed" } : undefined}>
+                  <table className="w-full text-sm" style={isComplaintPoolTab || isEscalatedTab || isResolvedComplaintsTab || isCompletedMeetingsTab ? { borderCollapse: "collapse", tableLayout: "fixed" } : { borderCollapse: "collapse" }}>
                     <colgroup>
                       {isComplaintPoolTab
                         ? columns.map((column) => <col key={column.key} style={complaintPoolColumnStyles[column.key]} />)
                         : isEscalatedTab
                           ? columns.map((column) => <col key={column.key} style={escalatedColumnStyles[column.key]} />)
-                          : isResolvedTab
-                            ? columns.map((column) => <col key={column.key} style={resolvedColumnStyles[column.key]} />)
-                            : isMyCasesTab
-                              ? columns.map((column) => <col key={column.key} style={myCasesColumnStyles[column.key]} />)
+                          : isResolvedComplaintsTab
+                            ? columns.map((column) => <col key={column.key} style={resolvedComplaintsColumnStyles[column.key]} />)
+                            : isCompletedMeetingsTab
+                              ? columns.map((column) => <col key={column.key} style={completedMeetingsColumnStyles[column.key]} />)
                         : <col style={idColumnStyle} />}
                     </colgroup>
-                    <thead style={{ background: tableHeaderBackground, borderBottom: `1px solid ${C.border}` }}>
+                    <thead>
                       <tr>
-                        {columns.map((column) => (
+                        {columns.map((column, index) => (
                           <th
                             key={column.key}
                             style={{
                               width: column.key === "status" || column.key === "action" ? "1%" : undefined,
-                              padding: column.key === "status" || column.key === "action" ? "13px 10px" : "13px 12px",
+                              padding: "13px 16px",
                               fontSize: 10,
                               fontWeight: 600,
                               color: tableHeaderText,
@@ -1162,7 +1206,10 @@ export default function AdminCases() {
                               whiteSpace: "nowrap",
                               textAlign: column.align,
                               background: tableHeaderBackground,
+                              borderBottom: `1px solid ${C.border}`,
                               verticalAlign: "middle",
+                              borderTopLeftRadius: index === 0 ? 12 : undefined,
+                              borderTopRightRadius: index === columns.length - 1 ? 12 : undefined,
                             }}
                           >
                             <span
@@ -1182,12 +1229,12 @@ export default function AdminCases() {
                     </thead>
                     <tbody>
                       {paginatedRows.map((item, index) => (
-                        <tr key={`${item.itemType}-${item.id}`} style={{ background: index % 2 === 0 ? C.card : alternateRowBackground, verticalAlign: "middle" }}>
+                        <tr key={`${item.itemType}-${item.id}`} style={{ borderBottom: `1px solid ${C.borderLight}`, background: index % 2 === 0 ? C.card : alternateRowBackground, verticalAlign: "middle" }}>
                           {columns.map((column) => {
                           if (column.key === "primaryId") {
                             return (
-                              <td key={column.key} style={{ padding: "10px 12px", fontSize: 13, fontWeight: 600, color: C.purple, borderBottom: `1px solid ${C.borderLight}`, verticalAlign: "middle" }}>
-                                <span title={toTooltipText(item.primaryId)} style={{ display: "block", whiteSpace: "nowrap" }}>
+                              <td key={column.key} style={{ padding: "10px 16px", fontSize: 13, color: C.t2, verticalAlign: "middle" }}>
+                                <span title={toTooltipText(item.primaryId)} style={{ ...tableCellTextStyle, fontWeight: 600 }}>
                                   {item.primaryId}
                                 </span>
                               </td>
@@ -1197,7 +1244,7 @@ export default function AdminCases() {
                           if (column.key === "itemType") {
                             const itemTypeLabel = item.itemType === "complaint" ? "Complaint" : item.itemType === "meeting" ? "Meeting" : item.itemType;
                             return (
-                              <td key={column.key} style={{ padding: "10px 12px", fontSize: 13, textTransform: "capitalize", color: C.t2, borderBottom: `1px solid ${C.borderLight}`, verticalAlign: "middle", maxWidth: 0 }}>
+                              <td key={column.key} style={{ padding: "10px 16px", fontSize: 13, textTransform: "capitalize", color: C.t2, verticalAlign: "middle", maxWidth: 0 }}>
                                 <span title={toTooltipText(itemTypeLabel)} style={tableCellTextStyle}>
                                   {itemTypeLabel}
                                 </span>
@@ -1207,7 +1254,7 @@ export default function AdminCases() {
 
                           if (column.key === "title") {
                             return (
-                            <td key={column.key} style={{ padding: "10px 12px", borderBottom: `1px solid ${C.borderLight}`, maxWidth: 0, verticalAlign: "middle" }}>
+                            <td key={column.key} style={{ padding: "10px 16px", maxWidth: 0, verticalAlign: "middle" }}>
                               <div
                                 title={toTooltipText(item.title)}
                                 style={{
@@ -1225,7 +1272,7 @@ export default function AdminCases() {
 
                           if (column.key === "category") {
                             return (
-                              <td key={column.key} style={{ padding: "10px 12px", fontSize: 13, color: C.t2, borderBottom: `1px solid ${C.borderLight}`, verticalAlign: "middle", maxWidth: 0 }}>
+                              <td key={column.key} style={{ padding: "10px 16px", fontSize: 13, color: C.t2, verticalAlign: "middle", maxWidth: 0 }}>
                                 <div title={toTooltipText(item.category)} style={tableCellTextStyle}>
                                   {item.category}
                                 </div>
@@ -1234,17 +1281,13 @@ export default function AdminCases() {
                           }
 
                           if (column.key === "handoffType") {
-                            const handoffTypeLabel = isResolvedTab
-                              ? item.itemType === "meeting"
-                                ? "Completed"
-                                : "Resolved"
-                              : item.handoffType === "reassigned"
-                                ? "Reassigned"
-                                : item.handoffType === "escalated"
-                                  ? "Escalated"
-                                  : "-";
+                            const handoffTypeLabel = item.handoffType === "reassigned"
+                              ? "Reassigned"
+                              : item.handoffType === "escalated"
+                                ? "Escalated"
+                                : "-";
                             return (
-                              <td key={column.key} style={{ padding: "10px 12px", fontSize: 13, color: C.t2, borderBottom: `1px solid ${C.borderLight}`, verticalAlign: "middle", maxWidth: 0 }}>
+                              <td key={column.key} style={{ padding: "10px 16px", fontSize: 13, color: C.t2, verticalAlign: "middle", maxWidth: 0 }}>
                                 <span title={toTooltipText(handoffTypeLabel)} style={tableCellTextStyle}>
                                   {handoffTypeLabel}
                                 </span>
@@ -1254,7 +1297,7 @@ export default function AdminCases() {
 
                           if (column.key === "citizen") {
                             return (
-                              <td key={column.key} style={{ padding: "10px 12px", fontSize: 13, color: C.t2, borderBottom: `1px solid ${C.borderLight}`, verticalAlign: "middle", maxWidth: 0 }}>
+                              <td key={column.key} style={{ padding: "10px 16px", fontSize: 13, color: C.t2, verticalAlign: "middle", maxWidth: 0 }}>
                                 <div title={toTooltipText(item.citizenName)} style={tableCellTextStyle}>
                                   {item.citizenName}
                                 </div>
@@ -1265,7 +1308,7 @@ export default function AdminCases() {
                           if (column.key === "incidentDate") {
                             const incidentDateLabel = formatDateCell(item.incidentDate);
                             return (
-                              <td key={column.key} style={{ padding: "10px 12px", fontSize: 13, color: C.t2, borderBottom: `1px solid ${C.borderLight}`, verticalAlign: "middle", maxWidth: 0 }}>
+                              <td key={column.key} style={{ padding: "10px 16px", fontSize: 13, color: C.t2, verticalAlign: "middle", maxWidth: 0 }}>
                                 <span title={toTooltipText(incidentDateLabel)} style={tableCellTextStyle}>
                                   {incidentDateLabel}
                                 </span>
@@ -1275,7 +1318,7 @@ export default function AdminCases() {
 
                           if (column.key === "owner") {
                             return (
-                              <td key={column.key} style={{ padding: "10px 12px", fontSize: 13, color: C.t2, borderBottom: `1px solid ${C.borderLight}`, verticalAlign: "middle", maxWidth: 0 }}>
+                              <td key={column.key} style={{ padding: "10px 16px", fontSize: 13, color: C.t2, verticalAlign: "middle", maxWidth: 0 }}>
                                 <span title={toTooltipText(item.owner)} style={tableCellTextStyle}>
                                   {item.owner}
                                 </span>
@@ -1285,7 +1328,7 @@ export default function AdminCases() {
 
                           if (column.key === "reference") {
                             return (
-                              <td key={column.key} style={{ padding: "10px 12px", fontSize: 13, color: C.t3, borderBottom: `1px solid ${C.borderLight}`, verticalAlign: "middle", maxWidth: 0 }}>
+                              <td key={column.key} style={{ padding: "10px 16px", fontSize: 13, color: C.t3, verticalAlign: "middle", maxWidth: 0 }}>
                                 <span title={toTooltipText(item.reference)} style={tableCellTextStyle}>
                                   {item.reference}
                                 </span>
@@ -1296,7 +1339,7 @@ export default function AdminCases() {
                           if (column.key === "createdAt") {
                             const createdAtLabel = formatDateCell(item.createdAt);
                             return (
-                              <td key={column.key} style={{ padding: "10px 12px", fontSize: 13, color: C.t2, borderBottom: `1px solid ${C.borderLight}`, verticalAlign: "middle", maxWidth: 0 }}>
+                              <td key={column.key} style={{ padding: "10px 16px", fontSize: 13, color: C.t2, verticalAlign: "middle", maxWidth: 0, whiteSpace: "nowrap" }}>
                                 <span title={toTooltipText(createdAtLabel)} style={tableCellTextStyle}>
                                   {createdAtLabel}
                                 </span>
@@ -1307,7 +1350,7 @@ export default function AdminCases() {
                           if (column.key === "handoffDate") {
                             const handoffDateLabel = formatDateCell(item.updatedAt);
                             return (
-                              <td key={column.key} style={{ padding: "10px 12px", fontSize: 13, color: C.t2, borderBottom: `1px solid ${C.borderLight}`, verticalAlign: "middle", maxWidth: 0 }}>
+                              <td key={column.key} style={{ padding: "10px 16px", fontSize: 13, color: C.t2, verticalAlign: "middle", maxWidth: 0, whiteSpace: "nowrap" }}>
                                 <span title={toTooltipText(handoffDateLabel)} style={tableCellTextStyle}>
                                   {handoffDateLabel}
                                 </span>
@@ -1317,7 +1360,7 @@ export default function AdminCases() {
 
                           if (column.key === "status") {
                             return (
-                              <td key={column.key} style={{ width: "1%", padding: "10px 10px", textAlign: "center", borderBottom: `1px solid ${C.borderLight}`, verticalAlign: "middle", whiteSpace: "nowrap" }}>
+                              <td key={column.key} style={{ width: "1%", padding: "10px 16px 10px 8px", textAlign: column.align, verticalAlign: "middle", whiteSpace: "nowrap" }}>
                                 <div style={{ maxWidth: "100%", overflow: "hidden" }}>
                                   <WorkspaceBadge status={item.status} title={item.statusLabel} style={{ maxWidth: "100%" }}>
                                     {item.statusLabel}
@@ -1329,25 +1372,28 @@ export default function AdminCases() {
 
                           const isActionHovered = hoveredActionId === `${item.itemType}-${item.id}`;
                           return (
-                            <td key={column.key} style={{ width: "1%", padding: "10px 10px", textAlign: "center", borderBottom: `1px solid ${C.borderLight}`, verticalAlign: "middle", whiteSpace: "nowrap" }}>
+                            <td key={column.key} style={{ width: "1%", padding: "10px 16px", textAlign: "center", verticalAlign: "middle", whiteSpace: "nowrap" }}>
                               <button
                                 type="button"
                                 onMouseEnter={() => setHoveredActionId(`${item.itemType}-${item.id}`)}
                                 onMouseLeave={() => setHoveredActionId(null)}
-                                onClick={() => navigate(buildItemRoute(item, tab))}
+                                onClick={() => {
+                                  setHoveredActionId(null);
+                                  navigate(buildItemRoute(item, tab));
+                                }}
                                 title="View details"
                                 style={{
                                   minWidth: 0,
                                   padding: 7,
                                   borderRadius: 10,
-                                  border: `1px solid ${C.purple}`,
+                                  border: "none",
                                   background: isActionHovered ? C.purple : "transparent",
                                   color: isActionHovered ? "#ffffff" : C.purple,
                                   display: "inline-flex",
                                   alignItems: "center",
                                   justifyContent: "center",
                                   cursor: "pointer",
-                                  transition: "background var(--portal-duration-fast) ease, color var(--portal-duration-fast) ease, border-color var(--portal-duration-fast) ease",
+                                  transition: "background var(--portal-duration-fast) ease, color var(--portal-duration-fast) ease",
                                 }}
                               >
                                 <Eye size={18} />
@@ -1360,19 +1406,17 @@ export default function AdminCases() {
                     </tbody>
                   </table>
                 )}
-              </div>
 
-              <div
-                style={{ background: C.bgElevated, borderTop: `1px solid ${C.border}` }}
-              >
-                <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 px-6 py-3.5">
+              <div className="portal-citizen-table-footer" style={{ background: C.bgElevated, borderTop: `1px solid ${C.border}` }}>
+                <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-2 py-1.5" style={{ width: "calc(100% - 24px)", margin: "0 auto" }}>
                   <p style={{ fontSize: 12, color: C.t2, margin: 0 }}>
-                    Showing <span style={{ fontWeight: 600 }}>{Math.min((currentPage - 1) * ITEMS_PER_PAGE + 1, activeRows.length)}</span>-<span style={{ fontWeight: 600 }}>{Math.min(currentPage * ITEMS_PER_PAGE, activeRows.length)}</span> of{" "}
+                    Showing <span style={{ fontWeight: 600 }}>{Math.min((currentPage - 1) * itemsPerPage + 1, activeRows.length)}</span>-<span style={{ fontWeight: 600 }}>{Math.min(currentPage * itemsPerPage, activeRows.length)}</span> of{" "}
                     <span style={{ fontWeight: 600 }}>{activeRows.length}</span> requests
                   </p>
 
-                  {totalPages > 1 && (
-                    <div className="flex items-center gap-2 flex-wrap">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    {totalPages > 1 ? (
+                      <>
                       <WorkspaceButton
                         type="button"
                         variant="outline"
@@ -1381,26 +1425,59 @@ export default function AdminCases() {
                         onMouseLeave={() => setHoveredPagerButton(null)}
                         onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
                         style={{
-                          width: 92,
-                          minHeight: 34,
-                          padding: "8px 12px",
+                          minWidth: 30,
+                          minHeight: 30,
+                          padding: "6px",
                           fontSize: 12,
-                          background: hoveredPagerButton === "previous" && currentPage !== 1 ? C.purple : "transparent",
+                          background: "transparent",
                           color: hoveredPagerButton === "previous" && currentPage !== 1 ? "#ffffff" : C.purple,
-                          border: `1px solid ${C.purple}`,
-                          opacity: currentPage === 1 ? 0.4 : 1,
+                          border: "none",
+                          opacity: currentPage === 1 ? 0.35 : 1,
                           display: "inline-flex",
                           alignItems: "center",
                           justifyContent: "center",
-                          gap: 6,
+                          borderRadius: 8,
+                          textShadow: hoveredPagerButton === "previous" && currentPage !== 1 ? "0 0 10px rgba(255,255,255,0.9)" : "none",
+                          transition: "text-shadow 0.18s ease, color 0.18s ease",
                         }}
                       >
-                        <ChevronLeft size={16} /> Previous
+                        <ChevronLeft size={16} />
                       </WorkspaceButton>
 
-                      <span style={{ padding: "6px 10px", fontSize: 12, color: C.t3 }}>
-                        Page <span style={{ fontWeight: 600 }}>{currentPage}</span> of <span style={{ fontWeight: 600 }}>{totalPages}</span>
-                      </span>
+                      {pageNumbers.map((pageNumber, index) => {
+                        const previousPage = pageNumbers[index - 1];
+                        const showGap = index > 0 && previousPage !== undefined && pageNumber - previousPage > 1;
+                        return (
+                          <div key={pageNumber} className="flex items-center gap-2">
+                            {showGap ? <span style={{ fontSize: 12, color: C.t3, padding: "0 2px" }}>...</span> : null}
+                            <WorkspaceButton
+                              type="button"
+                              variant="outline"
+                              onMouseEnter={() => setHoveredPagerButton(`page-${pageNumber}`)}
+                              onMouseLeave={() => setHoveredPagerButton(null)}
+                              onClick={() => setCurrentPage(pageNumber)}
+                              style={{
+                                minWidth: 30,
+                                minHeight: 30,
+                                padding: "6px",
+                                fontSize: 12,
+                                background: "transparent",
+                                color: currentPage === pageNumber || hoveredPagerButton === `page-${pageNumber}` ? "#ffffff" : C.purple,
+                                border: "none",
+                                display: "inline-flex",
+                                alignItems: "center",
+                                justifyContent: "center",
+                                borderRadius: 8,
+                                fontWeight: currentPage === pageNumber ? 700 : 600,
+                                textShadow: currentPage === pageNumber || hoveredPagerButton === `page-${pageNumber}` ? "0 0 10px rgba(255,255,255,0.9)" : "none",
+                                transition: "text-shadow 0.18s ease, color 0.18s ease",
+                              }}
+                            >
+                              {pageNumber}
+                            </WorkspaceButton>
+                          </div>
+                        );
+                      })}
 
                       <WorkspaceButton
                         type="button"
@@ -1410,30 +1487,37 @@ export default function AdminCases() {
                         onMouseLeave={() => setHoveredPagerButton(null)}
                         onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
                         style={{
-                          width: 92,
-                          minHeight: 34,
-                          padding: "8px 12px",
+                          minWidth: 30,
+                          minHeight: 30,
+                          padding: "6px",
                           fontSize: 12,
-                          background: hoveredPagerButton === "next" && currentPage !== totalPages ? C.purple : "transparent",
+                          background: "transparent",
                           color: hoveredPagerButton === "next" && currentPage !== totalPages ? "#ffffff" : C.purple,
-                          border: `1px solid ${C.purple}`,
-                          opacity: currentPage === totalPages ? 0.4 : 1,
+                          border: "none",
+                          opacity: currentPage === totalPages ? 0.35 : 1,
                           display: "inline-flex",
                           alignItems: "center",
                           justifyContent: "center",
-                          gap: 6,
+                          borderRadius: 8,
+                          textShadow: hoveredPagerButton === "next" && currentPage !== totalPages ? "0 0 10px rgba(255,255,255,0.9)" : "none",
+                          transition: "text-shadow 0.18s ease, color 0.18s ease",
                         }}
                       >
-                        Next <ChevronRight size={16} />
+                        <ChevronRight size={16} />
                       </WorkspaceButton>
-                    </div>
-                  )}
+                      </>
+                    ) : (
+                      <span style={{ color: "#ffffff", fontSize: 14, fontWeight: 700, textShadow: "0 0 10px rgba(255,255,255,0.9)", lineHeight: 1 }}>
+                        1
+                      </span>
+                    )}
+                  </div>
                 </div>
               </div>
-            </WorkspaceCard>
+            </div>
           )}
         </div>
       </div>
-    </WorkspacePage>
+    </div>
   );
 }

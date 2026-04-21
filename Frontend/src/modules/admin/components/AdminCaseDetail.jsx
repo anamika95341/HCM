@@ -13,7 +13,6 @@ import {
   WorkspaceEmptyState,
   WorkspaceInput,
   WorkspacePage,
-  WorkspaceSectionHeader,
   WorkspaceSelect,
 } from "../../../shared/components/WorkspaceUI.jsx";
 import { usePortalTheme } from "../../../shared/theme/portalTheme.jsx";
@@ -83,6 +82,7 @@ export function CenteredOverlay({ children }) {
 
 export function ModalShell({ title, subtitle, children, onClose }) {
   const { C } = usePortalTheme();
+  const [isCloseHovered, setIsCloseHovered] = useState(false);
   return (
     <CenteredOverlay>
       <div
@@ -104,9 +104,32 @@ export function ModalShell({ title, subtitle, children, onClose }) {
             <div style={{ fontSize: 24, fontWeight: 700, color: C.t1 }}>{title}</div>
             {subtitle ? <p style={{ marginTop: 8, fontSize: 13, color: C.t3 }}>{subtitle}</p> : null}
           </div>
-          <WorkspaceButton type="button" variant="ghost" onClick={onClose}>
-            Close
-          </WorkspaceButton>
+          <button
+            type="button"
+            onClick={onClose}
+            onMouseEnter={() => setIsCloseHovered(true)}
+            onMouseLeave={() => setIsCloseHovered(false)}
+            style={{
+              width: 40,
+              height: 40,
+              borderRadius: 999,
+              border: "none",
+              background: isCloseHovered ? C.danger : "transparent",
+              color: isCloseHovered ? "#ffffff" : C.danger,
+              display: "inline-flex",
+              alignItems: "center",
+              justifyContent: "center",
+              cursor: "pointer",
+              fontSize: 22,
+              fontWeight: 700,
+              lineHeight: 1,
+              padding: 0,
+              transition: "background var(--portal-duration-fast) ease, color var(--portal-duration-fast) ease",
+            }}
+            aria-label="Close"
+          >
+            ×
+          </button>
         </div>
         {children}
       </div>
@@ -135,13 +158,13 @@ export function SuccessModal({ open, message, onClose }) {
       <div
         style={{
           width: "100%",
-          maxWidth: 720,
-          minHeight: 360,
+          maxWidth: 460,
+          minHeight: 300,
           background: C.card,
           border: `1px solid ${C.border}`,
           borderRadius: 18,
           boxShadow: C.dialogShadow,
-          padding: 28,
+          padding: 24,
           display: "grid",
           alignContent: "center",
           justifyItems: "center",
@@ -239,9 +262,10 @@ export default function AdminCaseDetail() {
   const isComplaintPoolDetail = source === "complaint-pool";
   const isComplaintQueueDetail = source === "complaint-queue";
   const isMyCasesDetail = source === "my-cases";
-  const isResolvedCompletedDetail = source === "resolved-completed";
+  const isResolvedCompletedDetail = source === "resolved-completed" || source === "resolved-complaints";
   const isEscalatedOrReassignedDetail = source === "escalated-reassigned";
   const useComplaintQueueLayout = isComplaintQueueDetail || isMyCasesDetail;
+  const complaintPoolBackPath = `${PATHS.admin.workQueue}?tab=complaint-pool`;
 
   useEffect(() => {
     if (focusedAction) setSelectedAction(focusedAction);
@@ -360,7 +384,7 @@ export default function AdminCaseDetail() {
         return;
       }
       if (actionName === "escalate" || actionName === "reassign") {
-        navigate(PATHS.admin.workQueue);
+        navigate(complaintPoolBackPath);
         return;
       }
       setSuccessMessage(`${item?.complaintId || "Complaint"} updated successfully.`);
@@ -400,15 +424,19 @@ export default function AdminCaseDetail() {
   }
 
   const backPath =
-    isComplaintPoolDetail || isResolvedCompletedDetail || isEscalatedOrReassignedDetail
-      ? PATHS.admin.workQueue
+    isComplaintPoolDetail
+      ? complaintPoolBackPath
+      : isResolvedCompletedDetail || isEscalatedOrReassignedDetail
+        ? PATHS.admin.workQueue
       : source === "complaint-queue"
         ? PATHS.admin.complaintQueue
         : isMyCasesDetail
           ? PATHS.admin.cases
           : PATHS.admin.cases;
   const backLabel =
-    backPath === PATHS.admin.workQueue
+    isComplaintPoolDetail
+      ? "Back to Complaint Pool"
+      : backPath === PATHS.admin.workQueue
       ? "Back to Work Queue"
       : backPath === PATHS.admin.complaintQueue
         ? "Back to Complaint Queue"
@@ -463,17 +491,19 @@ export default function AdminCaseDetail() {
 
     return (
       <>
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: 18, alignItems: "start" }}>
+        <div style={standardGridStyle}>
           <DetailItem label="Complaint Id" value={item.complaintId} />
           <DetailItem label="Created At" value={createdAtLabel} />
+          <div />
+        </div>
+        <div style={standardGridStyle}>
+          <DetailItem label="Citizen Name" value={item.citizenSnapshot?.name || "Not provided"} />
+          <DetailItem label="Citizen Phone Number" value={item.citizenSnapshot?.phoneNumbers?.[0] || "Not provided"} />
+          <div />
         </div>
         {renderTitleBlock(item.title)}
         <div style={standardGridStyle}>
           <DetailItem label="Category" value={item.complaintType || "Not provided"} />
-          <DetailItem label="Citizen Name" value={item.citizenSnapshot?.name || "Not provided"} />
-          <DetailItem label="Citizen Phone Number" value={item.citizenSnapshot?.phoneNumbers?.[0] || "Not provided"} />
-        </div>
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: 18, alignItems: "start" }}>
           <DetailItem label="Date of Incident" value={incidentDateLabel} />
           <DetailItem label="Incident Location" value={item.complaintLocation || "Not provided"} />
         </div>
@@ -617,9 +647,41 @@ export default function AdminCaseDetail() {
       contentStyle={{ height: "100%", display: "flex", flexDirection: "column", minHeight: 0 }}
     >
       <SuccessModal open={!!successMessage} message={successMessage} onClose={handleSuccessModalClose} />
-      <WorkspaceSectionHeader
-        title={item.complaintId}
-        action={
+      {isComplaintPoolDetail ? (
+        <div style={{ display: "grid", gridTemplateColumns: "1fr auto 1fr", alignItems: "center", marginBottom: 16, gap: 12 }}>
+          <div style={{ justifySelf: "start" }}>
+            <button
+              type="button"
+              onClick={() => navigate(backPath)}
+              onMouseEnter={() => setIsBackHovered(true)}
+              onMouseLeave={() => setIsBackHovered(false)}
+              style={{
+                minHeight: 38,
+                padding: "0 16px",
+                borderRadius: 10,
+                border: `1px solid ${C.purple}`,
+                background: isBackHovered ? C.purple : "transparent",
+                color: isBackHovered ? "#ffffff" : C.purple,
+                display: "inline-flex",
+                alignItems: "center",
+                justifyContent: "center",
+                gap: 8,
+                cursor: "pointer",
+                fontSize: 13,
+                fontWeight: 600,
+                transition: "background var(--portal-duration-fast) ease, color var(--portal-duration-fast) ease",
+              }}
+            >
+              <ChevronLeft size={16} />
+              {backLabel}
+            </button>
+          </div>
+          <h2 style={{ margin: 0, fontSize: 20, fontWeight: 600, color: C.t1, textAlign: "center" }}>COMPLAINT DETAILS</h2>
+          <div />
+        </div>
+      ) : (
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16, gap: 12 }}>
+          <h2 style={{ margin: 0, fontSize: 20, fontWeight: 600, color: C.t1 }}>{item.complaintId}</h2>
           <button
             type="button"
             onClick={() => navigate(backPath)}
@@ -645,14 +707,14 @@ export default function AdminCaseDetail() {
             <ChevronLeft size={16} />
             {backLabel}
           </button>
-        }
-      />
+        </div>
+      )}
       <div style={{ display: "grid", gap: 16, flex: 1, minHeight: 0 }}>
 
         {error ? <WorkspaceCard style={{ color: C.danger }}>{error}</WorkspaceCard> : null}
 
         <WorkspaceCard style={{ padding: 0, marginBottom: 0, border: "none", background: "transparent" }}>
-          {showAssignToMeButton ? (
+          {showAssignToMeButton && !isComplaintPoolDetail ? (
             <WorkspaceButton
               type="button"
               disabled={actionLoading}
@@ -746,8 +808,21 @@ export default function AdminCaseDetail() {
             </WorkspaceCard>
           </>
         ) : (
-          <WorkspaceCard style={{ marginBottom: 0, flex: 1, minHeight: 0, display: "flex", flexDirection: "column" }}>
-            <WorkspaceCardHeader title="Complaint Information" />
+          <WorkspaceCard style={{ marginBottom: 0, flex: 1, minHeight: 0, display: "flex", flexDirection: "column", paddingTop: isComplaintPoolDetail ? 14 : 24 }}>
+            {isComplaintPoolDetail ? (
+              <div style={{ padding: "0 0 14px 0", marginLeft: 2, borderBottom: `1px solid ${C.border}`, marginBottom: 18 }}>
+                <WorkspaceButton
+                  type="button"
+                  disabled={actionLoading}
+                  onClick={() => runAction("assign", () => apiClient.patch(`/complaints/${id}/assign-self`, {}))}
+                  style={{ boxShadow: "none" }}
+                >
+                  Assign to Me
+                </WorkspaceButton>
+              </div>
+            ) : (
+              <WorkspaceCardHeader title="Complaint Information" />
+            )}
             <div style={{ display: "grid", gap: 18, flex: 1, minHeight: 0, overflowY: "auto", paddingRight: 2 }}>
               {isComplaintPoolDetail
                 ? renderComplaintPoolInfo()
@@ -811,7 +886,6 @@ export default function AdminCaseDetail() {
               <ErrorText>{reassignReasonError}</ErrorText>
             </div>
             <div style={{ display: "flex", justifyContent: "flex-end", gap: 12 }}>
-              <WorkspaceButton type="button" variant="ghost" onClick={closeActionModal} disabled={actionLoading}>Cancel</WorkspaceButton>
               <WorkspaceButton
                 type="button"
                 disabled={actionLoading || !complaintForm.reassignTo || !!reassignReasonError || reassignTrimmed.length < 4}
@@ -844,7 +918,6 @@ export default function AdminCaseDetail() {
               <ErrorText>{escalationReasonError}</ErrorText>
             </div>
             <div style={{ display: "flex", justifyContent: "flex-end", gap: 12 }}>
-              <WorkspaceButton type="button" variant="ghost" onClick={closeActionModal} disabled={actionLoading}>Cancel</WorkspaceButton>
               <WorkspaceButton
                 type="button"
                 disabled={actionLoading || !!escalationReasonError || escalationTrimmed.length < 4}
@@ -878,7 +951,6 @@ export default function AdminCaseDetail() {
               <ErrorText>{resolutionError}</ErrorText>
             </div>
             <div style={{ display: "flex", justifyContent: "flex-end", gap: 12 }}>
-              <WorkspaceButton type="button" variant="ghost" onClick={closeActionModal} disabled={actionLoading}>Cancel</WorkspaceButton>
               <WorkspaceButton
                 type="button"
                 disabled={actionLoading || !!resolutionError || resolutionTrimmed.length < 10}
@@ -909,7 +981,6 @@ export default function AdminCaseDetail() {
               <ErrorText>{scheduleError}</ErrorText>
             </div>
             <div style={{ display: "flex", justifyContent: "flex-end", gap: 12 }}>
-              <WorkspaceButton type="button" variant="ghost" onClick={closeActionModal} disabled={actionLoading}>Cancel</WorkspaceButton>
               <WorkspaceButton
                 type="button"
                 disabled={actionLoading || !scheduledIso || !!scheduleError}
@@ -952,7 +1023,6 @@ export default function AdminCaseDetail() {
               />
             </div>
             <div style={{ display: "flex", justifyContent: "flex-end", gap: 12 }}>
-              <WorkspaceButton type="button" variant="ghost" onClick={closeActionModal} disabled={actionLoading}>Cancel</WorkspaceButton>
               <WorkspaceButton
                 type="button"
                 disabled={actionLoading || !complaintForm.logType}
@@ -970,7 +1040,6 @@ export default function AdminCaseDetail() {
           <div style={{ display: "grid", gap: 16 }}>
             <WorkspaceTextArea value={complaintForm.reopenReason} onChange={(event) => setComplaintForm((current) => ({ ...current, reopenReason: event.target.value }))} rows={6} placeholder="Reason to reopen" />
             <div style={{ display: "flex", justifyContent: "flex-end", gap: 12 }}>
-              <WorkspaceButton type="button" variant="ghost" onClick={closeActionModal} disabled={actionLoading}>Cancel</WorkspaceButton>
               <WorkspaceButton type="button" disabled={actionLoading || complaintForm.reopenReason.trim().length < 3} onClick={() => runAction("reopen", () => apiClient.patch(`/complaints/${id}/reopen`, { reason: complaintForm.reopenReason.trim() }))}>
                 Confirm Reopen
               </WorkspaceButton>
@@ -984,7 +1053,6 @@ export default function AdminCaseDetail() {
           <div style={{ display: "grid", gap: 16 }}>
             <WorkspaceTextArea value={complaintForm.closeNote} onChange={(event) => setComplaintForm((current) => ({ ...current, closeNote: event.target.value }))} rows={6} placeholder="Closure note" />
             <div style={{ display: "flex", justifyContent: "flex-end", gap: 12 }}>
-              <WorkspaceButton type="button" variant="ghost" onClick={closeActionModal} disabled={actionLoading}>Cancel</WorkspaceButton>
               <WorkspaceButton type="button" disabled={actionLoading || complaintForm.closeNote.trim().length < 3} onClick={() => runAction("close", () => apiClient.patch(`/complaints/${id}/close`, { note: complaintForm.closeNote.trim() }))}>
                 Confirm Close
               </WorkspaceButton>
