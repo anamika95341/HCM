@@ -89,6 +89,33 @@ services:
       - frontend-backend-net
       - backend-data-net
 
+  worker:
+    image: ${JOB_WORKER_IMAGE:-hcm-job-worker:latest}
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+      target: runner
+    env_file:
+      - ./backend/.env
+    environment:
+      NODE_ENV: production
+      RUN_MIGRATIONS: "false"
+      DATABASE_URL: postgresql://app_user:${DB_PASSWORD:-change_me}@postgres:5432/citizen_portal
+      REDIS_URL: redis://:${REDIS_PASSWORD:-change_me}@redis:6379
+      SMS_PROVIDER: ${SMS_PROVIDER:-mock}
+    command: ["npm", "run", "worker:jobs"]
+    depends_on:
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "node", "-e", "process.exit(0)"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+    restart: unless-stopped
+    networks:
+      - backend-data-net
+
   auth-stream-worker:
     image: ${AUTH_STREAM_WORKER_IMAGE:-hcm-auth-stream-worker:latest}
     build:

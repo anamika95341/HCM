@@ -54,6 +54,34 @@ services:
       minio:
         condition: service_healthy
 
+  worker:
+    build:
+      target: dev
+    env_file:
+      - ./backend/.env.localhost
+    environment:
+      NODE_ENV: development
+      RUN_MIGRATIONS: "false"
+      DATABASE_URL: postgresql://app_user:${DB_PASSWORD:-change_me}@postgres:5432/citizen_portal
+      REDIS_URL: redis://:${REDIS_PASSWORD:-change_me}@redis:6379
+      STORAGE_MODE: ${STORAGE_MODE:-local}
+      S3_BUCKET: ${S3_BUCKET:-portal-private-files}
+      S3_SIGNED_URL_EXPIRY_SECONDS: ${S3_SIGNED_URL_EXPIRY_SECONDS:-90}
+      AWS_REGION: ${AWS_REGION:-us-east-1}
+      S3_ENDPOINT: ${S3_ENDPOINT:-http://minio:9000}
+      S3_PUBLIC_ENDPOINT: ${S3_PUBLIC_ENDPOINT:-http://localhost:5173}
+      S3_FORCE_PATH_STYLE: ${S3_FORCE_PATH_STYLE:-true}
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-admin}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-password}
+      SMS_PROVIDER: ${SMS_PROVIDER:-mock}
+    command: ["npm", "run", "worker:jobs"]
+    volumes:
+      - ./backend:/app
+      - backend-node-modules:/app/node_modules
+    depends_on:
+      redis:
+        condition: service_healthy
+
   auth-stream-worker:
     build:
       target: dev
