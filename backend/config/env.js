@@ -56,7 +56,7 @@ module.exports = {
   s3Bucket: process.env.S3_BUCKET || '',
   s3Region: process.env.AWS_REGION || 'us-east-1',
   s3Endpoint: process.env.S3_ENDPOINT || '',
-  s3PublicEndpoint: process.env.S3_PUBLIC_ENDPOINT || process.env.S3_ENDPOINT || '',
+  s3PublicEndpoint: process.env.S3_PUBLIC_ENDPOINT || '',
   s3AccessKeyId: process.env.STORAGE_MODE === 'local'
     ? (process.env.MINIO_ROOT_USER || process.env.AWS_ACCESS_KEY_ID || '')
     : (process.env.AWS_ACCESS_KEY_ID || ''),

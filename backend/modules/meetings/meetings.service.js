@@ -151,7 +151,7 @@ async function getCitizenMeetings(citizenId, { page, limit } = {}) {
   return { meetings };
 }
 
-async function getCitizenMeetingDetail(meetingId, citizenId) {
+async function getCitizenMeetingDetail(meetingId, citizenId, reqMeta) {
   const meeting = await meetingsRepository.getCitizenMeetingById(meetingId, citizenId);
   if (!meeting) {
     throw createHttpError(404, 'Meeting not found');
@@ -178,6 +178,7 @@ async function getCitizenMeetingDetail(meetingId, citizenId) {
     actorId: citizenId,
     contextType: 'meeting',
     contextId: meetingId,
+    reqMeta,
   });
   meeting.files = [...files, ...managedFiles];
   return { meeting, history };

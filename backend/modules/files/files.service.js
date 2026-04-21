@@ -271,7 +271,7 @@ async function assertContextAccess({ actorRole, actorId, contextType, contextId 
   throw createHttpError(400, 'Unsupported upload context');
 }
 
-async function createUploadUrl({ actorRole, actorId, body, reqMeta }) {
+async function createUploadUrl({ actorRole, actorId, body, reqMeta, publicEndpoint }) {
   assertUploaderRole(actorRole);
   const fileCategory = validateUploadPolicy(actorRole, body.mimeType, body.size);
   await assertContextAccess({
@@ -341,6 +341,7 @@ async function createUploadUrl({ actorRole, actorId, body, reqMeta }) {
   const upload = await storageService.generateUploadUrl({
     key: s3Key,
     contentType: body.mimeType,
+    publicEndpoint,
     metadata: {
       uploaderrole: actorRole,
       uploaderid: actorId,
@@ -553,7 +554,7 @@ async function listFiles({ actorRole, actorId, query = {} }) {
   return { files: visibleFiles };
 }
 
-async function createDownloadUrl({ fileId, actorRole, actorId, reqMeta }) {
+async function createDownloadUrl({ fileId, actorRole, actorId, reqMeta, publicEndpoint }) {
   assertViewerRole(actorRole);
   const file = await filesRepository.findFileRecordById(fileId);
   if (!file) {
@@ -566,6 +567,7 @@ async function createDownloadUrl({ fileId, actorRole, actorId, reqMeta }) {
     key: file.s3_key,
     filename: file.original_name,
     contentType: file.mime_type,
+    publicEndpoint,
   });
 
   await writeAuditLog({
@@ -590,7 +592,7 @@ async function createDownloadUrl({ fileId, actorRole, actorId, reqMeta }) {
   };
 }
 
-async function createOwnerDownloadUrl({ fileId, actorRole, actorId, reqMeta }) {
+async function createOwnerDownloadUrl({ fileId, actorRole, actorId, reqMeta, publicEndpoint }) {
   const file = await filesRepository.findFileRecordById(fileId);
   if (!file) {
     throw createHttpError(404, 'File not found');
@@ -602,6 +604,7 @@ async function createOwnerDownloadUrl({ fileId, actorRole, actorId, reqMeta }) {
     key: file.s3_key,
     filename: file.original_name,
     contentType: file.mime_type,
+    publicEndpoint,
   });
 
   await writeAuditLog({
@@ -638,6 +641,7 @@ async function listOwnedFiles({ actorRole, actorId, contextType, contextId, reqM
       actorRole,
       actorId,
       reqMeta,
+      publicEndpoint: reqMeta?.publicEndpoint || undefined,
     });
     return {
       ...owned.file,
@@ -689,21 +693,23 @@ async function createLegacyDownloadAccess({ fileId, actorRole, actorId, reqMeta,
   };
 }
 
-async function createStorageUploadUrl({ key, contentType, metadata, expiresIn }) {
+async function createStorageUploadUrl({ key, contentType, metadata, expiresIn, publicEndpoint }) {
   return storageService.generateUploadUrl({
     key,
     contentType,
     metadata,
     expiresIn,
+    publicEndpoint,
   });
 }
 
-async function createStorageDownloadUrl({ key, filename, contentType, expiresIn }) {
+async function createStorageDownloadUrl({ key, filename, contentType, expiresIn, publicEndpoint }) {
   return storageService.generateDownloadUrl({
     key,
     filename,
     contentType,
     expiresIn,
+    publicEndpoint,
   });
 }
 

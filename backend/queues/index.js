@@ -30,32 +30,37 @@ function makeBullConnection() {
   return conn;
 }
 
-/**
- * Email queue - handles transactional and promotional emails
- * Created once at module load (singleton pattern)
- */
-const emailQueue = new Queue('email', {
-  connection: makeBullConnection(),
-  defaultJobOptions: DEFAULT_JOB_OPTIONS,
-});
+let emailQueueInstance = null;
+let smsQueueInstance = null;
 
-/**
- * SMS queue - handles SMS notifications
- * Created once at module load (singleton pattern)
- */
-const smsQueue = new Queue('sms', {
-  connection: makeBullConnection(),
-  defaultJobOptions: DEFAULT_JOB_OPTIONS,
-});
+function getEmailQueue() {
+  if (!emailQueueInstance) {
+    emailQueueInstance = new Queue('email', {
+      connection: makeBullConnection(),
+      defaultJobOptions: DEFAULT_JOB_OPTIONS,
+    });
+  }
+  return emailQueueInstance;
+}
+
+function getSmsQueue() {
+  if (!smsQueueInstance) {
+    smsQueueInstance = new Queue('sms', {
+      connection: makeBullConnection(),
+      defaultJobOptions: DEFAULT_JOB_OPTIONS,
+    });
+  }
+  return smsQueueInstance;
+}
 
 /**
  * Map job names to queues to prevent accidental misrouting
  * (e.g. sending a sendEmail job to the sms queue where no worker would consume it)
  */
 const JOB_QUEUE_MAP = {
-  [JOBS.SEND_EMAIL]: emailQueue,
-  [JOBS.SEND_SMS]: smsQueue,
-  [JOBS.SEND_EMAIL_BATCH]: emailQueue,
+  [JOBS.SEND_EMAIL]: getEmailQueue,
+  [JOBS.SEND_SMS]: getSmsQueue,
+  [JOBS.SEND_EMAIL_BATCH]: getEmailQueue,
 };
 
 /**
@@ -69,10 +74,11 @@ const JOB_QUEUE_MAP = {
  * @throws {Error} If queue.add() fails
  */
 async function enqueue(jobName, payload, options = {}) {
-  const queue = JOB_QUEUE_MAP[jobName];
-  if (!queue) {
+  const getQueue = JOB_QUEUE_MAP[jobName];
+  if (!getQueue) {
     throw new TypeError(`enqueue: unknown job name "${jobName}" — not mapped to any queue`);
   }
+  const queue = getQueue();
 
   // Validate payload before enqueueing (throws TypeError if invalid)
   validateJobPayload(jobName, payload);
@@ -93,12 +99,22 @@ async function enqueue(jobName, payload, options = {}) {
 
 // Export queue instances and utilities
 module.exports = {
-  emailQueue,
-  smsQueue,
   enqueue,
+  getEmailQueue,
+  getSmsQueue,
   // Re-export job contract utilities for convenience
   // Services only need to require('../../queues/index')
   JOBS,
   buildJobId,
   validateJobPayload,
 };
+
+Object.defineProperty(module.exports, 'emailQueue', {
+  enumerable: true,
+  get: getEmailQueue,
+});
+
+Object.defineProperty(module.exports, 'smsQueue', {
+  enumerable: true,
+  get: getSmsQueue,
+});

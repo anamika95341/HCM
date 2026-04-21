@@ -1,0 +1,13 @@
+{
+  "name": "hcm-workspace",
+  "private": true,
+  "scripts": {
+    "dev": "docker compose -f compose.yml -f compose.dev.yml up --build",
+    "dev:detached": "docker compose -f compose.yml -f compose.dev.yml up --build -d",
+    "build": "docker compose -f compose.yml build",
+    "start": "docker compose -f compose.yml up --build",
+    "start:detached": "docker compose -f compose.yml up --build -d",
+    "down": "docker compose -f compose.yml -f compose.dev.yml down",
+    "logs": "docker compose -f compose.yml -f compose.dev.yml logs -f"
+  }
+}

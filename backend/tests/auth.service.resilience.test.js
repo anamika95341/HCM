@@ -33,6 +33,7 @@ jest.mock('../modules/auth/auth.repository', () => ({
   storeRefreshToken: jest.fn(),
   updatePassword: jest.fn(),
   findActiveRefreshToken: jest.fn(),
+  findRefreshTokenByJti: jest.fn(),
   revokeRefreshToken: jest.fn(),
   findActiveUserById: jest.fn(),
 }));
@@ -160,8 +161,9 @@ describe('auth service resilience', () => {
   });
 
   test('refreshSession verifies only the decoded role path', async () => {
+    authRepository.findRefreshTokenByJti
+      .mockResolvedValueOnce({ id: 'stored-old', token_hash: require('../utils/crypto').sha256('refresh-token'), revoked_at: null });
     authRepository.findActiveRefreshToken
-      .mockResolvedValueOnce({ id: 'stored-old', token_hash: require('../utils/crypto').sha256('refresh-token') })
       .mockResolvedValueOnce({ id: 'stored-new' });
     authRepository.findActiveUserById.mockResolvedValue({ id: 'user-1', citizen_id: 'CTZ-1' });
     authRepository.storeRefreshToken.mockResolvedValue({ id: 'stored-new' });
