@@ -22,9 +22,15 @@ const authenticate = require('../middleware/authenticate');
 function makeReq(token = 'Bearer mock.token') {
   return {
     headers: { authorization: token },
+    cookies: { access_token: 'mock.token' },
     originalUrl: '/api/test',
     method: 'GET',
     ip: '127.0.0.1',
+    get: jest.fn((header) => {
+      if (header.toLowerCase() === 'user-agent') return 'jest';
+      if (header.toLowerCase() === 'x-request-id') return undefined;
+      return undefined;
+    }),
   };
 }
 

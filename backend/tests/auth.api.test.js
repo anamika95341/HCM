@@ -21,6 +21,7 @@ jest.mock('../config/redis', () => ({
 jest.mock('../middleware/authenticate', () => jest.fn(() => (req, res, next) => {
   req.user = { role: 'citizen' };
   req.token = 'access-token';
+  req.cookies = { ...(req.cookies || {}), refresh_token: 'refresh-token-refresh-token' };
   next();
 }));
 jest.mock('../modules/auth/auth.service', () => ({
@@ -62,10 +63,13 @@ describe('auth API routes', () => {
       .send({ citizenId: 'CTZ12345678', password: 'StrongPass123!' });
 
     expect(response.status).toBe(200);
-    expect(response.body).toEqual(expect.objectContaining({
-      accessToken: 'access-token',
-      refreshToken: 'refresh-token-refresh-token',
-    }));
+    expect(response.body).toEqual({ user: { id: 'user-1' } });
+    expect(response.headers['set-cookie']).toEqual(
+      expect.arrayContaining([
+        expect.stringContaining('access_token=access-token'),
+        expect.stringContaining('refresh_token=refresh-token-refresh-token'),
+      ]),
+    );
     expect(authService.loginCitizen).toHaveBeenCalled();
   });
 

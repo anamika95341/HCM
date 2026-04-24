@@ -42,6 +42,7 @@ jest.mock('../modules/admin/admin.controller', () => ({
   getWorkQueue: jest.fn((req, res) => res.json({})),
   getWorkflowDirectory: jest.fn((req, res) => res.json({})),
   listDeos: jest.fn((req, res) => res.json({ deos: [] })),
+  getCalendar: jest.fn((req, res) => res.json({ events: [] })),
 }));
 jest.mock('../modules/notifications/notifications.controller', () => ({
   getPreferences: jest.fn((req, res) => res.json({ preferences: {} })),
