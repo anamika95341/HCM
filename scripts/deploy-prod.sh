@@ -10,7 +10,7 @@ if [[ ! -f .env ]]; then
   exit 1
 fi
 
-if grep -q 'PASTE_' .env; then
+if grep -v '^\s*#' .env | grep -q 'PASTE_'; then
   echo "Refusing to deploy: ${DEPLOY_ROOT}/.env still contains PASTE_ placeholders."
   exit 1
 fi
