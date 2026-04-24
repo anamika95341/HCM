@@ -23,7 +23,8 @@ WORKDIR /app
 RUN apt-get update \
   && apt-get install -y --no-install-recommends tini wget ca-certificates \
   && rm -rf /var/lib/apt/lists/*
-RUN groupadd --system appgroup && useradd --system --gid appgroup appuser
+RUN groupadd --system appgroup && useradd --system --gid appgroup appuser \
+  && mkdir -p /app/uploads && chown appuser:appgroup /app/uploads
 COPY --from=builder /app/docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
 COPY --from=builder /app/node_modules ./node_modules
 COPY --from=builder --chown=appuser:appgroup /app ./
