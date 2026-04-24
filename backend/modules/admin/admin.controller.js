@@ -36,8 +36,17 @@ async function listDeos(req, res, next) {
   }
 }
 
+async function getCalendar(req, res, next) {
+  try {
+    const events = await adminService.getCalendar();
+    res.json({ events });
+  } catch (error) {
+    next(error);
+  }
+}
+
 function reqMeta(req) {
   return { ip: req.ip, userAgent: req.get('user-agent') };
 }
 
-module.exports = { getDashboard, getWorkQueue, getWorkflowDirectory, listDeos };
+module.exports = { getDashboard, getWorkQueue, getWorkflowDirectory, listDeos, getCalendar };

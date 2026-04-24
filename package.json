@@ -2,12 +2,13 @@
   "name": "hcm-workspace",
   "private": true,
   "scripts": {
-    "dev": "docker compose -f compose.yml -f compose.dev.yml up --build",
-    "dev:detached": "docker compose -f compose.yml -f compose.dev.yml up --build -d",
-    "build": "docker compose -f compose.yml build",
-    "start": "docker compose -f compose.yml up --build",
-    "start:detached": "docker compose -f compose.yml up --build -d",
-    "down": "docker compose -f compose.yml -f compose.dev.yml down",
-    "logs": "docker compose -f compose.yml -f compose.dev.yml logs -f"
+    "dev": "docker compose --env-file .env -f compose.yml -f compose.dev.yml up --build --remove-orphans",
+    "dev:detached": "docker compose --env-file .env -f compose.yml -f compose.dev.yml up --build -d --remove-orphans",
+    "prod": "docker compose --env-file .env -f compose.yml -f compose.prod.yml up --build -d --remove-orphans",
+    "build": "docker compose --env-file .env -f compose.yml -f compose.prod.yml build",
+    "down": "docker compose --env-file .env -f compose.yml -f compose.dev.yml down --remove-orphans",
+    "down:prod": "docker compose --env-file .env -f compose.yml -f compose.prod.yml down --remove-orphans",
+    "logs": "docker compose --env-file .env -f compose.yml -f compose.dev.yml logs -f",
+    "logs:prod": "docker compose --env-file .env -f compose.yml -f compose.prod.yml logs -f"
   }
 }

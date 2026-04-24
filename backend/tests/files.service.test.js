@@ -377,4 +377,78 @@ describe('files service', () => {
       })
     ).rejects.toMatchObject({ statusCode: 404 });
   });
+
+  test('allows admin calendar viewers to download DEO files attached to meetings', async () => {
+    filesRepository.findFileRecordById.mockResolvedValue({
+      id: 'file-1',
+      s3_key: 'deo/deo-1/video.mp4',
+      uploaded_by: 'deo-1',
+      uploader_role: 'deo',
+      visible_to_role: 'minister',
+      original_name: 'video.mp4',
+      mime_type: 'video/mp4',
+      file_category: 'video',
+      size: 1024,
+      context_type: 'meeting',
+      context_id: 'meeting-1',
+      status: 'pending',
+      created_at: '2026-04-05T00:00:00.000Z',
+    });
+
+    await expect(
+      filesService.createDownloadUrl({
+        fileId: 'file-1',
+        actorRole: 'admin',
+        actorId: 'admin-1',
+        reqMeta: { ip: '127.0.0.1', userAgent: 'jest' },
+      })
+    ).resolves.toEqual(expect.objectContaining({ downloadUrl: 'http://download-url' }));
+  });
+
+  test('lists admin and minister visible files for shared calendar viewers', async () => {
+    filesRepository.listFilesVisibleToRole.mockResolvedValue([
+      {
+        id: 'file-admin',
+        s3_key: 'citizen/citizen-1/document.pdf',
+        uploaded_by: 'citizen-1',
+        uploader_role: 'citizen',
+        visible_to_role: 'admin',
+        original_name: 'document.pdf',
+        mime_type: 'application/pdf',
+        file_category: 'document',
+        size: 1024,
+        context_type: 'meeting',
+        context_id: 'meeting-1',
+        status: 'pending',
+        created_at: '2026-04-05T00:00:00.000Z',
+      },
+      {
+        id: 'file-minister',
+        s3_key: 'deo/deo-1/photo.png',
+        uploaded_by: 'deo-1',
+        uploader_role: 'deo',
+        visible_to_role: 'minister',
+        original_name: 'photo.png',
+        mime_type: 'image/png',
+        file_category: 'image',
+        size: 2048,
+        context_type: 'meeting',
+        context_id: 'meeting-1',
+        status: 'pending',
+        created_at: '2026-04-05T00:00:00.000Z',
+      },
+    ]);
+
+    const result = await filesService.listFiles({
+      actorRole: 'admin',
+      actorId: 'admin-1',
+      query: { contextType: 'meeting', contextId: 'meeting-1' },
+    });
+
+    expect(filesRepository.listFilesVisibleToRole).toHaveBeenCalledWith(
+      ['admin', 'minister'],
+      { contextType: 'meeting', contextId: 'meeting-1' }
+    );
+    expect(result.files.map((file) => file.id)).toEqual(['file-admin', 'file-minister']);
+  });
 });

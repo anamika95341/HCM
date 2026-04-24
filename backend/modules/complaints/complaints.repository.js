@@ -199,6 +199,38 @@ async function getComplaintById(id) {
   return result.rows[0] ? mapComplaint(result.rows[0]) : null;
 }
 
+async function listScheduledComplaintCalendarEvents() {
+  const result = await pool.query(
+    `SELECT
+       c.id,
+       c.id AS source_id,
+       NULL::uuid AS meeting_id,
+       c.complaint_id,
+       c.subject AS title,
+       c.subject AS who_to_meet,
+       c.call_scheduled_at AS starts_at,
+       c.call_scheduled_at + INTERVAL '30 minutes' AS ends_at,
+       COALESCE(NULLIF(c.complaint_location, ''), 'Complaint follow-up') AS location,
+       FALSE AS is_vip,
+       c.description AS comments,
+       c.created_at,
+       NULL::uuid AS created_by_deo_id,
+       'complaint_meeting' AS calendar_kind,
+       'Complaint Workflow' AS source_label,
+       ARRAY_REMOVE(ARRAY[
+         NULLIF(TRIM(CONCAT(citizen.first_name, ' ', citizen.last_name)), ''),
+         NULLIF(TRIM(CONCAT(admin.first_name, ' ', admin.last_name)), '')
+       ], NULL) AS participants
+     FROM complaints c
+     JOIN citizens citizen ON citizen.id = c.citizen_id
+     LEFT JOIN admins admin ON admin.id = c.assigned_admin_id
+     WHERE c.call_scheduled_at IS NOT NULL
+       AND c.status <> 'rejected'
+     ORDER BY c.call_scheduled_at ASC`
+  );
+  return result.rows;
+}
+
 async function getComplaintHistory(complaintId) {
   const result = await pool.query(
     `SELECT id, previous_status, new_status, actor_role, note, created_at
@@ -263,6 +295,7 @@ module.exports = {
   getCitizenComplaintById,
   getComplaintQueue,
   getComplaintById,
+  listScheduledComplaintCalendarEvents,
   getComplaintHistory,
   updateComplaintStatus,
 };

@@ -11,12 +11,13 @@ function statusColor(status, C) {
   return C.purple;
 }
 
-export function WorkspacePage({ children, width = 900, outerStyle, contentStyle }) {
+export function WorkspacePage({ children, width = 900, outerStyle, bodyStyle, contentStyle }) {
   return (
     <div className="portal-page" style={{ minHeight: "100%", background: "transparent", ...(outerStyle || {}) }}>
       <div
         style={{
           padding: "var(--portal-space-13) var(--portal-space-12) var(--portal-space-14)",
+          ...(bodyStyle || {}),
         }}
       >
         <div

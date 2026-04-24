@@ -1693,31 +1693,83 @@ function formatFileSize(size = 0) {
   return `${size} B`;
 }
 
+function toDateInputValue(value) {
+  if (!value) return "";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
+function toTimeInputValue(value) {
+  if (!value) return "";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+  return date.toTimeString().slice(0, 5);
+}
+
+function buildEditForm(item) {
+  return {
+    meetingDate: toDateInputValue(item?.startsAt),
+    startTime: toTimeInputValue(item?.startsAt),
+    endTime: toTimeInputValue(item?.endsAt),
+    location: item?.location || "",
+    details: item?.details || "",
+    isVip: Boolean(item?.isVip),
+  };
+}
+
+function buildIsoFromLocalParts(date, time) {
+  if (!date || !time) return "";
+  const parsed = new Date(`${date}T${time}`);
+  return Number.isNaN(parsed.getTime()) ? "" : parsed.toISOString();
+}
+
 function getItemKind(item) {
+  if (item.kind === "complaint") return "complaint";
   return item.kind === "event" ? "event" : "meeting";
 }
 
 function getItemSummary(items) {
   const meetings = items.filter((item) => getItemKind(item) === "meeting").length;
   const events = items.filter((item) => getItemKind(item) === "event").length;
+  const complaints = items.filter((item) => getItemKind(item) === "complaint").length;
   const parts = [];
   if (meetings) parts.push(`${meetings} meeting${meetings !== 1 ? "s" : ""}`);
   if (events) parts.push(`${events} event${events !== 1 ? "s" : ""}`);
+  if (complaints) parts.push(`${complaints} complaint meeting${complaints !== 1 ? "s" : ""}`);
   return parts.join(" ");
 }
 
 function getItemTypeLabel(item) {
+  if (getItemKind(item) === "complaint") {
+    return "Complaint Meeting";
+  }
   if (getItemKind(item) === "event") {
-    return item.isVip ? "VIP Event" : "Scheduled Event";
+    return "DEO Event";
   }
   return item.isVip ? "VIP Meeting" : "Scheduled Meeting";
+}
+
+function getItemBadgeLabel(item) {
+  if (getItemKind(item) === "complaint") return "Complaint";
+  if (getItemKind(item) === "event") return "Event";
+  return item.isVip ? "VIP" : "Standard";
+}
+
+function getItemTone(item, C) {
+  if (getItemKind(item) === "complaint") return C.warn;
+  if (getItemKind(item) === "event") return C.success;
+  return C.purple;
 }
 
 // ── EventPill ────────────────────────────────────────────────────────────────
 
 function EventPill({ item, compact = false, onClick }) {
   const { C } = usePortalTheme();
-  const tone = item.isVip ? C.warn : C.purple;
+  const tone = getItemTone(item, C);
   return (
     <button
       type="button"
@@ -2005,8 +2057,8 @@ function DayMeetingsPanel({ date, items, onClose, onSelectMeeting, isVisible }) 
         ) : (
           <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
             {items.map((item) => {
-              const tone = item.isVip ? C.warn : C.purple;
-              const kindLabel = getItemKind(item) === "event" ? "Event" : "Meeting";
+              const tone = getItemTone(item, C);
+              const kindLabel = getItemTypeLabel(item);
               return (
                 <button
                   key={item.id}
@@ -2212,11 +2264,15 @@ function FileGridSection({ type, C, tone }) {
 
 // ── MeetingDetailModal ────────────────────────────────────────────────────────
 
-function MeetingDetailModal({ meeting, onClose }) {
+function MeetingDetailModal({ meeting, onClose, canEdit = false, onUpdated }) {
   const { C } = usePortalTheme();
   const [activeTab, setActiveTab] = useState("details");
   const [isClosing, setIsClosing] = useState(false);
   const [fileCounts, setFileCounts] = useState({ photos: 0, videos: 0, documents: 0 });
+  const [isEditing, setIsEditing] = useState(false);
+  const [editForm, setEditForm] = useState(() => buildEditForm(meeting));
+  const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState("");
 
   // File counts load karo modal tab bar ke liye
   useEffect(() => {
@@ -2241,13 +2297,83 @@ function MeetingDetailModal({ meeting, onClose }) {
     return () => { mounted = false; };
   }, [meeting]);
 
+  useEffect(() => {
+    setIsEditing(false);
+    setEditForm(buildEditForm(meeting));
+    setSaveError("");
+  }, [meeting]);
+
   function handleClose() {
     setIsClosing(true);
     setTimeout(onClose, 240); // animation ke baad close karo
   }
 
+  async function handleSaveEdit() {
+    const kind = getItemKind(meeting);
+    const startsAt = buildIsoFromLocalParts(editForm.meetingDate, editForm.startTime);
+    if (!startsAt || Number.isNaN(new Date(startsAt).getTime())) {
+      setSaveError("Choose a valid date and time.");
+      return;
+    }
+    const endsAt = kind === "complaint"
+      ? new Date(new Date(startsAt).getTime() + 30 * 60 * 1000).toISOString()
+      : buildIsoFromLocalParts(editForm.meetingDate, editForm.endTime);
+    if (!endsAt || Number.isNaN(new Date(endsAt).getTime())) {
+      setSaveError("Choose a valid end time.");
+      return;
+    }
+    if (new Date(endsAt).getTime() <= new Date(startsAt).getTime()) {
+      setSaveError("End time must be after start time.");
+      return;
+    }
+    if (kind === "meeting" && !editForm.location.trim()) {
+      setSaveError("Location is required.");
+      return;
+    }
+    if (kind === "meeting" && !meeting.ministerId) {
+      setSaveError("Minister is missing for this meeting.");
+      return;
+    }
+
+    setSaving(true);
+    setSaveError("");
+    try {
+      if (kind === "complaint") {
+        await apiClient.patch(`/complaints/${meeting.sourceId}/schedule-call`, {
+          callScheduledAt: startsAt,
+        });
+      } else {
+        await apiClient.patch(`/meetings/${meeting.sourceId}/schedule`, {
+          ministerId: meeting.ministerId,
+          startsAt,
+          endsAt,
+          location: editForm.location.trim(),
+          isVip: editForm.isVip,
+          comments: editForm.details,
+        });
+      }
+
+      const updated = {
+        ...meeting,
+        startsAt,
+        endsAt,
+        location: kind === "complaint" ? meeting.location : editForm.location.trim(),
+        details: kind === "complaint" ? meeting.details : editForm.details,
+        isVip: kind === "complaint" ? meeting.isVip : editForm.isVip,
+      };
+      onUpdated?.(updated);
+      setIsEditing(false);
+    } catch (error) {
+      setSaveError(error?.response?.data?.error || "Unable to save calendar changes.");
+    } finally {
+      setSaving(false);
+    }
+  }
+
   if (!meeting) return null;
-  const tone = meeting.isVip ? C.warn : C.purple;
+  const tone = getItemTone(meeting, C);
+  const kind = getItemKind(meeting);
+  const canEditMeeting = canEdit && (kind === "meeting" || kind === "complaint");
 
   // Tab ke liye count — details ka null
   function getTabCount(id) {
@@ -2321,16 +2447,41 @@ function MeetingDetailModal({ meeting, onClose }) {
                   </span>
                 </div>
               </div>
-              <button
-                type="button"
-                onClick={handleClose}
-                style={{ width: 32, height: 32, borderRadius: 8, border: `1px solid ${C.border}`, background: C.card, color: C.t2, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, transition: "all 0.15s ease" }}
-                onMouseEnter={(e) => { e.currentTarget.style.borderColor = C.danger; e.currentTarget.style.color = C.danger; }}
-                onMouseLeave={(e) => { e.currentTarget.style.borderColor = C.border; e.currentTarget.style.color = C.t2; }}
-                aria-label="Close"
-              >
-                <X size={16} />
-              </button>
+              <div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
+                {canEditMeeting && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsEditing((current) => !current);
+                      setActiveTab("details");
+                      setSaveError("");
+                    }}
+                    style={{
+                      height: 32,
+                      padding: "0 12px",
+                      borderRadius: 8,
+                      border: `1px solid ${tone}40`,
+                      background: isEditing ? `${tone}14` : C.card,
+                      color: tone,
+                      cursor: "pointer",
+                      fontSize: 12,
+                      fontWeight: 700,
+                    }}
+                  >
+                    {isEditing ? "Cancel Edit" : "Edit"}
+                  </button>
+                )}
+                <button
+                  type="button"
+                  onClick={handleClose}
+                  style={{ width: 32, height: 32, borderRadius: 8, border: `1px solid ${C.border}`, background: C.card, color: C.t2, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, transition: "all 0.15s ease" }}
+                  onMouseEnter={(e) => { e.currentTarget.style.borderColor = C.danger; e.currentTarget.style.color = C.danger; }}
+                  onMouseLeave={(e) => { e.currentTarget.style.borderColor = C.border; e.currentTarget.style.color = C.t2; }}
+                  aria-label="Close"
+                >
+                  <X size={16} />
+                </button>
+              </div>
             </div>
 
             {/* ── Tabs — SIRF EK BAR, counts ke saath ── */}
@@ -2375,6 +2526,115 @@ function MeetingDetailModal({ meeting, onClose }) {
             {/* Details */}
             {activeTab === "details" && (
               <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
+                {isEditing && canEditMeeting && (
+                  <div style={{ padding: 16, borderRadius: 12, background: `${tone}08`, border: `1px solid ${tone}25`, display: "grid", gap: 14 }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12 }}>
+                      <div>
+                        <div style={{ fontSize: 11, fontWeight: 800, color: tone, textTransform: "uppercase", letterSpacing: ".08em" }}>
+                          Admin Edit
+                        </div>
+                        <div style={{ marginTop: 4, fontSize: 12, color: C.t3 }}>
+                          Saved changes update the shared calendar data seen by admin and minister.
+                        </div>
+                      </div>
+                    </div>
+
+                    <div style={{ display: "grid", gridTemplateColumns: kind === "complaint" ? "1fr 1fr" : "1fr 1fr 1fr", gap: 12 }}>
+                      <label style={{ display: "grid", gap: 6 }}>
+                        <span style={{ fontSize: 11, fontWeight: 700, color: C.t3, textTransform: "uppercase", letterSpacing: ".06em" }}>Date</span>
+                        <input
+                          type="date"
+                          value={editForm.meetingDate}
+                          onChange={(event) => setEditForm((current) => ({ ...current, meetingDate: event.target.value }))}
+                          style={{ border: `1px solid ${C.border}`, borderRadius: 8, background: C.card, color: C.t1, padding: "9px 10px", fontSize: 13, outline: "none" }}
+                        />
+                      </label>
+                      <label style={{ display: "grid", gap: 6 }}>
+                        <span style={{ fontSize: 11, fontWeight: 700, color: C.t3, textTransform: "uppercase", letterSpacing: ".06em" }}>Start</span>
+                        <input
+                          type="time"
+                          value={editForm.startTime}
+                          onChange={(event) => setEditForm((current) => ({ ...current, startTime: event.target.value }))}
+                          style={{ border: `1px solid ${C.border}`, borderRadius: 8, background: C.card, color: C.t1, padding: "9px 10px", fontSize: 13, outline: "none" }}
+                        />
+                      </label>
+                      {kind === "meeting" && (
+                        <label style={{ display: "grid", gap: 6 }}>
+                          <span style={{ fontSize: 11, fontWeight: 700, color: C.t3, textTransform: "uppercase", letterSpacing: ".06em" }}>End</span>
+                          <input
+                            type="time"
+                            value={editForm.endTime}
+                            onChange={(event) => setEditForm((current) => ({ ...current, endTime: event.target.value }))}
+                            style={{ border: `1px solid ${C.border}`, borderRadius: 8, background: C.card, color: C.t1, padding: "9px 10px", fontSize: 13, outline: "none" }}
+                          />
+                        </label>
+                      )}
+                    </div>
+
+                    {kind === "meeting" && (
+                      <>
+                        <label style={{ display: "grid", gap: 6 }}>
+                          <span style={{ fontSize: 11, fontWeight: 700, color: C.t3, textTransform: "uppercase", letterSpacing: ".06em" }}>Location</span>
+                          <input
+                            type="text"
+                            value={editForm.location}
+                            onChange={(event) => setEditForm((current) => ({ ...current, location: event.target.value }))}
+                            placeholder="Meeting location"
+                            style={{ border: `1px solid ${C.border}`, borderRadius: 8, background: C.card, color: C.t1, padding: "9px 10px", fontSize: 13, outline: "none" }}
+                          />
+                        </label>
+                        <label style={{ display: "grid", gap: 6 }}>
+                          <span style={{ fontSize: 11, fontWeight: 700, color: C.t3, textTransform: "uppercase", letterSpacing: ".06em" }}>Comments</span>
+                          <textarea
+                            rows={3}
+                            value={editForm.details}
+                            onChange={(event) => setEditForm((current) => ({ ...current, details: event.target.value }))}
+                            placeholder="Admin comments"
+                            style={{ border: `1px solid ${C.border}`, borderRadius: 8, background: C.card, color: C.t1, padding: "9px 10px", fontSize: 13, outline: "none", resize: "vertical" }}
+                          />
+                        </label>
+                        <label style={{ display: "inline-flex", alignItems: "center", gap: 8, fontSize: 13, color: C.t2, fontWeight: 600 }}>
+                          <input
+                            type="checkbox"
+                            checked={editForm.isVip}
+                            onChange={(event) => setEditForm((current) => ({ ...current, isVip: event.target.checked }))}
+                          />
+                          Mark as VIP meeting
+                        </label>
+                      </>
+                    )}
+
+                    {saveError && (
+                      <div style={{ padding: "10px 12px", borderRadius: 8, background: `${C.danger}10`, color: C.danger, fontSize: 12, fontWeight: 600 }}>
+                        {saveError}
+                      </div>
+                    )}
+
+                    <div style={{ display: "flex", justifyContent: "flex-end", gap: 10 }}>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setIsEditing(false);
+                          setEditForm(buildEditForm(meeting));
+                          setSaveError("");
+                        }}
+                        disabled={saving}
+                        style={{ padding: "9px 14px", borderRadius: 8, border: `1px solid ${C.border}`, background: C.card, color: C.t2, cursor: saving ? "not-allowed" : "pointer", fontSize: 13, fontWeight: 700 }}
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        type="button"
+                        onClick={handleSaveEdit}
+                        disabled={saving}
+                        style={{ padding: "9px 14px", borderRadius: 8, border: `1px solid ${tone}`, background: tone, color: "#fff", cursor: saving ? "not-allowed" : "pointer", fontSize: 13, fontWeight: 800 }}
+                      >
+                        {saving ? "Saving..." : "Save Changes"}
+                      </button>
+                    </div>
+                  </div>
+                )}
+
                 <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 16 }}>
                   <div style={{ padding: 16, borderRadius: 10, background: C.bgElevated, border: `1px solid ${C.border}` }}>
                     <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
@@ -2441,6 +2701,7 @@ function MeetingDetailModal({ meeting, onClose }) {
 export default function MinisterCalendar() {
   const { C } = usePortalTheme();
   const { session } = useAuth();
+  const calendarEndpoint = session?.role === "admin" ? "/admin/calendar" : "/minister/calendar";
 
   // Data
   const [items, setItems] = useState([]);
@@ -2460,19 +2721,20 @@ export default function MinisterCalendar() {
 
     async function loadCalendar() {
       try {
-        const { data } = await apiClient.get("/minister/calendar");
+        const { data } = await apiClient.get(calendarEndpoint);
         const mapped = (data.events || []).map((event) => ({
           id: event.id,
-          sourceId: event.meeting_id || event.id,
+          sourceId: event.source_id || event.meeting_id || event.id,
           title: event.title,
           details: event.comments || "",
           startsAt: event.starts_at,
           endsAt: event.ends_at,
           location: event.location,
-          source: event.meeting_id ? (event.is_vip ? "Minister Priority" : "Minister Calendar") : "DEO Event",
+          source: event.source_label || (event.meeting_id ? "Citizen Meeting Workflow" : "DEO Event"),
           participants: event.participants || [],
-          kind: event.meeting_id ? "meeting" : "event",
+          kind: event.calendar_kind === "complaint_meeting" ? "complaint" : event.meeting_id ? "meeting" : "event",
           isVip: Boolean(event.is_vip),
+          ministerId: event.minister_id || "",
           whoToMeet: event.who_to_meet || "",
         }));
         if (mounted) {
@@ -2496,7 +2758,7 @@ export default function MinisterCalendar() {
     }
 
     return () => { mounted = false; };
-  }, [session?.role]);
+  }, [calendarEndpoint, session?.role]);
 
   // ── Derived state ──────────────────────────────────────────────────────────
 
@@ -2605,6 +2867,11 @@ export default function MinisterCalendar() {
     setSelectedMeeting(null);
   }
 
+  function handleMeetingUpdated(updatedMeeting) {
+    setItems((current) => current.map((item) => (item.id === updatedMeeting.id ? updatedMeeting : item)));
+    setSelectedMeeting(updatedMeeting);
+  }
+
   function handleCloseDayDrawer() {
     setSelectedDate(null);
     setSelectedMeeting(null);
@@ -2616,16 +2883,21 @@ export default function MinisterCalendar() {
   // ── Render ─────────────────────────────────────────────────────────────────
 
   return (
-    <WorkspacePage width={1320}>
+    <WorkspacePage
+      width={1320}
+      outerStyle={{ height: "100%", minHeight: 0, overflow: "hidden" }}
+      bodyStyle={{ height: "100%", padding: 16, boxSizing: "border-box" }}
+      contentStyle={{ height: "100%", minHeight: 0 }}
+    >
 
       {loading ? (
         <WorkspaceEmptyState title="Loading calendar…" />
       ) : error ? (
         <WorkspaceCard style={{ color: C.danger }}>{error}</WorkspaceCard>
       ) : (
-        <div>
+        <div style={{ height: "100%", minHeight: 0 }}>
           {/* Main Grid: Drawer, Calendar & Right Panel */}
-          <div style={{ display: "flex", gap: 24, alignItems: "stretch", height: "calc(100vh - 120px)" }}>
+          <div style={{ display: "flex", gap: 16, alignItems: "stretch", height: "100%", minHeight: 0 }}>
             
             {/* Schedule Panel - Separate div outside calendar */}
             <div 
@@ -2939,7 +3211,7 @@ export default function MinisterCalendar() {
                 <div style={{ display: "grid", gap: 10 }}>
                   {dayItems.length ? (
                     dayItems.map((item) => {
-                      const tone = item.isVip ? C.warn : C.purple;
+                      const tone = getItemTone(item, C);
                       return (
                         <button
                           key={item.id}
@@ -2976,7 +3248,7 @@ export default function MinisterCalendar() {
                               </div>
                             </div>
                             <WorkspaceBadge color={tone}>
-                              {getItemKind(item) === "event" ? "Event" : item.isVip ? "VIP" : "Standard"}
+                              {getItemBadgeLabel(item)}
                             </WorkspaceBadge>
                           </div>
                         </button>
@@ -3012,7 +3284,7 @@ export default function MinisterCalendar() {
                 ) : (
                   <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
                     {nextTwoMeetings.map((item) => {
-                      const tone = item.isVip ? C.warn : C.purple;
+                      const tone = getItemTone(item, C);
                       return (
                         <button
                           key={item.id}
@@ -3070,6 +3342,8 @@ export default function MinisterCalendar() {
       {selectedMeeting && (
         <MeetingDetailModal
           meeting={selectedMeeting}
+          canEdit={session?.role === "admin"}
+          onUpdated={handleMeetingUpdated}
           onClose={handleCloseMeetingDetail}
         />
       )}

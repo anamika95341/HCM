@@ -58,7 +58,7 @@ async function findFileRecordById(fileId) {
 
 async function listFilesVisibleToRole(visibleToRole, filters = {}) {
   const values = [visibleToRole];
-  const where = ['visible_to_role = $1'];
+  const where = [Array.isArray(visibleToRole) ? 'visible_to_role = ANY($1)' : 'visible_to_role = $1'];
   let index = 2;
 
   if (filters.contextType) {

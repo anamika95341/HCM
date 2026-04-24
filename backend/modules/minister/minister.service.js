@@ -1,10 +1,18 @@
 const redis = require('../../config/redis');
 const ministerRepository = require('./minister.repository');
+const complaintsRepository = require('../complaints/complaints.repository');
 const meetingsRepository = require('../meetings/meetings.repository');
 const filesService = require('../files/files.service');
 
 async function getCalendar(ministerId) {
-  return ministerRepository.getCalendar(ministerId);
+  const [ministerCalendarEvents, complaintCalendarEvents] = await Promise.all([
+    ministerRepository.getCalendar(ministerId),
+    complaintsRepository.listScheduledComplaintCalendarEvents(),
+  ]);
+
+  return [...ministerCalendarEvents, ...complaintCalendarEvents].sort(
+    (left, right) => new Date(left.starts_at).getTime() - new Date(right.starts_at).getTime()
+  );
 }
 
 function cacheKey(meetingId) {

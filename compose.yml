@@ -1,188 +1,169 @@
-services:
-  nginx:
-    image: nginx:1.27-alpine
-    ports:
-      - "80:80"
-    volumes:
-      - ./backend/nginx/nginx.conf:/etc/nginx/nginx.conf:ro
-    depends_on:
-      frontend:
-        condition: service_healthy
-      backend:
-        condition: service_healthy
-    healthcheck:
-      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1/health || exit 1"]
-      interval: 30s
-      timeout: 5s
-      retries: 3
-    restart: unless-stopped
-    networks:
-      - frontend-backend-net
-      - backend-data-net
+x-backend-environment: &backend-environment
+  NODE_ENV: ${NODE_ENV:-development}
+  PORT: ${PORT:-3000}
+  RUN_MIGRATIONS: ${RUN_MIGRATIONS:-false}
+  COOKIE_SECURE: ${COOKIE_SECURE:-false}
+  FRONTEND_ORIGINS: ${FRONTEND_ORIGINS:-http://localhost:5173,http://localhost}
+  DATABASE_URL: ${DATABASE_URL:-postgresql://app_user:${DB_PASSWORD}@postgres:5432/citizen_portal}
+  DATABASE_SSL: ${DATABASE_SSL:-false}
+  DATABASE_SSL_REJECT_UNAUTHORIZED: ${DATABASE_SSL_REJECT_UNAUTHORIZED:-true}
+  REDIS_URL: ${REDIS_URL:-redis://:${REDIS_PASSWORD}@redis:6379}
+  JWT_ISSUER: ${JWT_ISSUER:-citizen-portal}
+  ACCESS_TOKEN_TTL: ${ACCESS_TOKEN_TTL:-15m}
+  REFRESH_TOKEN_TTL_DAYS: ${REFRESH_TOKEN_TTL_DAYS:-30}
+  JWT_PRIVATE_KEY: ${JWT_PRIVATE_KEY:-PASTE_PROD_RSA_PRIVATE_KEY}
+  JWT_PUBLIC_KEY: ${JWT_PUBLIC_KEY:-PASTE_PROD_RSA_PUBLIC_KEY}
+  JWT_CITIZEN_PRIVATE_KEY: ${JWT_CITIZEN_PRIVATE_KEY:-}
+  JWT_CITIZEN_PUBLIC_KEY: ${JWT_CITIZEN_PUBLIC_KEY:-}
+  JWT_MASTERADMIN_PRIVATE_KEY: ${JWT_MASTERADMIN_PRIVATE_KEY:-}
+  JWT_MASTERADMIN_PUBLIC_KEY: ${JWT_MASTERADMIN_PUBLIC_KEY:-}
+  JWT_ADMIN_PRIVATE_KEY: ${JWT_ADMIN_PRIVATE_KEY:-}
+  JWT_ADMIN_PUBLIC_KEY: ${JWT_ADMIN_PUBLIC_KEY:-}
+  JWT_DEO_PRIVATE_KEY: ${JWT_DEO_PRIVATE_KEY:-}
+  JWT_DEO_PUBLIC_KEY: ${JWT_DEO_PUBLIC_KEY:-}
+  JWT_MINISTER_PRIVATE_KEY: ${JWT_MINISTER_PRIVATE_KEY:-}
+  JWT_MINISTER_PUBLIC_KEY: ${JWT_MINISTER_PUBLIC_KEY:-}
+  AADHAAR_ENC_KEY: ${AADHAAR_ENC_KEY:-PASTE_64_HEX_CHARS}
+  RECAPTCHA_SECRET: ${RECAPTCHA_SECRET:-}
+  SMTP_HOST: ${SMTP_HOST:-}
+  SMTP_PORT: ${SMTP_PORT:-587}
+  SMTP_USER: ${SMTP_USER:-}
+  SMTP_PASSWORD: ${SMTP_PASSWORD:-}
+  SMTP_FROM: ${SMTP_FROM:-}
+  SMS_PROVIDER: ${SMS_PROVIDER:-mock}
+  UPLOAD_DIR: ${UPLOAD_DIR:-./uploads}
+  PRIVATE_FILE_BASE_URL: ${PRIVATE_FILE_BASE_URL:-}
+  STORAGE_MODE: ${STORAGE_MODE:-local}
+  S3_BUCKET: ${S3_BUCKET:-portal-private-files}
+  S3_SIGNED_URL_EXPIRY_SECONDS: ${S3_SIGNED_URL_EXPIRY_SECONDS:-90}
+  AWS_REGION: ${AWS_REGION:-ap-south-1}
+  AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID:-}
+  AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY:-}
+  S3_ENDPOINT: ${S3_ENDPOINT:-}
+  S3_PUBLIC_ENDPOINT: ${S3_PUBLIC_ENDPOINT:-}
+  S3_FORCE_PATH_STYLE: ${S3_FORCE_PATH_STYLE:-false}
+  MINIO_ROOT_USER: ${MINIO_ROOT_USER:-}
+  MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-}
+  REDIS_METRICS_TTL_SECONDS: ${REDIS_METRICS_TTL_SECONDS:-300}
+  ALERT_EMAIL_TO: ${ALERT_EMAIL_TO:-}
+  TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:-}
+  TELEGRAM_CHAT_ID: ${TELEGRAM_CHAT_ID:-}
+  CLAMAV_ENABLED: ${CLAMAV_ENABLED:-false}
+  ADMIN_MANUAL_UNLOCK_EMAIL: ${ADMIN_MANUAL_UNLOCK_EMAIL:-}
+  AUTH_STREAM_BATCH_SIZE: ${AUTH_STREAM_BATCH_SIZE:-25}
+  AUTH_STREAM_BLOCK_MS: ${AUTH_STREAM_BLOCK_MS:-5000}
+  AUTH_STREAM_POLL_INTERVAL_MS: ${AUTH_STREAM_POLL_INTERVAL_MS:-250}
+  AUTH_STREAM_CONCURRENCY: ${AUTH_STREAM_CONCURRENCY:-5}
+  AUTH_STREAM_MAX_RETRIES: ${AUTH_STREAM_MAX_RETRIES:-5}
+  AUTH_STREAM_CLAIM_IDLE_MS: ${AUTH_STREAM_CLAIM_IDLE_MS:-60000}
+  AUTH_STREAM_REPLAY_BATCH_SIZE: ${AUTH_STREAM_REPLAY_BATCH_SIZE:-100}
+  IDLE_TIMEOUT_SECONDS: ${IDLE_TIMEOUT_SECONDS:-1800}
+  MAX_SESSION_SECONDS: ${MAX_SESSION_SECONDS:-28800}
+  POOL_MAX_PER_WORKER: ${POOL_MAX_PER_WORKER:-5}
+  WS_HEARTBEAT_INTERVAL_MS: ${WS_HEARTBEAT_INTERVAL_MS:-30000}
 
+x-app-service: &app-service
+  restart: unless-stopped
+  security_opt:
+    - no-new-privileges:true
+
+services:
   frontend:
-    image: ${FRONTEND_IMAGE:-hcm-frontend:latest}
+    <<: *app-service
+    image: ${FRONTEND_IMAGE:-hcm-frontend:local}
     build:
       context: ./Frontend
       dockerfile: Dockerfile
       target: prod
       args:
         VITE_API_BASE_URL: ${VITE_API_BASE_URL:-/api/v1}
+    environment:
+      API_UPSTREAM: http://backend:3000
+      PORT: 5173
     depends_on:
       backend:
         condition: service_healthy
-    environment:
-      # Browser calls /api/v1 on the same origin; server.cjs forwards to the API container.
-      API_UPSTREAM: http://backend:3000
     healthcheck:
       test: ["CMD", "node", "-e", "fetch('http://localhost:5173').then((res)=>process.exit(res.ok?0:1)).catch(()=>process.exit(1))"]
       interval: 30s
       timeout: 5s
       retries: 5
-    restart: unless-stopped
     networks:
       - frontend-backend-net
 
   backend:
-    image: ${BACKEND_IMAGE:-hcm-backend:latest}
+    <<: *app-service
+    image: ${BACKEND_IMAGE:-hcm-backend:local}
     build:
       context: ./backend
       dockerfile: Dockerfile
       target: runner
-    env_file:
-      - ./backend/.env
     environment:
-      NODE_ENV: production
-      PORT: 3000
-      COOKIE_SECURE: "false"
-      RUN_MIGRATIONS: "true"
-      FRONTEND_ORIGINS: ${FRONTEND_ORIGINS:-}
-      DATABASE_URL: postgresql://app_user:${DB_PASSWORD:-change_me}@postgres:5432/citizen_portal
-      REDIS_URL: redis://:${REDIS_PASSWORD:-change_me}@redis:6379
-      STORAGE_MODE: ${STORAGE_MODE:-local}
-      S3_BUCKET: ${S3_BUCKET:-portal-private-files}
-      S3_SIGNED_URL_EXPIRY_SECONDS: ${S3_SIGNED_URL_EXPIRY_SECONDS:-90}
-      AWS_REGION: ${AWS_REGION:-ap-south-1}
-      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID:-}
-      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY:-}
-      S3_ENDPOINT: ${S3_ENDPOINT:-http://minio:9000}
-      S3_PUBLIC_ENDPOINT: ${S3_PUBLIC_ENDPOINT:-}
-      S3_FORCE_PATH_STYLE: ${S3_FORCE_PATH_STYLE:-true}
-      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-admin}
-      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-password}
+      <<: *backend-environment
     volumes:
       - uploads-data:/app/uploads
     depends_on:
       postgres:
         condition: service_healthy
       redis:
-        condition: service_healthy
-      minio:
         condition: service_healthy
     healthcheck:
       test: ["CMD", "node", "-e", "fetch('http://localhost:3000/health').then((res)=>process.exit(res.ok?0:1)).catch(()=>process.exit(1))"]
       interval: 30s
       timeout: 5s
       retries: 5
-    restart: unless-stopped
     networks:
       - frontend-backend-net
       - backend-data-net
 
   worker:
-    image: ${JOB_WORKER_IMAGE:-hcm-job-worker:latest}
+    <<: *app-service
+    image: ${JOB_WORKER_IMAGE:-hcm-job-worker:local}
     build:
       context: ./backend
       dockerfile: Dockerfile
       target: runner
-    env_file:
-      - ./backend/.env
-    environment:
-      NODE_ENV: production
-      RUN_MIGRATIONS: "false"
-      DATABASE_URL: postgresql://app_user:${DB_PASSWORD:-change_me}@postgres:5432/citizen_portal
-      REDIS_URL: redis://:${REDIS_PASSWORD:-change_me}@redis:6379
-      SMS_PROVIDER: ${SMS_PROVIDER:-mock}
     command: ["npm", "run", "worker:jobs"]
+    environment:
+      <<: *backend-environment
+      RUN_MIGRATIONS: "false"
+    volumes:
+      - uploads-data:/app/uploads
     depends_on:
       redis:
         condition: service_healthy
-    healthcheck:
-      test: ["CMD", "node", "-e", "process.exit(0)"]
-      interval: 30s
-      timeout: 5s
-      retries: 3
-    restart: unless-stopped
     networks:
       - backend-data-net
 
   auth-stream-worker:
-    image: ${AUTH_STREAM_WORKER_IMAGE:-hcm-auth-stream-worker:latest}
+    <<: *app-service
+    image: ${AUTH_STREAM_WORKER_IMAGE:-hcm-auth-stream-worker:local}
     build:
       context: ./backend
       dockerfile: Dockerfile
       target: runner
-    env_file:
-      - ./backend/.env
+    command: ["npm", "run", "worker:auth-stream"]
     environment:
-      NODE_ENV: production
+      <<: *backend-environment
       RUN_MIGRATIONS: "false"
-      DATABASE_URL: postgresql://app_user:${DB_PASSWORD:-change_me}@postgres:5432/citizen_portal
-      REDIS_URL: redis://:${REDIS_PASSWORD:-change_me}@redis:6379
-      STORAGE_MODE: ${STORAGE_MODE:-local}
-      S3_BUCKET: ${S3_BUCKET:-portal-private-files}
-      S3_SIGNED_URL_EXPIRY_SECONDS: ${S3_SIGNED_URL_EXPIRY_SECONDS:-90}
-      AWS_REGION: ${AWS_REGION:-ap-south-1}
-      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID:-}
-      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY:-}
-      S3_ENDPOINT: ${S3_ENDPOINT:-http://minio:9000}
-      S3_PUBLIC_ENDPOINT: ${S3_PUBLIC_ENDPOINT:-}
-      S3_FORCE_PATH_STYLE: ${S3_FORCE_PATH_STYLE:-true}
-      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-admin}
-      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-password}
     volumes:
       - uploads-data:/app/uploads
-    command: ["npm", "run", "worker:auth-stream"]
     depends_on:
       postgres:
         condition: service_healthy
       redis:
         condition: service_healthy
-      minio:
-        condition: service_healthy
-    healthcheck:
-      test: ["CMD", "node", "-e", "process.exit(0)"]
-      interval: 30s
-      timeout: 5s
-      retries: 3
-    restart: unless-stopped
-    networks:
-      - backend-data-net
-
-  minio:
-    image: quay.io/minio/minio:latest
-    command: server /data --console-address ":9001"
-    environment:
-      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-admin}
-      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-password}
-    volumes:
-      - minio-data:/data
-    healthcheck:
-      test: ["CMD-SHELL", "curl -fsS http://localhost:9000/minio/health/live >/dev/null || exit 1"]
-      interval: 20s
-      timeout: 5s
-      retries: 5
-    restart: unless-stopped
     networks:
       - backend-data-net
 
   postgres:
     image: postgres:16-alpine
+    restart: unless-stopped
     environment:
       POSTGRES_DB: citizen_portal
       POSTGRES_USER: app_user
-      POSTGRES_PASSWORD: ${DB_PASSWORD:-change_me}
-    command: ["postgres", "-c", "max_connections=50", "-c", "shared_buffers=64MB", "-c", "effective_cache_size=128MB", "-c", "work_mem=4MB", "-c", "shared_preload_libraries=pg_stat_statements"]
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+    command: ["postgres", "-c", "max_connections=50", "-c", "shared_buffers=128MB", "-c", "effective_cache_size=256MB", "-c", "work_mem=4MB", "-c", "shared_preload_libraries=pg_stat_statements"]
     volumes:
       - postgres-data:/var/lib/postgresql/data
       - ./backend/db/postgres/migrations:/docker-entrypoint-initdb.d:ro
@@ -191,35 +172,31 @@ services:
       interval: 20s
       timeout: 5s
       retries: 5
-    restart: unless-stopped
     networks:
       - backend-data-net
 
   redis:
     image: redis:7-alpine
-    command: ["redis-server", "--appendonly", "yes", "--requirepass", "${REDIS_PASSWORD:-change_me}", "--maxmemory", "64mb", "--maxmemory-policy", "noeviction", "--bind", "0.0.0.0"]
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes", "--requirepass", "${REDIS_PASSWORD}", "--maxmemory", "128mb", "--maxmemory-policy", "noeviction", "--bind", "0.0.0.0"]
     volumes:
       - redis-data:/data
     healthcheck:
-      test: ["CMD-SHELL", "redis-cli -a ${REDIS_PASSWORD:-change_me} ping"]
+      test: ["CMD-SHELL", "redis-cli -a ${REDIS_PASSWORD} ping"]
       interval: 20s
       timeout: 5s
       retries: 5
-    restart: unless-stopped
     networks:
       - backend-data-net
 
 networks:
   frontend-backend-net:
     driver: bridge
-    name: hcm-frontend-backend
   backend-data-net:
     driver: bridge
     internal: true
-    name: hcm-backend-data
 
 volumes:
   postgres-data:
   redis-data:
   uploads-data:
-  minio-data:

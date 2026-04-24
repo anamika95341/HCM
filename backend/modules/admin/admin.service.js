@@ -1,8 +1,7 @@
 const adminRepository = require('./admin.repository');
 const meetingsRepository = require('../meetings/meetings.repository');
 const complaintsRepository = require('../complaints/complaints.repository');
-const authRepository = require('../auth/auth.repository');
-const createHttpError = require('http-errors');
+const ministerRepository = require('../minister/minister.repository');
 
 async function getDashboard() {
   return adminRepository.getDashboard();
@@ -48,4 +47,15 @@ async function listDeos() {
   };
 }
 
-module.exports = { getDashboard, getWorkQueue, getWorkflowDirectory, listDeos };
+async function getCalendar() {
+  const [ministerCalendarEvents, complaintCalendarEvents] = await Promise.all([
+    ministerRepository.getAllCalendarEvents(),
+    complaintsRepository.listScheduledComplaintCalendarEvents(),
+  ]);
+
+  return [...ministerCalendarEvents, ...complaintCalendarEvents].sort(
+    (left, right) => new Date(left.starts_at).getTime() - new Date(right.starts_at).getTime()
+  );
+}
+
+module.exports = { getDashboard, getWorkQueue, getWorkflowDirectory, listDeos, getCalendar };

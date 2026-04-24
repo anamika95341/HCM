@@ -1,24 +1,32 @@
 const fs = require('fs');
 const path = require('path');
 const dotenv = require('dotenv');
-const { getDevSecretOrEnv } = require('./devSecrets');
+const { getDevSecretOrEnv, isPlaceholder } = require('./devSecrets');
 
-const envPath = path.join(process.cwd(), '.env');
-if (fs.existsSync(envPath)) {
+const envCandidates = [
+  process.env.ENV_FILE,
+  path.join(process.cwd(), '.env'),
+  path.join(process.cwd(), '..', '.env'),
+].filter(Boolean);
+
+const envPath = envCandidates.find((candidate) => fs.existsSync(candidate));
+if (envPath) {
   dotenv.config({ path: envPath });
-} else {
-  dotenv.config();
 }
 
 const requiredInProduction = [
   'DATABASE_URL',
   'REDIS_URL',
   'AADHAAR_ENC_KEY',
+  'JWT_PRIVATE_KEY',
+  'JWT_PUBLIC_KEY',
+  'FRONTEND_ORIGINS',
+  'S3_BUCKET',
 ];
 
 if (process.env.NODE_ENV === 'production') {
   for (const key of requiredInProduction) {
-    if (!process.env[key]) {
+    if (!process.env[key] || isPlaceholder(process.env[key])) {
       throw new Error(`Missing required environment variable: ${key}`);
     }
   }

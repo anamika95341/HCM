@@ -485,24 +485,35 @@ async function canMinisterAccessFile(file, ministerId) {
   return true;
 }
 
+function isCitizenVisibleFile(file) {
+  return file.visible_to_role === 'admin' && file.uploader_role === 'citizen';
+}
+
+function isDeoVisibleCalendarFile(file) {
+  return file.visible_to_role === 'minister'
+    && file.uploader_role === 'deo'
+    && ['meeting', 'event'].includes(file.context_type);
+}
+
 async function assertFileViewerAccess(file, actorRole, actorId) {
   assertViewerRole(actorRole);
 
   if (actorRole === 'admin') {
-    if (file.visible_to_role !== 'admin' || file.uploader_role !== 'citizen') {
-      throw createHttpError(404, 'File not found');
+    if (isCitizenVisibleFile(file) || isDeoVisibleCalendarFile(file)) {
+      return;
     }
-    return;
+    throw createHttpError(404, 'File not found');
   }
 
   if (actorRole === 'minister') {
-    if (file.visible_to_role !== 'minister' || file.uploader_role !== 'deo') {
+    if (isCitizenVisibleFile(file)) {
+      return;
+    }
+    if (!isDeoVisibleCalendarFile(file)) {
       throw createHttpError(404, 'File not found');
     }
     const allowed = await canMinisterAccessFile(file, actorId);
-    if (!allowed) {
-      throw createHttpError(404, 'File not found');
-    }
+    if (!allowed) throw createHttpError(404, 'File not found');
     return;
   }
 
@@ -536,7 +547,10 @@ function assertOwnedFileAccess(file, actorRole, actorId) {
 async function listFiles({ actorRole, actorId, query = {} }) {
   assertViewerRole(actorRole);
 
-  const files = await filesRepository.listFilesVisibleToRole(actorRole, query);
+  const visibleToRoles = actorRole === 'admin' || actorRole === 'minister'
+    ? ['admin', 'minister']
+    : [actorRole];
+  const files = await filesRepository.listFilesVisibleToRole(visibleToRoles, query);
   const visibleFiles = [];
 
   for (const file of files) {

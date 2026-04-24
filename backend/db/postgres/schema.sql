@@ -429,7 +429,7 @@ CREATE INDEX IF NOT EXISTS idx_audit_logs_entity ON audit_logs (entity_type, ent
 DO $$
 BEGIN
   IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'file_context_type') THEN
-    CREATE TYPE file_context_type AS ENUM ('meeting', 'event', 'general');
+    CREATE TYPE file_context_type AS ENUM ('meeting', 'complaint', 'event', 'general');
   END IF;
 
   IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'file_status_type') THEN

@@ -45,15 +45,11 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Prepare backend env files for compose validation
-        run: |
-          cp backend/.env.example backend/.env
-          cp backend/.env.example backend/.env.localhost
       - name: Validate Compose files
         run: |
-          docker compose --env-file backend/.env.example -f compose.yml config >/dev/null
-          docker compose --env-file backend/.env.example -f compose.yml -f compose.dev.yml config >/dev/null
-          docker compose --env-file backend/.env.example -f backend/docker-compose.yml config >/dev/null
+          docker compose --env-file .env.example -f compose.yml config >/dev/null
+          docker compose --env-file .env.example -f compose.yml -f compose.dev.yml config >/dev/null
+          docker compose --env-file .env.example -f compose.yml -f compose.prod.yml config >/dev/null
       - name: Build production images
         run: |
           docker build -f backend/Dockerfile --target dev backend

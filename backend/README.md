@@ -11,35 +11,25 @@ Secure Node.js + Express backend for:
 ## Run locally
 
 ```bash
-cd backend
-npm install
-npm run migrate
-npm run seed
-npm test
 npm run dev
 ```
 
 ## Local object storage with MinIO
 
-Start MinIO:
+Local development uses the root `.env` file and Docker Compose:
 
 ```bash
-docker run -d \
-  -p 9000:9000 -p 9001:9001 \
-  -e "MINIO_ROOT_USER=admin" \
-  -e "MINIO_ROOT_PASSWORD=password" \
-  quay.io/minio/minio server /data --console-address ":9001"
+npm run dev
 ```
 
-Then use `backend/.env.localhost` with:
+This starts MinIO automatically with:
 
 - `STORAGE_MODE=local`
 - `S3_BUCKET=portal-private-files`
-- `S3_ENDPOINT=http://localhost:9000`
+- `S3_ENDPOINT=http://minio:9000`
 - `AWS_REGION=us-east-1`
 - `S3_FORCE_PATH_STYLE=true`
-- `MINIO_ROOT_USER=admin`
-- `MINIO_ROOT_PASSWORD=password`
+- `MINIO_ROOT_USER` and `MINIO_ROOT_PASSWORD` from root `.env`
 
 Console: `http://localhost:9001`
 

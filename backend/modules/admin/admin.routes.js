@@ -23,5 +23,6 @@ router.get('/dashboard', adminController.getDashboard);
 router.get('/work-queue', adminController.getWorkQueue);
 router.get('/workflow-directory', adminController.getWorkflowDirectory);
 router.get('/deos', adminController.listDeos);
+router.get('/calendar', adminController.getCalendar);
 
 module.exports = router;

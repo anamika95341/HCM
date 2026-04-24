@@ -17,7 +17,6 @@ const MeetingList = lazy(() => import("../modules/citizen/components/MeetingList
 const MeetingDetail = lazy(() => import("../modules/citizen/components/MeetingDetail.jsx"));
 const CaseDetailPage = lazy(() => import("../modules/citizen/components/CaseDetailPage.jsx"));
 const SettingsPage = lazy(() => import("../modules/settings/SettingsPage.jsx"));
-const Calendar = lazy(() => import("../modules/admin/components/Calendar.jsx"));
 const MinisterDashboard = lazy(() => import("../modules/minister/MinisterDashboard.jsx"));
 const MinisterCalendar = lazy(() => import("../modules/minister/MinisterCalendar.jsx"));
 const DeoCalendarEvent = lazy(() => import("../modules/deo/DeoCalendarEvent.jsx"));
@@ -92,8 +91,8 @@ export default function AppRoutes() {
             <Route path={PATHS.admin.workQueue} element={<AdminCases />} />
             <Route path={PATHS.admin.workQueueMeetingDetail} element={<AdminMeeting />} />
             <Route path={PATHS.admin.complaintQueue} element={<AdminComplaintQueue />} />
-            <Route path={PATHS.admin.calendar} element={<Calendar />} />
-            <Route path={PATHS.admin.legacyCalendar} element={<Calendar />} />
+            <Route path={PATHS.admin.calendar} element={<MinisterCalendar />} />
+            <Route path={PATHS.admin.legacyCalendar} element={<MinisterCalendar />} />
             <Route path={PATHS.admin.pool} element={<AdminCases />} />
             <Route path={PATHS.admin.legacyPool} element={<AdminCases />} />
             <Route path={PATHS.admin.cases} element={<AdminCases />} />

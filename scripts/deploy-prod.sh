@@ -2,21 +2,19 @@
 set -euo pipefail
 
 DEPLOY_ROOT="${1:-$(pwd)}"
-
 cd "${DEPLOY_ROOT}"
 
-test -f backend/.env || { echo "Missing ${DEPLOY_ROOT}/backend/.env"; exit 1; }
-
-docker compose --env-file backend/.env -f compose.yml down --remove-orphans || true
-docker builder prune -af || true
-docker image prune -af || true
-
-if [[ -n "${FRONTEND_IMAGE:-}" && -n "${BACKEND_IMAGE:-}" && -n "${AUTH_STREAM_WORKER_IMAGE:-}" ]]; then
-  docker compose --env-file backend/.env -f compose.yml pull frontend backend auth-stream-worker
-  docker compose --env-file backend/.env -f compose.yml up -d --remove-orphans
-else
-  docker compose --env-file backend/.env -f compose.yml up -d --build --remove-orphans
+if [[ ! -f .env ]]; then
+  echo "Missing ${DEPLOY_ROOT}/.env"
+  echo "Create it from .env.example on the EC2 host and fill production values before deploying."
+  exit 1
 fi
 
-docker compose --env-file backend/.env -f compose.yml exec -T backend npm run migrate
-docker compose --env-file backend/.env -f compose.yml ps
+if grep -q 'PASTE_' .env; then
+  echo "Refusing to deploy: ${DEPLOY_ROOT}/.env still contains PASTE_ placeholders."
+  exit 1
+fi
+
+docker compose --env-file .env -f compose.yml -f compose.prod.yml config >/dev/null
+docker compose --env-file .env -f compose.yml -f compose.prod.yml up -d --build --remove-orphans
+docker compose --env-file .env -f compose.yml -f compose.prod.yml ps

@@ -5,7 +5,6 @@ on:
   workflow_run:
     workflows:
       - CI
-      - Security
     branches:
       - main
     types:
@@ -13,132 +12,50 @@ on:
 
 permissions:
   contents: read
-  actions: read
-  packages: write
+
+concurrency:
+  group: production-deploy
+  cancel-in-progress: false
 
 jobs:
-  gate:
+  deploy:
     if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success'
     runs-on: ubuntu-latest
-    outputs:
-      ready: ${{ steps.check.outputs.ready }}
-      ref: ${{ steps.check.outputs.ref }}
-    steps:
-      - name: Check CI and Security status for this commit
-        id: check
-        uses: actions/github-script@v7
-        with:
-          script: |
-            if (context.eventName === 'workflow_dispatch') {
-              core.setOutput('ready', 'true');
-              core.setOutput('ref', context.sha);
-              return;
-            }
-
-            const headSha = context.payload.workflow_run.head_sha;
-            const owner = context.repo.owner;
-            const repo = context.repo.repo;
-            const { data } = await github.rest.actions.listWorkflowRunsForRepo({
-              owner,
-              repo,
-              head_sha: headSha,
-              per_page: 100,
-            });
-
-            const required = new Map([
-              ['CI', false],
-              ['Security', false],
-            ]);
-
-            for (const run of data.workflow_runs) {
-              if (required.has(run.name) && run.status === 'completed' && run.conclusion === 'success') {
-                required.set(run.name, true);
-              }
-            }
-
-            const ready = Array.from(required.values()).every(Boolean);
-            core.info(`Gate results: ${JSON.stringify(Object.fromEntries(required))}`);
-            core.setOutput('ready', ready ? 'true' : 'false');
-            core.setOutput('ref', headSha);
-
-  deploy:
-    needs: gate
-    if: needs.gate.outputs.ready == 'true'
-    runs-on: ubuntu-latest
     environment: production
-    env:
-      FRONTEND_IMAGE: ghcr.io/${{ github.repository_owner }}/hcm-frontend:${{ needs.gate.outputs.ref }}
-      BACKEND_IMAGE: ghcr.io/${{ github.repository_owner }}/hcm-backend:${{ needs.gate.outputs.ref }}
-      AUTH_STREAM_WORKER_IMAGE: ghcr.io/${{ github.repository_owner }}/hcm-auth-stream-worker:${{ needs.gate.outputs.ref }}
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: ${{ needs.gate.outputs.ref }}
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
 
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-
-      - name: Log in to GHCR
-        uses: docker/login-action@v3
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Build and push backend image
-        uses: docker/build-push-action@v6
-        with:
-          context: ./backend
-          file: ./backend/Dockerfile
-          target: runner
-          push: true
-          tags: ${{ env.BACKEND_IMAGE }}
-
-      - name: Build and push auth stream worker image
-        uses: docker/build-push-action@v6
-        with:
-          context: ./backend
-          file: ./backend/Dockerfile
-          target: runner
-          push: true
-          tags: ${{ env.AUTH_STREAM_WORKER_IMAGE }}
-
-      - name: Build and push frontend image
-        uses: docker/build-push-action@v6
-        with:
-          context: ./Frontend
-          file: ./Frontend/Dockerfile
-          target: prod
-          push: true
-          build-args: |
-            VITE_API_BASE_URL=/api/v1
-          tags: ${{ env.FRONTEND_IMAGE }}
-
-      - name: Set up SSH
+      - name: Start SSH agent
         uses: webfactory/ssh-agent@v0.9.0
         with:
-          ssh-private-key: ${{ secrets.PROD_SSH_PRIVATE_KEY }}
+          ssh-private-key: ${{ secrets.EC2_SSH_KEY }}
 
-      - name: Add host key
+      - name: Trust EC2 host key
         run: |
           mkdir -p ~/.ssh
-          ssh-keyscan -H "${{ secrets.PROD_SSH_HOST }}" >> ~/.ssh/known_hosts
+          ssh-keyscan -p "${{ secrets.EC2_SSH_PORT || '22' }}" -H "${{ secrets.EC2_HOST }}" >> ~/.ssh/known_hosts
 
-      - name: Sync repository
+      - name: Ensure app directory exists
+        run: |
+          ssh -p "${{ secrets.EC2_SSH_PORT || '22' }}" "${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }}" \
+            "mkdir -p '${{ secrets.EC2_APP_DIR }}'"
+
+      - name: Sync repository to EC2
         run: |
           rsync -az --delete \
+            -e "ssh -p ${{ secrets.EC2_SSH_PORT || '22' }}" \
             --exclude '.git' \
+            --exclude '.env' \
+            --exclude 'node_modules' \
             --exclude 'backend/node_modules' \
             --exclude 'Frontend/node_modules' \
-            --exclude 'backend/.env' \
-            ./ "${{ secrets.PROD_SSH_USER }}@${{ secrets.PROD_SSH_HOST }}:${{ secrets.PROD_DEPLOY_PATH }}/"
+            --exclude 'Frontend/dist' \
+            --exclude 'backend/uploads' \
+            ./ "${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }}:${{ secrets.EC2_APP_DIR }}/"
 
-      - name: Login to GHCR on EC2
+      - name: Deploy on EC2
         run: |
-          ssh "${{ secrets.PROD_SSH_USER }}@${{ secrets.PROD_SSH_HOST }}" \
-            "echo '${{ secrets.GITHUB_TOKEN }}' | docker login ghcr.io -u '${{ github.actor }}' --password-stdin"
-
-      - name: Deploy production stack
-        run: |
-          ssh "${{ secrets.PROD_SSH_USER }}@${{ secrets.PROD_SSH_HOST }}" \
-            "cd '${{ secrets.PROD_DEPLOY_PATH }}' && chmod +x scripts/deploy-prod.sh && FRONTEND_IMAGE='${{ env.FRONTEND_IMAGE }}' BACKEND_IMAGE='${{ env.BACKEND_IMAGE }}' AUTH_STREAM_WORKER_IMAGE='${{ env.AUTH_STREAM_WORKER_IMAGE }}' ./scripts/deploy-prod.sh '${{ secrets.PROD_DEPLOY_PATH }}'"
+          ssh -p "${{ secrets.EC2_SSH_PORT || '22' }}" "${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }}" \
+            "cd '${{ secrets.EC2_APP_DIR }}' && chmod +x scripts/deploy-prod.sh && ./scripts/deploy-prod.sh '${{ secrets.EC2_APP_DIR }}'"
