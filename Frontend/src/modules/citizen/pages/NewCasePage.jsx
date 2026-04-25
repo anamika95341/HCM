@@ -17,10 +17,12 @@ import { WorkspaceButton, WorkspaceCard, WorkspaceCardHeader, WorkspaceInput, Wo
 
 const FILE_UPLOAD_OPTIONS = {
   maxFiles: 5,
-  maxFileSizeBytes: 10 * 1024 * 1024,
+  maxFileSizeBytes: 5 * 1024 * 1024,
+  allowedExtensions: ["pdf", "png", "jpg", "jpeg"],
+  allowedMimeTypes: ["application/pdf", "image/png", "image/jpeg"],
 };
 
-const ACCEPTED_UPLOAD_TYPES = ".pdf,.png,.jpg,.jpeg,.webp,.xls,.xlsx,.doc,.docx,.txt";
+const ACCEPTED_UPLOAD_TYPES = ".pdf,.png,.jpg,.jpeg";
 
 function SuccessModal({ open, title, message, onClose }) {
   const { C } = usePortalTheme();
@@ -938,7 +940,7 @@ export default function HCMNewCasePage() {
     const { acceptedFiles, rejectedFiles } = sanitizeUploadedFiles(fileList, FILE_UPLOAD_OPTIONS);
 
     if (rejectedFiles.length > 0) {
-      setError("Some files were rejected. Allowed types: PDF, PNG, JPG, WEBP, XLS, XLSX, DOC, DOCX, TXT. Max 10 MB each.");
+      setError("Some files were rejected. Allowed types: PDF, PNG, JPG, JPEG. Max 5 MB each.");
     } else {
       setError("");
     }
