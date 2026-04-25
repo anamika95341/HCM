@@ -880,7 +880,7 @@ export default function HCMNewCasePage() {
       const { data } = await apiClient.post("/complaints", payload, {
         headers: {
           "Content-Type": "multipart/form-data",
-          "Idempotency-Key": crypto.randomUUID(),
+          "Idempotency-Key": createIdempotencyKey(),
         },
       });
 
@@ -923,7 +923,12 @@ export default function HCMNewCasePage() {
         files: [],
       });
     } catch (submissionError) {
-      setError(submissionError?.response?.data?.error || "Unable to submit the complaint");
+      const serverMessage = submissionError?.response?.data?.error;
+      const status = submissionError?.response?.status;
+      const fallbackMessage = status
+        ? `Unable to submit the complaint. Server returned ${status}.`
+        : "Unable to submit the complaint. Please check your network connection and try again.";
+      setError(serverMessage || fallbackMessage);
     } finally {
       setLoading(false);
     }
