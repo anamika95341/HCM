@@ -48,7 +48,7 @@ function createApp() {
         origin: true,
         credentials: true,
         methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'],
-        allowedHeaders: ['Content-Type', 'X-XSRF-TOKEN', 'X-Request-ID'],
+        allowedHeaders: ['Content-Type', 'X-XSRF-TOKEN', 'X-Request-ID', 'Idempotency-Key'],
       });
     }
 

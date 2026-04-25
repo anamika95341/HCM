@@ -635,6 +635,27 @@ const toIsoFromDateAndSlot = (dateString, timeSlot) => {
   return date.toISOString();
 };
 
+const createIdempotencyKey = () => {
+  if (globalThis.crypto?.randomUUID) {
+    return globalThis.crypto.randomUUID();
+  }
+
+  const bytes = new Uint8Array(16);
+  if (globalThis.crypto?.getRandomValues) {
+    globalThis.crypto.getRandomValues(bytes);
+  } else {
+    for (let index = 0; index < bytes.length; index += 1) {
+      bytes[index] = Math.floor(Math.random() * 256);
+    }
+  }
+
+  bytes[6] = (bytes[6] & 0x0f) | 0x40;
+  bytes[8] = (bytes[8] & 0x3f) | 0x80;
+
+  const hex = Array.from(bytes, (byte) => byte.toString(16).padStart(2, "0")).join("");
+  return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
+};
+
 export default function HCMNewCasePage() {
   const { C } = usePortalTheme();
   const complaintCategories = [
@@ -785,7 +806,7 @@ export default function HCMNewCasePage() {
       const { data } = await apiClient.post("/meetings/request", payload, {
         headers: {
           "Content-Type": "multipart/form-data",
-          "Idempotency-Key": crypto.randomUUID(),
+          "Idempotency-Key": createIdempotencyKey(),
         },
       });
 
@@ -832,7 +853,12 @@ export default function HCMNewCasePage() {
         companions: [{ name: "", phone: "" }],
       });
     } catch (submissionError) {
-      setError(submissionError?.response?.data?.error || "Unable to submit the meeting request");
+      const serverMessage = submissionError?.response?.data?.error;
+      const status = submissionError?.response?.status;
+      const fallbackMessage = status
+        ? `Unable to submit the meeting request. Server returned ${status}.`
+        : "Unable to submit the meeting request. Please check your network connection and try again.";
+      setError(serverMessage || fallbackMessage);
     } finally {
       setLoading(false);
     }

@@ -52,6 +52,8 @@ services:
       S3_ENDPOINT: ""
       S3_PUBLIC_ENDPOINT: ""
       S3_FORCE_PATH_STYLE: "false"
+    healthcheck:
+      disable: true
 
   auth-stream-worker:
     environment:
@@ -60,6 +62,8 @@ services:
       S3_ENDPOINT: ""
       S3_PUBLIC_ENDPOINT: ""
       S3_FORCE_PATH_STYLE: "false"
+    healthcheck:
+      disable: true
 
   postgres:
     ports: []
