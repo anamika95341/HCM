@@ -24,6 +24,25 @@ function formatActorRole(role) {
     .join(" ");
 }
 
+function formatCitizenDate(value) {
+  if (!value) return "";
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return "";
+  const day = String(parsed.getDate()).padStart(2, "0");
+  const month = String(parsed.getMonth() + 1).padStart(2, "0");
+  const year = String(parsed.getFullYear()).slice(-2);
+  return `${day}/${month}/${year}`;
+}
+
+function formatCitizenDateTime(value) {
+  if (!value) return "";
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return "";
+  const dateLabel = formatCitizenDate(parsed);
+  const timeLabel = parsed.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit", hour12: false });
+  return `${dateLabel} ${timeLabel}`;
+}
+
 function DetailBlock({ label, value, multiline = false, compact = false }) {
   const { C } = usePortalTheme();
   return (
@@ -172,10 +191,10 @@ export default function CaseDetailsPage() {
   const attachedFiles = getAttachedFiles(caseData);
   const hasUploadedDocument = attachedFiles.length > 0;
   const createdLabel = caseData.createdAt || caseData.created_at
-    ? new Date(caseData.createdAt || caseData.created_at).toLocaleDateString("en-GB")
+    ? formatCitizenDate(caseData.createdAt || caseData.created_at)
     : "Not provided";
   const incidentDateLabel = caseData.incidentDate
-    ? new Date(caseData.incidentDate).toLocaleDateString("en-IN", { dateStyle: "medium" })
+    ? formatCitizenDate(caseData.incidentDate)
     : "Not provided";
 
   return (
@@ -209,7 +228,7 @@ export default function CaseDetailsPage() {
                 }}
               >
                 <ChevronRight size={16} className="rotate-180" />
-                {isMeeting ? "Back to Meetings" : "Back to Complaints"}
+                Back
               </button>
             </div>
             <h2 style={{ fontSize: 20, fontWeight: 600, color: C.t1, margin: 0, textAlign: "center" }}>
@@ -351,7 +370,7 @@ export default function CaseDetailsPage() {
                                 <p className="portal-citizen-caption" style={{ color: C.t3, margin: 0, paddingRight: 10, whiteSpace: "normal", wordBreak: "break-word", textAlign: "right" }}>{formatActorRole(entry.actor_role)}</p>
                               </div>
                               {entry.note ? <p className="portal-citizen-value" style={{ color: C.t2, marginTop: 8, marginBottom: 0, whiteSpace: "normal", wordBreak: "break-word" }}>{entry.note}</p> : null}
-                              <p className="portal-citizen-caption" style={{ color: C.t3, marginTop: 8, marginBottom: 0 }}>{new Date(entry.created_at).toLocaleString("en-IN")}</p>
+                              <p className="portal-citizen-caption" style={{ color: C.t3, marginTop: 8, marginBottom: 0 }}>{formatCitizenDateTime(entry.created_at)}</p>
                             </div>
                           </div>
                         </div>

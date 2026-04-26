@@ -28,40 +28,39 @@ function Sidebar({ collapsed, onToggle }) {
               to: PATHS.admin.workQueue,
               icon: FiClipboard,
               label: "Work Pool",
-              activeMatch: (location) => {
+              activeMatch: (location, isActive) => {
                 const currentTab = new URLSearchParams(location.search).get("tab");
-                return !currentTab || currentTab === "complaint-pool" || currentTab === "meeting-pool";
+                return isActive && (!currentTab || currentTab === "complaint-pool" || currentTab === "meeting-pool");
               },
             },
             {
               to: PATHS.admin.meetings,
               icon: RiTeamLine,
               label: "My Meetings",
-              activeMatch: (location) => {
-                const source = new URLSearchParams(location.search).get("source");
-                return source !== "completed-meetings";
+              activeMatch: (location, isActive) => {
+                return isActive && location.pathname === PATHS.admin.meetings;
               },
             },
             { to: PATHS.admin.complaintQueue, icon: FiFileText, label: "My Complaints" },
             {
               to: `${PATHS.admin.workQueue}?tab=escalated`,
               icon: RiAlarmWarningLine,
-              label: "Escalated Cases",
-              activeMatch: (location) => new URLSearchParams(location.search).get("tab") === "escalated",
+              label: "Reassigned Cases",
+              activeMatch: (location, isActive) => isActive && new URLSearchParams(location.search).get("tab") === "escalated",
             },
             {
               to: `${PATHS.admin.workQueue}?tab=resolved-complaints`,
               icon: FiCheckCircle,
-              label: "Resolved Complaints",
-              activeMatch: (location) => new URLSearchParams(location.search).get("tab") === "resolved-complaints",
+              label: "Resolved Cases",
+              activeMatch: (location, isActive) => isActive && new URLSearchParams(location.search).get("tab") === "resolved-complaints",
             },
             {
               to: `${PATHS.admin.workQueue}?tab=completed-meetings`,
               icon: RiCheckboxCircleLine,
               label: "Completed Meetings",
-              activeMatch: (location) => {
+              activeMatch: (location, isActive) => {
                 const params = new URLSearchParams(location.search);
-                return params.get("tab") === "completed-meetings" || params.get("source") === "completed-meetings";
+                return isActive && params.get("tab") === "completed-meetings";
               },
             },
             { to: PATHS.admin.calendar, icon: FiCalendar, label: "Calendar" },

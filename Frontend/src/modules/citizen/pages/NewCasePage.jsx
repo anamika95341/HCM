@@ -587,11 +587,10 @@ const formatDateValue = (date) => {
 const formatDisplayDate = (value) => {
   const parsedDate = parseDateValue(value);
   if (!parsedDate) return "";
-  return parsedDate.toLocaleDateString("en-US", {
-    day: "2-digit",
-    month: "short",
-    year: "numeric",
-  });
+  const day = String(parsedDate.getDate()).padStart(2, "0");
+  const month = String(parsedDate.getMonth() + 1).padStart(2, "0");
+  const year = String(parsedDate.getFullYear()).slice(-2);
+  return `${day}/${month}/${year}`;
 };
 
 const buildCalendarDays = (monthStart) => {
@@ -1031,7 +1030,7 @@ export default function HCMNewCasePage() {
                 }}
               >
                 <ChevronRight size={16} className="rotate-180" />
-                Back to Services
+                Back
               </button>
             </div>
             <h2 style={{ fontSize: 20, fontWeight: 600, color: C.t1, margin: 0, textAlign: "center" }}>

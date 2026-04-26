@@ -33,8 +33,7 @@ const SidebarItem = ({ children, type = "NavLink", to, icon: Icon, label, collap
           onMouseEnter={() => setNavHover(true)}
           onMouseLeave={() => setNavHover(false)}
           style={({ isActive }) => {
-            const matchesCustomActive = typeof activeMatch === "function" ? activeMatch(location) : true;
-            const isCurrent = isActive && matchesCustomActive;
+            const isCurrent = typeof activeMatch === "function" ? activeMatch(location, isActive) : isActive;
             return ({
             ...baseItemStyle,
             justifyContent: collapsed ? "center" : "flex-start",
@@ -45,8 +44,7 @@ const SidebarItem = ({ children, type = "NavLink", to, icon: Icon, label, collap
           }}
         >
           {({ isActive }) => {
-            const matchesCustomActive = typeof activeMatch === "function" ? activeMatch(location) : true;
-            const isCurrent = isActive && matchesCustomActive;
+            const isCurrent = typeof activeMatch === "function" ? activeMatch(location, isActive) : isActive;
             return (
             <>
               <Icon size={18} style={{ flexShrink: 0, color: isCurrent ? C.purple : C.t3 }} />

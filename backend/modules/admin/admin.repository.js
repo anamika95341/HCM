@@ -32,10 +32,10 @@ async function createAdmin(payload, db = pool) {
 
 async function getDashboard() {
   const [meetingQueue, complaintQueue, escalated, scheduled] = await Promise.all([
-    pool.query(`SELECT COUNT(*) FROM meetings WHERE status IN ('pending', 'accepted', 'verification_pending', 'verified', 'not_verified', 'scheduled')`),
+    pool.query(`SELECT COUNT(*) FROM meetings WHERE status IN ('pending', 'accepted', 'verification_pending', 'verified', 'not_verified', 'scheduled', 'rescheduled')`),
     pool.query(`SELECT COUNT(*) FROM complaints WHERE status IN ('submitted', 'assigned', 'in_review', 'department_contact_identified', 'call_scheduled', 'followup_in_progress')`),
     pool.query(`SELECT COUNT(*) FROM complaints WHERE status = 'escalated_to_meeting'`),
-    pool.query(`SELECT COUNT(*) FROM meetings WHERE status = 'scheduled'`),
+    pool.query(`SELECT COUNT(*) FROM meetings WHERE status IN ('scheduled', 'rescheduled')`),
   ]);
 
   return {

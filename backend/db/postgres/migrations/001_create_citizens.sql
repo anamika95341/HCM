@@ -19,7 +19,7 @@ BEGIN
     CREATE TYPE complaint_status_type AS ENUM ('submitted', 'in_review', 'resolved', 'rejected', 'escalated');
   END IF;
   IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'meeting_status_type') THEN
-    CREATE TYPE meeting_status_type AS ENUM ('pending', 'accepted', 'rejected', 'verification_pending', 'verified', 'not_verified', 'scheduled', 'completed', 'cancelled');
+    CREATE TYPE meeting_status_type AS ENUM ('pending', 'accepted', 'rejected', 'verification_pending', 'verified', 'not_verified', 'scheduled', 'rescheduled', 'completed', 'cancelled');
   END IF;
 END $$;
 

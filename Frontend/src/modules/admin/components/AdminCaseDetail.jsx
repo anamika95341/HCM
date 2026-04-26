@@ -13,9 +13,21 @@ import {
   WorkspaceEmptyState,
   WorkspaceInput,
   WorkspacePage,
+  WorkspaceSectionHeader,
   WorkspaceSelect,
 } from "../../../shared/components/WorkspaceUI.jsx";
 import { usePortalTheme } from "../../../shared/theme/portalTheme.jsx";
+
+const WORKFLOW_ACTION_LABELS = {
+  assign: "Assign to Me",
+  reassign: "Reassign",
+  logs: "Logs",
+  scheduleMeeting: "Schedule Meeting",
+  resolve: "Resolve",
+  escalate: "Escalate",
+  reopen: "Reopen",
+  close: "Close",
+};
 
 function buildComplaintActions(item, userId) {
   const actions = [];
@@ -44,6 +56,23 @@ function statusLabel(status) {
     .filter(Boolean)
     .map((chunk) => chunk.charAt(0).toUpperCase() + chunk.slice(1))
     .join(" ");
+}
+
+function complaintWorkflowStatus(item, adminId) {
+  if (item?.status === "resolved") return "resolved";
+  if (item?.handoffType === "reassigned" && item?.handoffByAdminUserId === adminId && item?.handoffToAdminUserId !== adminId) return "reassigned";
+  if (item?.handoffType === "reassigned" && item?.handoffToAdminUserId === adminId && item?.status === "assigned") return "reassigned";
+  if (item?.status === "assigned") return "accepted";
+  if (["in_review", "call_scheduled", "followup_in_progress"].includes(item?.status)) return "complaint_logged";
+  return item?.status || "";
+}
+
+function complaintWorkflowLabel(status) {
+  if (status === "accepted") return "Accepted";
+  if (status === "complaint_logged") return "Complaint Logged";
+  if (status === "reassigned") return "Reassigned";
+  if (status === "resolved") return "Resolved";
+  return statusLabel(status);
 }
 
 function countWords(value) {
@@ -80,7 +109,7 @@ export function CenteredOverlay({ children }) {
   );
 }
 
-export function ModalShell({ title, subtitle, children, onClose }) {
+export function ModalShell({ title, subtitle, children, onClose, maxWidth = 720, minHeight = 360 }) {
   const { C } = usePortalTheme();
   const [isCloseHovered, setIsCloseHovered] = useState(false);
   return (
@@ -88,8 +117,8 @@ export function ModalShell({ title, subtitle, children, onClose }) {
       <div
         style={{
           width: "100%",
-          maxWidth: 720,
-          minHeight: 360,
+          maxWidth,
+          minHeight,
           background: C.card,
           border: `1px solid ${C.border}`,
           borderRadius: 18,
@@ -186,10 +215,10 @@ function formatDateTimeLabel(value) {
   if (!value) return "Not provided";
   const parsed = new Date(value);
   if (Number.isNaN(parsed.getTime())) return "Not provided";
-  return parsed.toLocaleDateString("en-IN", {
+  return parsed.toLocaleDateString("en-GB", {
     day: "2-digit",
     month: "2-digit",
-    year: "numeric",
+    year: "2-digit",
   });
 }
 
@@ -197,10 +226,10 @@ function formatDateLabel(value) {
   if (!value) return "Not provided";
   const parsed = new Date(value);
   if (Number.isNaN(parsed.getTime())) return "Not provided";
-  return parsed.toLocaleDateString("en-IN", {
+  return parsed.toLocaleDateString("en-GB", {
     day: "2-digit",
     month: "2-digit",
-    year: "numeric",
+    year: "2-digit",
   });
 }
 
@@ -235,7 +264,7 @@ export default function AdminCaseDetail() {
   const [item, setItem] = useState(null);
   const [admins, setAdmins] = useState([]);
   const [history, setHistory] = useState([]);
-  const [selectedAction, setSelectedAction] = useState("");
+  const [modalAction, setModalAction] = useState("");
   const [successMessage, setSuccessMessage] = useState("");
   const [pendingSuccessRedirect, setPendingSuccessRedirect] = useState("");
   const [actionLoading, setActionLoading] = useState(false);
@@ -245,6 +274,7 @@ export default function AdminCaseDetail() {
   const [complaintInfoHeight, setComplaintInfoHeight] = useState(540);
   const [complaintForm, setComplaintForm] = useState({
     logType: "",
+    logTypes: [],
     logSummary: "",
     scheduleDate: "",
     scheduleTime: "",
@@ -255,24 +285,25 @@ export default function AdminCaseDetail() {
     reopenReason: "",
     closeNote: "",
   });
-
   const focusedAction = searchParams.get("action") || "";
-  const activeAction = focusedAction || selectedAction;
+  const activeAction = modalAction;
   const showAssignToMeOnly = !item?.assignedAdminUserId;
   const isComplaintPoolDetail = source === "complaint-pool";
   const isComplaintQueueDetail = source === "complaint-queue";
   const isMyCasesDetail = source === "my-cases";
   const isResolvedCompletedDetail = source === "resolved-completed" || source === "resolved-complaints";
   const isEscalatedOrReassignedDetail = source === "escalated-reassigned";
-  const useComplaintQueueLayout = isComplaintQueueDetail || isMyCasesDetail;
+  const useComplaintQueueLayout = isComplaintQueueDetail || isMyCasesDetail || isResolvedCompletedDetail || isEscalatedOrReassignedDetail;
   const complaintPoolBackPath = `${PATHS.admin.workQueue}?tab=complaint-pool`;
 
   useEffect(() => {
-    if (focusedAction) setSelectedAction(focusedAction);
+    if (focusedAction) {
+      setModalAction(focusedAction);
+    }
   }, [focusedAction]);
 
   useEffect(() => {
-    if (!useComplaintQueueLayout || !complaintInfoRef.current || typeof ResizeObserver === "undefined") return undefined;
+    if (!complaintInfoRef.current || typeof ResizeObserver === "undefined") return undefined;
     const updateHeight = () => {
       if (!complaintInfoRef.current) return;
       setComplaintInfoHeight(Math.max(540, complaintInfoRef.current.offsetHeight));
@@ -281,7 +312,7 @@ export default function AdminCaseDetail() {
     const observer = new ResizeObserver(() => updateHeight());
     observer.observe(complaintInfoRef.current);
     return () => observer.disconnect();
-  }, [history, item, useComplaintQueueLayout]);
+  }, [history, item, useComplaintQueueLayout, isComplaintPoolDetail, isEscalatedOrReassignedDetail, isResolvedCompletedDetail]);
 
   useEffect(() => {
     let mounted = true;
@@ -317,9 +348,47 @@ export default function AdminCaseDetail() {
   }, [id, session?.role]);
 
   const availableActions = useMemo(
-    () => buildComplaintActions(item || {}, session?.user?.id),
-    [item, session?.user?.id]
+    () => {
+      const actions = buildComplaintActions(item || {}, session?.user?.id);
+      if (isMyCasesDetail) {
+        return actions;
+      }
+
+      const incomingReassigned = item?.handoffType === "reassigned" && item?.handoffToAdminUserId === session?.user?.id;
+      return incomingReassigned
+        ? actions.filter(([value]) => value !== "reassign")
+        : actions;
+    },
+    [item, session?.user?.id, isMyCasesDetail]
   );
+
+  const liveWorkflowStatus = complaintWorkflowStatus(item, session?.user?.id);
+  const committedWorkflowAction = liveWorkflowStatus === "complaint_logged" ? "logs" : "";
+  const workflowSelectValue = modalAction || committedWorkflowAction;
+  const workflowFeedback = liveWorkflowStatus === "complaint_logged"
+    ? {
+        tone: "green",
+        message: "Complaint Logs filled",
+      }
+    : null;
+
+  const workflowOptions = useMemo(() => {
+    const committedLabel = WORKFLOW_ACTION_LABELS[committedWorkflowAction] || "";
+    const remaining = availableActions.filter(([value]) => value !== committedWorkflowAction && value !== modalAction);
+    if (committedWorkflowAction) {
+      return [
+        { value: committedWorkflowAction, label: committedLabel, disabled: true },
+        ...remaining.map(([value, label]) => ({ value, label, disabled: false })),
+      ];
+    }
+    if (modalAction && !availableActions.some(([value]) => value === modalAction)) {
+      return [
+        { value: modalAction, label: WORKFLOW_ACTION_LABELS[modalAction] || statusLabel(modalAction), disabled: true },
+        ...remaining.map(([value, label]) => ({ value, label, disabled: false })),
+      ];
+    }
+    return availableActions.map(([value, label]) => ({ value, label, disabled: false }));
+  }, [availableActions, committedWorkflowAction, modalAction]);
 
   const matchingAdminOptions = useMemo(
     () => admins.filter((admin) => admin.id !== session?.user?.id),
@@ -383,12 +452,30 @@ export default function AdminCaseDetail() {
         }
         return;
       }
-      if (actionName === "escalate" || actionName === "reassign") {
+      if (actionName === "escalate") {
         navigate(complaintPoolBackPath);
         return;
       }
+      if (actionName === "reassign") {
+        setModalAction("");
+        navigate(`${PATHS.admin.workQueue}?tab=escalated`);
+        return;
+      }
+      if (actionName === "logs") {
+        setModalAction("");
+        setComplaintForm((current) => ({
+          ...current,
+          logTypes: [],
+          logSummary: "",
+        }));
+        return;
+      }
+      if (actionName === "resolve") {
+        setModalAction("");
+        navigate(`${PATHS.admin.workQueue}?tab=resolved-complaints`);
+        return;
+      }
       setSuccessMessage(`${item?.complaintId || "Complaint"} updated successfully.`);
-      setSelectedAction("");
     } catch (actionError) {
       setError(actionError?.response?.data?.error || "Action failed");
     } finally {
@@ -397,7 +484,20 @@ export default function AdminCaseDetail() {
   }
 
   function closeActionModal() {
-    setSelectedAction("");
+    setModalAction("");
+  }
+
+  function handleWorkflowActionSelect(value) {
+    setModalAction(value);
+  }
+
+  function toggleLogType(logType) {
+    setComplaintForm((current) => ({
+      ...current,
+      logTypes: current.logTypes.includes(logType)
+        ? current.logTypes.filter((value) => value !== logType)
+        : [...current.logTypes, logType],
+    }));
   }
 
   function handleSuccessModalClose() {
@@ -426,8 +526,10 @@ export default function AdminCaseDetail() {
   const backPath =
     isComplaintPoolDetail
       ? complaintPoolBackPath
-      : isResolvedCompletedDetail || isEscalatedOrReassignedDetail
-        ? PATHS.admin.workQueue
+      : isResolvedCompletedDetail
+        ? `${PATHS.admin.workQueue}?tab=resolved-complaints`
+        : isEscalatedOrReassignedDetail
+          ? `${PATHS.admin.workQueue}?tab=escalated`
       : source === "complaint-queue"
         ? PATHS.admin.complaintQueue
         : isMyCasesDetail
@@ -435,12 +537,14 @@ export default function AdminCaseDetail() {
           : PATHS.admin.cases;
   const backLabel =
     isComplaintPoolDetail
-      ? "Back to Complaint Pool"
-      : backPath === PATHS.admin.workQueue
-      ? "Back to Work Queue"
-      : backPath === PATHS.admin.complaintQueue
-        ? "Back to Complaint Queue"
-        : "Back to My Cases";
+      ? "Back"
+      : isComplaintQueueDetail || isEscalatedOrReassignedDetail || isResolvedCompletedDetail
+        ? "Back"
+        : backPath === PATHS.admin.workQueue
+          ? "Back to Work Queue"
+          : backPath === PATHS.admin.complaintQueue
+            ? "Back"
+            : "Back to My Cases";
   const attachedFiles = getAttachedFiles(item);
   const createdAtLabel = formatDateTimeLabel(item.createdAt);
   const incidentDateLabel = formatDateLabel(item.incidentDate);
@@ -449,11 +553,21 @@ export default function AdminCaseDetail() {
   const handoffTypeLabel = complaintStateLabel
     ? complaintStateLabel.split("_").filter(Boolean).map((chunk) => chunk.charAt(0).toUpperCase() + chunk.slice(1)).join(" ")
     : "None";
-  const detailValueStyle = { fontSize: 14, fontWeight: 400, color: C.t1, lineHeight: 1.5, whiteSpace: "pre-wrap", wordBreak: "break-word" };
-  const standardGridStyle = { display: "grid", gridTemplateColumns: "repeat(3, minmax(0, 1fr))", gap: 18, alignItems: "start" };
+  const detailValueStyle = { fontSize: 14, fontWeight: 400, color: C.t1, lineHeight: 1.6, whiteSpace: "pre-wrap", wordBreak: "break-word" };
+  const standardGridStyle = { display: "grid", gridTemplateColumns: "repeat(3, minmax(0, 1fr))", gap: 20, alignItems: "start" };
+  const pairedGridStyle = { display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: 24, alignItems: "start" };
+  const complaintPoolGridStyle = { display: "grid", gridTemplateColumns: "repeat(3, minmax(0, 1fr))", gap: 24, alignItems: "start" };
+  const citizenDistrict = item.citizenSnapshot?.district || "Not provided";
+  const citizenLocalMp = item.citizenSnapshot?.localMp || "Not provided";
+  const currentAdminId = session?.user?.id;
+  const workflowStatus = complaintWorkflowStatus(item, currentAdminId);
   const showAssignToMeButton = isComplaintPoolDetail;
-  const showWorkflowActions = !isComplaintPoolDetail && !isEscalatedOrReassignedDetail && !isResolvedCompletedDetail;
-  const complaintStatusLabel = statusLabel(item.status);
+  const isOutgoingReassignedComplaint = item.handoffType === "reassigned" && item.handoffByAdminUserId === currentAdminId && item.handoffToAdminUserId !== currentAdminId;
+  const showWorkflowActions = !isComplaintPoolDetail && !isEscalatedOrReassignedDetail && !isResolvedCompletedDetail && item.status !== "resolved" && !isOutgoingReassignedComplaint;
+  const complaintStatusLabel = complaintWorkflowLabel(workflowStatus);
+  const isResolvedComplaint = item.status === "resolved";
+  const isReassignedComplaint = isOutgoingReassignedComplaint;
+  const complaintLogSummary = item.callOutcome || "";
 
   function renderTitleBlock(value) {
     return <DetailItem label="Title" value={value || "Untitled Complaint"} valueStyle={detailValueStyle} />;
@@ -478,41 +592,83 @@ export default function AdminCaseDetail() {
             <DetailItem label="Citizen Name" value={item.citizenSnapshot?.name || "Not provided"} />
             <DetailItem label="Citizen Phone Number" value={item.citizenSnapshot?.phoneNumbers?.[0] || "Not provided"} />
           </div>
-          <div style={standardGridStyle}>
-            <DetailItem label="Created At" value={createdAtLabel} />
-            <DetailItem label="Date of Incident" value={incidentDateLabel} />
-            <DetailItem label="Incident Location" value={item.complaintLocation || "Not provided"} />
-          </div>
-          {renderDescriptionBlock(item.description)}
-          {item.statusReason ? <NoticeBox tone="amber" label="Reason for Escalation" value={item.statusReason} /> : null}
-        </>
-      );
-    }
-
-    return (
-      <>
         <div style={standardGridStyle}>
-          <DetailItem label="Complaint Id" value={item.complaintId} />
           <DetailItem label="Created At" value={createdAtLabel} />
-          <div />
-        </div>
-        <div style={standardGridStyle}>
-          <DetailItem label="Citizen Name" value={item.citizenSnapshot?.name || "Not provided"} />
-          <DetailItem label="Citizen Phone Number" value={item.citizenSnapshot?.phoneNumbers?.[0] || "Not provided"} />
-          <div />
-        </div>
-        {renderTitleBlock(item.title)}
-        <div style={standardGridStyle}>
-          <DetailItem label="Category" value={item.complaintType || "Not provided"} />
           <DetailItem label="Date of Incident" value={incidentDateLabel} />
           <DetailItem label="Incident Location" value={item.complaintLocation || "Not provided"} />
         </div>
         {renderDescriptionBlock(item.description)}
+        {complaintLogSummary ? <NoticeBox tone="blue" label="Complaint Log Summary" value={complaintLogSummary} /> : null}
+        {item.statusReason ? <NoticeBox tone="amber" label="Reason for Escalation" value={item.statusReason} /> : null}
+      </>
+    );
+  }
+
+    return (
+      <>
+        <div className="grid md:grid-cols-3 gap-6">
+          <DetailItem label="Complaint Id" value={item.complaintId} />
+          <DetailItem label="Created At" value={createdAtLabel} />
+          <DetailItem label="Citizen Name" value={item.citizenSnapshot?.name || "Not provided"} />
+        </div>
+        <div className="grid md:grid-cols-3 gap-6">
+          <DetailItem label="Citizen Phone Number" value={item.citizenSnapshot?.phoneNumbers?.[0] || "Not provided"} />
+          <DetailItem label="District" value={citizenDistrict} />
+          <DetailItem label="MP of District" value={citizenLocalMp} />
+        </div>
+        <div>
+          <p style={{ fontSize: 11, color: C.t3, fontWeight: 700, textTransform: "uppercase", letterSpacing: ".08em", marginBottom: 8 }}>Title</p>
+          <p style={{ margin: 0, fontSize: 14, fontWeight: 400, color: C.t1, lineHeight: 1.6, whiteSpace: "normal", wordBreak: "break-word" }}>
+            {item.title || "Untitled Complaint"}
+          </p>
+        </div>
+        <div className="grid md:grid-cols-3 gap-6">
+          <DetailItem label="Category" value={item.complaintType || "Not provided"} />
+          <DetailItem label="Date of Incident" value={incidentDateLabel} />
+          <DetailItem label="Incident Location" value={item.complaintLocation || "Not provided"} />
+        </div>
+        <div>
+          <p style={{ fontSize: 11, color: C.t3, fontWeight: 700, textTransform: "uppercase", letterSpacing: ".08em", marginBottom: 8 }}>Description</p>
+          <p style={{ margin: 0, fontSize: 14, fontWeight: 400, color: C.t1, lineHeight: 1.6, whiteSpace: "pre-wrap", wordBreak: "break-word" }}>
+            {item.description || "Not provided"}
+          </p>
+        </div>
       </>
     );
   }
 
   function renderEscalatedInfo() {
+    if (item.handoffType === "reassigned") {
+      return (
+        <>
+          <div style={standardGridStyle}>
+            <DetailItem label="Complaint Id" value={item.complaintId} />
+            <DetailItem label="Reassigned Date" value={handoffDateLabel} />
+            <DetailItem label="Reassigned To" value={item.assignedAdminName || item.currentOwner || "Not provided"} />
+          </div>
+          <div style={standardGridStyle}>
+            <DetailItem label="Created At" value={createdAtLabel} />
+            <DetailItem label="Citizen Name" value={item.citizenSnapshot?.name || "Not provided"} />
+            <DetailItem label="Citizen Phone Number" value={item.citizenSnapshot?.phoneNumbers?.[0] || "Not provided"} />
+          </div>
+          <div style={standardGridStyle}>
+            <DetailItem label="District" value={citizenDistrict} />
+            <DetailItem label="MP of District" value={citizenLocalMp} />
+            <div />
+          </div>
+          {renderTitleBlock(item.title)}
+          <div style={standardGridStyle}>
+            <DetailItem label="Category" value={item.complaintType || "Not provided"} />
+            <DetailItem label="Date of Incident" value={incidentDateLabel} />
+            <DetailItem label="Incident Location" value={item.complaintLocation || "Not provided"} />
+          </div>
+          {renderDescriptionBlock(item.description)}
+          {complaintLogSummary ? <NoticeBox tone="blue" label="Complaint Log Summary" value={complaintLogSummary} /> : null}
+          {item.statusReason ? <NoticeBox tone="blue" label="Reason for Reassignation" value={item.statusReason} /> : null}
+        </>
+      );
+    }
+
     return (
       <>
         <div style={standardGridStyle}>
@@ -532,6 +688,7 @@ export default function AdminCaseDetail() {
           <DetailItem label="Incident Location" value={item.complaintLocation || "Not provided"} />
         </div>
         {renderDescriptionBlock(item.description)}
+        {complaintLogSummary ? <NoticeBox tone="blue" label="Complaint Log Summary" value={complaintLogSummary} /> : null}
         {item.statusReason ? (
           <NoticeBox
             tone={item.handoffType === "reassigned" ? "blue" : "amber"}
@@ -548,23 +705,28 @@ export default function AdminCaseDetail() {
       <>
         <div style={standardGridStyle}>
           <DetailItem label="Complaint Id" value={item.complaintId} />
-          <DetailItem label="Handoff Type" value={handoffTypeLabel} />
           <DetailItem label="Resolved Date" value={handoffDateLabel} />
+          <div />
         </div>
-        {renderTitleBlock(item.title)}
         <div style={standardGridStyle}>
-          <DetailItem label="Category" value={item.complaintType || "Not provided"} />
+          <DetailItem label="Created At" value={createdAtLabel} />
           <DetailItem label="Citizen Name" value={item.citizenSnapshot?.name || "Not provided"} />
           <DetailItem label="Citizen Phone Number" value={item.citizenSnapshot?.phoneNumbers?.[0] || "Not provided"} />
         </div>
         <div style={standardGridStyle}>
-          <DetailItem label="Created At" value={createdAtLabel} />
+          <DetailItem label="District" value={citizenDistrict} />
+          <DetailItem label="MP of District" value={citizenLocalMp} />
+          <div />
+        </div>
+        {renderTitleBlock(item.title)}
+        <div style={standardGridStyle}>
+          <DetailItem label="Category" value={item.complaintType || "Not provided"} />
           <DetailItem label="Date of Incident" value={incidentDateLabel} />
           <DetailItem label="Incident Location" value={item.complaintLocation || "Not provided"} />
         </div>
         {renderDescriptionBlock(item.description)}
-        {item.statusReason ? <NoticeBox tone="amber" label="Reason for Escalation" value={item.statusReason} /> : null}
-        {item.resolutionSummary ? <NoticeBox tone="green" label="Summary" value={item.resolutionSummary} /> : null}
+        {complaintLogSummary ? <NoticeBox tone="blue" label="Complaint Log Summary" value={complaintLogSummary} /> : null}
+        {item.resolutionSummary ? <NoticeBox tone="green" label="Resolved Summary" value={item.resolutionSummary} /> : null}
       </>
     );
   }
@@ -574,7 +736,7 @@ export default function AdminCaseDetail() {
       <>
         <div style={standardGridStyle}>
           <DetailItem label="Complaint Id" value={item.complaintId} />
-          <DetailItem label="Status" value={handoffTypeLabel} />
+          <DetailItem label="Status" value={complaintStatusLabel} />
           <DetailItem label="Updated Date" value={handoffDateLabel} />
         </div>
         {renderTitleBlock(item.title)}
@@ -589,6 +751,7 @@ export default function AdminCaseDetail() {
           <DetailItem label="Incident Location" value={item.complaintLocation || "Not provided"} />
         </div>
         {renderDescriptionBlock(item.description)}
+        {complaintLogSummary ? <NoticeBox tone="blue" label="Complaint Log Summary" value={complaintLogSummary} /> : null}
         {item.statusReason ? (
           <NoticeBox
             tone={item.handoffType === "reassigned" ? "blue" : "amber"}
@@ -596,12 +759,51 @@ export default function AdminCaseDetail() {
             value={item.statusReason}
           />
         ) : null}
-        {item.resolutionSummary ? <NoticeBox tone="green" label="Summary" value={item.resolutionSummary} /> : null}
+        {item.resolutionSummary ? <NoticeBox tone="green" label="Mark As Resolved Summary" value={item.resolutionSummary} /> : null}
       </>
     );
   }
 
   function renderComplaintQueueInfo() {
+    if (isMyCasesDetail) {
+      return (
+        <>
+          <div style={standardGridStyle}>
+            <DetailItem label="Complaint Id" value={item.complaintId} />
+            <DetailItem
+              label="Status"
+              value={(
+                <WorkspaceBadge status={item.status} title={statusLabel(item.status)}>
+                  {statusLabel(item.status)}
+                </WorkspaceBadge>
+              )}
+            />
+            <DetailItem label="Updated Date" value={handoffDateLabel} />
+          </div>
+          {renderTitleBlock(item.title)}
+          <div style={standardGridStyle}>
+            <DetailItem label="Category" value={item.complaintType || "Not provided"} />
+            <DetailItem label="Citizen Name" value={item.citizenSnapshot?.name || "Not provided"} />
+            <DetailItem label="Citizen Phone Number" value={item.citizenSnapshot?.phoneNumbers?.[0] || "Not provided"} />
+          </div>
+          <div style={standardGridStyle}>
+            <DetailItem label="Created At" value={createdAtLabel} />
+            <DetailItem label="Date of Incident" value={incidentDateLabel} />
+            <DetailItem label="Incident Location" value={item.complaintLocation || "Not provided"} />
+          </div>
+          {renderDescriptionBlock(item.description)}
+          {item.statusReason ? (
+            <NoticeBox
+              tone={item.handoffType === "reassigned" ? "blue" : "amber"}
+              label={item.handoffType === "reassigned" ? "Reason for Reassignation" : "Reason for Escalation"}
+              value={item.statusReason}
+            />
+          ) : null}
+          {item.resolutionSummary ? <NoticeBox tone="green" label="Summary" value={item.resolutionSummary} /> : null}
+        </>
+      );
+    }
+
     return (
       <>
         <div style={standardGridStyle}>
@@ -609,7 +811,7 @@ export default function AdminCaseDetail() {
           <DetailItem
             label="Status"
             value={(
-              <WorkspaceBadge status={item.status} title={complaintStatusLabel}>
+              <WorkspaceBadge status={workflowStatus} color={workflowStatus === "reassigned" ? C.danger : workflowStatus === "complaint_logged" ? C.warn : undefined} title={complaintStatusLabel}>
                 {complaintStatusLabel}
               </WorkspaceBadge>
             )}
@@ -628,6 +830,7 @@ export default function AdminCaseDetail() {
           <DetailItem label="Incident Location" value={item.complaintLocation || "Not provided"} />
         </div>
         {renderDescriptionBlock(item.description)}
+        {complaintLogSummary ? <NoticeBox tone="blue" label="Complaint Log Summary" value={complaintLogSummary} /> : null}
         {item.statusReason ? (
           <NoticeBox
             tone={item.handoffType === "reassigned" ? "blue" : "amber"}
@@ -635,9 +838,17 @@ export default function AdminCaseDetail() {
             value={item.statusReason}
           />
         ) : null}
-        {item.resolutionSummary ? <NoticeBox tone="green" label="Summary" value={item.resolutionSummary} /> : null}
+        {item.resolutionSummary ? <NoticeBox tone="green" label="Mark As Resolved Summary" value={item.resolutionSummary} /> : null}
       </>
     );
+  }
+
+  function renderPrimaryDetailInfo() {
+    if (isComplaintPoolDetail) return renderComplaintPoolInfo();
+    if (isEscalatedOrReassignedDetail) return renderEscalatedInfo();
+    if (isResolvedCompletedDetail) return renderResolvedInfo();
+    if (useComplaintQueueLayout) return renderComplaintQueueInfo();
+    return renderMyCasesInfo();
   }
 
   return (
@@ -647,7 +858,38 @@ export default function AdminCaseDetail() {
       contentStyle={{ height: "100%", display: "flex", flexDirection: "column", minHeight: 0 }}
     >
       <SuccessModal open={!!successMessage} message={successMessage} onClose={handleSuccessModalClose} />
-      {isComplaintPoolDetail ? (
+      {isMyCasesDetail ? (
+        <WorkspaceSectionHeader
+          title={item.complaintId}
+          action={
+            <button
+              type="button"
+              onClick={() => navigate(backPath)}
+              onMouseEnter={() => setIsBackHovered(true)}
+              onMouseLeave={() => setIsBackHovered(false)}
+              style={{
+                minHeight: 38,
+                padding: "0 16px",
+                borderRadius: 10,
+                border: `1px solid ${C.purple}`,
+                background: isBackHovered ? C.purple : "transparent",
+                color: isBackHovered ? "#ffffff" : C.purple,
+                display: "inline-flex",
+                alignItems: "center",
+                justifyContent: "center",
+                gap: 8,
+                cursor: "pointer",
+                fontSize: 13,
+                fontWeight: 600,
+                transition: "background var(--portal-duration-fast) ease, color var(--portal-duration-fast) ease",
+              }}
+            >
+              <ChevronLeft size={16} />
+              {backLabel}
+            </button>
+          }
+        />
+      ) : isComplaintPoolDetail || isComplaintQueueDetail || isResolvedCompletedDetail || isEscalatedOrReassignedDetail ? (
         <div style={{ display: "grid", gridTemplateColumns: "1fr auto 1fr", alignItems: "center", marginBottom: 16, gap: 12 }}>
           <div style={{ justifySelf: "start" }}>
             <button
@@ -723,12 +965,30 @@ export default function AdminCaseDetail() {
             >
               Assign to Me
             </WorkspaceButton>
-          ) : showWorkflowActions ? (
+          ) : showWorkflowActions && !isComplaintQueueDetail ? (
             <div className="grid md:grid-cols-[minmax(0,320px)_auto] gap-3 items-start">
-              <WorkspaceSelect value={activeAction} onChange={(event) => setSelectedAction(event.target.value)}>
-                <option value="">Select workflow action</option>
-                {availableActions.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
-              </WorkspaceSelect>
+              {isMyCasesDetail ? (
+                <WorkspaceSelect value={modalAction} onChange={(event) => handleWorkflowActionSelect(event.target.value)}>
+                  <option value="">Select workflow action</option>
+                  {availableActions.map(([value, label]) => (
+                    <option key={value} value={value}>
+                      {label}
+                    </option>
+                  ))}
+                </WorkspaceSelect>
+              ) : (
+                <>
+                  <WorkspaceSelect value={workflowSelectValue} onChange={(event) => handleWorkflowActionSelect(event.target.value)}>
+                    {!committedWorkflowAction ? <option value="">Select workflow action</option> : null}
+                    {workflowOptions.map((option) => (
+                      <option key={option.value} value={option.value} disabled={option.disabled}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </WorkspaceSelect>
+                  <InlineActionFeedback feedback={workflowFeedback} />
+                </>
+              )}
             </div>
           ) : null}
         </WorkspaceCard>
@@ -745,9 +1005,67 @@ export default function AdminCaseDetail() {
             >
               <div ref={complaintInfoRef}>
                 <WorkspaceCard style={{ marginBottom: 0, minHeight: 540, display: "flex", flexDirection: "column" }}>
-                  <WorkspaceCardHeader title="Complaint Information" />
+                  {isMyCasesDetail ? (
+                    <WorkspaceCardHeader title="Complaint Information" />
+                  ) : showWorkflowActions ? (
+                    <div style={{ paddingBottom: 16, marginBottom: 20, borderBottom: `1px solid ${C.border}` }}>
+                      <WorkspaceSelect value={workflowSelectValue} onChange={(event) => handleWorkflowActionSelect(event.target.value)} style={{ maxWidth: 320 }}>
+                        {!committedWorkflowAction ? <option value="">Select workflow action</option> : null}
+                        {workflowOptions.map((option) => (
+                          <option key={option.value} value={option.value} disabled={option.disabled}>
+                            {option.label}
+                          </option>
+                        ))}
+                      </WorkspaceSelect>
+                      <InlineActionFeedback feedback={workflowFeedback} />
+                    </div>
+                  ) : null}
+                  {isResolvedComplaint && !isMyCasesDetail ? (
+                    <div style={{ paddingBottom: 16, marginBottom: 18, borderBottom: `1px solid ${C.border}` }}>
+                      <div
+                        style={{
+                          display: "inline-flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          gap: 8,
+                          minHeight: 38,
+                          padding: "0 16px",
+                          borderRadius: 10,
+                          background: C.mint,
+                          color: "#ffffff",
+                          fontSize: 13,
+                          fontWeight: 600,
+                          lineHeight: 1.2,
+                        }}
+                      >
+                        <span aria-hidden="true">✓</span>
+                        Resolved
+                      </div>
+                    </div>
+                  ) : isReassignedComplaint && !isMyCasesDetail ? (
+                    <div style={{ paddingBottom: 16, marginBottom: 18, borderBottom: `1px solid ${C.border}` }}>
+                      <div
+                        style={{
+                          display: "inline-flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          gap: 8,
+                          minHeight: 38,
+                          padding: "0 16px",
+                          borderRadius: 10,
+                          background: C.danger,
+                          color: "#ffffff",
+                          fontSize: 13,
+                          fontWeight: 600,
+                          lineHeight: 1.2,
+                        }}
+                      >
+                        Reassigned
+                      </div>
+                    </div>
+                  ) : null}
                   <div style={{ display: "grid", gap: 18 }}>
-                    {renderComplaintQueueInfo()}
+                    {renderPrimaryDetailInfo()}
                   </div>
                 </WorkspaceCard>
               </div>
@@ -773,7 +1091,7 @@ export default function AdminCaseDetail() {
                               <p style={{ margin: 0, fontWeight: 600, color: C.t1 }}>{statusLabel(event.new_status)}</p>
                               <p style={{ fontSize: 12, color: C.t3, marginTop: 4, marginBottom: 0 }}>{event.actor_role}</p>
                             </div>
-                            <p style={{ fontSize: 12, color: C.t3, whiteSpace: "nowrap", margin: 0 }}>{new Date(event.created_at).toLocaleDateString("en-IN")}</p>
+                            <p style={{ fontSize: 12, color: C.t3, whiteSpace: "nowrap", margin: 0 }}>{new Date(event.created_at).toLocaleDateString("en-GB", { day: "2-digit", month: "2-digit", year: "2-digit" })}</p>
                           </div>
                           {event.note ? <p style={{ fontSize: 13, color: C.t2, marginTop: 8, marginBottom: 0, whiteSpace: "normal", wordBreak: "break-word" }}>{event.note}</p> : null}
                         </div>
@@ -785,7 +1103,10 @@ export default function AdminCaseDetail() {
             </div>
 
             <WorkspaceCard style={{ marginBottom: 0 }}>
-              <WorkspaceCardHeader title="Meeting Files" subtitle="View the citizen submission files and uploaded complaint artifacts." />
+              <WorkspaceCardHeader
+                title={isMyCasesDetail ? "Meeting Files" : "Complaint Files"}
+                subtitle="View the citizen submission files and uploaded complaint artifacts."
+              />
               {attachedFiles.length === 0 ? (
                 <div style={{ fontSize: 13, color: C.t3, padding: "2px 0" }}>No files attached to this complaint yet.</div>
               ) : (
@@ -808,59 +1129,113 @@ export default function AdminCaseDetail() {
             </WorkspaceCard>
           </>
         ) : (
-          <WorkspaceCard style={{ marginBottom: 0, flex: 1, minHeight: 0, display: "flex", flexDirection: "column", paddingTop: isComplaintPoolDetail ? 14 : 24 }}>
-            {isComplaintPoolDetail ? (
-              <div style={{ padding: "0 0 14px 0", marginLeft: 2, borderBottom: `1px solid ${C.border}`, marginBottom: 18 }}>
-                <WorkspaceButton
-                  type="button"
-                  disabled={actionLoading}
-                  onClick={() => runAction("assign", () => apiClient.patch(`/complaints/${id}/assign-self`, {}))}
-                  style={{ boxShadow: "none" }}
+          <>
+                <WorkspaceCard
+                  style={
+                    isComplaintPoolDetail
+                      ? { marginBottom: 0, height: "auto", display: "flex", flexDirection: "column", paddingTop: 14 }
+                      : { marginBottom: 0, flex: 1, minHeight: 0, display: "flex", flexDirection: "column", paddingTop: 24 }
+                  }
                 >
-                  Assign to Me
-                </WorkspaceButton>
+              {isComplaintPoolDetail ? (
+                <div style={{ padding: "0 0 14px 0", marginLeft: 2, borderBottom: `1px solid ${C.border}`, marginBottom: 18 }}>
+                  <WorkspaceButton
+                    type="button"
+                    disabled={actionLoading}
+                    onClick={() => runAction("assign", () => apiClient.patch(`/complaints/${id}/assign-self`, {}))}
+                    style={{ boxShadow: "none" }}
+                  >
+                    Assign to Me
+                  </WorkspaceButton>
+                </div>
+              ) : (
+                <WorkspaceCardHeader title="Complaint Information" />
+              )}
+              {isResolvedComplaint ? (
+                <div style={{ paddingBottom: 16, marginBottom: 18, borderBottom: `1px solid ${C.border}` }}>
+                  <div
+                    style={{
+                      display: "inline-flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      gap: 8,
+                      minHeight: 38,
+                      padding: "0 16px",
+                      borderRadius: 10,
+                      background: C.mint,
+                      color: "#ffffff",
+                      fontSize: 13,
+                      fontWeight: 600,
+                      lineHeight: 1.2,
+                    }}
+                  >
+                    <span aria-hidden="true">✓</span>
+                    Resolved
+                  </div>
+                </div>
+              ) : isReassignedComplaint ? (
+                <div style={{ paddingBottom: 16, marginBottom: 18, borderBottom: `1px solid ${C.border}` }}>
+                  <div
+                    style={{
+                      display: "inline-flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      gap: 8,
+                      minHeight: 38,
+                      padding: "0 16px",
+                      borderRadius: 10,
+                      background: C.danger,
+                      color: "#ffffff",
+                      fontSize: 13,
+                      fontWeight: 600,
+                      lineHeight: 1.2,
+                    }}
+                  >
+                    Reassigned
+                  </div>
+                </div>
+              ) : null}
+              <div
+                style={
+                  isComplaintPoolDetail
+                    ? { display: "grid", gap: 18, paddingRight: 2 }
+                    : { display: "grid", gap: 18, flex: 1, minHeight: 0, overflowY: "auto", paddingRight: 2 }
+                }
+              >
+                {renderPrimaryDetailInfo()}
               </div>
-            ) : (
-              <WorkspaceCardHeader title="Complaint Information" />
-            )}
-            <div style={{ display: "grid", gap: 18, flex: 1, minHeight: 0, overflowY: "auto", paddingRight: 2 }}>
-              {isComplaintPoolDetail
-                ? renderComplaintPoolInfo()
-                : isEscalatedOrReassignedDetail
-                  ? renderEscalatedInfo()
-                  : isResolvedCompletedDetail
-                    ? renderResolvedInfo()
-                    : renderMyCasesInfo()}
-              {attachedFiles.length > 0 ? (
-                <div>
-                  <p style={{ fontSize: 11, color: C.t3, fontWeight: 700, textTransform: "uppercase", letterSpacing: ".08em", margin: "0 0 8px" }}>Attached Documents</p>
-                  <div style={{ padding: 12, borderRadius: 12, border: `1px solid ${C.border}`, background: C.bgElevated, display: "grid", gap: 10 }}>
-                    {attachedFiles.map((file) => (
-                      <div
-                        key={file.id || file.downloadUrl || file.name}
-                        style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}
-                      >
-                        <div style={{ minWidth: 0 }}>
-                          <div style={{ ...detailValueStyle }}>{file.name}</div>
-                          <div style={{ marginTop: 2, fontSize: 12, color: C.t3 }}>{file.mimeType || "Document"}</div>
+            </WorkspaceCard>
+
+            <WorkspaceCard style={{ marginBottom: 0 }}>
+              <WorkspaceCardHeader title="Complaint Files" subtitle="View the citizen submission files and uploaded complaint artifacts." />
+              {attachedFiles.length === 0 ? (
+                <div style={{ fontSize: 13, color: C.t3, padding: "2px 0" }}>No files attached to this complaint yet.</div>
+              ) : (
+                <div style={{ display: "grid", gap: 10 }}>
+                  {attachedFiles.map((file) => (
+                    <div key={file.id || file.downloadUrl || file.name} style={{ padding: 10, borderRadius: 12, border: `1px solid ${C.border}`, background: C.bgElevated }}>
+                      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
+                        <div>
+                          <div style={{ fontSize: 13, fontWeight: 700, color: C.t1 }}>{file.name}</div>
+                          <div style={{ marginTop: 4, fontSize: 12, color: C.t3 }}>{file.mimeType || "Document"}</div>
                         </div>
                         <WorkspaceButton type="button" variant="outline" onClick={() => openDownloadUrl(file.downloadUrl)}>
                           Download
                         </WorkspaceButton>
                       </div>
-                    ))}
-                  </div>
+                    </div>
+                  ))}
                 </div>
-              ) : null}
-            </div>
-          </WorkspaceCard>
+              )}
+            </WorkspaceCard>
+          </>
         )}
       </div>
 
       {activeAction === "reassign" ? (
         <ModalShell
           title="Reassign Complaint"
-          subtitle="Select the admin who should receive this complaint and write the reassignment reason."
+          subtitle={isMyCasesDetail ? "Select the admin who should receive this complaint and write the reassignment reason." : "Select the admin who should receive this complaint. Reassignment reason is optional."}
           onClose={closeActionModal}
         >
           <div style={{ display: "grid", gap: 16 }}>
@@ -886,9 +1261,10 @@ export default function AdminCaseDetail() {
               <ErrorText>{reassignReasonError}</ErrorText>
             </div>
             <div style={{ display: "flex", justifyContent: "flex-end", gap: 12 }}>
+              {isMyCasesDetail ? <WorkspaceButton type="button" variant="ghost" onClick={closeActionModal} disabled={actionLoading}>Cancel</WorkspaceButton> : null}
               <WorkspaceButton
                 type="button"
-                disabled={actionLoading || !complaintForm.reassignTo || !!reassignReasonError || reassignTrimmed.length < 4}
+                disabled={isMyCasesDetail ? actionLoading || !complaintForm.reassignTo || !!reassignReasonError || reassignTrimmed.length < 4 : actionLoading || !complaintForm.reassignTo || !!reassignReasonError}
                 onClick={() => runAction("reassign", () => apiClient.patch(`/complaints/${id}/reassign`, { adminId: complaintForm.reassignTo, reason: reassignTrimmed }))}
               >
                 Confirm Reassign
@@ -918,6 +1294,7 @@ export default function AdminCaseDetail() {
               <ErrorText>{escalationReasonError}</ErrorText>
             </div>
             <div style={{ display: "flex", justifyContent: "flex-end", gap: 12 }}>
+              {isMyCasesDetail ? <WorkspaceButton type="button" variant="ghost" onClick={closeActionModal} disabled={actionLoading}>Cancel</WorkspaceButton> : null}
               <WorkspaceButton
                 type="button"
                 disabled={actionLoading || !!escalationReasonError || escalationTrimmed.length < 4}
@@ -951,6 +1328,7 @@ export default function AdminCaseDetail() {
               <ErrorText>{resolutionError}</ErrorText>
             </div>
             <div style={{ display: "flex", justifyContent: "flex-end", gap: 12 }}>
+              {isMyCasesDetail ? <WorkspaceButton type="button" variant="ghost" onClick={closeActionModal} disabled={actionLoading}>Cancel</WorkspaceButton> : null}
               <WorkspaceButton
                 type="button"
                 disabled={actionLoading || !!resolutionError || resolutionTrimmed.length < 10}
@@ -981,6 +1359,7 @@ export default function AdminCaseDetail() {
               <ErrorText>{scheduleError}</ErrorText>
             </div>
             <div style={{ display: "flex", justifyContent: "flex-end", gap: 12 }}>
+              {isMyCasesDetail ? <WorkspaceButton type="button" variant="ghost" onClick={closeActionModal} disabled={actionLoading}>Cancel</WorkspaceButton> : null}
               <WorkspaceButton
                 type="button"
                 disabled={actionLoading || !scheduledIso || !!scheduleError}
@@ -1004,12 +1383,46 @@ export default function AdminCaseDetail() {
               <div style={{ fontSize: 11, fontWeight: 700, color: C.t3, textTransform: "uppercase", letterSpacing: ".08em", marginBottom: 8 }}>
                 Log Type
               </div>
-              <WorkspaceSelect value={complaintForm.logType} onChange={(event) => setComplaintForm((current) => ({ ...current, logType: event.target.value }))}>
-                <option value="">Select log type</option>
-                <option value="phone_call">Phone Call</option>
-                <option value="mail">Mail</option>
-                <option value="letter_summary">Letter Summary</option>
-              </WorkspaceSelect>
+              {isMyCasesDetail ? (
+                <WorkspaceSelect value={complaintForm.logType} onChange={(event) => setComplaintForm((current) => ({ ...current, logType: event.target.value }))}>
+                  <option value="">Select log type</option>
+                  <option value="phone_call">Phone Call</option>
+                  <option value="mail">Mail</option>
+                  <option value="letter_summary">Letter Summary</option>
+                </WorkspaceSelect>
+              ) : (
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(4, minmax(0, 1fr))", gap: 10 }}>
+                  {[
+                    ["phone_call", "Phone Call"],
+                    ["letter_summary", "Letter"],
+                    ["mail", "Mail"],
+                    ["meeting", "Meeting"],
+                  ].map(([value, label]) => {
+                    const checked = complaintForm.logTypes.includes(value);
+                    return (
+                      <button
+                        key={value}
+                        type="button"
+                        onClick={() => toggleLogType(value)}
+                        style={{
+                          minHeight: 42,
+                          padding: "0 10px",
+                          borderRadius: 10,
+                          border: `1px solid ${checked ? C.purple : C.border}`,
+                          background: checked ? `${C.purple}12` : C.inp,
+                          color: checked ? C.purple : C.t2,
+                          fontSize: 12,
+                          fontWeight: 600,
+                          cursor: "pointer",
+                          textAlign: "center",
+                        }}
+                      >
+                        {label}
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
             </div>
             <div>
               <div style={{ fontSize: 11, fontWeight: 700, color: C.t3, textTransform: "uppercase", letterSpacing: ".08em", marginBottom: 8 }}>
@@ -1023,10 +1436,11 @@ export default function AdminCaseDetail() {
               />
             </div>
             <div style={{ display: "flex", justifyContent: "flex-end", gap: 12 }}>
+              {isMyCasesDetail ? <WorkspaceButton type="button" variant="ghost" onClick={closeActionModal} disabled={actionLoading}>Cancel</WorkspaceButton> : null}
               <WorkspaceButton
                 type="button"
-                disabled={actionLoading || !complaintForm.logType}
-                onClick={() => runAction("logs", () => apiClient.patch(`/complaints/${id}/log`, { logType: complaintForm.logType, summary: complaintForm.logSummary.trim() }))}
+                disabled={isMyCasesDetail ? actionLoading || !complaintForm.logType : actionLoading || complaintForm.logTypes.length === 0}
+                onClick={() => runAction("logs", () => apiClient.patch(`/complaints/${id}/log`, isMyCasesDetail ? { logType: complaintForm.logType, summary: complaintForm.logSummary.trim() } : { logTypes: complaintForm.logTypes, summary: complaintForm.logSummary.trim() }))}
               >
                 Confirm Log
               </WorkspaceButton>
@@ -1040,6 +1454,7 @@ export default function AdminCaseDetail() {
           <div style={{ display: "grid", gap: 16 }}>
             <WorkspaceTextArea value={complaintForm.reopenReason} onChange={(event) => setComplaintForm((current) => ({ ...current, reopenReason: event.target.value }))} rows={6} placeholder="Reason to reopen" />
             <div style={{ display: "flex", justifyContent: "flex-end", gap: 12 }}>
+              {isMyCasesDetail ? <WorkspaceButton type="button" variant="ghost" onClick={closeActionModal} disabled={actionLoading}>Cancel</WorkspaceButton> : null}
               <WorkspaceButton type="button" disabled={actionLoading || complaintForm.reopenReason.trim().length < 3} onClick={() => runAction("reopen", () => apiClient.patch(`/complaints/${id}/reopen`, { reason: complaintForm.reopenReason.trim() }))}>
                 Confirm Reopen
               </WorkspaceButton>
@@ -1053,6 +1468,7 @@ export default function AdminCaseDetail() {
           <div style={{ display: "grid", gap: 16 }}>
             <WorkspaceTextArea value={complaintForm.closeNote} onChange={(event) => setComplaintForm((current) => ({ ...current, closeNote: event.target.value }))} rows={6} placeholder="Closure note" />
             <div style={{ display: "flex", justifyContent: "flex-end", gap: 12 }}>
+              {isMyCasesDetail ? <WorkspaceButton type="button" variant="ghost" onClick={closeActionModal} disabled={actionLoading}>Cancel</WorkspaceButton> : null}
               <WorkspaceButton type="button" disabled={actionLoading || complaintForm.closeNote.trim().length < 3} onClick={() => runAction("close", () => apiClient.patch(`/complaints/${id}/close`, { note: complaintForm.closeNote.trim() }))}>
                 Confirm Close
               </WorkspaceButton>
@@ -1069,9 +1485,20 @@ function DetailItem({ label, value, valueStyle }) {
   return (
     <div>
       <p style={{ fontSize: 11, color: C.t3, fontWeight: 700, textTransform: "uppercase", letterSpacing: ".08em", marginBottom: 8 }}>{label}</p>
-      <p style={{ margin: 0, fontSize: 14, fontWeight: 400, color: C.t1, lineHeight: 1.5, whiteSpace: "pre-wrap", wordBreak: "break-word", ...(valueStyle || {}) }}>
+      <p style={{ margin: 0, fontSize: 14, fontWeight: 400, color: C.t1, lineHeight: 1.6, whiteSpace: "pre-wrap", wordBreak: "break-word", ...(valueStyle || {}) }}>
         {value}
       </p>
+    </div>
+  );
+}
+
+function InlineActionFeedback({ feedback }) {
+  const { C } = usePortalTheme();
+  if (!feedback) return null;
+  const color = feedback.tone === "green" ? C.mint : feedback.tone === "amber" ? C.warn : C.t2;
+  return (
+    <div style={{ marginTop: 8, fontSize: 13, fontWeight: 600, color }}>
+      {feedback.message}
     </div>
   );
 }

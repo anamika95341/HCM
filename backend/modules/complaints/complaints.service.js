@@ -26,7 +26,8 @@ function sanitizeOptional(input) {
 function complaintLogTypeLabel(logType) {
   if (logType === 'phone_call') return 'Phone Call';
   if (logType === 'mail') return 'Mail';
-  if (logType === 'letter_summary') return 'Letter Summary';
+  if (logType === 'letter_summary') return 'Letter';
+  if (logType === 'meeting') return 'Meeting';
   return 'Log';
 }
 
@@ -322,6 +323,7 @@ async function reassignComplaint(complaintId, actorId, adminId, reason, reqMeta)
     actionLabel: 'reassign this complaint',
   });
 
+  const sanitizedReason = sanitizeOptional(reason) || 'Complaint reassigned';
   const complaint = await applyComplaintTransition({
     complaintId,
     actorId,
@@ -335,13 +337,13 @@ async function reassignComplaint(complaintId, actorId, adminId, reason, reqMeta)
       'followup_in_progress',
     ],
     actionLabel: 'reassign this complaint',
-    note: sanitizeText(reason),
+    note: sanitizedReason,
     patch: {
       assigned_admin_id: adminId,
       handoff_type: 'reassigned',
       handoff_by_admin_id: actorId,
       handoff_to_admin_id: adminId,
-      status_reason: sanitizeText(reason),
+      status_reason: sanitizedReason,
     },
   });
 
@@ -501,9 +503,11 @@ async function logComplaintAction(complaintId, actorId, body, reqMeta) {
   }
   assertComplaintAdminAccess(current, actorId, { actionLabel: 'log this complaint activity' });
   const summary = sanitizeOptional(body.summary);
+  const logTypes = Array.isArray(body.logTypes) ? body.logTypes : [];
+  const logLabels = logTypes.map(complaintLogTypeLabel).join(', ');
   const note = summary
-    ? `${complaintLogTypeLabel(body.logType)}: ${summary}`
-    : `${complaintLogTypeLabel(body.logType)} logged`;
+    ? `${logLabels}: ${summary}`
+    : `${logLabels} logged`;
 
   const complaint = await applyComplaintTransition({
     complaintId,
@@ -513,7 +517,7 @@ async function logComplaintAction(complaintId, actorId, body, reqMeta) {
     allowedPreviousStatuses: ['assigned', 'in_review', 'call_scheduled', 'followup_in_progress'],
     actionLabel: 'log this complaint activity',
     note,
-    patch: summary ? { call_outcome: summary } : {},
+    patch: { call_outcome: note },
   });
 
   await writeAuditLog({
@@ -524,7 +528,7 @@ async function logComplaintAction(complaintId, actorId, body, reqMeta) {
     action: 'complaint_log_added',
     ipAddress: reqMeta.ip,
     userAgent: reqMeta.userAgent,
-    metadata: { logType: body.logType },
+    metadata: { logTypes },
   });
 
   return complaint;

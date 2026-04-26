@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { Calendar, ChevronLeft, ChevronRight, Clock, Eye, FileText, Filter, Search } from "lucide-react";
 import { RiTeamLine } from "react-icons/ri";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
@@ -36,7 +36,7 @@ function formatDateValue(date) {
 function formatDisplayDate(value) {
   const parsedDate = parseDateValue(value);
   if (!parsedDate) return "";
-  return parsedDate.toLocaleDateString("en-US", { day: "2-digit", month: "short", year: "numeric" });
+  return parsedDate.toLocaleDateString("en-GB", { day: "2-digit", month: "2-digit", year: "2-digit" });
 }
 
 function buildCalendarDays(monthStart) {
@@ -84,11 +84,27 @@ function formatDateOnly(value) {
   if (!value) return "Not provided";
   const parsed = new Date(value);
   if (Number.isNaN(parsed.getTime())) return "Not provided";
-  return parsed.toLocaleDateString("en-IN", {
+  return parsed.toLocaleDateString("en-GB", {
     day: "2-digit",
     month: "2-digit",
-    year: "numeric",
+    year: "2-digit",
   });
+}
+
+function formatDateTimeLabel(value) {
+  if (!value) return "Pending";
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return "Pending";
+  const dateLabel = parsed.toLocaleDateString("en-GB", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "2-digit",
+  });
+  const timeLabel = parsed.toLocaleTimeString("en-IN", {
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+  return `${dateLabel} ${timeLabel}`;
 }
 
 function formatTimeOnly(value) {
@@ -99,6 +115,18 @@ function formatTimeOnly(value) {
     hour: "2-digit",
     minute: "2-digit",
   });
+}
+
+function hasMeetingSchedulePassed(meeting) {
+  const referenceValue = meeting?.scheduled_at;
+  if (!referenceValue) return false;
+  const scheduledAt = new Date(referenceValue);
+  if (Number.isNaN(scheduledAt.getTime())) return false;
+  return scheduledAt.getTime() <= Date.now();
+}
+
+function isScheduledLikeStatus(status) {
+  return status === "scheduled" || status === "rescheduled";
 }
 
 function CustomDateFilter({ value, onChange, placeholder, min, max }) {
@@ -179,7 +207,8 @@ function CustomDateFilter({ value, onChange, placeholder, min, max }) {
           border: `1px solid ${C.border}`,
           background: C.inp,
           color: value ? C.t1 : C.t3,
-          fontSize: 13,
+          fontSize: 11,
+          lineHeight: 1.2,
           outline: "none",
           borderRadius: "var(--portal-radius-sm, 10px)",
           display: "flex",
@@ -861,7 +890,8 @@ function buildMeetingActions(meeting, adminId) {
   if (["pending", "accepted", "verification_pending", "verified", "not_verified"].includes(status)) actions.push(["reject", "Reject Meeting"]);
   if (["accepted", "not_verified"].includes(status)) actions.push(["sendVerification", "Send for DEO Verification"]);
   if (["accepted", "verified", "VERIFIED_BY_DEO"].includes(status)) actions.push(["schedule", "Schedule Meeting"]);
-  if (status === "scheduled") {
+  if (isScheduledLikeStatus(status)) {
+    actions.push(["reschedule", "Reschedule Meeting"]);
     actions.push(["complete", "Mark as Completed"]);
     actions.push(["scheduledReject", "Cancel Meeting"]);
   }
@@ -899,6 +929,80 @@ function NoticeBox({ tone, label, value }) {
     <div style={{ padding: 16, borderRadius: 10, border: `1px solid ${color}33`, background: `${color}12` }}>
       <p style={{ fontSize: 11, fontWeight: 700, color, textTransform: "uppercase", marginBottom: 8 }}>{label}</p>
       <p style={{ fontSize: 13, color: C.t2 }}>{value}</p>
+    </div>
+  );
+}
+
+const MEETING_TIMELINE_STATUSES = new Set(["accepted", "verification_pending", "verified", "scheduled", "cancelled", "rejected", "rescheduled", "completed"]);
+
+function buildMeetingTimeline(history, currentStatus) {
+  const filteredHistory = Array.isArray(history)
+    ? history.filter((event) => MEETING_TIMELINE_STATUSES.has(event?.new_status))
+    : [];
+
+  const deduped = filteredHistory.reduce((items, event) => {
+    const existingIndex = items.findIndex((item) => item.new_status === event.new_status);
+    if (existingIndex >= 0) items[existingIndex] = event;
+    else items.push(event);
+    return items;
+  }, []);
+
+  if (MEETING_TIMELINE_STATUSES.has(currentStatus) && !deduped.some((event) => event.new_status === currentStatus)) {
+    deduped.push({ new_status: currentStatus, actor_role: "", created_at: null });
+  }
+
+  return deduped;
+}
+
+function buildMeetingNoticeItems(meeting) {
+  if (!meeting) return [];
+
+  const hasContent = (value) => typeof value === "string" ? value.trim().length > 0 : Boolean(value);
+  const items = [];
+  if (hasContent(meeting.rejection_reason)) items.push({ tone: "red", label: "Rejection Reason", value: meeting.rejection_reason.trim() });
+  if (hasContent(meeting.verification_reason)) items.push({ tone: "amber", label: "Verification Reason", value: meeting.verification_reason.trim() });
+  if (hasContent(meeting.admin_comments)) {
+    items.push({
+      tone: "blue",
+      label: meeting.status === "rescheduled" ? "Rescheduled Reason" : "Schedule Summary",
+      value: meeting.admin_comments.trim(),
+    });
+  }
+  if (hasContent(meeting.completionNote)) items.push({ tone: "green", label: "Completed Summary", value: meeting.completionNote.trim() });
+  if (hasContent(meeting.cancellationReason)) items.push({ tone: "red", label: "Cancellation Reason", value: meeting.cancellationReason.trim() });
+  return items;
+}
+
+function MeetingTimeline({ history }) {
+  const { C } = usePortalTheme();
+
+  return (
+    <div style={{ display: "grid", gap: 18, overflowY: "auto", paddingRight: 6, flex: 1, minHeight: 0 }}>
+      {history.length === 0 ? (
+        <p style={{ fontSize: 13, color: C.t3 }}>No timeline events yet.</p>
+      ) : (
+        history.map((event, index) => (
+          <div key={`${event.new_status}-${event.created_at || index}`} className="flex gap-4">
+            <div className="flex flex-col items-center" style={{ flexShrink: 0 }}>
+              <div className="h-3 w-3 rounded-full" style={{ background: C.purple, border: `2px solid ${C.card}` }} />
+              {index !== history.length - 1 ? <div className="mt-2 w-0.5 flex-1 min-h-10" style={{ background: C.purple }} /> : null}
+            </div>
+            <div className="flex-1 pb-2">
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <p style={{ margin: 0, fontWeight: 600, color: C.t1 }}>{statusLabel(event.new_status)}</p>
+                  {event.actor_role ? <p style={{ fontSize: 12, color: C.t3, marginTop: 4, marginBottom: 0 }}>{event.actor_role}</p> : null}
+                </div>
+                {event.created_at ? (
+                  <p style={{ fontSize: 12, color: C.t3, whiteSpace: "nowrap", margin: 0 }}>
+                    {new Date(event.created_at).toLocaleDateString("en-GB", { day: "2-digit", month: "2-digit", year: "2-digit" })}
+                  </p>
+                ) : null}
+              </div>
+            </div>
+          </div>
+        ))
+      )}
     </div>
   );
 }
@@ -1004,6 +1108,7 @@ export default function AdminMeeting() {
   const [rejectReason, setRejectReason] = useState("");
   const [scheduleError, setScheduleError] = useState("");
   const [selectedAction, setSelectedAction] = useState("");
+  const [showBlockedCompletionModal, setShowBlockedCompletionModal] = useState(false);
   const [completeNote, setCompleteNote] = useState("");
   const [scheduledRejectNote, setScheduledRejectNote] = useState("");
   const [isBackHovered, setIsBackHovered] = useState(false);
@@ -1012,6 +1117,8 @@ export default function AdminMeeting() {
   const [hoveredPagerButton, setHoveredPagerButton] = useState(null);
   const [itemsPerPage, setItemsPerPage] = useState(7);
   const [showEntriesFocused, setShowEntriesFocused] = useState(false);
+  const detailCardRef = useRef(null);
+  const [detailContentHeight, setDetailContentHeight] = useState(null);
 
   async function loadMeetingPool() {
     const [queueResponse, directoryResponse] = await Promise.all([
@@ -1125,7 +1232,7 @@ export default function AdminMeeting() {
   );
 
   const queueStats = useMemo(() => {
-    const scheduled = meetings.filter((meeting) => meeting.status === "scheduled").length;
+    const scheduled = meetings.filter((meeting) => isScheduledLikeStatus(meeting.status)).length;
     return [
       { label: "Total Meetings", value: personalMeetingQueue.length },
       { label: "Scheduled", value: scheduled },
@@ -1148,6 +1255,18 @@ export default function AdminMeeting() {
     setCurrentPage((page) => Math.min(page, totalPages));
   }, [totalPages]);
 
+  useLayoutEffect(() => {
+    if (!detailCardRef.current || typeof ResizeObserver === "undefined") return undefined;
+    const updateHeight = () => {
+      if (!detailCardRef.current) return;
+      setDetailContentHeight(detailCardRef.current.offsetHeight || null);
+    };
+    updateHeight();
+    const observer = new ResizeObserver(() => updateHeight());
+    observer.observe(detailCardRef.current);
+    return () => observer.disconnect();
+  }, [selectedMeeting, history, selectedAction, actionError, successMessage]);
+
   const availableActions = useMemo(
     () => buildMeetingActions(selectedMeeting || {}, adminId),
     [selectedMeeting, adminId]
@@ -1158,6 +1277,16 @@ export default function AdminMeeting() {
     if (id) {
       await loadMeetingDetail(id);
     }
+  }
+
+  async function assignMeetingToCurrentAdmin() {
+    return runAction(
+      () => apiClient.patch(`/meetings/${meetingId}/assign-self`, {}),
+      {
+        successMessage: "Meeting successfully assigned to you.",
+        successRedirect: PATHS.admin.meetings,
+      }
+    );
   }
 
   async function runAction(request, options = {}) {
@@ -1210,6 +1339,15 @@ export default function AdminMeeting() {
     setSelectedAction("");
   }
 
+  function handleWorkflowActionChange(nextAction) {
+    if (nextAction === "complete" && selectedMeeting && !hasMeetingSchedulePassed(selectedMeeting)) {
+      setSelectedAction("");
+      setShowBlockedCompletionModal(true);
+      return;
+    }
+    setSelectedAction(nextAction);
+  }
+
   function handleSuccessModalClose() {
     const redirectPath = pendingSuccessRedirect;
     setSuccessMessage("");
@@ -1231,17 +1369,18 @@ export default function AdminMeeting() {
     const isAssignedToCurrentAdmin = selectedMeeting.assignedAdminUserId === adminId;
     const isUnassignedPoolMeeting = selectedMeeting.status === "pending" && !selectedMeeting.assignedAdminUserId;
     const canSendVerification = isAssignedToCurrentAdmin && ["accepted", "not_verified", "verification_pending", "verified"].includes(selectedMeeting.status);
-    const canSchedule = isAssignedToCurrentAdmin && ["accepted", "verified", "VERIFIED_BY_DEO", "scheduled"].includes(selectedMeeting.status);
-    const canUploadPhotos = isAssignedToCurrentAdmin && ["scheduled", "completed"].includes(selectedMeeting.status);
+    const canSchedule = isAssignedToCurrentAdmin && ["accepted", "verified", "VERIFIED_BY_DEO", "scheduled", "rescheduled"].includes(selectedMeeting.status);
+    const canUploadPhotos = isAssignedToCurrentAdmin && ["scheduled", "rescheduled", "completed"].includes(selectedMeeting.status);
     const verificationPending = ["verification_pending", "SENT_FOR_DEO_VERIFICATION"].includes(selectedMeeting.status);
     const verificationDone = ["verified", "VERIFIED_BY_DEO"].includes(selectedMeeting.status);
-    const meetingScheduled = selectedMeeting.status === "scheduled";
+    const meetingScheduled = isScheduledLikeStatus(selectedMeeting.status);
     const workflowDisplayLabel =
       verificationPending || verificationDone
         ? "Send for DEO Verification"
         : meetingScheduled
-          ? "Schedule Meeting"
+          ? "Meeting Actions"
           : "Select workflow action";
+    const citizenMeetingFiles = meetingFiles.filter((file) => file.kind !== "meeting_photo");
     const isCompletedMeetingDetail = selectedMeeting.status === "completed";
     const showAssignToMeButton = !selectedMeeting.assignedAdminUserId && (isMeetingPoolDetail || isUnassignedPoolMeeting);
     const showWorkflowActions = !showAssignToMeButton && !isResolvedCompletedDetail && selectedMeeting.status !== "completed";
@@ -1258,37 +1397,32 @@ export default function AdminMeeting() {
             ? PATHS.admin.workQueue
             : PATHS.admin.meetings;
     const backLabel = isMeetingPoolDetail
-      ? "Back to Meeting Pool"
+      ? "Back"
       : isResolvedCompletedDetail
-        ? "Back to Completed Meettings"
+        ? "Back"
       : isWorkQueueDetail
         ? "Back to Work Queue"
       : isMeetingQueueDetail
-        ? "Back to Meetings"
+        ? "Back"
         : "Back to Meeting Queue";
     const citizenName = [selectedMeeting.first_name, selectedMeeting.last_name].filter(Boolean).join(" ") || "Unknown";
     const citizenPhone = selectedMeeting.mobile_number || "Not provided";
+    const citizenDistrict = selectedMeeting.citizenSnapshot?.district || "Not provided";
+    const citizenLocalMp = selectedMeeting.citizenSnapshot?.localMp || "Not provided";
     const createdAtLabel = formatDateOnly(selectedMeeting.createdAt || selectedMeeting.created_at);
     const updatedAtLabel = formatDateOnly(selectedMeeting.updatedAt || selectedMeeting.updated_at || selectedMeeting.createdAt || selectedMeeting.created_at);
     const preferredMeetingDateLabel = formatDateOnly(selectedMeeting.preferred_time);
     const preferredMeetingTimeLabel = formatTimeOnly(selectedMeeting.preferred_time);
     const meetingStatusLabel = statusLabel(selectedMeeting.status);
     const citizenContact = selectedMeeting.mobile_number || selectedMeeting.email || "Not provided";
-    const scheduledAtLabel = selectedMeeting.scheduled_at ? new Date(selectedMeeting.scheduled_at).toLocaleString("en-IN") : "Pending";
+    const scheduledAtLabel = formatDateTimeLabel(selectedMeeting.scheduled_at);
     const scheduledLocationLabel = selectedMeeting.scheduled_location || "Pending";
-    const hasReasonDetails = Boolean(
-      selectedMeeting.rejection_reason ||
-      selectedMeeting.verification_reason ||
-      selectedMeeting.admin_comments ||
-      selectedMeeting.completionNote ||
-      selectedMeeting.cancellationReason
-    );
-    const detailPanelHeight = hasReasonDetails ? "auto" : 540;
-
+    const meetingTimeline = buildMeetingTimeline(history, selectedMeeting.status);
+    const meetingNoticeItems = buildMeetingNoticeItems(selectedMeeting);
     return (
       <WorkspacePage
         width={1280}
-        outerStyle={isWorkQueueDetail && !isCompletedMeetingDetail ? { height: "calc(100vh - 73px)", overflow: "hidden" } : undefined}
+        outerStyle={isWorkQueueDetail && !isCompletedMeetingDetail ? { height: "calc(100vh - 73px)", overflow: "auto" } : undefined}
         contentStyle={isWorkQueueDetail && !isCompletedMeetingDetail ? { height: "100%", display: "flex", flexDirection: "column", minHeight: 0 } : undefined}
       >
         <SuccessModal open={!!successMessage} message={successMessage} onClose={handleSuccessModalClose} />
@@ -1362,7 +1496,7 @@ export default function AdminMeeting() {
           </div>
         )}
 
-        <div style={{ display: "grid", gap: isWorkQueueDetail ? 16 : 24, flex: isWorkQueueDetail ? 1 : undefined, minHeight: isWorkQueueDetail ? 0 : undefined, overflow: isWorkQueueDetail ? "hidden" : undefined }}>
+        <div style={{ display: "grid", gap: isWorkQueueDetail ? 16 : 24, flex: isWorkQueueDetail ? 1 : undefined, minHeight: isWorkQueueDetail ? 0 : undefined }}>
           {error ? <WorkspaceCard style={{ color: C.danger }}>{error}</WorkspaceCard> : null}
           {actionError ? <WorkspaceCard style={{ color: C.danger }}>{actionError}</WorkspaceCard> : null}
 
@@ -1371,10 +1505,7 @@ export default function AdminMeeting() {
               <WorkspaceButton
                 type="button"
                 disabled={actionLoading}
-                onClick={() => runAction(
-                  () => apiClient.patch(`/meetings/${meetingId}/assign-self`, {}),
-                  { successMessage: "Meeting successfully assigned to you.", successRedirect: PATHS.admin.meetings }
-                )}
+                onClick={assignMeetingToCurrentAdmin}
                 style={isWorkQueueDetail ? { boxShadow: "none" } : undefined}
               >
                 Assign to Me
@@ -1383,7 +1514,7 @@ export default function AdminMeeting() {
               <div>
                 <WorkspaceSelect
                   value={selectedAction}
-                  onChange={(event) => setSelectedAction(event.target.value)}
+                  onChange={(event) => handleWorkflowActionChange(event.target.value)}
                 >
                   <option value="">Select workflow action</option>
                   {availableActions.map(([value, label]) => (
@@ -1396,162 +1527,268 @@ export default function AdminMeeting() {
 
           {isWorkQueueDetail ? (
             isCompletedMeetingDetail ? (
-              <div
-                style={{
-                  display: "grid",
-                  gap: 24,
-                  gridTemplateColumns: "minmax(0, 7fr) minmax(280px, 3fr)",
-                  alignItems: "stretch",
-                  flex: 1,
-                  minHeight: 0,
-                }}
-              >
-                <WorkspaceCard style={{ marginBottom: 0, minHeight: 540, display: "flex", flexDirection: "column" }}>
-                  <div style={{ paddingBottom: 16, marginBottom: 20, borderBottom: `1px solid ${C.border}` }}>
-                    <div
-                      style={{
-                        display: "inline-flex",
-                        alignItems: "center",
-                        justifyContent: "center",
-                        gap: 8,
-                        minHeight: 38,
-                        padding: "0 16px",
-                        borderRadius: 10,
-                        background: C.mint,
-                        color: "#ffffff",
-                        fontSize: 13,
-                        fontWeight: 600,
-                        lineHeight: 1.2,
-                        cursor: "default",
-                        userSelect: "none",
-                      }}
-                    >
-                      <span aria-hidden="true">✓</span>
-                      Completed
+              <>
+                <div
+                  style={{
+                    display: "grid",
+                    gap: 24,
+                    gridTemplateColumns: "minmax(0, 7fr) minmax(280px, 3fr)",
+                    alignItems: "start",
+                    flex: 1,
+                    minHeight: 0,
+                  }}
+                >
+                  <div ref={detailCardRef}>
+                    <WorkspaceCard style={{ marginBottom: 0, display: "flex", flexDirection: "column" }}>
+                    <div style={{ paddingBottom: 16, marginBottom: 20, borderBottom: `1px solid ${C.border}` }}>
+                      <div
+                        style={{
+                          display: "inline-flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          gap: 8,
+                          minHeight: 38,
+                          padding: "0 16px",
+                          borderRadius: 10,
+                          background: C.mint,
+                          color: "#ffffff",
+                          fontSize: 13,
+                          fontWeight: 600,
+                          lineHeight: 1.2,
+                          cursor: "default",
+                          userSelect: "none",
+                        }}
+                      >
+                        <span aria-hidden="true">✓</span>
+                        Completed
+                      </div>
                     </div>
+                    <div style={{ display: "grid", gap: 18, flex: 1, minHeight: 0, overflowY: "auto", paddingRight: 2 }}>
+                      <InlineDetailGrid columns={3}>
+                        <DetailItem label="Meeting Id" value={selectedMeeting.requestId || selectedMeeting.id} />
+                        <div />
+                        <DetailItem label="Completion Date" value={formatDateOnly(selectedMeeting.completedAt || selectedMeeting.updated_at || selectedMeeting.updatedAt)} />
+                      </InlineDetailGrid>
+                      <InlineDetailGrid columns={3}>
+                        <DetailItem label="Created At" value={createdAtLabel} />
+                        <DetailItem label="Citizen Name" value={citizenName} />
+                        <DetailItem label="Citizen Phone Number" value={citizenPhone} />
+                      </InlineDetailGrid>
+                      <InlineDetailGrid columns={3}>
+                        <DetailItem label="District" value={citizenDistrict} />
+                        <DetailItem label="MP of District" value={citizenLocalMp} />
+                        <div />
+                      </InlineDetailGrid>
+                      <div>
+                        <p style={{ fontSize: 11, color: C.t3, fontWeight: 700, textTransform: "uppercase", letterSpacing: ".08em", marginBottom: 8 }}>Meeting Title</p>
+                        <p style={{ margin: 0, fontSize: 14, fontWeight: 400, color: C.t1, lineHeight: 1.6, whiteSpace: "pre-wrap", wordBreak: "break-word" }}>
+                          {selectedMeeting.title || selectedMeeting.purpose || "Untitled Meeting"}
+                        </p>
+                      </div>
+                      <InlineDetailGrid columns={3}>
+                        <DetailItem label="Preferred Date" value={preferredMeetingDateLabel} />
+                        <DetailItem label="Preferred Time" value={preferredMeetingTimeLabel} />
+                        <div />
+                      </InlineDetailGrid>
+                      <InlineDetailGrid columns={3}>
+                        <DetailItem label="Scheduled At" value={scheduledAtLabel} />
+                        <DetailItem label="Scheduled Location" value={scheduledLocationLabel} />
+                        <DetailItem
+                          label="VIP Meeting"
+                          value={(
+                            <WorkspaceBadge color={selectedMeeting.is_vip ? C.mint : C.danger} title={selectedMeeting.is_vip ? "Yes" : "No"}>
+                              {selectedMeeting.is_vip ? "Yes" : "No"}
+                            </WorkspaceBadge>
+                          )}
+                        />
+                      </InlineDetailGrid>
+                      <div>
+                        <p style={{ fontSize: 11, color: C.t3, fontWeight: 700, textTransform: "uppercase", letterSpacing: ".08em", marginBottom: 8 }}>Purpose Of Meeting</p>
+                        <p style={{ margin: 0, fontSize: 14, fontWeight: 400, color: C.t1, lineHeight: 1.6, whiteSpace: "pre-wrap", wordBreak: "break-word" }}>
+                          {selectedMeeting.purpose || selectedMeeting.description || "Not provided"}
+                        </p>
+                      </div>
+                      {meetingNoticeItems.length ? (
+                        <div className="space-y-3">
+                          {meetingNoticeItems.map((item) => (
+                            <NoticeBox key={`${item.label}-${item.value}`} tone={item.tone} label={item.label} value={item.value} />
+                          ))}
+                        </div>
+                      ) : null}
+                    </div>
+                    </WorkspaceCard>
                   </div>
-                  <div style={{ display: "grid", gap: 18, flex: 1, minHeight: 0, overflowY: "auto", paddingRight: 2 }}>
-                    <InlineDetailGrid columns={3}>
+
+                  <WorkspaceCard
+                    style={{
+                      marginBottom: 0,
+                      height: detailContentHeight || "auto",
+                      maxHeight: detailContentHeight || "none",
+                      display: "flex",
+                      flexDirection: "column",
+                    }}
+                  >
+                    <div className="flex items-center gap-2 mb-6">
+                      <FileText size={22} color={C.purple} />
+                      <h2 style={{ fontSize: 24, fontWeight: 700, color: C.t1 }}>Timeline</h2>
+                    </div>
+                    <MeetingTimeline history={meetingTimeline} />
+                  </WorkspaceCard>
+                </div>
+
+                <WorkspaceCard style={{ marginBottom: 0 }}>
+                <WorkspaceCardHeader
+                  title="Meeting Files"
+                  subtitle="View the citizen submission files and uploaded meeting artifacts."
+                />
+                {meetingFiles.length === 0 ? (
+                  <div style={{ fontSize: 13, color: C.t3, padding: "2px 0" }}>No files attached to this meeting yet.</div>
+                ) : (
+                    <div style={{ display: "grid", gap: 10 }}>
+                      {meetingFiles.map((file) => (
+                        <div key={file.id} style={{ padding: 10, borderRadius: 12, border: `1px solid ${C.border}`, background: C.bgElevated }}>
+                          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
+                            <div>
+                              <div style={{ fontSize: 13, fontWeight: 700, color: C.t1 }}>{file.name}</div>
+                              <div style={{ marginTop: 4, fontSize: 12, color: C.t3 }}>{file.mimeType}</div>
+                            </div>
+                            <WorkspaceButton
+                              type="button"
+                              variant="outline"
+                              onClick={() => openDownloadUrl(file.downloadUrl)}
+                            >
+                              Download
+                            </WorkspaceButton>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </WorkspaceCard>
+              </>
+            ) : (
+              <>
+                <WorkspaceCard
+                  style={
+                    isMeetingPoolDetail
+                      ? { marginBottom: 0, height: "auto", display: "flex", flexDirection: "column", paddingTop: 14 }
+                      : { marginBottom: 0, flex: 1, minHeight: 0, display: "flex", flexDirection: "column", paddingTop: 24 }
+                  }
+                >
+                  {isMeetingPoolDetail ? (
+                    <div style={{ padding: "0 0 14px 0", marginLeft: 2, borderBottom: `1px solid ${C.border}`, marginBottom: 18 }}>
+                      <WorkspaceButton
+                        type="button"
+                        disabled={actionLoading}
+                        onClick={assignMeetingToCurrentAdmin}
+                        style={{ boxShadow: "none" }}
+                      >
+                        Assign to Me
+                      </WorkspaceButton>
+                    </div>
+                  ) : (
+                    <WorkspaceCardHeader title="Meeting Information" />
+                  )}
+                  <div
+                    style={
+                      isMeetingPoolDetail
+                        ? { display: "grid", gap: 18, paddingRight: 2 }
+                        : { display: "grid", gap: 18, flex: 1, minHeight: 0, overflowY: "auto", paddingRight: 2 }
+                    }
+                  >
+                    <div className="grid md:grid-cols-3 gap-6">
                       <DetailItem label="Meeting Id" value={selectedMeeting.requestId || selectedMeeting.id} />
+                      <DetailItem label="Updated At" value={updatedAtLabel} />
+                      <DetailItem
+                        label="Status"
+                        value={(
+                          <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-start", gap: 8 }}>
+                            <WorkspaceBadge status={selectedMeeting.status} title={meetingStatusLabel}>
+                              {meetingStatusLabel}
+                            </WorkspaceBadge>
+                          </div>
+                        )}
+                      />
+                    </div>
+                    <div className="grid md:grid-cols-3 gap-6">
+                      <DetailItem label="Created At" value={createdAtLabel} />
                       <DetailItem label="Citizen Name" value={citizenName} />
-                      <DetailItem label="Completed Date" value={formatDateOnly(selectedMeeting.completedAt || selectedMeeting.updated_at || selectedMeeting.updatedAt)} />
-                    </InlineDetailGrid>
+                      <DetailItem label="Citizen Phone Number" value={citizenPhone} />
+                    </div>
+                    <div className="grid md:grid-cols-3 gap-6">
+                      <DetailItem label="District" value={citizenDistrict} />
+                      <DetailItem label="MP of District" value={citizenLocalMp} />
+                      <div />
+                    </div>
                     <div>
-                      <p style={{ fontSize: 11, color: C.t3, fontWeight: 700, textTransform: "uppercase", letterSpacing: ".08em", marginBottom: 8 }}>Title</p>
-                      <p style={{ margin: 0, fontSize: 14, fontWeight: 400, color: C.t1, lineHeight: 1.6, whiteSpace: "pre-wrap", wordBreak: "break-word" }}>
+                      <p style={{ fontSize: 11, color: C.t3, fontWeight: 700, textTransform: "uppercase", letterSpacing: ".08em", marginBottom: 8 }}>Meeting Title</p>
+                      <p style={{ margin: 0, fontSize: 14, fontWeight: 400, color: C.t1, lineHeight: 1.6, whiteSpace: "normal", wordBreak: "break-word" }}>
                         {selectedMeeting.title || selectedMeeting.purpose || "Untitled Meeting"}
                       </p>
                     </div>
-                    <InlineDetailGrid columns={3}>
-                      <DetailItem label="Created At" value={createdAtLabel} />
-                      <DetailItem label="Preferred Time" value={preferredMeetingTimeLabel} />
-                      <DetailItem label="Scheduled Location" value={scheduledLocationLabel} />
-                    </InlineDetailGrid>
-                    <InlineDetailGrid columns={3}>
-                      <DetailItem label="Citizen Phone Number" value={citizenPhone} />
+                    <div className="grid md:grid-cols-3 gap-6">
                       <DetailItem label="Preferred Date" value={preferredMeetingDateLabel} />
+                      <DetailItem label="Preferred Time" value={preferredMeetingTimeLabel} />
+                      <div />
+                    </div>
+                    <div className="grid md:grid-cols-3 gap-6">
                       <DetailItem label="Scheduled At" value={scheduledAtLabel} />
-                    </InlineDetailGrid>
+                      <DetailItem label="Scheduled Location" value={scheduledLocationLabel} />
+                      <DetailItem
+                        label="VIP Meeting"
+                        value={(
+                          <WorkspaceBadge color={selectedMeeting.is_vip ? C.mint : C.danger} title={selectedMeeting.is_vip ? "Yes" : "No"}>
+                            {selectedMeeting.is_vip ? "Yes" : "No"}
+                          </WorkspaceBadge>
+                        )}
+                      />
+                    </div>
                     <div>
-                      <p style={{ fontSize: 11, color: C.t3, fontWeight: 700, textTransform: "uppercase", letterSpacing: ".08em", marginBottom: 8 }}>Description</p>
+                      <p style={{ fontSize: 11, color: C.t3, fontWeight: 700, textTransform: "uppercase", letterSpacing: ".08em", marginBottom: 8 }}>Purpose Of Meeting</p>
                       <p style={{ margin: 0, fontSize: 14, fontWeight: 400, color: C.t1, lineHeight: 1.6, whiteSpace: "pre-wrap", wordBreak: "break-word" }}>
                         {selectedMeeting.purpose || selectedMeeting.description || "Not provided"}
                       </p>
                     </div>
-                    {selectedMeeting.completionNote ? <NoticeBox tone="green" label="MARK AS COMPLETED SUMMARY" value={selectedMeeting.completionNote} /> : null}
                   </div>
+                  {meetingNoticeItems.length ? (
+                    <div className="mt-6 space-y-3">
+                      {meetingNoticeItems.map((item) => (
+                        <NoticeBox key={`${item.label}-${item.value}`} tone={item.tone} label={item.label} value={item.value} />
+                      ))}
+                    </div>
+                  ) : null}
                 </WorkspaceCard>
 
-                <WorkspaceCard style={{ marginBottom: 0, minHeight: 540, display: "flex", flexDirection: "column" }}>
-                  <div className="flex items-center gap-2 mb-6">
-                    <FileText size={22} color={C.purple} />
-                    <h2 style={{ fontSize: 24, fontWeight: 700, color: C.t1 }}>Timeline</h2>
-                  </div>
-                  <div style={{ display: "grid", gap: 18, overflowY: "auto", paddingRight: 6, flex: 1, minHeight: 0 }}>
-                    {history.length === 0 ? (
-                      <p style={{ fontSize: 13, color: C.t3 }}>No timeline events yet.</p>
-                    ) : (
-                      history.map((event, index) => (
-                        <div key={`${event.created_at}-${index}`} className="flex gap-4">
-                          <div className="flex flex-col items-center" style={{ flexShrink: 0 }}>
-                            <div className="h-3 w-3 rounded-full" style={{ background: C.purple, border: `2px solid ${C.card}` }} />
-                            {index !== history.length - 1 ? <div className="mt-2 w-0.5 flex-1 min-h-10" style={{ background: C.purple }} /> : null}
-                          </div>
-                          <div className="flex-1 pb-2">
-                            <div className="flex items-start justify-between gap-3">
-                              <div>
-                                <p style={{ margin: 0, fontWeight: 600, color: C.t1 }}>{statusLabel(event.new_status)}</p>
-                                <p style={{ fontSize: 12, color: C.t3, marginTop: 4, marginBottom: 0 }}>{event.actor_role}</p>
-                              </div>
-                              <p style={{ fontSize: 12, color: C.t3, whiteSpace: "nowrap", margin: 0 }}>{new Date(event.created_at).toLocaleDateString("en-IN")}</p>
+                <WorkspaceCard style={{ marginBottom: 0 }}>
+                <WorkspaceCardHeader
+                  title="Meeting Files"
+                  subtitle="View the citizen submission files and uploaded meeting artifacts."
+                />
+                {meetingFiles.length === 0 ? (
+                  <div style={{ fontSize: 13, color: C.t3, padding: "2px 0" }}>No files attached to this meeting yet.</div>
+                ) : (
+                    <div style={{ display: "grid", gap: 10 }}>
+                      {meetingFiles.map((file) => (
+                        <div key={file.id} style={{ padding: 10, borderRadius: 12, border: `1px solid ${C.border}`, background: C.bgElevated }}>
+                          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
+                            <div>
+                              <div style={{ fontSize: 13, fontWeight: 700, color: C.t1 }}>{file.name}</div>
+                              <div style={{ marginTop: 4, fontSize: 12, color: C.t3 }}>{file.mimeType}</div>
                             </div>
-                            {(!isCompletedMeetingDetail && (event.new_status === "verification_pending" ? "Sent to DEO for Verification" : event.note)) ? (
-                              <p style={{ fontSize: 13, color: C.t2, marginTop: 8, marginBottom: 0, whiteSpace: "normal", wordBreak: "break-word" }}>
-                                {event.new_status === "verification_pending" ? "Sent to DEO for Verification" : event.note}
-                              </p>
-                            ) : null}
+                            <WorkspaceButton
+                              type="button"
+                              variant="outline"
+                              onClick={() => openDownloadUrl(file.downloadUrl)}
+                            >
+                              Download
+                            </WorkspaceButton>
                           </div>
                         </div>
-                      ))
-                    )}
-                  </div>
+                      ))}
+                    </div>
+                  )}
                 </WorkspaceCard>
-              </div>
-            ) : (
-              <WorkspaceCard style={{ marginBottom: 0, flex: 1, minHeight: 0, display: "flex", flexDirection: "column", paddingTop: isMeetingPoolDetail ? 14 : 24 }}>
-                {isMeetingPoolDetail ? (
-                  <div style={{ padding: "0 0 14px 0", marginLeft: 2, borderBottom: `1px solid ${C.border}`, marginBottom: 18 }}>
-                    <WorkspaceButton
-                      type="button"
-                      disabled={actionLoading}
-                      onClick={() => runAction(
-                        () => apiClient.patch(`/meetings/${meetingId}/assign-self`, {}),
-                        { successMessage: "Meeting successfully assigned to you.", successRedirect: PATHS.admin.meetings }
-                      )}
-                      style={{ boxShadow: "none" }}
-                    >
-                      Assign to Me
-                    </WorkspaceButton>
-                  </div>
-                ) : (
-                  <WorkspaceCardHeader title="Meeting Information" />
-                )}
-                <div style={{ display: "grid", gap: 18, flex: 1, minHeight: 0, overflowY: "auto", paddingRight: 2 }}>
-                  <div className="grid md:grid-cols-2 gap-6">
-                    <DetailItem label="Meeting Id" value={selectedMeeting.requestId || selectedMeeting.id} />
-                    <DetailItem label="Created At" value={createdAtLabel} />
-                  </div>
-                  <div>
-                    <p style={{ fontSize: 11, color: C.t3, fontWeight: 700, textTransform: "uppercase", letterSpacing: ".08em", marginBottom: 8 }}>Title</p>
-                    <p style={{ margin: 0, fontSize: 14, fontWeight: 400, color: C.t1, lineHeight: 1.6, whiteSpace: "normal", wordBreak: "break-word" }}>
-                      {selectedMeeting.title || selectedMeeting.purpose || "Untitled Meeting"}
-                    </p>
-                  </div>
-                  <div className="grid md:grid-cols-2 gap-6">
-                    <DetailItem label="Citizen Name" value={citizenName} />
-                    <DetailItem label="Citizen Phone Number" value={citizenPhone} />
-                  </div>
-                  <div className="grid md:grid-cols-2 gap-6">
-                    <DetailItem label="Preferred Date" value={preferredMeetingDateLabel} />
-                    <DetailItem label="Preferred Time" value={preferredMeetingTimeLabel} />
-                  </div>
-                  <div>
-                    <p style={{ fontSize: 11, color: C.t3, fontWeight: 700, textTransform: "uppercase", letterSpacing: ".08em", marginBottom: 8 }}>Description</p>
-                    <p style={{ margin: 0, fontSize: 14, fontWeight: 400, color: C.t1, lineHeight: 1.6, whiteSpace: "pre-wrap", wordBreak: "break-word" }}>
-                      {selectedMeeting.purpose || selectedMeeting.description || "Not provided"}
-                    </p>
-                  </div>
-                </div>
-                {(selectedMeeting.rejection_reason || selectedMeeting.verification_reason || selectedMeeting.admin_comments || selectedMeeting.completionNote || selectedMeeting.cancellationReason) ? (
-                  <div className="mt-6 space-y-3">
-                    {selectedMeeting.rejection_reason ? <NoticeBox tone="red" label="Rejection Reason" value={selectedMeeting.rejection_reason} /> : null}
-                    {selectedMeeting.verification_reason ? <NoticeBox tone="amber" label="Verification Reason" value={selectedMeeting.verification_reason} /> : null}
-                    {selectedMeeting.admin_comments ? <NoticeBox tone="blue" label="Admin Comments" value={selectedMeeting.admin_comments} /> : null}
-                    {selectedMeeting.completionNote ? <NoticeBox tone="blue" label="Completion Note" value={selectedMeeting.completionNote} /> : null}
-                    {selectedMeeting.cancellationReason ? <NoticeBox tone="red" label="Cancellation Reason" value={selectedMeeting.cancellationReason} /> : null}
-                  </div>
-                ) : null}
-              </WorkspaceCard>
+              </>
             )
           ) : (
             <>
@@ -1560,15 +1797,16 @@ export default function AdminMeeting() {
                   display: "grid",
                   gap: 24,
                   gridTemplateColumns: "minmax(0, 7fr) minmax(280px, 3fr)",
-                  alignItems: "stretch",
+                  alignItems: "start",
                 }}
               >
-                <WorkspaceCard style={{ marginBottom: 0, minHeight: 540, height: detailPanelHeight, display: "flex", flexDirection: "column" }}>
+                <div ref={detailCardRef}>
+                  <WorkspaceCard style={{ marginBottom: 0, height: "auto", display: "flex", flexDirection: "column" }}>
                   {showWorkflowActions ? (
                     <div style={{ paddingBottom: 16, marginBottom: 20, borderBottom: `1px solid ${C.border}` }}>
                       <WorkspaceSelect
                         value={selectedAction}
-                        onChange={(event) => setSelectedAction(event.target.value)}
+                        onChange={(event) => handleWorkflowActionChange(event.target.value)}
                         style={{ maxWidth: 320 }}
                       >
                         <option value="">{workflowDisplayLabel}</option>
@@ -1603,7 +1841,7 @@ export default function AdminMeeting() {
                       </div>
                     </div>
                   ) : null}
-                  <div style={{ display: "grid", gap: 18, flex: 1 }}>
+                  <div style={{ display: "grid", gap: 18 }}>
                     <InlineDetailGrid columns={3}>
                       <DetailItem label="Meeting Id" value={selectedMeeting.requestId || selectedMeeting.id} />
                       <DetailItem label="Updated At" value={updatedAtLabel} />
@@ -1618,6 +1856,16 @@ export default function AdminMeeting() {
                         )}
                       />
                     </InlineDetailGrid>
+                    <InlineDetailGrid columns={3}>
+                      <DetailItem label="Created At" value={createdAtLabel} />
+                      <DetailItem label="Citizen Name" value={citizenName} />
+                      <DetailItem label="Citizen Phone Number" value={citizenPhone} />
+                    </InlineDetailGrid>
+                    <InlineDetailGrid columns={3}>
+                      <DetailItem label="District" value={citizenDistrict} />
+                      <DetailItem label="MP of District" value={citizenLocalMp} />
+                      <div />
+                    </InlineDetailGrid>
                     <div>
                       <p style={{ fontSize: 11, color: C.t3, fontWeight: 700, textTransform: "uppercase", letterSpacing: ".08em", marginBottom: 8 }}>Meeting Title</p>
                       <p style={{ margin: 0, fontSize: 14, fontWeight: 400, color: C.t1, lineHeight: 1.6, whiteSpace: "normal", wordBreak: "break-word" }}>
@@ -1625,14 +1873,9 @@ export default function AdminMeeting() {
                       </p>
                     </div>
                     <InlineDetailGrid columns={3}>
-                      <DetailItem label="Citizen Id" value={selectedMeeting.citizen_code || selectedMeeting.citizen_id || "Pending"} />
-                      <DetailItem label="Citizen Name" value={citizenName} />
-                      <DetailItem label="Contact" value={citizenContact} />
-                    </InlineDetailGrid>
-                    <InlineDetailGrid columns={3}>
-                      <DetailItem label="Created At" value={createdAtLabel} />
                       <DetailItem label="Preferred Date" value={preferredMeetingDateLabel} />
                       <DetailItem label="Preferred Time" value={preferredMeetingTimeLabel} />
+                      <div />
                     </InlineDetailGrid>
                     <InlineDetailGrid columns={3}>
                       <DetailItem
@@ -1666,79 +1909,44 @@ export default function AdminMeeting() {
                         {selectedMeeting.purpose || "Not provided"}
                       </p>
                     </div>
-                    {selectedMeeting.rejection_reason ? (
-                      <div>
-                        <p style={{ fontSize: 11, color: C.danger, fontWeight: 700, textTransform: "uppercase", letterSpacing: ".08em", marginBottom: 8 }}>Reason For Rejection</p>
-                        <p style={{ margin: 0, fontSize: 14, fontWeight: 600, color: C.danger, lineHeight: 1.6, whiteSpace: "pre-wrap", wordBreak: "break-word" }}>
-                          {selectedMeeting.rejection_reason}
-                        </p>
-                      </div>
-                    ) : null}
-                    {(selectedMeeting.verification_reason || selectedMeeting.admin_comments || selectedMeeting.completionNote || selectedMeeting.cancellationReason) ? (
+                    {meetingNoticeItems.length ? (
                       <div className="space-y-3">
-                        {selectedMeeting.verification_reason ? <NoticeBox tone="amber" label="Verification Reason" value={selectedMeeting.verification_reason} /> : null}
-                        {selectedMeeting.admin_comments ? <NoticeBox tone="blue" label="Admin Comments" value={selectedMeeting.admin_comments} /> : null}
-                        {selectedMeeting.completionNote ? <NoticeBox tone="blue" label="Completion Note" value={selectedMeeting.completionNote} /> : null}
-                        {selectedMeeting.cancellationReason ? <NoticeBox tone="red" label="Cancellation Reason" value={selectedMeeting.cancellationReason} /> : null}
+                        {meetingNoticeItems.map((item) => (
+                          <NoticeBox key={`${item.label}-${item.value}`} tone={item.tone} label={item.label} value={item.value} />
+                        ))}
                       </div>
                     ) : null}
                   </div>
-                </WorkspaceCard>
+                  </WorkspaceCard>
+                </div>
 
-                <WorkspaceCard style={{ marginBottom: 0, minHeight: 540, height: detailPanelHeight, display: "flex", flexDirection: "column" }}>
+                <WorkspaceCard
+                  style={{
+                    marginBottom: 0,
+                    height: detailContentHeight || "auto",
+                    maxHeight: detailContentHeight || "none",
+                    display: "flex",
+                    flexDirection: "column",
+                  }}
+                >
                   <div className="flex items-center gap-2 mb-6">
                     <FileText size={22} color={C.purple} />
                     <h2 style={{ fontSize: 24, fontWeight: 700, color: C.t1 }}>Timeline</h2>
                   </div>
-                  <div style={{ display: "grid", gap: 18, overflowY: "auto", paddingRight: 6, flex: 1, minHeight: 0 }}>
-                    {history.length === 0 ? (
-                      <p style={{ fontSize: 13, color: C.t3 }}>No timeline events yet.</p>
-                    ) : (
-                      history.map((event, index) => (
-                        <div key={`${event.created_at}-${index}`} className="flex gap-4">
-                          <div className="flex flex-col items-center" style={{ flexShrink: 0 }}>
-                            <div className="h-3 w-3 rounded-full" style={{ background: C.purple, border: `2px solid ${C.card}` }} />
-                            {index !== history.length - 1 ? <div className="mt-2 w-0.5 flex-1 min-h-10" style={{ background: C.purple }} /> : null}
-                          </div>
-                          <div className="flex-1 pb-2">
-                            <div className="flex items-start justify-between gap-3">
-                              <div>
-                                <p style={{ margin: 0, fontWeight: 600, color: C.t1 }}>{statusLabel(event.new_status)}</p>
-                                <p style={{ fontSize: 12, color: C.t3, marginTop: 4, marginBottom: 0 }}>{event.actor_role}</p>
-                              </div>
-                              <p style={{ fontSize: 12, color: C.t3, whiteSpace: "nowrap", margin: 0 }}>{new Date(event.created_at).toLocaleDateString("en-IN")}</p>
-                            </div>
-                            {(event.new_status === "verification_pending" ? "Sent to DEO for Verification" : event.note) ? (
-                              <p style={{ fontSize: 13, color: C.t2, marginTop: 8, marginBottom: 0, whiteSpace: "normal", wordBreak: "break-word" }}>
-                                {event.new_status === "verification_pending" ? "Sent to DEO for Verification" : event.note}
-                              </p>
-                            ) : null}
-                          </div>
-                        </div>
-                      ))
-                    )}
-                  </div>
+                  <MeetingTimeline history={meetingTimeline} />
                 </WorkspaceCard>
               </div>
 
-              <WorkspaceCard>
+              <WorkspaceCard style={{ marginBottom: 0 }}>
                 <WorkspaceCardHeader
                   title="Meeting Files"
-                  subtitle={canUploadPhotos ? "Meeting photos uploaded here are visible from the minister calendar." : "View the citizen submission files and uploaded meeting artifacts."}
+                  subtitle="View the files uploaded by the citizen."
                 />
-                {canUploadPhotos ? (
-                  <div className="flex flex-wrap items-center gap-3">
-                    <input type="file" accept="image/png,image/jpeg" onChange={(event) => setUploadFile(event.target.files?.[0] || null)} />
-                    <WorkspaceButton type="button" disabled={!uploadFile || uploadingFile} onClick={uploadMeetingPhoto}>
-                      {uploadingFile ? "Uploading..." : "Upload Photo"}
-                    </WorkspaceButton>
-                  </div>
-                ) : null}
-                {meetingFiles.length === 0 ? (
+                {citizenMeetingFiles.length === 0 ? (
                   <div style={{ fontSize: 13, color: C.t3, padding: "2px 0" }}>No files attached to this meeting yet.</div>
                 ) : (
                   <div style={{ display: "grid", gap: 10 }}>
-                    {meetingFiles.map((file) => (
+                    {citizenMeetingFiles.map((file) => (
                       <div key={file.id} style={{ padding: 10, borderRadius: 12, border: `1px solid ${C.border}`, background: C.bgElevated }}>
                         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
                           <div>
@@ -1991,11 +2199,29 @@ export default function AdminMeeting() {
           </ModalShell>
         ) : null}
 
+        {showBlockedCompletionModal ? (
+          <ModalShell
+            title="Meeting Not Yet Completed"
+            onClose={() => setShowBlockedCompletionModal(false)}
+            maxWidth={500}
+            minHeight={260}
+          >
+            <div style={{ display: "grid", gap: 20 }}>
+              <p style={{ margin: 0, fontSize: 14, color: C.t2, lineHeight: 1.7 }}>
+                Meeting is yet not completed. You cannot mark it as completed.
+                <br />
+                You can cancel meeting if required.
+              </p>
+            </div>
+          </ModalShell>
+        ) : null}
+
         {selectedAction === "scheduledReject" ? (
           <ModalShell
             title="Cancel Meeting"
             subtitle="Write cancellation comments before confirming."
             onClose={closeActionModal}
+            maxWidth={520}
           >
             <div style={{ display: "grid", gap: 16 }}>
               <div>
@@ -2079,43 +2305,6 @@ export default function AdminMeeting() {
 
           <div style={{ marginBottom: 6 }}>
             <div style={{ marginBottom: 8, display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                <span style={{ fontSize: 12, color: C.t2, whiteSpace: "nowrap" }}>
-                  Show
-                </span>
-                <input
-                  type="number"
-                  min={1}
-                  max={25}
-                  value={itemsPerPage}
-                  onChange={(event) => {
-                    const nextValue = Number(event.target.value);
-                    if (!Number.isFinite(nextValue)) return;
-                    setItemsPerPage(Math.min(25, Math.max(1, nextValue)));
-                    setCurrentPage(1);
-                  }}
-                  onFocus={() => setShowEntriesFocused(true)}
-                  onBlur={() => setShowEntriesFocused(false)}
-                  style={{
-                    width: 64,
-                    minHeight: 34,
-                    padding: "6px 14px",
-                    border: `1px solid ${showEntriesFocused ? C.purple : C.border}`,
-                    borderRadius: "var(--portal-radius-sm, 10px)",
-                    background: C.inp,
-                    color: C.t1,
-                    fontSize: 13,
-                    fontWeight: 500,
-                    outline: "none",
-                    boxShadow: showEntriesFocused ? `0 0 0 3px ${C.purple}1f` : "none",
-                    transition: "border-color var(--portal-duration-fast) ease, box-shadow var(--portal-duration-fast) ease",
-                  }}
-                />
-                <span style={{ fontSize: 12, color: C.t2, whiteSpace: "nowrap" }}>
-                  Entries
-                </span>
-              </div>
-
               <div style={{ marginLeft: "auto", width: "50%", minWidth: 520, display: "grid", gap: 12, gridTemplateColumns: "minmax(280px, 3fr) minmax(140px, 1fr) minmax(140px, 1fr)" }}>
                 <div className="relative">
                   <Search className="absolute left-3 top-2.5" size={17} style={{ color: C.t3 }} />
@@ -2124,7 +2313,7 @@ export default function AdminMeeting() {
                     value={query}
                     onChange={(event) => setQuery(event.target.value)}
                     placeholder="Search by Meeting Id , Title and Citizen"
-                    style={{ paddingLeft: 36, minHeight: 34, paddingTop: 6, paddingBottom: 6 }}
+                    style={{ paddingLeft: 36, minHeight: 34, paddingTop: 0, paddingBottom: 0, fontSize: 11, lineHeight: "34px" }}
                   />
                 </div>
                 <CustomDateFilter
@@ -2135,7 +2324,7 @@ export default function AdminMeeting() {
                 />
                 <div className="relative">
                   <Filter className="absolute left-3 top-2.5" size={17} style={{ color: C.t3 }} />
-                  <WorkspaceSelect value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)} style={{ paddingLeft: 36, minHeight: 34, paddingTop: 6, paddingBottom: 6 }}>
+                  <WorkspaceSelect value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)} style={{ paddingLeft: 36, minHeight: 34, paddingTop: 0, paddingBottom: 0, fontSize: 11, lineHeight: "34px" }}>
                     <option value="all">All Status</option>
                     {meetingStatusOptions.map((status) => (
                       <option key={status} value={status}>{statusLabel(status)}</option>
@@ -2264,13 +2453,49 @@ export default function AdminMeeting() {
                   </tbody>
                 </table>
               <div className="portal-citizen-table-footer" style={{ background: C.bgElevated, borderTop: `1px solid ${C.border}` }}>
-                <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-2 py-1.5" style={{ width: "calc(100% - 24px)", margin: "0 auto" }}>
-                  <p style={{ fontSize: 12, color: C.t2, margin: 0 }}>
+                <div className="flex flex-col md:flex-row md:items-center gap-2 py-1.5" style={{ width: "calc(100% - 24px)", margin: "0 auto" }}>
+                  <div className="flex items-center gap-2 md:flex-1 md:basis-0">
+                    <span className="portal-citizen-caption" style={{ color: C.t2, whiteSpace: "nowrap" }}>
+                      Show
+                    </span>
+                    <input
+                      type="number"
+                      min={1}
+                      max={25}
+                      value={itemsPerPage}
+                      onChange={(event) => {
+                        const nextValue = Number(event.target.value);
+                        if (!Number.isFinite(nextValue)) return;
+                        setItemsPerPage(Math.min(25, Math.max(1, nextValue)));
+                        setCurrentPage(1);
+                      }}
+                      onFocus={() => setShowEntriesFocused(true)}
+                      onBlur={() => setShowEntriesFocused(false)}
+                      style={{
+                        width: 64,
+                        minHeight: 34,
+                        padding: "6px 14px",
+                        border: `1px solid ${showEntriesFocused ? C.purple : C.border}`,
+                        borderRadius: "var(--portal-radius-sm, 10px)",
+                        background: C.inp,
+                        color: C.t1,
+                        fontSize: 13,
+                        fontWeight: 500,
+                        outline: "none",
+                        boxShadow: showEntriesFocused ? `0 0 0 3px ${C.purple}1f` : "none",
+                        transition: "border-color var(--portal-duration-fast) ease, box-shadow var(--portal-duration-fast) ease",
+                      }}
+                    />
+                    <span className="portal-citizen-caption" style={{ color: C.t2, whiteSpace: "nowrap" }}>
+                      Entries
+                    </span>
+                  </div>
+                  <p className="portal-citizen-caption md:order-2" style={{ color: C.t2, margin: 0, whiteSpace: "nowrap", textAlign: "right", flex: 1, flexBasis: 0 }}>
                     Showing <span style={{ fontWeight: 600 }}>{Math.min((currentPage - 1) * itemsPerPage + 1, filteredMeetingQueue.length)}</span>-<span style={{ fontWeight: 600 }}>{Math.min(currentPage * itemsPerPage, filteredMeetingQueue.length)}</span> of{" "}
                     <span style={{ fontWeight: 600 }}>{filteredMeetingQueue.length}</span> requests
                   </p>
 
-                  <div className="flex items-center gap-2 flex-wrap">
+                  <div className="flex items-center gap-2 flex-wrap md:flex-1 md:basis-0 md:justify-center md:order-1">
                     {totalPages > 1 ? (
                       <>
                       <WorkspaceButton

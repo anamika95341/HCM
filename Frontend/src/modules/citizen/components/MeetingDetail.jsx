@@ -37,6 +37,25 @@ function cleanTimelineNote(note) {
   return String(note).replace(/Sent to DEO\s+[a-f0-9-]+\s+for verification/i, "Sent to DEO for verification");
 }
 
+function formatCitizenDate(value) {
+  if (!value) return "";
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return "";
+  const day = String(parsed.getDate()).padStart(2, "0");
+  const month = String(parsed.getMonth() + 1).padStart(2, "0");
+  const year = String(parsed.getFullYear()).slice(-2);
+  return `${day}/${month}/${year}`;
+}
+
+function formatCitizenDateTime(value) {
+  if (!value) return "";
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return "";
+  const dateLabel = formatCitizenDate(parsed);
+  const timeLabel = parsed.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit", hour12: false });
+  return `${dateLabel} ${timeLabel}`;
+}
+
 function valueTone(status, C) {
   const s = String(status || "").toLowerCase().replace(/[_\s-]/g, "");
   if (/^(verified|resolved|completed|scheduled|active|accepted|approved)$/.test(s)) return C.mint;
@@ -206,13 +225,13 @@ export default function MeetingDetail() {
   }
 
   const preferredTimeLabel = meeting.preferred_time
-    ? new Date(meeting.preferred_time).toLocaleString("en-IN", { dateStyle: "long", timeStyle: "short" })
+    ? formatCitizenDateTime(meeting.preferred_time)
     : null;
   const createdAtLabel = meeting.createdAt || meeting.created_at
-    ? new Date(meeting.createdAt || meeting.created_at).toLocaleDateString("en-GB")
+    ? formatCitizenDate(meeting.createdAt || meeting.created_at)
     : "Not provided";
   const scheduledTimeLabel = meeting.scheduled_at
-    ? new Date(meeting.scheduled_at).toLocaleString("en-IN", { dateStyle: "long", timeStyle: "short" })
+    ? formatCitizenDateTime(meeting.scheduled_at)
     : "Pending";
   const attachedFiles = getAttachedFiles(meeting);
   const hasUploadedDocument = attachedFiles.length > 0;
@@ -260,7 +279,7 @@ export default function MeetingDetail() {
                 }}
               >
                 <ChevronRight size={16} className="rotate-180" />
-                Back to Meetings
+                Back
               </button>
             </div>
             <h2 style={{ fontSize: 20, fontWeight: 600, color: C.t1, margin: 0, textAlign: "center" }}>MEETING DETAILS</h2>
@@ -471,7 +490,7 @@ export default function MeetingDetail() {
                                 <p className="portal-citizen-caption" style={{ color: C.t3, margin: 0, paddingRight: 10, whiteSpace: "normal", wordBreak: "break-word", textAlign: "right" }}>{formatActorRole(entry.actor_role)}</p>
                               </div>
                               {entry.note ? <p className="portal-citizen-value" style={{ color: C.t2, marginTop: 8, marginBottom: 0, whiteSpace: "normal", wordBreak: "break-word" }}>{cleanTimelineNote(entry.note)}</p> : null}
-                              <p className="portal-citizen-caption" style={{ color: C.t3, marginTop: 8, marginBottom: 0 }}>{new Date(entry.created_at).toLocaleString("en-IN")}</p>
+                              <p className="portal-citizen-caption" style={{ color: C.t3, marginTop: 8, marginBottom: 0 }}>{formatCitizenDateTime(entry.created_at)}</p>
                             </div>
                           </div>
                         </div>

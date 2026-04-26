@@ -41,7 +41,10 @@ function formatDateValue(date) {
 function formatDisplayDate(value) {
   const parsedDate = parseDateValue(value);
   if (!parsedDate) return "";
-  return parsedDate.toLocaleDateString("en-US", { day: "2-digit", month: "short", year: "numeric" });
+  const day = String(parsedDate.getDate()).padStart(2, "0");
+  const month = String(parsedDate.getMonth() + 1).padStart(2, "0");
+  const year = String(parsedDate.getFullYear()).slice(-2);
+  return `${day}/${month}/${year}`;
 }
 
 function buildCalendarDays(monthStart) {
@@ -86,7 +89,10 @@ function formatIncidentDate(value) {
   if (!value) return "";
   const parsed = new Date(value);
   if (Number.isNaN(parsed.getTime())) return "";
-  return parsed.toLocaleDateString("en-GB");
+  const day = String(parsed.getDate()).padStart(2, "0");
+  const month = String(parsed.getMonth() + 1).padStart(2, "0");
+  const year = String(parsed.getFullYear()).slice(-2);
+  return `${day}/${month}/${year}`;
 }
 
 function CustomDateFilter({ value, onChange, placeholder, max }) {
@@ -163,7 +169,8 @@ function CustomDateFilter({ value, onChange, placeholder, max }) {
           border: `1px solid ${focused ? C.purple : C.border}`,
           background: C.inp,
           color: value ? C.t1 : C.t3,
-          fontSize: 13,
+          fontSize: 11,
+          lineHeight: 1.2,
           outline: "none",
           boxShadow: focused ? `0 0 0 3px ${C.purpleDim}` : "none",
           borderRadius: "var(--portal-radius-sm, 10px)",
@@ -532,43 +539,7 @@ export default function MyCases() {
         </div>
 
         <div style={{ marginBottom: 14, display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-            <span className="portal-citizen-caption" style={{ color: C.t2, whiteSpace: "nowrap" }}>
-              Show
-            </span>
-            <input
-              type="number"
-              min={1}
-              max={25}
-              value={itemsPerPage}
-              onChange={(event) => {
-                const nextValue = Number(event.target.value);
-                if (!Number.isFinite(nextValue)) return;
-                setItemsPerPage(Math.min(25, Math.max(1, nextValue)));
-                setCurrentPage(1);
-              }}
-              onFocus={() => setShowEntriesFocused(true)}
-              onBlur={() => setShowEntriesFocused(false)}
-              style={{
-                width: 64,
-                minHeight: 34,
-                padding: "6px 14px",
-                border: `1px solid ${showEntriesFocused ? C.purple : C.border}`,
-                borderRadius: "var(--portal-radius-sm, 10px)",
-                background: C.inp,
-                color: C.t1,
-                fontSize: 13,
-                fontWeight: 500,
-                outline: "none",
-                boxShadow: showEntriesFocused ? `0 0 0 3px ${C.purpleDim}` : "none",
-                transition: "border-color var(--portal-duration-fast) ease, box-shadow var(--portal-duration-fast) ease",
-              }}
-            />
-            <span className="portal-citizen-caption" style={{ color: C.t2, whiteSpace: "nowrap" }}>
-              Entries
-            </span>
-          </div>
-          <div style={{ marginLeft: "auto", width: "50%", minWidth: 520, display: "grid", gap: 12, gridTemplateColumns: "minmax(280px, 3fr) minmax(140px, 1fr) minmax(140px, 1fr)" }}>
+          <div style={{ marginLeft: "auto", width: "50%", minWidth: 520, display: "grid", gap: 12, gridTemplateColumns: "minmax(240px, 2.4fr) minmax(170px, 1.2fr) minmax(140px, 1fr)" }}>
             <div className="relative">
               <Search className="absolute left-3 top-2.5" size={17} style={{ color: C.t3 }} />
               <WorkspaceInput
@@ -578,7 +549,7 @@ export default function MyCases() {
                   setCurrentPage(1);
                 }}
                 placeholder="Search by Complaint Id , Title , Category and Location"
-                style={{ paddingLeft: 36, minHeight: 34, paddingTop: 6, paddingBottom: 6 }}
+                style={{ paddingLeft: 36, minHeight: 34, paddingTop: 0, paddingBottom: 0, fontSize: 11, lineHeight: "34px" }}
               />
             </div>
             <CustomDateFilter
@@ -598,7 +569,7 @@ export default function MyCases() {
                   setFilters((current) => ({ ...current, status: event.target.value }));
                   setCurrentPage(1);
                 }}
-                style={{ paddingLeft: 36, minHeight: 34, paddingTop: 6, paddingBottom: 6 }}
+                style={{ paddingLeft: 36, minHeight: 34, paddingTop: 0, paddingBottom: 0, fontSize: 11, lineHeight: "34px" }}
               >
                 <option value="all">All status</option>
                 {statusOptions.map((status) => (
@@ -714,12 +685,45 @@ export default function MyCases() {
                     </table>
 
                     <div className="portal-citizen-table-footer" style={{ background: C.bgElevated, borderTop: `1px solid ${C.border}` }}>
-                      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-2 py-1.5" style={{ width: "calc(100% - 24px)", margin: "0 auto" }}>
-                        <p className="portal-citizen-caption" style={{ color: C.t2, margin: 0 }}>
-                          Showing <span className="font-semibold">{Math.min((currentPage - 1) * itemsPerPage + 1, items.length)}</span>-<span className="font-semibold">{Math.min(currentPage * itemsPerPage, items.length)}</span> of <span className="font-semibold">{items.length}</span> requests
-                        </p>
+                      <div className="flex flex-col md:flex-row md:items-center gap-2 py-1.5" style={{ width: "calc(100% - 24px)", margin: "0 auto" }}>
+                        <div className="flex items-center gap-2 md:flex-1 md:basis-0">
+                          <span className="portal-citizen-caption" style={{ color: C.t2, whiteSpace: "nowrap" }}>
+                            Show
+                          </span>
+                          <input
+                            type="number"
+                            min={1}
+                            max={25}
+                            value={itemsPerPage}
+                            onChange={(event) => {
+                              const nextValue = Number(event.target.value);
+                              if (!Number.isFinite(nextValue)) return;
+                              setItemsPerPage(Math.min(25, Math.max(1, nextValue)));
+                              setCurrentPage(1);
+                            }}
+                            onFocus={() => setShowEntriesFocused(true)}
+                            onBlur={() => setShowEntriesFocused(false)}
+                            style={{
+                              width: 64,
+                              minHeight: 34,
+                              padding: "6px 14px",
+                              border: `1px solid ${showEntriesFocused ? C.purple : C.border}`,
+                              borderRadius: "var(--portal-radius-sm, 10px)",
+                              background: C.inp,
+                              color: C.t1,
+                              fontSize: 13,
+                              fontWeight: 500,
+                              outline: "none",
+                              boxShadow: showEntriesFocused ? `0 0 0 3px ${C.purpleDim}` : "none",
+                              transition: "border-color var(--portal-duration-fast) ease, box-shadow var(--portal-duration-fast) ease",
+                            }}
+                          />
+                          <span className="portal-citizen-caption" style={{ color: C.t2, whiteSpace: "nowrap" }}>
+                            Entries
+                          </span>
+                        </div>
 
-                        <div className="portal-citizen-pager flex items-center gap-2 flex-wrap">
+                        <div className="portal-citizen-pager flex items-center gap-2 flex-wrap md:flex-1 md:basis-0 md:justify-center">
                           {totalPages > 1 ? (
                             <>
                             <WorkspaceButton
@@ -822,6 +826,10 @@ export default function MyCases() {
                             </span>
                           )}
                         </div>
+
+                        <p className="portal-citizen-caption" style={{ color: C.t2, margin: 0, whiteSpace: "nowrap", textAlign: "right", flex: 1, flexBasis: 0 }}>
+                          Showing <span className="font-semibold">{Math.min((currentPage - 1) * itemsPerPage + 1, items.length)}</span>-<span className="font-semibold">{Math.min(currentPage * itemsPerPage, items.length)}</span> of <span className="font-semibold">{items.length}</span> requests
+                        </p>
                       </div>
                     </div>
                   </div>

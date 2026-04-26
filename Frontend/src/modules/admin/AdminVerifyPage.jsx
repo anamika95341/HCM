@@ -68,7 +68,7 @@ export default function AdminVerifyPage() {
   }
 
   return (
-    <div className="portal-content" style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", padding: "24px 16px", background: C.bg }}>
+    <div className="portal-content" style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", padding: "24px 16px", background: C.bg, fontFamily: "var(--ep-font-serif)" }}>
       <div style={{ width: "100%", maxWidth: 460, background: C.card, border: `1px solid ${C.border}`, borderRadius: 12, boxShadow: "none", overflow: "hidden" }}>
         <div style={{ padding: "32px 32px 28px", background: C.bgElevated, borderBottom: `1px solid ${C.border}` }}>
           <div style={{ width: 56, height: 56, borderRadius: 12, background: C.purpleDim, display: "flex", alignItems: "center", justifyContent: "center", marginBottom: 18 }}>
