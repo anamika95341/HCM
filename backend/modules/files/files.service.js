@@ -342,11 +342,6 @@ async function createUploadUrl({ actorRole, actorId, body, reqMeta, publicEndpoi
     key: s3Key,
     contentType: body.mimeType,
     publicEndpoint,
-    metadata: {
-      uploaderrole: actorRole,
-      uploaderid: actorId,
-      contexttype: body.contextType,
-    },
   });
 
   const auditTarget = getUploadAuditTarget({
