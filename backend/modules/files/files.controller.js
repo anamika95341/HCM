@@ -3,6 +3,7 @@ const path = require('path');
 const createHttpError = require('http-errors');
 const env = require('../../config/env');
 const filesService = require('./files.service');
+const { getPublicEndpoint } = require('../../utils/requestPublicEndpoint');
 
 const UPLOAD_BASE = path.resolve(process.cwd(), env.uploadDir);
 
@@ -24,7 +25,11 @@ function resolveLegacyPath(storagePath) {
 }
 
 function reqMeta(req) {
-  return { ip: req.ip, userAgent: req.get('user-agent') };
+  return {
+    ip: req.ip,
+    userAgent: req.get('user-agent'),
+    publicEndpoint: getPublicEndpoint(req, env.s3PublicEndpoint),
+  };
 }
 
 async function createUploadUrl(req, res, next) {
@@ -34,6 +39,7 @@ async function createUploadUrl(req, res, next) {
       actorId: req.user.sub,
       body: req.body,
       reqMeta: reqMeta(req),
+      publicEndpoint: reqMeta(req).publicEndpoint,
     });
     res.status(201).json(result);
   } catch (error) {
@@ -75,6 +81,7 @@ async function createDownloadUrl(req, res, next) {
       actorRole: req.user.role,
       actorId: req.user.sub,
       reqMeta: reqMeta(req),
+      publicEndpoint: reqMeta(req).publicEndpoint,
     });
     res.json(result);
   } catch (error) {
@@ -99,6 +106,7 @@ async function accessSignedFile(req, res, next) {
       key: file.storage_path,
       filename: file.original_name,
       contentType: file.mime_type,
+      publicEndpoint: reqMeta(req).publicEndpoint,
     });
 
     if (!downloadUrl) {

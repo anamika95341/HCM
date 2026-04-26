@@ -39,7 +39,7 @@ async function getMyCases(citizenId) {
   return { complaints };
 }
 
-async function getCaseDetail(citizenId, caseId) {
+async function getCaseDetail(citizenId, caseId, reqMeta) {
   const [meeting, complaint] = await Promise.all([
     meetingsRepository.getCitizenMeetingById(caseId, citizenId),
     complaintsRepository.getCitizenComplaintById(caseId, citizenId),
@@ -71,6 +71,7 @@ async function getCaseDetail(citizenId, caseId) {
         actorId: citizenId,
         contextType: 'meeting',
         contextId: caseId,
+        reqMeta,
       });
       meeting.files = [...files, ...managedFiles];
     } catch (_) {
@@ -105,6 +106,7 @@ async function getCaseDetail(citizenId, caseId) {
         actorId: citizenId,
         contextType: 'complaint',
         contextId: caseId,
+        reqMeta,
       });
       complaint.files = [...files, ...managedFiles];
     } catch (_) {

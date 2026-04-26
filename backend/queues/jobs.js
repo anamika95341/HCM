@@ -213,14 +213,15 @@ function validateSendEmailBatchPayload(data) {
 }
 
 /**
- * Builds deterministic job ID strings for deduplication and idempotency
- * Combines type and variable parts with ':' separator
+ * Builds deterministic BullMQ-safe job IDs for deduplication and idempotency.
+ * BullMQ reserves ':' inside custom job ids, so each segment is URL-encoded and
+ * joined with a safe delimiter.
  *
  * Examples:
- *   buildJobId('notif-email', notificationId) → 'notif-email:123'
- *   buildJobId('notif-sms', notificationId) → 'notif-sms:123'
- *   buildJobId('pool-email', eventType, entityId) → 'pool-email:meeting.submitted:abc-123'
- *   buildJobId('otp-email', userId, purpose, windowSlot) → 'otp-email:u1:registration_verification:329847'
+ *   buildJobId('notif-email', notificationId) → 'notif-email|123'
+ *   buildJobId('notif-sms', notificationId) → 'notif-sms|123'
+ *   buildJobId('pool-email', eventType, entityId) → 'pool-email|meeting.submitted|abc-123'
+ *   buildJobId('otp-email', userId, purpose, windowSlot) → 'otp-email|u1|registration_verification|329847'
  *
  * @param {string} type - Job type identifier
  * @param {...*} parts - Variable parts to append (converted to string)
@@ -232,10 +233,9 @@ function buildJobId(type, ...parts) {
   }
 
   if (parts.length === 0) {
-    return type;
+    return encodeURIComponent(type);
   }
 
-  // Convert all parts to strings and join with ':'
   const stringParts = parts.map((part, i) => {
     // Guard: null, undefined, or empty string
     if (part === null || part === undefined || String(part).trim() === '') {
@@ -250,7 +250,7 @@ function buildJobId(type, ...parts) {
     return String(part);
   });
 
-  return `${type}:${stringParts.join(':')}`;
+  return [type, ...stringParts].map((segment) => encodeURIComponent(segment)).join('|');
 }
 
 /**

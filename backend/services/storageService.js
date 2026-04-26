@@ -100,7 +100,10 @@ function createStorageService(options = {}) {
     || (options.s3Client ? options.s3Client : createS3Client(config, { usePublicEndpoint: true }));
   const presign = options.presign || getSignedUrl;
 
-  async function generateUploadUrl({ key, contentType, expiresIn, metadata = {} }) {
+  async function generateUploadUrl({ key, contentType, expiresIn, metadata = {}, publicEndpoint }) {
+    const signer = publicEndpoint
+      ? createS3Client({ ...config, publicEndpoint }, { usePublicEndpoint: true })
+      : signingClient;
     const command = new PutObjectCommand({
       Bucket: config.bucket,
       Key: key,
@@ -108,7 +111,7 @@ function createStorageService(options = {}) {
       Metadata: metadata,
     });
 
-    const uploadUrl = await presign(signingClient, command, {
+    const uploadUrl = await presign(signer, command, {
       expiresIn: clampSignedUrlExpiry(expiresIn ?? config.signedUrlExpirySeconds),
     });
 
@@ -120,7 +123,10 @@ function createStorageService(options = {}) {
     };
   }
 
-  async function generateDownloadUrl({ key, filename, contentType, expiresIn }) {
+  async function generateDownloadUrl({ key, filename, contentType, expiresIn, publicEndpoint }) {
+    const signer = publicEndpoint
+      ? createS3Client({ ...config, publicEndpoint }, { usePublicEndpoint: true })
+      : signingClient;
     const command = new GetObjectCommand({
       Bucket: config.bucket,
       Key: key,
@@ -128,7 +134,7 @@ function createStorageService(options = {}) {
       ResponseContentType: contentType || undefined,
     });
 
-    const downloadUrl = await presign(signingClient, command, {
+    const downloadUrl = await presign(signer, command, {
       expiresIn: clampSignedUrlExpiry(expiresIn ?? config.signedUrlExpirySeconds),
     });
 

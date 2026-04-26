@@ -28,7 +28,8 @@ services:
       NODE_ENV: development
       COOKIE_SECURE: "false"
       RUN_MIGRATIONS: "true"
-      FRONTEND_ORIGINS: http://localhost:5173
+      FRONTEND_ORIGINS: http://localhost:5173,http://ec2-13-233-125-130.ap-south-1.compute.amazonaws.com
+      PRIVATE_FILE_BASE_URL: ${PRIVATE_FILE_BASE_URL:-http://localhost:3000}
       DATABASE_URL: postgresql://app_user:${DB_PASSWORD:-change_me}@postgres:5432/citizen_portal
       REDIS_URL: redis://:${REDIS_PASSWORD:-change_me}@redis:6379
       STORAGE_MODE: ${STORAGE_MODE:-local}
@@ -52,6 +53,34 @@ services:
       redis:
         condition: service_healthy
       minio:
+        condition: service_healthy
+
+  worker:
+    build:
+      target: dev
+    env_file:
+      - ./backend/.env.localhost
+    environment:
+      NODE_ENV: development
+      RUN_MIGRATIONS: "false"
+      DATABASE_URL: postgresql://app_user:${DB_PASSWORD:-change_me}@postgres:5432/citizen_portal
+      REDIS_URL: redis://:${REDIS_PASSWORD:-change_me}@redis:6379
+      STORAGE_MODE: ${STORAGE_MODE:-local}
+      S3_BUCKET: ${S3_BUCKET:-portal-private-files}
+      S3_SIGNED_URL_EXPIRY_SECONDS: ${S3_SIGNED_URL_EXPIRY_SECONDS:-90}
+      AWS_REGION: ${AWS_REGION:-us-east-1}
+      S3_ENDPOINT: ${S3_ENDPOINT:-http://minio:9000}
+      S3_PUBLIC_ENDPOINT: ${S3_PUBLIC_ENDPOINT:-http://localhost:5173}
+      S3_FORCE_PATH_STYLE: ${S3_FORCE_PATH_STYLE:-true}
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-admin}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-password}
+      SMS_PROVIDER: ${SMS_PROVIDER:-mock}
+    command: ["npm", "run", "worker:jobs"]
+    volumes:
+      - ./backend:/app
+      - backend-node-modules:/app/node_modules
+    depends_on:
+      redis:
         condition: service_healthy
 
   auth-stream-worker:
@@ -103,7 +132,7 @@ services:
 
   redis:
     image: redis:7-alpine
-    command: ["redis-server", "--appendonly", "yes", "--requirepass", "${REDIS_PASSWORD:-change_me}", "--maxmemory", "64mb", "--maxmemory-policy", "allkeys-lru", "--bind", "0.0.0.0"]
+    command: ["redis-server", "--appendonly", "yes", "--requirepass", "${REDIS_PASSWORD:-change_me}", "--maxmemory", "64mb", "--maxmemory-policy", "noeviction", "--bind", "0.0.0.0"]
     volumes:
       - redis-data:/data
     healthcheck:

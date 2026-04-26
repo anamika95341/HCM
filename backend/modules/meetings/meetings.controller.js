@@ -1,8 +1,14 @@
 const meetingsService = require('./meetings.service');
+const env = require('../../config/env');
 const logger = require('../../utils/logger');
+const { getPublicEndpoint } = require('../../utils/requestPublicEndpoint');
 
 function reqMeta(req) {
-  return { ip: req.ip, userAgent: req.get('user-agent') };
+  return {
+    ip: req.ip,
+    userAgent: req.get('user-agent'),
+    publicEndpoint: getPublicEndpoint(req, env.s3PublicEndpoint),
+  };
 }
 
 async function submitMeetingRequest(req, res, next) {
@@ -40,7 +46,7 @@ async function getCitizenMeetings(req, res, next) {
 
 async function getCitizenMeetingDetail(req, res, next) {
   try {
-    const detail = await meetingsService.getCitizenMeetingDetail(req.params.meetingId, req.user.sub);
+    const detail = await meetingsService.getCitizenMeetingDetail(req.params.meetingId, req.user.sub, reqMeta(req));
     res.json(detail);
   } catch (error) {
     next(error);

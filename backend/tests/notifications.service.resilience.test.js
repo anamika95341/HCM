@@ -22,6 +22,16 @@ jest.mock('../utils/logger', () => ({
   info: jest.fn(),
 }));
 
+jest.mock('../queues/index', () => ({
+  enqueue: jest.fn().mockResolvedValue({ id: 'job-1' }),
+  JOBS: {
+    SEND_EMAIL: 'sendEmail',
+    SEND_SMS: 'sendSms',
+    SEND_EMAIL_BATCH: 'sendEmailBatch',
+  },
+  buildJobId: jest.fn(() => 'job-1'),
+}));
+
 jest.mock('../realtime/wsPublisher', () => ({
   publishMeetingStatusUpdate: jest.fn(),
   publishComplaintStatusUpdate: jest.fn(),
@@ -30,8 +40,7 @@ jest.mock('../realtime/wsPublisher', () => ({
 
 const authRepository = require('../modules/auth/auth.repository');
 const notificationsRepository = require('../modules/notifications/notifications.repository');
-const { sendMail } = require('../utils/mailer');
-const logger = require('../utils/logger');
+const { enqueue, JOBS } = require('../queues/index');
 const { publishNotificationCreated } = require('../realtime/wsPublisher');
 const notificationsService = require('../modules/notifications/notifications.service');
 
@@ -55,10 +64,6 @@ describe('notifications service resilience', () => {
   });
 
   test('notifyMinisterMeetingScheduled succeeds when email delivery fails', async () => {
-    sendMail.mockRejectedValue(Object.assign(new Error('connect ECONNREFUSED 127.0.0.1:1025'), {
-      code: 'ESOCKET',
-    }));
-
     const result = await notificationsService.notifyMinisterMeetingScheduled({
       ministerId: 'minister-1',
       meetingId: 'meeting-1',
@@ -77,14 +82,14 @@ describe('notifications service resilience', () => {
       recipientId: 'minister-1',
       unreadCount: 3,
     }));
-    expect(logger.warn).toHaveBeenCalledWith(
-      'Notification email delivery failed',
+    expect(enqueue).toHaveBeenCalledWith(
+      JOBS.SEND_EMAIL,
       expect.objectContaining({
-        recipientRole: 'minister',
-        recipientId: 'minister-1',
-        notificationId: 'notification-1',
-        error: expect.objectContaining({ code: 'ESOCKET' }),
+        to: 'minister@example.gov.in',
+        subject: expect.any(String),
+        text: expect.any(String),
       }),
+      expect.objectContaining({ jobId: 'job-1' }),
     );
   });
 });

@@ -35,19 +35,28 @@ function createApp() {
     referrerPolicy: { policy: 'no-referrer' },
   }));
 
-  app.use(cors({
-    origin(origin, callback) {
-      if (env.nodeEnv === 'production' && env.frontendOrigins.length === 0) {
-        return callback(new Error('CORS is not configured'));
-      }
-      if (!origin || env.frontendOrigins.includes(origin)) {
-        return callback(null, true);
-      }
+  app.use(cors((req, callback) => {
+    const origin = req.get('origin');
+    const forwardedHost = (req.get('x-forwarded-host') || '').split(',')[0].trim();
+    const forwardedProto = (req.get('x-forwarded-proto') || '').split(',')[0].trim();
+    const inferredOrigin = forwardedHost
+      ? `${forwardedProto || req.protocol}://${forwardedHost}`
+      : '';
+
+    if (!origin || env.frontendOrigins.includes(origin) || (inferredOrigin && origin === inferredOrigin)) {
+      return callback(null, {
+        origin: true,
+        credentials: true,
+        methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'],
+        allowedHeaders: ['Content-Type', 'X-XSRF-TOKEN', 'X-Request-ID'],
+      });
+    }
+
+    if (env.nodeEnv === 'production' && env.frontendOrigins.length === 0) {
       return callback(new Error('Origin not allowed by CORS'));
-    },
-    credentials: true,
-    methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'],
-    allowedHeaders: ['Content-Type', 'X-XSRF-TOKEN', 'X-Request-ID'],
+    }
+
+    return callback(new Error('Origin not allowed by CORS'));
   }));
 
   app.use(express.json({ limit: '50kb' }));

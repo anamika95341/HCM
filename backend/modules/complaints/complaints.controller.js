@@ -1,8 +1,14 @@
 const complaintsService = require('./complaints.service');
+const env = require('../../config/env');
 const logger = require('../../utils/logger');
+const { getPublicEndpoint } = require('../../utils/requestPublicEndpoint');
 
 function reqMeta(req) {
-  return { ip: req.ip, userAgent: req.get('user-agent') };
+  return {
+    ip: req.ip,
+    userAgent: req.get('user-agent'),
+    publicEndpoint: getPublicEndpoint(req, env.s3PublicEndpoint),
+  };
 }
 
 async function submitComplaint(req, res, next) {
@@ -39,7 +45,7 @@ async function getCitizenComplaints(req, res, next) {
 
 async function getCitizenComplaintDetail(req, res, next) {
   try {
-    const detail = await complaintsService.getCitizenComplaintDetail(req.params.complaintId, req.user.sub);
+    const detail = await complaintsService.getCitizenComplaintDetail(req.params.complaintId, req.user.sub, reqMeta(req));
     res.json(detail);
   } catch (error) {
     next(error);

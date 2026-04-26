@@ -27,11 +27,7 @@ export default defineConfig({
         },
       } : {}),
     },
-    allowedHosts: [
-      "localhost",
-      "127.0.0.1",
-      "ec2-13-201-12-198.ap-south-1.compute.amazonaws.com",
-    ],
+    allowedHosts: true,
   },
   preview: {
     host: "0.0.0.0",
@@ -52,11 +48,7 @@ export default defineConfig({
         },
       } : {}),
     },
-    allowedHosts: [
-      "localhost",
-      "127.0.0.1",
-      "ec2-13-201-12-198.ap-south-1.compute.amazonaws.com",
-    ],
+    allowedHosts: true,
   },
   resolve: {
     alias: {

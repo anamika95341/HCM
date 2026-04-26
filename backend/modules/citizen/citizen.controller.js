@@ -1,4 +1,14 @@
 const citizenService = require('./citizen.service');
+const env = require('../../config/env');
+const { getPublicEndpoint } = require('../../utils/requestPublicEndpoint');
+
+function reqMeta(req) {
+  return {
+    ip: req.ip,
+    userAgent: req.get('user-agent'),
+    publicEndpoint: getPublicEndpoint(req, env.s3PublicEndpoint),
+  };
+}
 
 async function getProfile(req, res, next) {
   try {
@@ -38,7 +48,7 @@ async function getMyCases(req, res, next) {
 
 async function getCaseDetail(req, res, next) {
   try {
-    const detail = await citizenService.getCaseDetail(req.user.sub, req.params.caseId);
+    const detail = await citizenService.getCaseDetail(req.user.sub, req.params.caseId, reqMeta(req));
     if (!detail) {
       return res.status(404).json({ error: 'Case not found' });
     }

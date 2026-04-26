@@ -100,7 +100,7 @@ async function getCitizenComplaints(citizenId) {
   return complaintsRepository.getCitizenComplaints(citizenId);
 }
 
-async function getCitizenComplaintDetail(complaintId, citizenId) {
+async function getCitizenComplaintDetail(complaintId, citizenId, reqMeta) {
   const complaint = await complaintsRepository.getCitizenComplaintById(complaintId, citizenId);
   if (!complaint) {
     throw createHttpError(404, 'Complaint not found');
@@ -130,6 +130,7 @@ async function getCitizenComplaintDetail(complaintId, citizenId) {
       actorId: citizenId,
       contextType: 'complaint',
       contextId: complaintId,
+      reqMeta,
     });
     complaint.files = [...files, ...managedFiles];
   } catch (_) {
