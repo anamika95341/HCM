@@ -25,10 +25,14 @@ function resolveLegacyPath(storagePath) {
 }
 
 function reqMeta(req) {
+  const publicEndpoint = env.storageMode === 'local'
+    ? getPublicEndpoint(req, env.s3PublicEndpoint)
+    : env.s3PublicEndpoint;
+
   return {
     ip: req.ip,
     userAgent: req.get('user-agent'),
-    publicEndpoint: getPublicEndpoint(req, env.s3PublicEndpoint),
+    publicEndpoint,
   };
 }
 
