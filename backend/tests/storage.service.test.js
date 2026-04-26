@@ -52,6 +52,7 @@ describe('storage service', () => {
       region: 'us-east-1',
       endpoint: 'http://localhost:9000',
       forcePathStyle: true,
+      requestChecksumCalculation: 'WHEN_REQUIRED',
       credentials: {
         accessKeyId: 'admin',
         secretAccessKey: 'password',
@@ -74,6 +75,7 @@ describe('storage service', () => {
     expect(buildS3ClientConfig(config)).toEqual({
       region: 'ap-south-1',
       forcePathStyle: false,
+      requestChecksumCalculation: 'WHEN_REQUIRED',
     });
   });
 

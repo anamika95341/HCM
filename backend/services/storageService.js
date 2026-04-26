@@ -56,6 +56,7 @@ function buildS3ClientConfig(config, options = {}) {
   const clientConfig = {
     region: config.region,
     forcePathStyle: Boolean(config.forcePathStyle),
+    requestChecksumCalculation: 'WHEN_REQUIRED',
   };
 
   const endpoint = options.usePublicEndpoint && config.publicEndpoint
