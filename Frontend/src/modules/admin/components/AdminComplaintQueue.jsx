@@ -22,6 +22,13 @@ function statusLabel(status) {
     .join(" ");
 }
 
+function complaintQueueStatus(complaint) {
+  if (complaint?.handoffType === "reassigned" && complaint?.status === "assigned") return "reassigned";
+  if (complaint?.status === "assigned") return "accepted";
+  if (["in_review", "call_scheduled", "followup_in_progress"].includes(complaint?.status)) return "complaint_logged";
+  return complaint?.status || "";
+}
+
 const tableCellTextStyle = {
   display: "block",
   maxWidth: "100%",
@@ -49,7 +56,7 @@ function formatDateValue(date) {
 function formatDisplayDate(value) {
   const parsedDate = parseDateValue(value);
   if (!parsedDate) return "";
-  return parsedDate.toLocaleDateString("en-US", { day: "2-digit", month: "short", year: "numeric" });
+  return parsedDate.toLocaleDateString("en-GB", { day: "2-digit", month: "2-digit", year: "2-digit" });
 }
 
 function buildCalendarDays(monthStart) {
@@ -82,10 +89,10 @@ function formatDateOnly(value) {
   if (!value) return "Not provided";
   const parsed = new Date(value);
   if (Number.isNaN(parsed.getTime())) return "Not provided";
-  return parsed.toLocaleDateString("en-IN", {
+  return parsed.toLocaleDateString("en-GB", {
     day: "2-digit",
     month: "2-digit",
-    year: "numeric",
+    year: "2-digit",
   });
 }
 
@@ -174,7 +181,8 @@ function CustomDateFilter({ value, onChange, placeholder, min, max }) {
           border: `1px solid ${C.border}`,
           background: C.inp,
           color: value ? C.t1 : C.t3,
-          fontSize: 13,
+          fontSize: 11,
+          lineHeight: 1.2,
           outline: "none",
           borderRadius: "var(--portal-radius-sm, 10px)",
           display: "flex",
@@ -469,15 +477,15 @@ export default function AdminComplaintQueue() {
         .join(" ")
         .toLowerCase();
       const matchesSearch = !q || haystack.includes(q);
-      const matchesStatus = statusFilter === "all" || complaint.status === statusFilter;
+      const matchesStatus = statusFilter === "all" || complaintQueueStatus(complaint) === statusFilter;
       const matchesIncidentDate = !incidentDateFilter || getDateOnlyValue(complaint.incidentDate) === incidentDateFilter;
       return matchesSearch && matchesStatus && matchesIncidentDate;
     });
   }, [incidentDateFilter, personalComplaintQueue, query, statusFilter]);
 
   const statusOptions = useMemo(
-    () => Array.from(new Set(personalComplaintQueue.map((complaint) => complaint.status).filter(Boolean))).sort(),
-    [personalComplaintQueue]
+    () => ["accepted", "complaint_logged", "reassigned"],
+    []
   );
 
   const queueStats = useMemo(() => {
@@ -559,43 +567,6 @@ export default function AdminComplaintQueue() {
 
           <div style={{ marginBottom: 6 }}>
             <div style={{ marginBottom: 8, display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                <span style={{ fontSize: 12, color: C.t2, whiteSpace: "nowrap" }}>
-                  Show
-                </span>
-                <input
-                  type="number"
-                  min={1}
-                  max={25}
-                  value={itemsPerPage}
-                  onChange={(event) => {
-                    const nextValue = Number(event.target.value);
-                    if (!Number.isFinite(nextValue)) return;
-                    setItemsPerPage(Math.min(25, Math.max(1, nextValue)));
-                    setCurrentPage(1);
-                  }}
-                  onFocus={() => setShowEntriesFocused(true)}
-                  onBlur={() => setShowEntriesFocused(false)}
-                  style={{
-                    width: 64,
-                    minHeight: 34,
-                    padding: "6px 14px",
-                    border: `1px solid ${showEntriesFocused ? C.purple : C.border}`,
-                    borderRadius: "var(--portal-radius-sm, 10px)",
-                    background: C.inp,
-                    color: C.t1,
-                    fontSize: 13,
-                    fontWeight: 500,
-                    outline: "none",
-                    boxShadow: showEntriesFocused ? `0 0 0 3px ${C.purple}1f` : "none",
-                    transition: "border-color var(--portal-duration-fast) ease, box-shadow var(--portal-duration-fast) ease",
-                  }}
-                />
-                <span style={{ fontSize: 12, color: C.t2, whiteSpace: "nowrap" }}>
-                  Entries
-                </span>
-              </div>
-
               <div style={{ marginLeft: "auto", width: "50%", minWidth: 520, display: "grid", gap: 12, gridTemplateColumns: "minmax(280px, 3fr) minmax(140px, 1fr) minmax(140px, 1fr)" }}>
                 <div className="relative">
                   <Search className="absolute left-3 top-2.5" size={17} style={{ color: C.t3 }} />
@@ -604,7 +575,7 @@ export default function AdminComplaintQueue() {
                     value={query}
                     onChange={(event) => setQuery(event.target.value)}
                     placeholder="Search by Complaint Id , Title , Category , Citizen and Location"
-                    style={{ paddingLeft: 36, minHeight: 34, paddingTop: 6, paddingBottom: 6 }}
+                    style={{ paddingLeft: 36, minHeight: 34, paddingTop: 0, paddingBottom: 0, fontSize: 11, lineHeight: "34px" }}
                   />
                 </div>
                 <CustomDateFilter
@@ -615,10 +586,10 @@ export default function AdminComplaintQueue() {
                 />
                 <div className="relative">
                   <Filter className="absolute left-3 top-2.5" size={17} style={{ color: C.t3 }} />
-                  <WorkspaceSelect value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)} style={{ paddingLeft: 36, minHeight: 34, paddingTop: 6, paddingBottom: 6 }}>
+                  <WorkspaceSelect value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)} style={{ paddingLeft: 36, minHeight: 34, paddingTop: 0, paddingBottom: 0, fontSize: 11, lineHeight: "34px" }}>
                     <option value="all">All statuses</option>
-                    {statusOptions.map((status) => (
-                      <option key={status} value={status}>{statusLabel(status)}</option>
+                      {statusOptions.map((status) => (
+                      <option key={status} value={status}>{status === "accepted" ? "Accepted" : status === "complaint_logged" ? "Complaint Logged" : status === "reassigned" ? "Reassigned" : statusLabel(status)}</option>
                     ))}
                   </WorkspaceSelect>
                 </div>
@@ -710,8 +681,8 @@ export default function AdminComplaintQueue() {
                         </td>
                         <td style={{ padding: "10px 16px 10px 8px", textAlign: "center", verticalAlign: "middle", whiteSpace: "nowrap" }}>
                           <div style={{ maxWidth: "100%", overflow: "hidden" }}>
-                            <WorkspaceBadge status={complaint.status} title={statusLabel(complaint.status)} style={{ maxWidth: "100%" }}>
-                              {statusLabel(complaint.status)}
+                            <WorkspaceBadge status={complaintQueueStatus(complaint)} color={complaintQueueStatus(complaint) === "reassigned" ? C.danger : complaintQueueStatus(complaint) === "complaint_logged" ? C.warn : undefined} title={complaintQueueStatus(complaint) === "accepted" ? "Accepted" : complaintQueueStatus(complaint) === "complaint_logged" ? "Complaint Logged" : complaintQueueStatus(complaint) === "reassigned" ? "Reassigned" : statusLabel(complaintQueueStatus(complaint))} style={{ maxWidth: "100%" }}>
+                              {complaintQueueStatus(complaint) === "accepted" ? "Accepted" : complaintQueueStatus(complaint) === "complaint_logged" ? "Complaint Logged" : complaintQueueStatus(complaint) === "reassigned" ? "Reassigned" : statusLabel(complaintQueueStatus(complaint))}
                             </WorkspaceBadge>
                           </div>
                         </td>
@@ -746,13 +717,49 @@ export default function AdminComplaintQueue() {
               </table>
 
               <div className="portal-citizen-table-footer" style={{ background: C.bgElevated, borderTop: `1px solid ${C.border}` }}>
-                <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-2 py-1.5" style={{ width: "calc(100% - 24px)", margin: "0 auto" }}>
-                  <p style={{ fontSize: 12, color: C.t2, margin: 0 }}>
+                <div className="flex flex-col md:flex-row md:items-center gap-2 py-1.5" style={{ width: "calc(100% - 24px)", margin: "0 auto" }}>
+                  <div className="flex items-center gap-2 md:flex-1 md:basis-0">
+                    <span className="portal-citizen-caption" style={{ color: C.t2, whiteSpace: "nowrap" }}>
+                      Show
+                    </span>
+                    <input
+                      type="number"
+                      min={1}
+                      max={25}
+                      value={itemsPerPage}
+                      onChange={(event) => {
+                        const nextValue = Number(event.target.value);
+                        if (!Number.isFinite(nextValue)) return;
+                        setItemsPerPage(Math.min(25, Math.max(1, nextValue)));
+                        setCurrentPage(1);
+                      }}
+                      onFocus={() => setShowEntriesFocused(true)}
+                      onBlur={() => setShowEntriesFocused(false)}
+                      style={{
+                        width: 64,
+                        minHeight: 34,
+                        padding: "6px 14px",
+                        border: `1px solid ${showEntriesFocused ? C.purple : C.border}`,
+                        borderRadius: "var(--portal-radius-sm, 10px)",
+                        background: C.inp,
+                        color: C.t1,
+                        fontSize: 13,
+                        fontWeight: 500,
+                        outline: "none",
+                        boxShadow: showEntriesFocused ? `0 0 0 3px ${C.purple}1f` : "none",
+                        transition: "border-color var(--portal-duration-fast) ease, box-shadow var(--portal-duration-fast) ease",
+                      }}
+                    />
+                    <span className="portal-citizen-caption" style={{ color: C.t2, whiteSpace: "nowrap" }}>
+                      Entries
+                    </span>
+                  </div>
+                  <p className="portal-citizen-caption md:order-2" style={{ color: C.t2, margin: 0, whiteSpace: "nowrap", textAlign: "right", flex: 1, flexBasis: 0 }}>
                     Showing <span style={{ fontWeight: 600 }}>{Math.min((currentPage - 1) * itemsPerPage + 1, filteredComplaintQueue.length)}</span>-<span style={{ fontWeight: 600 }}>{Math.min(currentPage * itemsPerPage, filteredComplaintQueue.length)}</span> of{" "}
                     <span style={{ fontWeight: 600 }}>{filteredComplaintQueue.length}</span> requests
                   </p>
 
-                  <div className="flex items-center gap-2 flex-wrap">
+                  <div className="flex items-center gap-2 flex-wrap md:flex-1 md:basis-0 md:justify-center md:order-1">
                     {totalPages > 1 ? (
                       <>
                       <button

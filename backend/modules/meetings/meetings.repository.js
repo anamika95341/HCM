@@ -36,6 +36,8 @@ const meetingSelect = `
     citizen.citizen_id AS citizen_code,
     citizen.mobile_number,
     citizen.email,
+    citizen.city AS citizen_district,
+    citizen.local_mp AS citizen_local_mp,
     admin.first_name AS admin_first_name,
     admin.last_name AS admin_last_name,
     deo.first_name AS deo_first_name,
@@ -94,6 +96,8 @@ function mapMeeting(row) {
       citizenId: row.citizen_code,
       phoneNumbers: row.mobile_number ? [row.mobile_number] : [],
       email: row.email || '',
+      district: row.citizen_district || '',
+      localMp: row.citizen_local_mp || '',
     },
     relatedComplaint: row.linked_complaint_id
       ? { id: row.linked_complaint_id, complaintId: row.linked_complaint_code, title: row.linked_complaint_subject }

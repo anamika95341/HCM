@@ -5,7 +5,7 @@ import { usePortalTheme } from "../theme/portalTheme.jsx";
 function statusColor(status, C) {
   if (!status) return C.purple;
   const s = status.toLowerCase().replace(/[_\s-]/g, "");
-  if (/^(verified|resolved|completed|scheduled|active|accepted|approved)$/.test(s)) return C.mint;
+  if (/^(verified|resolved|completed|scheduled|rescheduled|active|accepted|approved)$/.test(s)) return C.mint;
   if (/^(rejected|cancelled|notverified|locked|failed)$/.test(s)) return C.danger;
   if (/^(pending|submitted|inreview|assigned|verificationpending|deptcontactidentified|callscheduled|followup|escalatedtomeeting|escalated)$/.test(s)) return C.warn;
   return C.purple;

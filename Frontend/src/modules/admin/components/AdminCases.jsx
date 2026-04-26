@@ -115,14 +115,13 @@ const complaintPoolColumnStyles = {
   title: { width: "38%" },
   category: { width: "18%" },
   citizen: { width: "16%" },
-  incidentDate: { width: 112, minWidth: 112, maxWidth: 112 },
+  incidentDate: { width: 132, minWidth: 132, maxWidth: 132 },
   createdAt: { width: 112, minWidth: 112, maxWidth: 112 },
   action: { width: 84, minWidth: 84, maxWidth: 84 },
 };
 
 const escalatedColumnStyles = {
   primaryId: { width: 180, minWidth: 180, maxWidth: 180 },
-  handoffType: { width: 130, minWidth: 130, maxWidth: 130 },
   title: { width: "26%" },
   category: { width: "14%" },
   citizen: { width: "14%" },
@@ -178,7 +177,7 @@ function formatDateValue(date) {
 function formatDisplayDate(value) {
   const parsedDate = parseDateValue(value);
   if (!parsedDate) return "";
-  return parsedDate.toLocaleDateString("en-US", { day: "2-digit", month: "short", year: "numeric" });
+  return parsedDate.toLocaleDateString("en-GB", { day: "2-digit", month: "2-digit", year: "2-digit" });
 }
 
 function buildCalendarDays(monthStart) {
@@ -216,10 +215,10 @@ function formatDateCell(value) {
   if (!value) return "-";
   const parsed = new Date(value);
   if (Number.isNaN(parsed.getTime())) return "-";
-  return parsed.toLocaleDateString("en-IN", {
+  return parsed.toLocaleDateString("en-GB", {
     day: "2-digit",
     month: "2-digit",
-    year: "numeric",
+    year: "2-digit",
   });
 }
 
@@ -310,7 +309,8 @@ function CustomDateFilter({ value, onChange, placeholder, min, max }) {
           border: `1px solid ${C.border}`,
           background: C.inp,
           color: value ? C.t1 : C.t3,
-          fontSize: 13,
+          fontSize: 11,
+          lineHeight: 1.2,
           outline: "none",
           borderRadius: "var(--portal-radius-sm, 10px)",
           display: "flex",
@@ -608,7 +608,7 @@ export default function AdminCases() {
   const meetingPool = meetings.filter((item) => !item.assignedAdminUserId && !isResolvedMeeting(item.status)).map(meetingRow);
   const resolvedComplaints = complaints.filter((item) => item.status === "resolved").map(complaintRow);
   const completedMeetings = meetings.filter((item) => item.status === "completed").map(meetingRow);
-  const escalated = complaints.filter((item) => item.handoffByAdminUserId === session?.user?.id && ["escalated", "reassigned"].includes(item.handoffType) && !isResolvedComplaint(item.status)).map(complaintRow);
+  const escalated = complaints.filter((item) => item.handoffByAdminUserId === session?.user?.id && item.handoffType === "reassigned" && !isResolvedComplaint(item.status)).map(complaintRow);
 
   const sections = { complaintPool, meetingPool, escalated, resolvedComplaints, completedMeetings };
   const today = formatDateValue(new Date());
@@ -632,7 +632,7 @@ export default function AdminCases() {
     const matchesIncidentDate = !incidentDateFilter || getDateOnlyValue(item.incidentDate) === incidentDateFilter;
     const matchesCreatedAt = !createdAtFilter || getDateOnlyValue(item.createdAt) === createdAtFilter;
     const matchesHandoffDate = !handoffDateFilter || getDateOnlyValue(item.updatedAt) === handoffDateFilter;
-    const matchesHandoffType = !isEscalatedTab || !handoffTypeFilter || item.handoffType === handoffTypeFilter;
+    const matchesHandoffType = true;
     const matchesDateFilters = isMeetingPoolTab
       ? matchesPreferredDate && matchesCreatedAt
       : isComplaintPoolTab
@@ -659,8 +659,8 @@ export default function AdminCases() {
   const tabs = [
     { id: "complaintPool", label: "Complaint Pool",       count: complaintPool.length },
     { id: "meetingPool",   label: "Meeting Pool",         count: meetingPool.length   },
-    { id: "escalated",     label: "Escalated / Reassigned", count: escalated.length },
-    { id: "resolvedComplaints", label: "Resolved Complaints", count: resolvedComplaints.length },
+    { id: "escalated",     label: "Reassigned Cases", count: escalated.length },
+    { id: "resolvedComplaints", label: "Resolved Cases", count: resolvedComplaints.length },
     { id: "completedMeetings", label: "Completed Meetings", count: completedMeetings.length },
   ];
   const workPoolTabs = tabs.filter((item) => item.id === "complaintPool" || item.id === "meetingPool");
@@ -746,7 +746,7 @@ export default function AdminCases() {
         { key: "title", label: "Title", align: "left" },
         { key: "category", label: "Category", align: "left" },
         { key: "citizen", label: "Citizen Name", align: "left" },
-        { key: "incidentDate", label: "Date of Incident", align: "left" },
+        { key: "incidentDate", label: "Incident Date", align: "left" },
         { key: "createdAt", label: "Created At", align: "left" },
         { key: "action", label: "Action", align: "center" },
       ];
@@ -755,13 +755,12 @@ export default function AdminCases() {
     if (isEscalatedTab) {
       return [
         { key: "primaryId", label: "Complaint Id", align: "left" },
-        { key: "handoffType", label: "Handoff Type", align: "left" },
         { key: "title", label: "Title", align: "left" },
         { key: "category", label: "Category", align: "left" },
         { key: "citizen", label: "Citizen Name", align: "left" },
-        { key: "incidentDate", label: "Date of Incident", align: "left" },
+        { key: "incidentDate", label: "Incident Date", align: "left" },
         { key: "createdAt", label: "Created At", align: "left" },
-        { key: "handoffDate", label: "Escalated/Reassigned Date", align: "left" },
+        { key: "handoffDate", label: "Reassigned Date", align: "left" },
         { key: "action", label: "Action", align: "center" },
       ];
     }
@@ -816,7 +815,7 @@ export default function AdminCases() {
     { key: "primaryId", label: "Meeting Id" },
     { key: "title", label: "Title" },
     { key: "citizen", label: "Citizen Name" },
-    { key: "preferredTime", label: "Preferred Meeting Date" },
+    { key: "preferredTime", label: "Preferred Date" },
     { key: "createdAt", label: "Created At" },
     { key: "action", label: "Action" },
   ]), []);
@@ -898,76 +897,24 @@ export default function AdminCases() {
         {/* QUEUE FILTERS */}
         <div style={{ marginBottom: 6 }}>
             <div style={{ marginBottom: 8, display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                <span style={{ fontSize: 12, color: C.t2, whiteSpace: "nowrap" }}>
-                  Show
-                </span>
-                <input
-                  type="number"
-                  min={1}
-                  max={25}
-                  value={itemsPerPage}
-                  onChange={(event) => {
-                    const nextValue = Number(event.target.value);
-                    if (!Number.isFinite(nextValue)) return;
-                    setItemsPerPage(Math.min(25, Math.max(1, nextValue)));
-                    setCurrentPage(1);
-                  }}
-                  onFocus={() => setShowEntriesFocused(true)}
-                  onBlur={() => setShowEntriesFocused(false)}
-                  style={{
-                    width: 64,
-                    minHeight: 34,
-                    padding: "6px 14px",
-                    border: `1px solid ${showEntriesFocused ? C.purple : C.border}`,
-                    borderRadius: "var(--portal-radius-sm, 10px)",
-                    background: C.inp,
-                    color: C.t1,
-                    fontSize: 13,
-                    fontWeight: 500,
-                    outline: "none",
-                    boxShadow: showEntriesFocused ? `0 0 0 3px ${C.purple}1f` : "none",
-                    transition: "border-color var(--portal-duration-fast) ease, box-shadow var(--portal-duration-fast) ease",
-                  }}
-                />
-                <span style={{ fontSize: 12, color: C.t2, whiteSpace: "nowrap" }}>
-                  Entries
-                </span>
-              </div>
-
-              <div style={{ marginLeft: "auto", width: "50%", minWidth: 520, display: "grid", gap: 12, gridTemplateColumns: isEscalatedTab ? "minmax(0, 3fr) repeat(4, minmax(0, 1fr))" : isResolvedComplaintsTab || isCompletedMeetingsTab ? "minmax(0, 3fr) minmax(0, 1.35fr) minmax(0, 1.35fr)" : isComplaintPoolTab || isMeetingPoolTab ? "minmax(280px, 3fr) minmax(140px, 1fr) minmax(140px, 1fr)" : "minmax(0, 1.6fr) minmax(220px, 0.8fr)" }}>
+              <div style={{ marginLeft: "auto", width: "50%", minWidth: 520, display: "grid", gap: 12, gridTemplateColumns: isEscalatedTab ? "minmax(0, 3fr) repeat(3, minmax(0, 1fr))" : isResolvedComplaintsTab || isCompletedMeetingsTab ? "minmax(0, 3fr) minmax(0, 1.35fr) minmax(0, 1.35fr)" : isComplaintPoolTab || isMeetingPoolTab ? "minmax(280px, 3fr) minmax(140px, 1fr) minmax(140px, 1fr)" : "minmax(0, 1.6fr) minmax(220px, 0.8fr)" }}>
               <div className={isComplaintPoolTab || isMeetingPoolTab ? "relative" : undefined}>
                 {isComplaintPoolTab || isMeetingPoolTab ? <Search className="absolute left-3 top-2.5" size={17} style={{ color: C.t3 }} /> : null}
                 <WorkspaceInput
                   value={query}
                   onChange={(e) => setQuery(e.target.value)}
                   placeholder={isMeetingPoolTab ? "Search by Meeting ID , Title , Citizen" : isComplaintPoolTab ? "Search by Complaint ID , Title , Category and Citizen" : isEscalatedTab ? "Search by Complaint Id , Title , Category and Citizen name" : isResolvedComplaintsTab ? "Search by Complaint ID , Title , Category and Citizen" : isCompletedMeetingsTab ? "Search by Meeting ID , Title and Citizen" : "Search by ID, title, citizen name..."}
-                  style={isComplaintPoolTab || isMeetingPoolTab ? { paddingLeft: 36, minHeight: 34, paddingTop: 6, paddingBottom: 6 } : undefined}
+                  style={
+                    isComplaintPoolTab || isMeetingPoolTab
+                      ? { paddingLeft: 36, minHeight: 34, paddingTop: 0, paddingBottom: 0, fontSize: 11, lineHeight: "34px" }
+                      : isEscalatedTab || isResolvedComplaintsTab || isCompletedMeetingsTab
+                        ? { minHeight: 34, paddingTop: 0, paddingBottom: 0, fontSize: 11, lineHeight: "34px" }
+                        : undefined
+                  }
                 />
               </div>
               {isEscalatedTab ? (
                 <>
-                  <div>
-                    <select
-                      value={handoffTypeFilter}
-                      onChange={(e) => setHandoffTypeFilter(e.target.value)}
-                      style={{
-                        width: "100%",
-                        padding: "10px 14px",
-                        border: `1px solid ${C.border}`,
-                        background: C.inp,
-                        color: C.t1,
-                        fontSize: 13,
-                        outline: "none",
-                        cursor: "pointer",
-                        borderRadius: "var(--portal-radius-sm, 10px)",
-                      }}
-                    >
-                      <option value="">Handoff Type</option>
-                      <option value="escalated">Escalated</option>
-                      <option value="reassigned">Reassigned</option>
-                    </select>
-                  </div>
                   <CustomDateFilter
                     value={incidentDateFilter}
                     onChange={setIncidentDateFilter}
@@ -1007,7 +954,7 @@ export default function AdminCases() {
                   <CustomDateFilter
                     value={isMeetingPoolTab ? preferredDateFilter : incidentDateFilter}
                     onChange={isMeetingPoolTab ? setPreferredDateFilter : setIncidentDateFilter}
-                    placeholder={isMeetingPoolTab ? "Preferred meeting date" : "Date of incident"}
+                    placeholder={isMeetingPoolTab ? "Preferred Date" : "Incident Date"}
                     max={today}
                   />
                   {isComplaintPoolTab ? (
@@ -1037,7 +984,8 @@ export default function AdminCases() {
                       border: `1px solid ${C.border}`,
                       background: C.inp,
                       color: C.t1,
-                      fontSize: 13,
+                      fontSize: 11,
+                      lineHeight: "34px",
                       outline: "none",
                       cursor: "pointer",
                       borderRadius: "var(--portal-radius-sm, 10px)",
@@ -1071,9 +1019,9 @@ export default function AdminCases() {
                   <table className="w-full text-sm" style={{ borderCollapse: "collapse", tableLayout: "fixed" }}>
                     <colgroup>
                       <col style={{ width: 180, minWidth: 180, maxWidth: 180 }} />
-                      <col style={{ width: "54%" }} />
+                      <col style={{ width: "50%" }} />
                       <col style={{ width: "14%" }} />
-                      <col style={{ width: 118, minWidth: 118, maxWidth: 118 }} />
+                      <col style={{ width: 132, minWidth: 132, maxWidth: 132 }} />
                       <col style={{ width: 118, minWidth: 118, maxWidth: 118 }} />
                       <col style={{ width: 84, minWidth: 84, maxWidth: 84 }} />
                     </colgroup>
@@ -1104,9 +1052,9 @@ export default function AdminCases() {
                               title={column.label}
                               style={{
                                 display: "block",
-                                overflow: "hidden",
-                                textOverflow: "ellipsis",
-                                whiteSpace: "nowrap",
+                                whiteSpace: column.key === "preferredTime" ? "nowrap" : "normal",
+                                wordBreak: column.key === "preferredTime" ? "normal" : "break-word",
+                                lineHeight: 1.25,
                               }}
                             >
                               {column.label}
@@ -1309,7 +1257,10 @@ export default function AdminCases() {
                             const incidentDateLabel = formatDateCell(item.incidentDate);
                             return (
                               <td key={column.key} style={{ padding: "10px 16px", fontSize: 13, color: C.t2, verticalAlign: "middle", maxWidth: 0 }}>
-                                <span title={toTooltipText(incidentDateLabel)} style={tableCellTextStyle}>
+                                <span
+                                  title={toTooltipText(incidentDateLabel)}
+                                  style={{ display: "block", whiteSpace: "nowrap" }}
+                                >
                                   {incidentDateLabel}
                                 </span>
                               </td>
@@ -1408,13 +1359,49 @@ export default function AdminCases() {
                 )}
 
               <div className="portal-citizen-table-footer" style={{ background: C.bgElevated, borderTop: `1px solid ${C.border}` }}>
-                <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-2 py-1.5" style={{ width: "calc(100% - 24px)", margin: "0 auto" }}>
-                  <p style={{ fontSize: 12, color: C.t2, margin: 0 }}>
+                <div className="flex flex-col md:flex-row md:items-center gap-2 py-1.5" style={{ width: "calc(100% - 24px)", margin: "0 auto" }}>
+                  <div className="flex items-center gap-2 md:flex-1 md:basis-0">
+                    <span className="portal-citizen-caption" style={{ color: C.t2, whiteSpace: "nowrap" }}>
+                      Show
+                    </span>
+                    <input
+                      type="number"
+                      min={1}
+                      max={25}
+                      value={itemsPerPage}
+                      onChange={(event) => {
+                        const nextValue = Number(event.target.value);
+                        if (!Number.isFinite(nextValue)) return;
+                        setItemsPerPage(Math.min(25, Math.max(1, nextValue)));
+                        setCurrentPage(1);
+                      }}
+                      onFocus={() => setShowEntriesFocused(true)}
+                      onBlur={() => setShowEntriesFocused(false)}
+                      style={{
+                        width: 64,
+                        minHeight: 34,
+                        padding: "6px 14px",
+                        border: `1px solid ${showEntriesFocused ? C.purple : C.border}`,
+                        borderRadius: "var(--portal-radius-sm, 10px)",
+                        background: C.inp,
+                        color: C.t1,
+                        fontSize: 13,
+                        fontWeight: 500,
+                        outline: "none",
+                        boxShadow: showEntriesFocused ? `0 0 0 3px ${C.purple}1f` : "none",
+                        transition: "border-color var(--portal-duration-fast) ease, box-shadow var(--portal-duration-fast) ease",
+                      }}
+                    />
+                    <span className="portal-citizen-caption" style={{ color: C.t2, whiteSpace: "nowrap" }}>
+                      Entries
+                    </span>
+                  </div>
+                  <p className="portal-citizen-caption md:order-2" style={{ color: C.t2, margin: 0, whiteSpace: "nowrap", textAlign: "right", flex: 1, flexBasis: 0 }}>
                     Showing <span style={{ fontWeight: 600 }}>{Math.min((currentPage - 1) * itemsPerPage + 1, activeRows.length)}</span>-<span style={{ fontWeight: 600 }}>{Math.min(currentPage * itemsPerPage, activeRows.length)}</span> of{" "}
                     <span style={{ fontWeight: 600 }}>{activeRows.length}</span> requests
                   </p>
 
-                  <div className="flex items-center gap-2 flex-wrap">
+                  <div className="flex items-center gap-2 flex-wrap md:flex-1 md:basis-0 md:justify-center md:order-1">
                     {totalPages > 1 ? (
                       <>
                       <WorkspaceButton

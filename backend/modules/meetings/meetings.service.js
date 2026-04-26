@@ -47,6 +47,18 @@ function assertAssignedDeo(meeting, deoId) {
   }
 }
 
+function assertMeetingScheduleHasPassed(meeting) {
+  const referenceDate = meeting.scheduled_at;
+  const parsedReferenceDate = referenceDate ? new Date(referenceDate) : null;
+  if (!parsedReferenceDate || Number.isNaN(parsedReferenceDate.getTime()) || parsedReferenceDate.getTime() > Date.now()) {
+    throw createHttpError(409, 'Meeting is yet not completed. You cannot mark it as completed. You can cancel meeting if required.');
+  }
+}
+
+function isScheduledMeetingStatus(status) {
+  return status === 'scheduled' || status === 'rescheduled';
+}
+
 async function submitMeetingRequest({ citizenId, body, file, reqMeta, idempotencyKey }) {
   const claim = await claimIdempotency(redis, {
     scope: 'meeting_submission',
@@ -475,7 +487,8 @@ async function scheduleMeeting(meetingId, adminId, body, reqMeta) {
   if (!meeting) {
     throw createHttpError(404, 'Meeting not found');
   }
-  assertMeetingAdminAccess(meeting, adminId, { actionLabel: meeting.status === 'scheduled' ? 'reschedule this meeting' : 'schedule this meeting' });
+  const isReschedule = isScheduledMeetingStatus(meeting.status);
+  assertMeetingAdminAccess(meeting, adminId, { actionLabel: isReschedule ? 'reschedule this meeting' : 'schedule this meeting' });
   // Block scheduling while the meeting is still with DEO verification.
   if (meeting.status === 'verification_pending' || meeting.status === 'SENT_FOR_DEO_VERIFICATION') {
     throw createHttpError(409, 'You cannot schedule this meeting as it is sent for DEO verification.');
@@ -489,10 +502,10 @@ async function scheduleMeeting(meetingId, adminId, body, reqMeta) {
     meetingId,
     actorRole: 'admin',
     actorId: adminId,
-    status: 'scheduled',
-    allowedPreviousStatuses: ['accepted', 'verified', 'scheduled'],
-    actionLabel: meeting.status === 'scheduled' ? 'reschedule this meeting' : 'schedule this meeting',
-    note: meeting.status === 'scheduled' ? 'Meeting rescheduled' : 'Meeting scheduled',
+    status: isReschedule ? 'rescheduled' : 'scheduled',
+    allowedPreviousStatuses: ['accepted', 'verified', 'scheduled', 'rescheduled'],
+    actionLabel: isReschedule ? 'reschedule this meeting' : 'schedule this meeting',
+    note: isReschedule ? 'Meeting rescheduled' : 'Meeting scheduled',
     patch: {
       assigned_admin_id: adminId,
       minister_id: body.ministerId,
@@ -524,7 +537,7 @@ async function scheduleMeeting(meetingId, adminId, body, reqMeta) {
     actorId: adminId,
     entityType: 'meeting',
     entityId: meetingId,
-    action: meeting.status === 'scheduled' ? 'meeting_rescheduled' : 'meeting_scheduled',
+    action: isReschedule ? 'meeting_rescheduled' : 'meeting_scheduled',
     ipAddress: reqMeta.ip,
     userAgent: reqMeta.userAgent,
     metadata: { ministerId: body.ministerId },
@@ -537,7 +550,7 @@ async function scheduleMeeting(meetingId, adminId, body, reqMeta) {
     scheduledAt: body.startsAt,
     location: sanitizeText(body.location),
     adminId,
-    isRescheduled: meeting.status === 'scheduled',
+    isRescheduled: isReschedule,
   });
 
   await notifyAdminScheduledMeetingUpcoming({
@@ -559,7 +572,7 @@ async function uploadMeetingPhoto(meetingId, adminId, file, reqMeta) {
   assertMeetingAdminAccess(meeting, adminId, {
     actionLabel: 'upload files for this meeting',
   });
-  assertAllowedTransition(meeting.status, ['scheduled', 'completed'], 'upload files for this meeting');
+  assertAllowedTransition(meeting.status, ['scheduled', 'rescheduled', 'completed'], 'upload files for this meeting');
   if (!file) {
     throw createHttpError(400, 'File is required');
   }
@@ -602,6 +615,7 @@ async function completeMeeting(meetingId, adminId, reason, reqMeta) {
     throw createHttpError(404, 'Meeting not found');
   }
   assertMeetingAdminAccess(current, adminId, { actionLabel: 'complete this meeting' });
+  assertMeetingScheduleHasPassed(current);
 
   const cleanReason = sanitizeText(reason);
   const updated = await changeMeetingStatus({
@@ -609,7 +623,7 @@ async function completeMeeting(meetingId, adminId, reason, reqMeta) {
     actorRole: 'admin',
     actorId: adminId,
     status: 'completed',
-    allowedPreviousStatuses: ['scheduled'],
+    allowedPreviousStatuses: ['scheduled', 'rescheduled'],
     actionLabel: 'complete this meeting',
     note: cleanReason,
     patch: {
@@ -656,7 +670,7 @@ async function cancelMeeting(meetingId, adminId, reason, reqMeta) {
     actorRole: 'admin',
     actorId: adminId,
     status: 'cancelled',
-    allowedPreviousStatuses: ['pending', 'accepted', 'verification_pending', 'verified', 'not_verified', 'scheduled'],
+    allowedPreviousStatuses: ['pending', 'accepted', 'verification_pending', 'verified', 'not_verified', 'scheduled', 'rescheduled'],
     actionLabel: 'cancel this meeting',
     note: cleanReason,
     patch: {
@@ -664,7 +678,6 @@ async function cancelMeeting(meetingId, adminId, reason, reqMeta) {
       cancellation_reason: cleanReason,
       cancelled_at: new Date().toISOString(),
     },
-    calendarEvent: { action: 'delete' },
   });
 
   await writeAuditLog({

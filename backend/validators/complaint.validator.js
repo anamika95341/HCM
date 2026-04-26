@@ -20,7 +20,7 @@ const assignComplaintSchema = z.object({});
 
 const reassignComplaintSchema = z.object({
   adminId: z.string().uuid(),
-  reason: z.string().trim().min(4).max(500),
+  reason: z.string().trim().max(500).optional().or(z.literal('')),
 });
 
 const complaintDepartmentSchema = z.object({
@@ -35,7 +35,7 @@ const complaintScheduleCallSchema = z.object({
 });
 
 const complaintLogSchema = z.object({
-  logType: z.enum(['phone_call', 'mail', 'letter_summary']),
+  logTypes: z.array(z.enum(['phone_call', 'mail', 'letter_summary', 'meeting'])).min(1).max(4),
   summary: z.string().trim().max(3000).optional().or(z.literal('')),
 });
 

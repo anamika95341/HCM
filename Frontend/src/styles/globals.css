@@ -106,6 +106,19 @@ a:hover {
   letter-spacing: -0.02em;
 }
 
+.portal-shell[data-portal-role="admin"] {
+  font-family: var(--ep-font-serif);
+}
+
+.portal-shell[data-portal-role="admin"] .portal-content h1,
+.portal-shell[data-portal-role="admin"] .portal-content h2,
+.portal-shell[data-portal-role="admin"] .portal-content h3,
+.portal-shell[data-portal-role="admin"] .portal-content h4,
+.portal-shell[data-portal-role="admin"] .portal-content h5,
+.portal-shell[data-portal-role="admin"] .portal-content h6 {
+  font-family: var(--ep-font-serif);
+}
+
 .portal-shell[data-portal-role="citizen"],
 .portal-shell[data-portal-role="citizen"] button,
 .portal-shell[data-portal-role="citizen"] input,
