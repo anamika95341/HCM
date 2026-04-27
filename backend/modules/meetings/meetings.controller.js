@@ -1,4 +1,5 @@
 const meetingsService = require('./meetings.service');
+const meetingPassService = require('../../services/meetingPassService');
 const env = require('../../config/env');
 const logger = require('../../utils/logger');
 const { getPublicEndpoint } = require('../../utils/requestPublicEndpoint');
@@ -159,6 +160,21 @@ async function cancelMeeting(req, res, next) {
   }
 }
 
+async function downloadMeetingPass(req, res, next) {
+  try {
+    const result = await meetingPassService.getMeetingPassDownloadUrl(
+      req.params.meetingId,
+      req.user.sub,
+    );
+    if (!result) {
+      return res.status(404).json({ error: 'Appointment pass not available yet. It is generated once your meeting is scheduled.' });
+    }
+    return res.json(result);
+  } catch (error) {
+    return next(error);
+  }
+}
+
 module.exports = {
   submitMeetingRequest,
   getCitizenMeetings,
@@ -174,4 +190,5 @@ module.exports = {
   uploadMeetingPhoto,
   completeMeeting,
   cancelMeeting,
+  downloadMeetingPass,
 };

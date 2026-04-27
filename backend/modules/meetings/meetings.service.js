@@ -19,6 +19,7 @@ const {
 const { generateCaseCode } = require('../../utils/generateCaseCode');
 const logger = require('../../utils/logger');
 const { claimIdempotency, storeIdempotencyResult, clearIdempotency } = require('../../utils/idempotency');
+const { generateMeetingPass } = require('../../services/meetingPassService');
 
 function assertAllowedTransition(currentStatus, allowedStatuses, actionLabel) {
   if (!allowedStatuses.includes(currentStatus)) {
@@ -560,6 +561,11 @@ async function scheduleMeeting(meetingId, adminId, body, reqMeta) {
     title: updated.title || updated.requestId,
     scheduledAt: body.startsAt,
   });
+
+  // Generate (or regenerate) the citizen appointment pass PDF.
+  // This is intentionally fire-and-forget: errors are caught inside generateMeetingPass
+  // and logged, so they never block or fail the scheduling response.
+  generateMeetingPass(updated).catch(() => {});
 
   return updated;
 }

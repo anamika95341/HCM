@@ -29,6 +29,7 @@ const meetingSelect = `
     m.meeting_docket,
     m.completion_note,
     m.cancellation_reason,
+    m.pass_s3_key,
     m.created_at,
     m.updated_at,
     citizen.first_name,
@@ -102,6 +103,7 @@ function mapMeeting(row) {
     relatedComplaint: row.linked_complaint_id
       ? { id: row.linked_complaint_id, complaintId: row.linked_complaint_code, title: row.linked_complaint_subject }
       : null,
+    pass_s3_key: row.pass_s3_key || null,
   };
 }
 

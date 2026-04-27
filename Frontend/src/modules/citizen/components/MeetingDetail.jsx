@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import {
   ChevronRight,
+  FileDown,
 } from "lucide-react";
 import { apiClient } from "../../../shared/api/client.js";
 import { openDownloadUrl } from "../../../shared/api/downloads.js";
@@ -119,6 +120,8 @@ export default function MeetingDetail() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [isBackHovered, setIsBackHovered] = useState(false);
+  const [passLoading, setPassLoading] = useState(false);
+  const [passError, setPassError] = useState("");
   const informationCardRef = useRef(null);
   const [timelineCardHeight, setTimelineCardHeight] = useState(null);
   const [isDesktopLayout, setIsDesktopLayout] = useState(false);
@@ -239,6 +242,25 @@ export default function MeetingDetail() {
   const locationLabel = meeting.scheduled_location || "Pending";
   const scheduledTone = valueTone(meeting.scheduled_at ? "scheduled" : "pending", C);
   const locationTone = valueTone(meeting.scheduled_location ? "scheduled" : "pending", C);
+  const isScheduled = meeting.status === "scheduled" || meeting.status === "rescheduled";
+
+  async function handleDownloadPass() {
+    setPassLoading(true);
+    setPassError("");
+    try {
+      const { data } = await apiClient.get(`/meetings/my/${id}/pass`);
+      if (data?.downloadUrl) {
+        openDownloadUrl(data.downloadUrl);
+      }
+    } catch (err) {
+      setPassError(
+        err?.response?.data?.error ||
+        "Appointment pass is not available yet. Please try again after the meeting is confirmed."
+      );
+    } finally {
+      setPassLoading(false);
+    }
+  }
 
   return (
     <div
@@ -283,7 +305,39 @@ export default function MeetingDetail() {
               </button>
             </div>
             <h2 style={{ fontSize: 20, fontWeight: 600, color: C.t1, margin: 0, textAlign: "center" }}>MEETING DETAILS</h2>
-            <div />
+            <div style={{ justifySelf: "end", display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 4 }}>
+              {isScheduled && (
+                <button
+                  type="button"
+                  onClick={handleDownloadPass}
+                  disabled={passLoading}
+                  style={{
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: 6,
+                    border: "1px solid #f9a825",
+                    background: passLoading ? "#f9a82520" : "#f9a82514",
+                    color: "#f9a825",
+                    fontSize: 13,
+                    fontWeight: 600,
+                    padding: "8px 12px",
+                    borderRadius: 10,
+                    cursor: passLoading ? "not-allowed" : "pointer",
+                    whiteSpace: "nowrap",
+                    opacity: passLoading ? 0.7 : 1,
+                    transition: "background 0.15s",
+                  }}
+                >
+                  <FileDown size={15} />
+                  {passLoading ? "Preparing..." : "Download Pass"}
+                </button>
+              )}
+              {passError && (
+                <span style={{ fontSize: 11, color: C.danger, maxWidth: 200, textAlign: "right" }}>
+                  {passError}
+                </span>
+              )}
+            </div>
           </div>
 
           <div className="grid lg:grid-cols-[7fr_3fr] gap-6" style={{ flex: 1, minHeight: 0, alignItems: "start" }}>

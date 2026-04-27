@@ -14,6 +14,7 @@ const router = express.Router();
 router.post('/request', authenticate('citizen'), authorize('citizen'), rateLimiter.uploads, (req, res, next) => documentUpload(req, res, next), parseMultipartFields(['additionalAttendees']), validateRequest(meetingRequestSchema), meetingsController.submitMeetingRequest);
 router.get('/my', authenticate('citizen'), authorize('citizen'), meetingsController.getCitizenMeetings);
 router.get('/my/:meetingId', authenticate('citizen'), authorize('citizen'), meetingsController.getCitizenMeetingDetail);
+router.get('/my/:meetingId/pass', authenticate('citizen'), authorize('citizen'), meetingsController.downloadMeetingPass);
 router.get('/:meetingId/admin-view', authenticate('admin'), authorize('admin'), meetingsController.getAdminMeetingDetail);
 router.get('/:meetingId/files', authenticate('admin'), authorize('admin'), meetingsController.getAdminMeetingFiles);
 
