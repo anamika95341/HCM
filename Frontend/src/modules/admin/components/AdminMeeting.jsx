@@ -1409,8 +1409,9 @@ export default function AdminMeeting() {
           : "Select workflow action";
     const citizenMeetingFiles = meetingFiles.filter((file) => file.kind !== "meeting_photo");
     const isCompletedMeetingDetail = selectedMeeting.status === "completed";
+    const isCancelledMeetingDetail = selectedMeeting.status === "cancelled";
     const showAssignToMeButton = !selectedMeeting.assignedAdminUserId && (isMeetingPoolDetail || isUnassignedPoolMeeting);
-    const showWorkflowActions = !showAssignToMeButton && !isResolvedCompletedDetail && selectedMeeting.status !== "completed";
+    const showWorkflowActions = !showAssignToMeButton && !isResolvedCompletedDetail && !["completed", "cancelled"].includes(selectedMeeting.status);
 
     const backPath = isMyCasesDetail
       ? PATHS.admin.cases
@@ -1865,6 +1866,28 @@ export default function AdminMeeting() {
                         }}
                       >
                         Completed
+                      </div>
+                    </div>
+                  ) : isCancelledMeetingDetail ? (
+                    <div style={{ paddingBottom: 16, marginBottom: 20, borderBottom: `1px solid ${C.border}` }}>
+                      <div
+                        style={{
+                          display: "inline-flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          minHeight: 38,
+                          padding: "0 16px",
+                          borderRadius: 10,
+                          background: C.danger,
+                          color: "#ffffff",
+                          fontSize: 13,
+                          fontWeight: 600,
+                          lineHeight: 1.2,
+                          cursor: "default",
+                          userSelect: "none",
+                        }}
+                      >
+                        Cancelled
                       </div>
                     </div>
                   ) : null}

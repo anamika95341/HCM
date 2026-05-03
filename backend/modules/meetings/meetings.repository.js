@@ -238,7 +238,7 @@ async function getCitizenMeetingById(meetingId, citizenId) {
 async function getMeetingQueue() {
   const result = await pool.query(
     `${meetingSelect}
-     WHERE m.status NOT IN ('cancelled', 'rejected')
+     WHERE m.status != 'rejected'
      ORDER BY m.updated_at DESC, m.created_at DESC`
   );
   return result.rows.map(mapMeeting);

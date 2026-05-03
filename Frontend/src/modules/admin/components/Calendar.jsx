@@ -1183,7 +1183,15 @@ function sortByStartTime(items) {
 
 function getItemTone(item, C) {
   if (item.calendarKind === "complaintCall") return C.mint;
+  if (item.meetingStatus === "cancelled") return C.danger;
   return item.type === "VIP Meeting" ? C.warn : C.purple;
+}
+
+function getItemBadgeLabel(item) {
+  if (item.calendarKind === "complaintCall") return "Call";
+  if (item.meetingStatus === "cancelled") return "Cancelled";
+  if (item.type === "VIP Meeting") return "VIP";
+  return "Meeting";
 }
 
 // ── DayMeetingsPanel — Side drawer ─────────────────────────────────────────────
@@ -1347,7 +1355,7 @@ function DayMeetingsPanel({ date, items, onClose, onSelectMeeting, isVisible }) 
                       marginBottom: 8,
                     }}
                   >
-                    {item.calendarKind === "complaintCall" ? "Call" : item.type === "VIP Meeting" ? "VIP" : "Meeting"}
+                    {getItemBadgeLabel(item)}
                   </div>
 
                   {/* Title */}
@@ -1384,6 +1392,7 @@ function Modal({ item, mode, editForm, setEditForm, onClose, onSave, onModeChang
   if (!item) return null;
   const tone = getItemTone(item, C);
   const isComplaintCall = item.calendarKind === "complaintCall";
+  const isCancelledMeeting = item.meetingStatus === "cancelled";
 
   return (
     <>
@@ -1488,7 +1497,7 @@ function Modal({ item, mode, editForm, setEditForm, onClose, onSave, onModeChang
           {/* Fixed Tabs */}
           <div style={{ padding: "12px 28px", borderBottom: `1px solid ${C.border}`, background: C.card, flexShrink: 0 }}>
             <WorkspaceTabs
-              items={[{ id: "details", label: "Details" }, { id: "edit", label: "Edit" }]}
+              items={isCancelledMeeting ? [{ id: "details", label: "Details" }] : [{ id: "details", label: "Details" }, { id: "edit", label: "Edit" }]}
               value={mode}
               onChange={onModeChange}
             />
@@ -1722,7 +1731,7 @@ export default function Calendar() {
         const queueResponse = await apiClient.get("/admin/work-queue");
         const data = queueResponse.data;
         const scheduledMeetings = (data.meetings || [])
-          .filter((meeting) => ["scheduled", "rescheduled"].includes(meeting.status) && meeting.scheduled_at)
+          .filter((meeting) => ["scheduled", "rescheduled", "cancelled"].includes(meeting.status) && meeting.scheduled_at)
           .map((meeting) => ({
             id: meeting.id,
             calendarKind: "meeting",
@@ -1733,9 +1742,16 @@ export default function Calendar() {
             startsAt: meeting.scheduled_at,
             endsAt: meeting.scheduled_end_at || new Date(new Date(meeting.scheduled_at).getTime() + 30 * 60 * 1000).toISOString(),
             location: meeting.scheduled_location || "Location pending",
-            type: meeting.is_vip ? "VIP Meeting" : meeting.status === "rescheduled" ? "Rescheduled Meeting" : "Scheduled Meeting",
+            type: meeting.status === "cancelled"
+              ? "Cancelled Meeting"
+              : meeting.is_vip
+                ? "VIP Meeting"
+                : meeting.status === "rescheduled"
+                  ? "Rescheduled Meeting"
+                  : "Scheduled Meeting",
             source: "Citizen Meeting Workflow",
             isVip: Boolean(meeting.is_vip),
+            meetingStatus: meeting.status,
           }));
 
         const scheduledCalls = (data.complaints || [])
@@ -2324,7 +2340,7 @@ export default function Calendar() {
                             </div>
                           </div>
                           <WorkspaceBadge color={tone}>
-                            {item.calendarKind === "complaintCall" ? "Call" : item.type === "VIP Meeting" ? "VIP" : "Standard"}
+                            {getItemBadgeLabel(item)}
                           </WorkspaceBadge>
                         </div>
                       </button>
