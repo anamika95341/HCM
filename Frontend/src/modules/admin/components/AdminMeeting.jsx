@@ -129,6 +129,25 @@ function isScheduledLikeStatus(status) {
   return status === "scheduled" || status === "rescheduled";
 }
 
+const SCHEDULE_LOCATION_OPTIONS = [
+  "Minister's Residence",
+  "Kartavya Bhawan - Culture ministry",
+  "Transport Bhawan - Tourism Ministry",
+  "Jodhpur",
+  "Others",
+];
+
+function deriveScheduleLocationFields(location) {
+  const trimmed = String(location || "").trim();
+  if (!trimmed) {
+    return { locationOption: "", otherLocation: "" };
+  }
+  if (SCHEDULE_LOCATION_OPTIONS.includes(trimmed) && trimmed !== "Others") {
+    return { locationOption: trimmed, otherLocation: "" };
+  }
+  return { locationOption: "Others", otherLocation: trimmed };
+}
+
 function CustomDateFilter({ value, onChange, placeholder, min, max }) {
   const { C } = usePortalTheme();
   const [isOpen, setIsOpen] = useState(false);
@@ -1099,7 +1118,8 @@ export default function AdminMeeting() {
     startTime: "",
     endDate: "",
     endTime: "",
-    location: "",
+    locationOption: "",
+    otherLocation: "",
     isVip: false,
     comments: "",
   });
@@ -1119,6 +1139,13 @@ export default function AdminMeeting() {
   const [showEntriesFocused, setShowEntriesFocused] = useState(false);
   const detailCardRef = useRef(null);
   const [detailContentHeight, setDetailContentHeight] = useState(null);
+
+  function getResolvedScheduleLocation(form = scheduleForm) {
+    if (form.locationOption === "Others") {
+      return form.otherLocation.trim();
+    }
+    return form.locationOption.trim();
+  }
 
   async function loadMeetingPool() {
     const [queueResponse, directoryResponse] = await Promise.all([
@@ -1151,7 +1178,7 @@ export default function AdminMeeting() {
         startTime: startParts.time,
         endDate: endParts.date,
         endTime: endParts.time,
-        location: data.meeting?.scheduled_location || "",
+        ...deriveScheduleLocationFields(data.meeting?.scheduled_location || ""),
         isVip: Boolean(data.meeting?.is_vip),
         comments: data.meeting?.admin_comments || "",
       });
@@ -1382,8 +1409,9 @@ export default function AdminMeeting() {
           : "Select workflow action";
     const citizenMeetingFiles = meetingFiles.filter((file) => file.kind !== "meeting_photo");
     const isCompletedMeetingDetail = selectedMeeting.status === "completed";
+    const isCancelledMeetingDetail = selectedMeeting.status === "cancelled";
     const showAssignToMeButton = !selectedMeeting.assignedAdminUserId && (isMeetingPoolDetail || isUnassignedPoolMeeting);
-    const showWorkflowActions = !showAssignToMeButton && !isResolvedCompletedDetail && selectedMeeting.status !== "completed";
+    const showWorkflowActions = !showAssignToMeButton && !isResolvedCompletedDetail && !["completed", "cancelled"].includes(selectedMeeting.status);
 
     const backPath = isMyCasesDetail
       ? PATHS.admin.cases
@@ -1840,6 +1868,28 @@ export default function AdminMeeting() {
                         Completed
                       </div>
                     </div>
+                  ) : isCancelledMeetingDetail ? (
+                    <div style={{ paddingBottom: 16, marginBottom: 20, borderBottom: `1px solid ${C.border}` }}>
+                      <div
+                        style={{
+                          display: "inline-flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          minHeight: 38,
+                          padding: "0 16px",
+                          borderRadius: 10,
+                          background: C.danger,
+                          color: "#ffffff",
+                          fontSize: 13,
+                          fontWeight: 600,
+                          lineHeight: 1.2,
+                          cursor: "default",
+                          userSelect: "none",
+                        }}
+                      >
+                        Cancelled
+                      </div>
+                    </div>
                   ) : null}
                   <div style={{ display: "grid", gap: 18 }}>
                     <InlineDetailGrid columns={3}>
@@ -2081,8 +2131,29 @@ export default function AdminMeeting() {
                 <input
                   type="checkbox"
                   checked={scheduleForm.isVip}
-                  style={{ width: 14, height: 14 }}
+                  style={{
+                    position: "absolute",
+                    opacity: 0,
+                    pointerEvents: "none",
+                    width: 0,
+                    height: 0,
+                    margin: 0,
+                  }}
                   onChange={(event) => setScheduleForm((current) => ({ ...current, isVip: event.target.checked }))}
+                />
+                <span
+                  aria-hidden="true"
+                  style={{
+                    width: 15,
+                    height: 15,
+                    display: "inline-block",
+                    borderRadius: 1,
+                    border: scheduleForm.isVip ? "none" : `1px solid ${C.border}`,
+                    background: scheduleForm.isVip
+                      ? `#dc2626 url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12'%3E%3Cpath d='M2.2 6.2 4.8 8.8 9.8 3.8' fill='none' stroke='white' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") center/10px 10px no-repeat`
+                      : C.inp,
+                    flexShrink: 0,
+                  }}
                 />
                 Mark as VIP meeting
               </label>
@@ -2098,12 +2169,31 @@ export default function AdminMeeting() {
                     </option>
                   ))}
                 </WorkspaceSelect>
-                <WorkspaceInput
-                  value={scheduleForm.location}
-                  onChange={(event) => setScheduleForm((current) => ({ ...current, location: event.target.value }))}
-                  placeholder="Location"
-                />
+                <WorkspaceSelect
+                  value={scheduleForm.locationOption}
+                  onChange={(event) =>
+                    setScheduleForm((current) => ({
+                      ...current,
+                      locationOption: event.target.value,
+                      otherLocation: event.target.value === "Others" ? current.otherLocation : "",
+                    }))
+                  }
+                >
+                  <option value="">Select Location</option>
+                  {SCHEDULE_LOCATION_OPTIONS.map((location) => (
+                    <option key={location} value={location}>
+                      {location}
+                    </option>
+                  ))}
+                </WorkspaceSelect>
               </div>
+              {scheduleForm.locationOption === "Others" ? (
+                <WorkspaceInput
+                  value={scheduleForm.otherLocation}
+                  onChange={(event) => setScheduleForm((current) => ({ ...current, otherLocation: event.target.value }))}
+                  placeholder="Enter location"
+                />
+              ) : null}
               <div className="grid gap-3 md:grid-cols-2">
                 <div style={{ display: "grid", gap: 8 }}>
                   <div style={{ fontSize: 11, fontWeight: 700, color: C.t3, textTransform: "uppercase", letterSpacing: ".08em" }}>Start Date</div>
@@ -2138,7 +2228,7 @@ export default function AdminMeeting() {
               </div>
               <div style={{ display: "flex", justifyContent: "flex-end", gap: 12 }}>
                 <PurpleOutlineButton
-                  disabled={actionLoading || !scheduleForm.ministerId || !scheduleForm.startDate || !scheduleForm.startTime || !scheduleForm.location.trim()}
+                  disabled={actionLoading || !scheduleForm.ministerId || !scheduleForm.startDate || !scheduleForm.startTime || !getResolvedScheduleLocation()}
                   onClick={() => {
                     setScheduleError("");
                     setActionError("");
@@ -2153,7 +2243,7 @@ export default function AdminMeeting() {
                         ministerId: scheduleForm.ministerId,
                         startsAt: combineDateAndTime(scheduleForm.startDate, scheduleForm.startTime),
                         endsAt: addMinutesToDateTime(scheduleForm.startDate, scheduleForm.startTime, 30),
-                        location: scheduleForm.location.trim(),
+                        location: getResolvedScheduleLocation(),
                         isVip: scheduleForm.isVip,
                         comments: scheduleForm.comments,
                       }),

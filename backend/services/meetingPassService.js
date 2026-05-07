@@ -452,7 +452,8 @@ async function storeMeetingPassKey(meetingId, s3Key) {
  */
 async function generateMeetingPass(meeting) {
   const meetingId = meeting.id;
-  const oldPassKey = meeting.pass_s3_key || null;
+  // S3 object path of any previously generated pass (null on first schedule)
+  const previousPassPath = meeting.pass_s3_key || null;
 
   try {
     logger.info('meetingPassService: generating meeting pass', { meetingId });
@@ -470,19 +471,19 @@ async function generateMeetingPass(meeting) {
     const pdfBuffer = await buildPdfBuffer(meeting, ministerName, photoBuffer, qrBuffer);
 
     const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-    const newKey = `meeting-passes/${meetingId}/${timestamp}.pdf`;
+    const newPassPath = `meeting-passes/${meetingId}/${timestamp}.pdf`;
 
     // Delete old pass first (if rescheduled)
-    if (oldPassKey && oldPassKey !== newKey) {
-      await deleteS3Object(oldPassKey);
+    if (previousPassPath && previousPassPath !== newPassPath) {
+      await deleteS3Object(previousPassPath);
     }
 
-    await uploadPdfToS3(newKey, pdfBuffer);
-    await storeMeetingPassKey(meetingId, newKey);
+    await uploadPdfToS3(newPassPath, pdfBuffer);
+    await storeMeetingPassKey(meetingId, newPassPath);
 
     logger.info('meetingPassService: meeting pass generated and stored', {
       meetingId,
-      s3Key: newKey,
+      s3Path: newPassPath,
     });
   } catch (err) {
     // Non-fatal: scheduling must not fail because of PDF generation errors
