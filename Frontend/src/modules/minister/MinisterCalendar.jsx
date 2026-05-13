@@ -2463,7 +2463,8 @@ export default function MinisterCalendar() {
 
     async function loadCalendar() {
       try {
-        const { data } = await apiClient.get("/minister/calendar");
+        const endpoint = session?.role === "admin" ? "/admin/calendar" : "/minister/calendar";
+        const { data } = await apiClient.get(endpoint);
         const mapped = (data.events || []).map((event) => ({
           id: event.id,
           sourceId: event.meeting_id || event.id,
