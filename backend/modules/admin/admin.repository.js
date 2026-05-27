@@ -31,19 +31,40 @@ async function createAdmin(payload, db = pool) {
 }
 
 async function getDashboard() {
-  const [meetingQueue, complaintQueue, escalated, scheduled] = await Promise.all([
-    pool.query(`SELECT COUNT(*) FROM meetings WHERE status IN ('pending', 'accepted', 'verification_pending', 'verified', 'not_verified', 'scheduled', 'rescheduled')`),
-    pool.query(`SELECT COUNT(*) FROM complaints WHERE status IN ('submitted', 'assigned', 'in_review', 'department_contact_identified', 'call_scheduled', 'followup_in_progress')`),
-    pool.query(`SELECT COUNT(*) FROM complaints WHERE status = 'escalated_to_meeting'`),
-    pool.query(`SELECT COUNT(*) FROM meetings WHERE status IN ('scheduled', 'rescheduled')`),
+  const [appointmentQueue, grievanceQueue, scheduled] = await Promise.all([
+    pool.query(`SELECT COUNT(*) FROM appointments WHERE status IN ('pending', 'accepted', 'verification_pending', 'verified', 'not_verified', 'scheduled', 'rescheduled')`),
+    pool.query(`SELECT COUNT(*) FROM grievances WHERE status IN ('submitted', 'assigned', 'in_review', 'department_contact_identified', 'call_scheduled', 'followup_in_progress')`),
+    pool.query(`SELECT COUNT(*) FROM appointments WHERE status IN ('scheduled', 'rescheduled')`),
   ]);
 
   return {
-    pendingMeetings: Number(meetingQueue.rows[0].count),
-    pendingComplaints: Number(complaintQueue.rows[0].count),
-    escalatedComplaints: Number(escalated.rows[0].count),
-    scheduledMeetings: Number(scheduled.rows[0].count),
+    pendingAppointments: Number(appointmentQueue.rows[0].count),
+    pendingGrievances: Number(grievanceQueue.rows[0].count),
+    scheduledAppointments: Number(scheduled.rows[0].count),
   };
+}
+
+async function findChiefMinisterAdmin() {
+  const result = await pool.query(
+    `SELECT id, first_name, last_name, username
+     FROM admins
+     WHERE admin_type = 'chief_minister'
+       AND status = 'active'
+       AND is_verified = TRUE
+       AND removed_at IS NULL
+     LIMIT 1`
+  );
+  return result.rows[0] || null;
+}
+
+async function listActiveDeos() {
+  const result = await pool.query(
+    `SELECT id FROM deos
+     WHERE status = 'active'
+       AND is_verified = TRUE
+       AND removed_at IS NULL`
+  );
+  return result.rows;
 }
 
 async function listActiveAdminsForCitizenDirectory() {
@@ -211,11 +232,13 @@ module.exports = {
   createDeo,
   deleteDeoById,
   findActiveAdminById,
+  findChiefMinisterAdmin,
   findDeoByIdentityConflict,
   findActiveDeoById,
   findActiveMinisterById,
   getDashboard,
   listActiveAdminsForCitizenDirectory,
+  listActiveDeos,
   listWorkflowDirectory,
   purgePendingDeoById,
 };

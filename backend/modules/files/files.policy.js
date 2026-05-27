@@ -5,24 +5,36 @@ const FILE_CATEGORY_BY_MIME = Object.freeze({
   'application/pdf': 'document',
   'image/jpeg': 'image',
   'image/png': 'image',
+  'image/webp': 'image',
   'video/mp4': 'video',
   'video/mpeg': 'video',
   'video/webm': 'video',
+  'application/msword': 'document',
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document': 'document',
+  'application/vnd.ms-excel': 'document',
+  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': 'document',
+  'text/plain': 'document',
 });
 
 const FILE_EXTENSION_BY_MIME = Object.freeze({
   'application/pdf': '.pdf',
   'image/jpeg': '.jpg',
   'image/png': '.png',
+  'image/webp': '.webp',
   'video/mp4': '.mp4',
   'video/mpeg': '.mpeg',
   'video/webm': '.webm',
+  'application/msword': '.doc',
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document': '.docx',
+  'application/vnd.ms-excel': '.xls',
+  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': '.xlsx',
+  'text/plain': '.txt',
 });
 
 const ROLE_UPLOAD_LIMITS = Object.freeze({
   citizen: Object.freeze({
-    document: 5 * 1024 * 1024,
-    image: 5 * 1024 * 1024,
+    document: 10 * 1024 * 1024,
+    image: 10 * 1024 * 1024,
   }),
   deo: Object.freeze({
     document: 5 * 1024 * 1024,
@@ -31,7 +43,7 @@ const ROLE_UPLOAD_LIMITS = Object.freeze({
   }),
 });
 
-const CONTEXT_TYPES = Object.freeze(['meeting', 'complaint', 'event', 'general']);
+const CONTEXT_TYPES = Object.freeze(['appointment', 'grievance', 'event', 'general']);
 const VIEWER_ROLES = Object.freeze(['admin', 'minister']);
 const UPLOADER_ROLES = Object.freeze(['citizen', 'deo']);
 

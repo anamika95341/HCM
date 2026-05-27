@@ -46,9 +46,26 @@ async function persistPrivateUpload(file, subdir, allowedMimes = ALLOWED) {
   };
 }
 
+const deoGrievanceUpload = multer({
+  storage,
+  limits: { fileSize: 10 * 1024 * 1024 },
+  fileFilter(req, file, cb) { cb(null, true); },
+}).fields([
+  { name: 'document', maxCount: 5 },
+  { name: 'letterhead', maxCount: 2 },
+]);
+
+const deoLetterheadMultiUpload = multer({
+  storage,
+  limits: { fileSize: 10 * 1024 * 1024 },
+  fileFilter(req, file, cb) { cb(null, true); },
+}).array('file', 2);
+
 module.exports = {
   photoUpload: createUploader({ maxSizeBytes: 2 * 1024 * 1024, subdir: 'photos' }),
   documentUpload: createUploader({ maxSizeBytes: 10 * 1024 * 1024, subdir: 'documents' }),
+  deoGrievanceUpload,
+  deoLetterheadMultiUpload,
   persistPrivateUpload,
   PHOTO_ALLOWED,
 };

@@ -52,11 +52,10 @@ const SidebarItem = ({ children, type = "NavLink", to, icon: Icon, label, collap
                 <div
                   className={isCitizen ? "portal-citizen-value" : undefined}
                   style={{
-                    whiteSpace: "nowrap",
+                    whiteSpace: "normal",
+                    wordBreak: "break-word",
                     fontSize: isCitizen ? 14 : 13,
-                    lineHeight: isCitizen ? 1.45 : "16px",
-                    overflow: "hidden",
-                    textOverflow: "ellipsis",
+                    lineHeight: isCitizen ? 1.45 : 1.35,
                   }}
                 >
                   {label}
@@ -83,11 +82,10 @@ const SidebarItem = ({ children, type = "NavLink", to, icon: Icon, label, collap
             <div
               className={isCitizen ? "portal-citizen-value" : undefined}
               style={{
-                whiteSpace: "nowrap",
+                whiteSpace: "normal",
+                wordBreak: "break-word",
                 fontSize: isCitizen ? 14 : 13,
-                lineHeight: isCitizen ? 1.45 : "16px",
-                overflow: "hidden",
-                textOverflow: "ellipsis",
+                lineHeight: isCitizen ? 1.45 : 1.35,
               }}
             >
               {label}

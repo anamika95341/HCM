@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { ChevronLeft, FileText } from "lucide-react";
+import { useTranslation } from "react-i18next";
 import { PATHS } from "../../../routes/paths.js";
 import { apiClient } from "../../../shared/api/client.js";
 import { openDownloadUrl } from "../../../shared/api/downloads.js";
@@ -18,34 +19,30 @@ import {
 } from "../../../shared/components/WorkspaceUI.jsx";
 import { usePortalTheme } from "../../../shared/theme/portalTheme.jsx";
 
+const MONTH_NAMES = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+
 const WORKFLOW_ACTION_LABELS = {
   assign: "Assign to Me",
-  reassign: "Reassign",
   logs: "Logs",
-  scheduleMeeting: "Schedule Meeting",
+  scheduleAppointment: "Schedule Appointment",
   resolve: "Resolve",
-  escalate: "Escalate",
   reopen: "Reopen",
   close: "Close",
 };
 
-function buildComplaintActions(item, userId) {
+function buildGrievanceActions(item, userId) {
   const actions = [];
-  const canReassign = ["assigned", "in_review", "call_scheduled", "followup_in_progress"].includes(item.status);
   const canLog = ["assigned", "in_review", "call_scheduled", "followup_in_progress"].includes(item.status);
-  const canScheduleMeeting = ["assigned", "in_review", "call_scheduled", "followup_in_progress"].includes(item.status);
+  const canScheduleAppointment = ["assigned", "in_review", "call_scheduled", "followup_in_progress"].includes(item.status);
   const canResolve = ["assigned", "in_review", "call_scheduled", "followup_in_progress"].includes(item.status);
-  const canEscalate = ["assigned", "in_review", "call_scheduled", "followup_in_progress"].includes(item.status);
 
   if (!item.assignedAdminUserId) actions.push(["assign", "Assign to Me"]);
   if (item.assignedAdminUserId === userId) {
-    if (canReassign) actions.push(["reassign", "Reassign"]);
     if (canLog) actions.push(["logs", "Logs"]);
-    if (canScheduleMeeting) actions.push(["scheduleMeeting", "Schedule Meeting"]);
+    if (canScheduleAppointment) actions.push(["scheduleAppointment", "Schedule Appointment"]);
     if (canResolve) actions.push(["resolve", "Resolve"]);
-    if (canEscalate) actions.push(["escalate", "Escalate"]);
   }
-  if (["resolved", "completed", "escalated_to_meeting"].includes(item.status)) actions.push(["reopen", "Reopen"]);
+  if (["resolved", "completed"].includes(item.status)) actions.push(["reopen", "Reopen"]);
   if (item.status === "resolved") actions.push(["close", "Close"]);
   return actions;
 }
@@ -58,19 +55,16 @@ function statusLabel(status) {
     .join(" ");
 }
 
-function complaintWorkflowStatus(item, adminId) {
+function grievanceWorkflowStatus(item) {
   if (item?.status === "resolved") return "resolved";
-  if (item?.handoffType === "reassigned" && item?.handoffByAdminUserId === adminId && item?.handoffToAdminUserId !== adminId) return "reassigned";
-  if (item?.handoffType === "reassigned" && item?.handoffToAdminUserId === adminId && item?.status === "assigned") return "reassigned";
   if (item?.status === "assigned") return "accepted";
-  if (["in_review", "call_scheduled", "followup_in_progress"].includes(item?.status)) return "complaint_logged";
+  if (["in_review", "call_scheduled", "followup_in_progress"].includes(item?.status)) return "grievance_logged";
   return item?.status || "";
 }
 
-function complaintWorkflowLabel(status) {
+function grievanceWorkflowLabel(status) {
   if (status === "accepted") return "Accepted";
-  if (status === "complaint_logged") return "Complaint Logged";
-  if (status === "reassigned") return "Reassigned";
+  if (status === "grievance_logged") return "Grievance Logged";
   if (status === "resolved") return "Resolved";
   return statusLabel(status);
 }
@@ -181,6 +175,7 @@ function getAttachedFiles(item) {
 
 export function SuccessModal({ open, message, onClose }) {
   const { C } = usePortalTheme();
+  const { t } = useTranslation();
   if (!open) return null;
   return (
     <CenteredOverlay>
@@ -201,10 +196,10 @@ export function SuccessModal({ open, message, onClose }) {
         }}
       >
         <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-full text-white text-3xl" style={{ background: C.mint }}>✓</div>
-        <h3 style={{ fontSize: 28, fontWeight: 700, color: C.t1 }}>Success</h3>
+        <h3 style={{ fontSize: 28, fontWeight: 700, color: C.t1 }}>{t("admin.grievanceDetail.success")}</h3>
         <p style={{ marginTop: 8, fontSize: 14, color: C.t3, maxWidth: 420 }}>{message}</p>
         <WorkspaceButton type="button" onClick={onClose} style={{ width: 220, marginTop: 24, justifySelf: "center" }}>
-          Okay
+          {t("admin.grievanceDetail.okay")}
         </WorkspaceButton>
       </div>
     </CenteredOverlay>
@@ -215,22 +210,20 @@ function formatDateTimeLabel(value) {
   if (!value) return "Not provided";
   const parsed = new Date(value);
   if (Number.isNaN(parsed.getTime())) return "Not provided";
-  return parsed.toLocaleDateString("en-GB", {
-    day: "2-digit",
-    month: "2-digit",
-    year: "2-digit",
-  });
+  const day = String(parsed.getDate()).padStart(2, "0");
+  const mon = MONTH_NAMES[parsed.getMonth()];
+  const year = String(parsed.getFullYear()).slice(-2);
+  return `${day} ${mon},${year}`;
 }
 
 function formatDateLabel(value) {
   if (!value) return "Not provided";
   const parsed = new Date(value);
   if (Number.isNaN(parsed.getTime())) return "Not provided";
-  return parsed.toLocaleDateString("en-GB", {
-    day: "2-digit",
-    month: "2-digit",
-    year: "2-digit",
-  });
+  const day = String(parsed.getDate()).padStart(2, "0");
+  const mon = MONTH_NAMES[parsed.getMonth()];
+  const year = String(parsed.getFullYear()).slice(-2);
+  return `${day} ${mon},${year}`;
 }
 
 export function WorkspaceTextArea(props) {
@@ -256,6 +249,7 @@ export function WorkspaceTextArea(props) {
 
 export default function AdminCaseDetail() {
   const { C } = usePortalTheme();
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const { id } = useParams();
   const [searchParams] = useSearchParams();
@@ -270,31 +264,27 @@ export default function AdminCaseDetail() {
   const [actionLoading, setActionLoading] = useState(false);
   const [error, setError] = useState("");
   const [isBackHovered, setIsBackHovered] = useState(false);
-  const complaintInfoRef = useRef(null);
-  const [complaintInfoHeight, setComplaintInfoHeight] = useState(540);
-  const [complaintForm, setComplaintForm] = useState({
+  const grievanceInfoRef = useRef(null);
+  const [grievanceInfoHeight, setGrievanceInfoHeight] = useState(540);
+  const [grievanceForm, setGrievanceForm] = useState({
     logType: "",
     logTypes: [],
     logSummary: "",
     scheduleDate: "",
     scheduleTime: "",
-    escalationReason: "",
     resolutionSummary: "",
-    reassignTo: "",
-    reassignReason: "",
     reopenReason: "",
     closeNote: "",
   });
   const focusedAction = searchParams.get("action") || "";
   const activeAction = modalAction;
   const showAssignToMeOnly = !item?.assignedAdminUserId;
-  const isComplaintPoolDetail = source === "complaint-pool";
-  const isComplaintQueueDetail = source === "complaint-queue";
+  const isGrievancePoolDetail = source === "grievance-pool";
+  const isGrievanceQueueDetail = source === "grievance-queue";
   const isMyCasesDetail = source === "my-cases";
-  const isResolvedCompletedDetail = source === "resolved-completed" || source === "resolved-complaints";
-  const isEscalatedOrReassignedDetail = source === "escalated-reassigned";
-  const useComplaintQueueLayout = isComplaintQueueDetail || isMyCasesDetail || isResolvedCompletedDetail || isEscalatedOrReassignedDetail;
-  const complaintPoolBackPath = `${PATHS.admin.workQueue}?tab=complaint-pool`;
+  const isResolvedCompletedDetail = source === "resolved-completed" || source === "resolved-grievances";
+  const useGrievanceQueueLayout = isGrievanceQueueDetail || isMyCasesDetail || isResolvedCompletedDetail;
+  const grievancePoolBackPath = `${PATHS.admin.workQueue}?tab=grievance-pool`;
 
   useEffect(() => {
     if (focusedAction) {
@@ -303,33 +293,33 @@ export default function AdminCaseDetail() {
   }, [focusedAction]);
 
   useEffect(() => {
-    if (!complaintInfoRef.current || typeof ResizeObserver === "undefined") return undefined;
+    if (!grievanceInfoRef.current || typeof ResizeObserver === "undefined") return undefined;
     const updateHeight = () => {
-      if (!complaintInfoRef.current) return;
-      setComplaintInfoHeight(Math.max(540, complaintInfoRef.current.offsetHeight));
+      if (!grievanceInfoRef.current) return;
+      setGrievanceInfoHeight(Math.max(540, grievanceInfoRef.current.offsetHeight));
     };
     updateHeight();
     const observer = new ResizeObserver(() => updateHeight());
-    observer.observe(complaintInfoRef.current);
+    observer.observe(grievanceInfoRef.current);
     return () => observer.disconnect();
-  }, [history, item, useComplaintQueueLayout, isComplaintPoolDetail, isEscalatedOrReassignedDetail, isResolvedCompletedDetail]);
+  }, [history, item, useGrievanceQueueLayout, isGrievancePoolDetail, isResolvedCompletedDetail]);
 
   useEffect(() => {
     let mounted = true;
 
     async function loadDetail() {
       try {
-        const { data } = await apiClient.get(`/complaints/${id}/admin-view`);
+        const { data } = await apiClient.get(`/grievances/${id}/admin-view`);
         if (!mounted) return;
-        const callScheduledAt = data.complaint.callScheduledAt ? new Date(data.complaint.callScheduledAt) : null;
-        setItem(data.complaint);
+        const callScheduledAt = data.grievance.callScheduledAt ? new Date(data.grievance.callScheduledAt) : null;
+        setItem(data.grievance);
         setAdmins(data.admins || []);
         setHistory(data.history || []);
-        setComplaintForm((current) => ({
+        setGrievanceForm((current) => ({
           ...current,
           scheduleDate: callScheduledAt && !Number.isNaN(callScheduledAt.getTime()) ? new Date(callScheduledAt.getTime() - callScheduledAt.getTimezoneOffset() * 60000).toISOString().slice(0, 10) : "",
           scheduleTime: callScheduledAt && !Number.isNaN(callScheduledAt.getTime()) ? new Date(callScheduledAt.getTime() - callScheduledAt.getTimezoneOffset() * 60000).toISOString().slice(11, 16) : "",
-          resolutionSummary: data.complaint.resolutionSummary || "",
+          resolutionSummary: data.grievance.resolutionSummary || "",
         }));
       } catch (loadError) {
         if (mounted) {
@@ -349,26 +339,23 @@ export default function AdminCaseDetail() {
 
   const availableActions = useMemo(
     () => {
-      const actions = buildComplaintActions(item || {}, session?.user?.id);
+      const actions = buildGrievanceActions(item || {}, session?.user?.id);
       if (isMyCasesDetail) {
         return actions;
       }
 
-      const incomingReassigned = item?.handoffType === "reassigned" && item?.handoffToAdminUserId === session?.user?.id;
-      return incomingReassigned
-        ? actions.filter(([value]) => value !== "reassign")
-        : actions;
+      return actions;
     },
     [item, session?.user?.id, isMyCasesDetail]
   );
 
-  const liveWorkflowStatus = complaintWorkflowStatus(item, session?.user?.id);
-  const committedWorkflowAction = liveWorkflowStatus === "complaint_logged" ? "logs" : "";
+  const liveWorkflowStatus = grievanceWorkflowStatus(item);
+  const committedWorkflowAction = liveWorkflowStatus === "grievance_logged" ? "logs" : "";
   const workflowSelectValue = modalAction || committedWorkflowAction;
-  const workflowFeedback = liveWorkflowStatus === "complaint_logged"
+  const workflowFeedback = liveWorkflowStatus === "grievance_logged"
     ? {
         tone: "green",
-        message: "Complaint Logs filled",
+        message: t("admin.grievanceDetail.grievanceFeedback"),
       }
     : null;
 
@@ -390,41 +377,20 @@ export default function AdminCaseDetail() {
     return availableActions.map(([value, label]) => ({ value, label, disabled: false }));
   }, [availableActions, committedWorkflowAction, modalAction]);
 
-  const matchingAdminOptions = useMemo(
-    () => admins.filter((admin) => admin.id !== session?.user?.id),
-    [admins, session?.user?.id]
-  );
-
-  const escalationTrimmed = complaintForm.escalationReason.trim();
-  const escalationReasonError =
-    complaintForm.escalationReason.length > 500
-      ? "Maximum 500 characters allowed"
-      : complaintForm.escalationReason.length > 0 && escalationTrimmed.length < 4
-        ? "Write a valid reason."
-        : "";
-
-  const reassignTrimmed = complaintForm.reassignReason.trim();
-  const reassignReasonError =
-    complaintForm.reassignReason.length > 500
-      ? "Maximum 500 characters allowed"
-      : complaintForm.reassignReason.length > 0 && reassignTrimmed.length < 4
-        ? "Write a valid reason."
-        : "";
-
-  const resolutionWordCount = countWords(complaintForm.resolutionSummary);
-  const resolutionTrimmed = complaintForm.resolutionSummary.trim();
+  const resolutionWordCount = countWords(grievanceForm.resolutionSummary);
+  const resolutionTrimmed = grievanceForm.resolutionSummary.trim();
   const resolutionError =
     resolutionWordCount > 1000
-      ? "Maximum 1000 words allowed"
-      : complaintForm.resolutionSummary.length > 0 && resolutionTrimmed.length < 10
-        ? "Write a valid summary."
+      ? t("admin.grievanceDetail.maxWordsError")
+      : grievanceForm.resolutionSummary.length > 0 && resolutionTrimmed.length < 10
+        ? t("admin.grievanceDetail.minSummaryError")
         : "";
 
-  const scheduledIso = buildFutureIso(complaintForm.scheduleDate, complaintForm.scheduleTime);
+  const scheduledIso = buildFutureIso(grievanceForm.scheduleDate, grievanceForm.scheduleTime);
   const scheduleError =
-    complaintForm.scheduleDate || complaintForm.scheduleTime
+    grievanceForm.scheduleDate || grievanceForm.scheduleTime
       ? !scheduledIso || new Date(scheduledIso).getTime() <= Date.now()
-        ? "Select a future date and time."
+        ? t("admin.grievanceDetail.scheduleDateError")
         : ""
       : "";
 
@@ -433,37 +399,28 @@ export default function AdminCaseDetail() {
     setError("");
     try {
       const { data } = await request();
-      if (data.complaint) {
-        setItem(data.complaint);
+      if (data.grievance) {
+        setItem(data.grievance);
       }
       if (data.history) {
         setHistory(data.history);
       } else {
-        const detail = await apiClient.get(`/complaints/${id}/admin-view`);
-        setItem(detail.data.complaint);
+        const detail = await apiClient.get(`/grievances/${id}/admin-view`);
+        setItem(detail.data.grievance);
         setHistory(detail.data.history || []);
       }
       if (actionName === "assign") {
-        if (isComplaintPoolDetail) {
-          setSuccessMessage("Complaint assigned successfully.");
-          setPendingSuccessRedirect(PATHS.admin.complaintQueue);
+        if (isGrievancePoolDetail) {
+          setSuccessMessage(t("admin.grievanceDetail.grievanceAssigned"));
+          setPendingSuccessRedirect(PATHS.admin.grievanceQueue);
         } else {
-          navigate(PATHS.admin.complaintQueue);
+          navigate(PATHS.admin.grievanceQueue);
         }
-        return;
-      }
-      if (actionName === "escalate") {
-        navigate(complaintPoolBackPath);
-        return;
-      }
-      if (actionName === "reassign") {
-        setModalAction("");
-        navigate(`${PATHS.admin.workQueue}?tab=escalated`);
         return;
       }
       if (actionName === "logs") {
         setModalAction("");
-        setComplaintForm((current) => ({
+        setGrievanceForm((current) => ({
           ...current,
           logTypes: [],
           logSummary: "",
@@ -472,10 +429,10 @@ export default function AdminCaseDetail() {
       }
       if (actionName === "resolve") {
         setModalAction("");
-        navigate(`${PATHS.admin.workQueue}?tab=resolved-complaints`);
+        navigate(`${PATHS.admin.workQueue}?tab=resolved-grievances`);
         return;
       }
-      setSuccessMessage(`${item?.complaintId || "Complaint"} updated successfully.`);
+      setSuccessMessage(`${item?.grievanceId || "Grievance"} updated successfully.`);
     } catch (actionError) {
       setError(actionError?.response?.data?.error || "Action failed");
     } finally {
@@ -492,7 +449,7 @@ export default function AdminCaseDetail() {
   }
 
   function toggleLogType(logType) {
-    setComplaintForm((current) => ({
+    setGrievanceForm((current) => ({
       ...current,
       logTypes: current.logTypes.includes(logType)
         ? current.logTypes.filter((value) => value !== logType)
@@ -518,184 +475,88 @@ export default function AdminCaseDetail() {
         outerStyle={{ height: "calc(100vh - 73px)", overflow: "auto" }}
         contentStyle={{ height: "100%", display: "flex", flexDirection: "column", minHeight: 0 }}
       >
-        {error ? <WorkspaceCard style={{ color: C.danger }}>{error}</WorkspaceCard> : <WorkspaceEmptyState title="Loading case details..." />}
+        {error ? <WorkspaceCard style={{ color: C.danger }}>{error}</WorkspaceCard> : <WorkspaceEmptyState title={t("admin.grievanceDetail.loading")} />}
       </WorkspacePage>
     );
   }
 
   const backPath =
-    isComplaintPoolDetail
-      ? complaintPoolBackPath
+    isGrievancePoolDetail
+      ? grievancePoolBackPath
       : isResolvedCompletedDetail
-        ? `${PATHS.admin.workQueue}?tab=resolved-complaints`
-        : isEscalatedOrReassignedDetail
-          ? `${PATHS.admin.workQueue}?tab=escalated`
-      : source === "complaint-queue"
-        ? PATHS.admin.complaintQueue
+        ? `${PATHS.admin.workQueue}?tab=resolved-grievances`
+      : source === "grievance-queue"
+        ? PATHS.admin.grievanceQueue
         : isMyCasesDetail
           ? PATHS.admin.cases
           : PATHS.admin.cases;
   const backLabel =
-    isComplaintPoolDetail
-      ? "Back"
-      : isComplaintQueueDetail || isEscalatedOrReassignedDetail || isResolvedCompletedDetail
-        ? "Back"
+    isGrievancePoolDetail
+      ? t("common.back")
+      : isGrievanceQueueDetail || isResolvedCompletedDetail
+        ? t("common.back")
         : backPath === PATHS.admin.workQueue
-          ? "Back to Work Queue"
-          : backPath === PATHS.admin.complaintQueue
-            ? "Back"
-            : "Back to My Cases";
+          ? t("admin.grievanceDetail.backToWorkQueue")
+          : backPath === PATHS.admin.grievanceQueue
+            ? t("common.back")
+            : t("admin.grievanceDetail.backToMyCases");
   const attachedFiles = getAttachedFiles(item);
   const createdAtLabel = formatDateTimeLabel(item.createdAt);
   const incidentDateLabel = formatDateLabel(item.incidentDate);
   const handoffDateLabel = formatDateLabel(item.updatedAt);
-  const complaintStateLabel = item.handoffType || item.status || "";
-  const handoffTypeLabel = complaintStateLabel
-    ? complaintStateLabel.split("_").filter(Boolean).map((chunk) => chunk.charAt(0).toUpperCase() + chunk.slice(1)).join(" ")
-    : "None";
   const detailValueStyle = { fontSize: 14, fontWeight: 400, color: C.t1, lineHeight: 1.6, whiteSpace: "pre-wrap", wordBreak: "break-word" };
   const standardGridStyle = { display: "grid", gridTemplateColumns: "repeat(3, minmax(0, 1fr))", gap: 20, alignItems: "start" };
   const pairedGridStyle = { display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: 24, alignItems: "start" };
-  const complaintPoolGridStyle = { display: "grid", gridTemplateColumns: "repeat(3, minmax(0, 1fr))", gap: 24, alignItems: "start" };
+  const grievancePoolGridStyle = { display: "grid", gridTemplateColumns: "repeat(3, minmax(0, 1fr))", gap: 24, alignItems: "start" };
   const citizenDistrict = item.citizenSnapshot?.district || "Not provided";
   const citizenLocalMp = item.citizenSnapshot?.localMp || "Not provided";
-  const currentAdminId = session?.user?.id;
-  const workflowStatus = complaintWorkflowStatus(item, currentAdminId);
-  const showAssignToMeButton = isComplaintPoolDetail;
-  const isOutgoingReassignedComplaint = item.handoffType === "reassigned" && item.handoffByAdminUserId === currentAdminId && item.handoffToAdminUserId !== currentAdminId;
-  const showWorkflowActions = !isComplaintPoolDetail && !isEscalatedOrReassignedDetail && !isResolvedCompletedDetail && item.status !== "resolved" && !isOutgoingReassignedComplaint;
-  const complaintStatusLabel = complaintWorkflowLabel(workflowStatus);
-  const isResolvedComplaint = item.status === "resolved";
-  const isReassignedComplaint = isOutgoingReassignedComplaint;
-  const complaintLogSummary = item.callOutcome || "";
+  const isChiefMinister = session?.user?.adminType === "chief_minister";
+  const workflowStatus = grievanceWorkflowStatus(item);
+  const showAssignToMeButton = isGrievancePoolDetail;
+  const showWorkflowActions = !isGrievancePoolDetail && !isResolvedCompletedDetail && item.status !== "resolved";
+  const grievanceStatusLabel = grievanceWorkflowLabel(workflowStatus);
+  const isResolvedGrievance = item.status === "resolved";
+  const grievanceLogSummary = item.callOutcome || "";
 
   function renderTitleBlock(value) {
-    return <DetailItem label="Title" value={value || "Untitled Complaint"} valueStyle={detailValueStyle} />;
+    return <DetailItem label={t("admin.grievanceDetail.titleLabel")} value={value || t("admin.grievanceDetail.untitledGrievance")} valueStyle={detailValueStyle} />;
   }
 
   function renderDescriptionBlock(value) {
-    return <DetailItem label="Description" value={value || "Not provided"} valueStyle={detailValueStyle} />;
+    return <DetailItem label={t("admin.grievanceDetail.descriptionLabel")} value={value || t("admin.grievanceDetail.notProvided")} valueStyle={detailValueStyle} />;
   }
 
-  function renderComplaintPoolInfo() {
-    if (item.handoffType === "escalated") {
-      return (
-        <>
-          <div style={standardGridStyle}>
-            <DetailItem label="Complaint Id" value={item.complaintId} />
-            <DetailItem label="Handoff Type" value={handoffTypeLabel} />
-            <DetailItem label="Escalation Date" value={handoffDateLabel} />
-          </div>
-          {renderTitleBlock(item.title)}
-          <div style={standardGridStyle}>
-            <DetailItem label="Category" value={item.complaintType || "Not provided"} />
-            <DetailItem label="Citizen Name" value={item.citizenSnapshot?.name || "Not provided"} />
-            <DetailItem label="Citizen Phone Number" value={item.citizenSnapshot?.phoneNumbers?.[0] || "Not provided"} />
-          </div>
-        <div style={standardGridStyle}>
-          <DetailItem label="Created At" value={createdAtLabel} />
-          <DetailItem label="Date of Incident" value={incidentDateLabel} />
-          <DetailItem label="Incident Location" value={item.complaintLocation || "Not provided"} />
-        </div>
-        {renderDescriptionBlock(item.description)}
-        {complaintLogSummary ? <NoticeBox tone="blue" label="Complaint Log Summary" value={complaintLogSummary} /> : null}
-        {item.statusReason ? <NoticeBox tone="amber" label="Reason for Escalation" value={item.statusReason} /> : null}
-      </>
-    );
-  }
+  function renderGrievancePoolInfo() {
 
     return (
       <>
         <div className="grid md:grid-cols-3 gap-6">
-          <DetailItem label="Complaint Id" value={item.complaintId} />
-          <DetailItem label="Created At" value={createdAtLabel} />
-          <DetailItem label="Citizen Name" value={item.citizenSnapshot?.name || "Not provided"} />
+          <DetailItem label={t("admin.grievanceDetail.grievanceId")} value={item.grievanceId} />
+          <DetailItem label={t("admin.caseDetail.createdAt")} value={createdAtLabel} />
+          <DetailItem label={t("admin.grievanceDetail.citizenName")} value={item.citizenSnapshot?.name || t("admin.grievanceDetail.notProvided")} />
         </div>
         <div className="grid md:grid-cols-3 gap-6">
-          <DetailItem label="Citizen Phone Number" value={item.citizenSnapshot?.phoneNumbers?.[0] || "Not provided"} />
-          <DetailItem label="District" value={citizenDistrict} />
-          <DetailItem label="MP of District" value={citizenLocalMp} />
+          <DetailItem label={t("admin.grievanceDetail.citizenPhone")} value={item.citizenSnapshot?.phoneNumbers?.[0] || t("admin.grievanceDetail.notProvided")} />
+          <DetailItem label={t("admin.workQueue.colDistrict")} value={citizenDistrict} />
+          <DetailItem label={t("admin.grievanceDetail.mpOfDistrict")} value={citizenLocalMp} />
         </div>
         <div>
-          <p style={{ fontSize: 11, color: C.t3, fontWeight: 700, textTransform: "uppercase", letterSpacing: ".08em", marginBottom: 8 }}>Title</p>
+          <p style={{ fontSize: 11, color: C.t3, fontWeight: 700, textTransform: "uppercase", letterSpacing: ".08em", marginBottom: 8 }}>{t("admin.grievanceDetail.titleLabel")}</p>
           <p style={{ margin: 0, fontSize: 14, fontWeight: 400, color: C.t1, lineHeight: 1.6, whiteSpace: "normal", wordBreak: "break-word" }}>
-            {item.title || "Untitled Complaint"}
+            {item.title || t("admin.grievanceDetail.untitledGrievance")}
           </p>
         </div>
         <div className="grid md:grid-cols-3 gap-6">
-          <DetailItem label="Category" value={item.complaintType || "Not provided"} />
-          <DetailItem label="Date of Incident" value={incidentDateLabel} />
-          <DetailItem label="Incident Location" value={item.complaintLocation || "Not provided"} />
+          <DetailItem label={t("admin.grievanceDetail.category")} value={item.grievanceType || t("admin.grievanceDetail.notProvided")} />
+          <DetailItem label={t("admin.grievanceDetail.dateOfIncident")} value={incidentDateLabel} />
+          <DetailItem label={t("admin.grievanceDetail.incidentLocation")} value={item.grievanceLocation || t("admin.grievanceDetail.notProvided")} />
         </div>
         <div>
-          <p style={{ fontSize: 11, color: C.t3, fontWeight: 700, textTransform: "uppercase", letterSpacing: ".08em", marginBottom: 8 }}>Description</p>
+          <p style={{ fontSize: 11, color: C.t3, fontWeight: 700, textTransform: "uppercase", letterSpacing: ".08em", marginBottom: 8 }}>{t("admin.grievanceDetail.descriptionLabel")}</p>
           <p style={{ margin: 0, fontSize: 14, fontWeight: 400, color: C.t1, lineHeight: 1.6, whiteSpace: "pre-wrap", wordBreak: "break-word" }}>
-            {item.description || "Not provided"}
+            {item.description || t("admin.grievanceDetail.notProvided")}
           </p>
         </div>
-      </>
-    );
-  }
-
-  function renderEscalatedInfo() {
-    if (item.handoffType === "reassigned") {
-      return (
-        <>
-          <div style={standardGridStyle}>
-            <DetailItem label="Complaint Id" value={item.complaintId} />
-            <DetailItem label="Reassigned Date" value={handoffDateLabel} />
-            <DetailItem label="Reassigned To" value={item.assignedAdminName || item.currentOwner || "Not provided"} />
-          </div>
-          <div style={standardGridStyle}>
-            <DetailItem label="Created At" value={createdAtLabel} />
-            <DetailItem label="Citizen Name" value={item.citizenSnapshot?.name || "Not provided"} />
-            <DetailItem label="Citizen Phone Number" value={item.citizenSnapshot?.phoneNumbers?.[0] || "Not provided"} />
-          </div>
-          <div style={standardGridStyle}>
-            <DetailItem label="District" value={citizenDistrict} />
-            <DetailItem label="MP of District" value={citizenLocalMp} />
-            <div />
-          </div>
-          {renderTitleBlock(item.title)}
-          <div style={standardGridStyle}>
-            <DetailItem label="Category" value={item.complaintType || "Not provided"} />
-            <DetailItem label="Date of Incident" value={incidentDateLabel} />
-            <DetailItem label="Incident Location" value={item.complaintLocation || "Not provided"} />
-          </div>
-          {renderDescriptionBlock(item.description)}
-          {complaintLogSummary ? <NoticeBox tone="blue" label="Complaint Log Summary" value={complaintLogSummary} /> : null}
-          {item.statusReason ? <NoticeBox tone="blue" label="Reason for Reassignation" value={item.statusReason} /> : null}
-        </>
-      );
-    }
-
-    return (
-      <>
-        <div style={standardGridStyle}>
-          <DetailItem label="Complaint Id" value={item.complaintId} />
-          <DetailItem label="Handoff Type" value={handoffTypeLabel} />
-          <DetailItem label={item.handoffType === "reassigned" ? "Reassignation Date" : "Escalation Date"} value={handoffDateLabel} />
-        </div>
-        {renderTitleBlock(item.title)}
-        <div style={standardGridStyle}>
-          <DetailItem label="Category" value={item.complaintType || "Not provided"} />
-          <DetailItem label="Citizen Name" value={item.citizenSnapshot?.name || "Not provided"} />
-          <DetailItem label="Citizen Phone Number" value={item.citizenSnapshot?.phoneNumbers?.[0] || "Not provided"} />
-        </div>
-        <div style={standardGridStyle}>
-          <DetailItem label="Created At" value={createdAtLabel} />
-          <DetailItem label="Date of Incident" value={incidentDateLabel} />
-          <DetailItem label="Incident Location" value={item.complaintLocation || "Not provided"} />
-        </div>
-        {renderDescriptionBlock(item.description)}
-        {complaintLogSummary ? <NoticeBox tone="blue" label="Complaint Log Summary" value={complaintLogSummary} /> : null}
-        {item.statusReason ? (
-          <NoticeBox
-            tone={item.handoffType === "reassigned" ? "blue" : "amber"}
-            label={item.handoffType === "reassigned" ? "Reason for Reassignation" : "Reason for Escalation"}
-            value={item.statusReason}
-          />
-        ) : null}
       </>
     );
   }
@@ -704,29 +565,29 @@ export default function AdminCaseDetail() {
     return (
       <>
         <div style={standardGridStyle}>
-          <DetailItem label="Complaint Id" value={item.complaintId} />
-          <DetailItem label="Resolved Date" value={handoffDateLabel} />
+          <DetailItem label={t("admin.grievanceDetail.grievanceId")} value={item.grievanceId} />
+          <DetailItem label={t("admin.grievanceDetail.resolvedDate")} value={handoffDateLabel} />
           <div />
         </div>
         <div style={standardGridStyle}>
-          <DetailItem label="Created At" value={createdAtLabel} />
-          <DetailItem label="Citizen Name" value={item.citizenSnapshot?.name || "Not provided"} />
-          <DetailItem label="Citizen Phone Number" value={item.citizenSnapshot?.phoneNumbers?.[0] || "Not provided"} />
+          <DetailItem label={t("admin.caseDetail.createdAt")} value={createdAtLabel} />
+          <DetailItem label={t("admin.grievanceDetail.citizenName")} value={item.citizenSnapshot?.name || t("admin.grievanceDetail.notProvided")} />
+          <DetailItem label={t("admin.grievanceDetail.citizenPhone")} value={item.citizenSnapshot?.phoneNumbers?.[0] || t("admin.grievanceDetail.notProvided")} />
         </div>
         <div style={standardGridStyle}>
-          <DetailItem label="District" value={citizenDistrict} />
-          <DetailItem label="MP of District" value={citizenLocalMp} />
+          <DetailItem label={t("admin.workQueue.colDistrict")} value={citizenDistrict} />
+          <DetailItem label={t("admin.grievanceDetail.mpOfDistrict")} value={citizenLocalMp} />
           <div />
         </div>
         {renderTitleBlock(item.title)}
         <div style={standardGridStyle}>
-          <DetailItem label="Category" value={item.complaintType || "Not provided"} />
-          <DetailItem label="Date of Incident" value={incidentDateLabel} />
-          <DetailItem label="Incident Location" value={item.complaintLocation || "Not provided"} />
+          <DetailItem label={t("admin.grievanceDetail.category")} value={item.grievanceType || t("admin.grievanceDetail.notProvided")} />
+          <DetailItem label={t("admin.grievanceDetail.dateOfIncident")} value={incidentDateLabel} />
+          <DetailItem label={t("admin.grievanceDetail.incidentLocation")} value={item.grievanceLocation || t("admin.grievanceDetail.notProvided")} />
         </div>
         {renderDescriptionBlock(item.description)}
-        {complaintLogSummary ? <NoticeBox tone="blue" label="Complaint Log Summary" value={complaintLogSummary} /> : null}
-        {item.resolutionSummary ? <NoticeBox tone="green" label="Resolved Summary" value={item.resolutionSummary} /> : null}
+        {grievanceLogSummary ? <NoticeBox tone="blue" label={t("admin.grievanceDetail.grievanceLogSummaryLabel")} value={grievanceLogSummary} /> : null}
+        {item.resolutionSummary ? <NoticeBox tone="green" label={t("admin.grievanceDetail.resolvedSummaryNotice")} value={item.resolutionSummary} /> : null}
       </>
     );
   }
@@ -735,71 +596,59 @@ export default function AdminCaseDetail() {
     return (
       <>
         <div style={standardGridStyle}>
-          <DetailItem label="Complaint Id" value={item.complaintId} />
-          <DetailItem label="Status" value={complaintStatusLabel} />
-          <DetailItem label="Updated Date" value={handoffDateLabel} />
+          <DetailItem label={t("admin.grievanceDetail.grievanceId")} value={item.grievanceId} />
+          <DetailItem label={t("admin.caseDetail.status")} value={grievanceStatusLabel} />
+          <DetailItem label={t("admin.grievanceDetail.updatedDate")} value={handoffDateLabel} />
         </div>
         {renderTitleBlock(item.title)}
         <div style={standardGridStyle}>
-          <DetailItem label="Category" value={item.complaintType || "Not provided"} />
-          <DetailItem label="Citizen Name" value={item.citizenSnapshot?.name || "Not provided"} />
-          <DetailItem label="Citizen Phone Number" value={item.citizenSnapshot?.phoneNumbers?.[0] || "Not provided"} />
+          <DetailItem label={t("admin.grievanceDetail.category")} value={item.grievanceType || t("admin.grievanceDetail.notProvided")} />
+          <DetailItem label={t("admin.grievanceDetail.citizenName")} value={item.citizenSnapshot?.name || t("admin.grievanceDetail.notProvided")} />
+          <DetailItem label={t("admin.grievanceDetail.citizenPhone")} value={item.citizenSnapshot?.phoneNumbers?.[0] || t("admin.grievanceDetail.notProvided")} />
         </div>
         <div style={standardGridStyle}>
-          <DetailItem label="Created At" value={createdAtLabel} />
-          <DetailItem label="Date of Incident" value={incidentDateLabel} />
-          <DetailItem label="Incident Location" value={item.complaintLocation || "Not provided"} />
+          <DetailItem label={t("admin.caseDetail.createdAt")} value={createdAtLabel} />
+          <DetailItem label={t("admin.grievanceDetail.dateOfIncident")} value={incidentDateLabel} />
+          <DetailItem label={t("admin.grievanceDetail.incidentLocation")} value={item.grievanceLocation || t("admin.grievanceDetail.notProvided")} />
         </div>
         {renderDescriptionBlock(item.description)}
-        {complaintLogSummary ? <NoticeBox tone="blue" label="Complaint Log Summary" value={complaintLogSummary} /> : null}
-        {item.statusReason ? (
-          <NoticeBox
-            tone={item.handoffType === "reassigned" ? "blue" : "amber"}
-            label={item.handoffType === "reassigned" ? "Reason for Reassignation" : "Reason for Escalation"}
-            value={item.statusReason}
-          />
-        ) : null}
-        {item.resolutionSummary ? <NoticeBox tone="green" label="Mark As Resolved Summary" value={item.resolutionSummary} /> : null}
+        {grievanceLogSummary ? <NoticeBox tone="blue" label={t("admin.grievanceDetail.grievanceLogSummaryLabel")} value={grievanceLogSummary} /> : null}
+        {item.statusReason ? <NoticeBox tone="amber" label={t("admin.grievanceDetail.statusReason")} value={item.statusReason} /> : null}
+        {item.resolutionSummary ? <NoticeBox tone="green" label={t("admin.grievanceDetail.markAsResolvedSummary")} value={item.resolutionSummary} /> : null}
       </>
     );
   }
 
-  function renderComplaintQueueInfo() {
+  function renderGrievanceQueueInfo() {
     if (isMyCasesDetail) {
       return (
         <>
           <div style={standardGridStyle}>
-            <DetailItem label="Complaint Id" value={item.complaintId} />
+            <DetailItem label={t("admin.grievanceDetail.grievanceId")} value={item.grievanceId} />
             <DetailItem
-              label="Status"
+              label={t("admin.caseDetail.status")}
               value={(
                 <WorkspaceBadge status={item.status} title={statusLabel(item.status)}>
                   {statusLabel(item.status)}
                 </WorkspaceBadge>
               )}
             />
-            <DetailItem label="Updated Date" value={handoffDateLabel} />
+            <DetailItem label={t("admin.grievanceDetail.updatedDate")} value={handoffDateLabel} />
           </div>
           {renderTitleBlock(item.title)}
           <div style={standardGridStyle}>
-            <DetailItem label="Category" value={item.complaintType || "Not provided"} />
-            <DetailItem label="Citizen Name" value={item.citizenSnapshot?.name || "Not provided"} />
-            <DetailItem label="Citizen Phone Number" value={item.citizenSnapshot?.phoneNumbers?.[0] || "Not provided"} />
+            <DetailItem label={t("admin.grievanceDetail.category")} value={item.grievanceType || t("admin.grievanceDetail.notProvided")} />
+            <DetailItem label={t("admin.grievanceDetail.citizenName")} value={item.citizenSnapshot?.name || t("admin.grievanceDetail.notProvided")} />
+            <DetailItem label={t("admin.grievanceDetail.citizenPhone")} value={item.citizenSnapshot?.phoneNumbers?.[0] || t("admin.grievanceDetail.notProvided")} />
           </div>
           <div style={standardGridStyle}>
-            <DetailItem label="Created At" value={createdAtLabel} />
-            <DetailItem label="Date of Incident" value={incidentDateLabel} />
-            <DetailItem label="Incident Location" value={item.complaintLocation || "Not provided"} />
+            <DetailItem label={t("admin.caseDetail.createdAt")} value={createdAtLabel} />
+            <DetailItem label={t("admin.grievanceDetail.dateOfIncident")} value={incidentDateLabel} />
+            <DetailItem label={t("admin.grievanceDetail.incidentLocation")} value={item.grievanceLocation || t("admin.grievanceDetail.notProvided")} />
           </div>
           {renderDescriptionBlock(item.description)}
-          {item.statusReason ? (
-            <NoticeBox
-              tone={item.handoffType === "reassigned" ? "blue" : "amber"}
-              label={item.handoffType === "reassigned" ? "Reason for Reassignation" : "Reason for Escalation"}
-              value={item.statusReason}
-            />
-          ) : null}
-          {item.resolutionSummary ? <NoticeBox tone="green" label="Summary" value={item.resolutionSummary} /> : null}
+          {item.statusReason ? <NoticeBox tone="amber" label={t("admin.grievanceDetail.statusReason")} value={item.statusReason} /> : null}
+          {item.resolutionSummary ? <NoticeBox tone="green" label={t("admin.grievanceDetail.summaryNotice")} value={item.resolutionSummary} /> : null}
         </>
       );
     }
@@ -807,47 +656,44 @@ export default function AdminCaseDetail() {
     return (
       <>
         <div style={standardGridStyle}>
-          <DetailItem label="Complaint Id" value={item.complaintId} />
+          <DetailItem label={t("admin.grievanceDetail.grievanceId")} value={item.grievanceId} />
           <DetailItem
-            label="Status"
+            label={t("admin.caseDetail.status")}
             value={(
-              <WorkspaceBadge status={workflowStatus} color={workflowStatus === "reassigned" ? C.danger : workflowStatus === "complaint_logged" ? C.warn : undefined} title={complaintStatusLabel}>
-                {complaintStatusLabel}
+              <WorkspaceBadge status={workflowStatus} color={workflowStatus === "grievance_logged" ? C.warn : undefined} title={grievanceStatusLabel}>
+                {grievanceStatusLabel}
               </WorkspaceBadge>
             )}
           />
-          <DetailItem label="Updated Date" value={handoffDateLabel} />
+          <DetailItem label={t("admin.grievanceDetail.updatedDate")} value={handoffDateLabel} />
         </div>
         {renderTitleBlock(item.title)}
         <div style={standardGridStyle}>
-          <DetailItem label="Category" value={item.complaintType || "Not provided"} />
-          <DetailItem label="Citizen Name" value={item.citizenSnapshot?.name || "Not provided"} />
-          <DetailItem label="Citizen Phone Number" value={item.citizenSnapshot?.phoneNumbers?.[0] || "Not provided"} />
+          <DetailItem label={t("admin.grievanceDetail.citizenName")} value={item.citizenSnapshot?.name || t("admin.grievanceDetail.notProvided")} />
+          <DetailItem label={t("admin.workQueue.colState")} value={item.state || item.citizenSnapshot?.state || t("admin.grievanceDetail.notProvided")} />
+          <DetailItem label={t("admin.workQueue.colDistrict")} value={item.district || item.citizenSnapshot?.district || t("admin.grievanceDetail.notProvided")} />
         </div>
         <div style={standardGridStyle}>
-          <DetailItem label="Created At" value={createdAtLabel} />
-          <DetailItem label="Date of Incident" value={incidentDateLabel} />
-          <DetailItem label="Incident Location" value={item.complaintLocation || "Not provided"} />
+          <DetailItem label={t("admin.caseDetail.createdAt")} value={createdAtLabel} />
+          <DetailItem label={t("admin.grievanceDetail.dateLabel")} value={incidentDateLabel} />
+          <DetailItem
+            label={t("admin.grievanceDetail.deoOffice")}
+            value={item.deoOffice || t("admin.grievanceDetail.notProvided")}
+            valueStyle={item.deoOffice ? { color: "#16a34a", fontWeight: 600 } : undefined}
+          />
         </div>
         {renderDescriptionBlock(item.description)}
-        {complaintLogSummary ? <NoticeBox tone="blue" label="Complaint Log Summary" value={complaintLogSummary} /> : null}
-        {item.statusReason ? (
-          <NoticeBox
-            tone={item.handoffType === "reassigned" ? "blue" : "amber"}
-            label={item.handoffType === "reassigned" ? "Reason for Reassignation" : "Reason for Escalation"}
-            value={item.statusReason}
-          />
-        ) : null}
-        {item.resolutionSummary ? <NoticeBox tone="green" label="Mark As Resolved Summary" value={item.resolutionSummary} /> : null}
+        {grievanceLogSummary ? <NoticeBox tone="blue" label={t("admin.grievanceDetail.grievanceLogSummaryLabel")} value={grievanceLogSummary} /> : null}
+        {item.statusReason ? <NoticeBox tone="amber" label={t("admin.grievanceDetail.statusReason")} value={item.statusReason} /> : null}
+        {item.resolutionSummary ? <NoticeBox tone="green" label={t("admin.grievanceDetail.markAsResolvedSummary")} value={item.resolutionSummary} /> : null}
       </>
     );
   }
 
   function renderPrimaryDetailInfo() {
-    if (isComplaintPoolDetail) return renderComplaintPoolInfo();
-    if (isEscalatedOrReassignedDetail) return renderEscalatedInfo();
+    if (isGrievancePoolDetail) return renderGrievancePoolInfo();
     if (isResolvedCompletedDetail) return renderResolvedInfo();
-    if (useComplaintQueueLayout) return renderComplaintQueueInfo();
+    if (useGrievanceQueueLayout) return renderGrievanceQueueInfo();
     return renderMyCasesInfo();
   }
 
@@ -860,7 +706,7 @@ export default function AdminCaseDetail() {
       <SuccessModal open={!!successMessage} message={successMessage} onClose={handleSuccessModalClose} />
       {isMyCasesDetail ? (
         <WorkspaceSectionHeader
-          title={item.complaintId}
+          title={item.grievanceId}
           action={
             <button
               type="button"
@@ -889,7 +735,7 @@ export default function AdminCaseDetail() {
             </button>
           }
         />
-      ) : isComplaintPoolDetail || isComplaintQueueDetail || isResolvedCompletedDetail || isEscalatedOrReassignedDetail ? (
+      ) : isGrievancePoolDetail || isGrievanceQueueDetail || isResolvedCompletedDetail ? (
         <div style={{ display: "grid", gridTemplateColumns: "1fr auto 1fr", alignItems: "center", marginBottom: 16, gap: 12 }}>
           <div style={{ justifySelf: "start" }}>
             <button
@@ -918,12 +764,12 @@ export default function AdminCaseDetail() {
               {backLabel}
             </button>
           </div>
-          <h2 style={{ margin: 0, fontSize: 20, fontWeight: 600, color: C.t1, textAlign: "center" }}>COMPLAINT DETAILS</h2>
+          <h2 style={{ margin: 0, fontSize: 20, fontWeight: 600, color: C.t1, textAlign: "center" }}>{t("admin.grievanceDetail.grievanceDetailsTitle")}</h2>
           <div />
         </div>
       ) : (
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16, gap: 12 }}>
-          <h2 style={{ margin: 0, fontSize: 20, fontWeight: 600, color: C.t1 }}>{item.complaintId}</h2>
+          <h2 style={{ margin: 0, fontSize: 20, fontWeight: 600, color: C.t1 }}>{item.grievanceId}</h2>
           <button
             type="button"
             onClick={() => navigate(backPath)}
@@ -955,45 +801,40 @@ export default function AdminCaseDetail() {
 
         {error ? <WorkspaceCard style={{ color: C.danger }}>{error}</WorkspaceCard> : null}
 
+        {isGrievanceQueueDetail && isChiefMinister && !item.letterheadReady && (
+          <WorkspaceCard style={{ borderColor: C.purple, background: "transparent" }}>
+            <p style={{ margin: 0, fontSize: 13, color: C.t2, fontWeight: 500 }}>
+              {t("admin.grievanceDetail.awaitingDeo")}
+            </p>
+          </WorkspaceCard>
+        )}
+        {isGrievanceQueueDetail && isChiefMinister && item.letterheadReady && (
+          <p style={{ margin: 0, marginBottom: -20, fontSize: 13, color: "#16a34a", fontWeight: 600 }}>
+            {item.createdByDeo
+              ? t("admin.grievanceDetail.deoCreatedLetterhead")
+              : t("admin.grievanceDetail.deoVerifiedLetterhead")}
+          </p>
+        )}
+
         <WorkspaceCard style={{ padding: 0, marginBottom: 0, border: "none", background: "transparent" }}>
-          {showAssignToMeButton && !isComplaintPoolDetail ? (
-            <WorkspaceButton
-              type="button"
-              disabled={actionLoading}
-              onClick={() => runAction("assign", () => apiClient.patch(`/complaints/${id}/assign-self`, {}))}
-              style={{ boxShadow: "none" }}
-            >
-              Assign to Me
-            </WorkspaceButton>
-          ) : showWorkflowActions && !isComplaintQueueDetail ? (
+          {showWorkflowActions && !isGrievanceQueueDetail && !isMyCasesDetail ? (
             <div className="grid md:grid-cols-[minmax(0,320px)_auto] gap-3 items-start">
-              {isMyCasesDetail ? (
-                <WorkspaceSelect value={modalAction} onChange={(event) => handleWorkflowActionSelect(event.target.value)}>
-                  <option value="">Select workflow action</option>
-                  {availableActions.map(([value, label]) => (
-                    <option key={value} value={value}>
-                      {label}
+              <>
+                <WorkspaceSelect value={workflowSelectValue} onChange={(event) => handleWorkflowActionSelect(event.target.value)}>
+                  {!committedWorkflowAction ? <option value="">{t("admin.grievanceDetail.selectWorkflowAction")}</option> : null}
+                  {workflowOptions.map((option) => (
+                    <option key={option.value} value={option.value} disabled={option.disabled}>
+                      {option.label}
                     </option>
                   ))}
                 </WorkspaceSelect>
-              ) : (
-                <>
-                  <WorkspaceSelect value={workflowSelectValue} onChange={(event) => handleWorkflowActionSelect(event.target.value)}>
-                    {!committedWorkflowAction ? <option value="">Select workflow action</option> : null}
-                    {workflowOptions.map((option) => (
-                      <option key={option.value} value={option.value} disabled={option.disabled}>
-                        {option.label}
-                      </option>
-                    ))}
-                  </WorkspaceSelect>
-                  <InlineActionFeedback feedback={workflowFeedback} />
-                </>
-              )}
+                <InlineActionFeedback feedback={workflowFeedback} />
+              </>
             </div>
           ) : null}
         </WorkspaceCard>
 
-        {useComplaintQueueLayout ? (
+        {useGrievanceQueueLayout ? (
           <>
             <div
               style={{
@@ -1003,14 +844,14 @@ export default function AdminCaseDetail() {
                 alignItems: "start",
               }}
             >
-              <div ref={complaintInfoRef}>
+              <div ref={grievanceInfoRef}>
                 <WorkspaceCard style={{ marginBottom: 0, minHeight: 540, display: "flex", flexDirection: "column" }}>
                   {isMyCasesDetail ? (
-                    <WorkspaceCardHeader title="Complaint Information" />
-                  ) : showWorkflowActions ? (
+                    <WorkspaceCardHeader title={t("admin.grievanceDetail.grievanceInformation")} />
+                  ) : showWorkflowActions && (!isGrievanceQueueDetail || (isChiefMinister && item.letterheadReady)) ? (
                     <div style={{ paddingBottom: 16, marginBottom: 20, borderBottom: `1px solid ${C.border}` }}>
                       <WorkspaceSelect value={workflowSelectValue} onChange={(event) => handleWorkflowActionSelect(event.target.value)} style={{ maxWidth: 320 }}>
-                        {!committedWorkflowAction ? <option value="">Select workflow action</option> : null}
+                        {!committedWorkflowAction ? <option value="">{t("admin.grievanceDetail.selectWorkflowAction")}</option> : null}
                         {workflowOptions.map((option) => (
                           <option key={option.value} value={option.value} disabled={option.disabled}>
                             {option.label}
@@ -1020,7 +861,7 @@ export default function AdminCaseDetail() {
                       <InlineActionFeedback feedback={workflowFeedback} />
                     </div>
                   ) : null}
-                  {isResolvedComplaint && !isMyCasesDetail ? (
+                  {isResolvedGrievance && !isMyCasesDetail ? (
                     <div style={{ paddingBottom: 16, marginBottom: 18, borderBottom: `1px solid ${C.border}` }}>
                       <div
                         style={{
@@ -1039,28 +880,7 @@ export default function AdminCaseDetail() {
                         }}
                       >
                         <span aria-hidden="true">✓</span>
-                        Resolved
-                      </div>
-                    </div>
-                  ) : isReassignedComplaint && !isMyCasesDetail ? (
-                    <div style={{ paddingBottom: 16, marginBottom: 18, borderBottom: `1px solid ${C.border}` }}>
-                      <div
-                        style={{
-                          display: "inline-flex",
-                          alignItems: "center",
-                          justifyContent: "center",
-                          gap: 8,
-                          minHeight: 38,
-                          padding: "0 16px",
-                          borderRadius: 10,
-                          background: C.danger,
-                          color: "#ffffff",
-                          fontSize: 13,
-                          fontWeight: 600,
-                          lineHeight: 1.2,
-                        }}
-                      >
-                        Reassigned
+                        {t("admin.grievanceDetail.resolved")}
                       </div>
                     </div>
                   ) : null}
@@ -1070,14 +890,14 @@ export default function AdminCaseDetail() {
                 </WorkspaceCard>
               </div>
 
-              <WorkspaceCard style={{ marginBottom: 0, height: complaintInfoHeight, minHeight: 540, display: "flex", flexDirection: "column" }}>
+              <WorkspaceCard style={{ marginBottom: 0, height: grievanceInfoHeight, minHeight: 540, display: "flex", flexDirection: "column" }}>
                 <div className="flex items-center gap-2 mb-6">
                   <FileText size={22} color={C.purple} />
-                  <h2 style={{ fontSize: 24, fontWeight: 700, color: C.t1 }}>Timeline</h2>
+                  <h2 style={{ fontSize: 24, fontWeight: 700, color: C.t1 }}>{t("admin.grievanceDetail.timeline")}</h2>
                 </div>
                 <div style={{ display: "grid", gap: 18, overflowY: "auto", paddingRight: 6, flex: 1, minHeight: 0 }}>
                   {history.length === 0 ? (
-                    <p style={{ fontSize: 13, color: C.t3 }}>No timeline events yet.</p>
+                    <p style={{ fontSize: 13, color: C.t3 }}>{t("admin.grievanceDetail.noTimeline")}</p>
                   ) : (
                     history.map((event, index) => (
                       <div key={`${event.created_at}-${index}`} className="flex gap-4">
@@ -1091,7 +911,7 @@ export default function AdminCaseDetail() {
                               <p style={{ margin: 0, fontWeight: 600, color: C.t1 }}>{statusLabel(event.new_status)}</p>
                               <p style={{ fontSize: 12, color: C.t3, marginTop: 4, marginBottom: 0 }}>{event.actor_role}</p>
                             </div>
-                            <p style={{ fontSize: 12, color: C.t3, whiteSpace: "nowrap", margin: 0 }}>{new Date(event.created_at).toLocaleDateString("en-GB", { day: "2-digit", month: "2-digit", year: "2-digit" })}</p>
+                            <p style={{ fontSize: 12, color: C.t3, whiteSpace: "nowrap", margin: 0 }}>{(() => { const _d = new Date(event.created_at); return `${String(_d.getDate()).padStart(2,"0")} ${MONTH_NAMES[_d.getMonth()]},${String(_d.getFullYear()).slice(-2)}`; })()}</p>
                           </div>
                           {event.note ? <p style={{ fontSize: 13, color: C.t2, marginTop: 8, marginBottom: 0, whiteSpace: "normal", wordBreak: "break-word" }}>{event.note}</p> : null}
                         </div>
@@ -1104,14 +924,14 @@ export default function AdminCaseDetail() {
 
             <WorkspaceCard style={{ marginBottom: 0 }}>
               <WorkspaceCardHeader
-                title={isMyCasesDetail ? "Meeting Files" : "Complaint Files"}
-                subtitle="View the citizen submission files and uploaded complaint artifacts."
+                title={isMyCasesDetail ? t("admin.grievanceDetail.appointmentFiles") : t("admin.grievanceDetail.grievanceFiles")}
+                subtitle={t("admin.grievanceDetail.filesSubtitle")}
               />
-              {attachedFiles.length === 0 ? (
-                <div style={{ fontSize: 13, color: C.t3, padding: "2px 0" }}>No files attached to this complaint yet.</div>
+              {attachedFiles.filter((f) => f.fileCategory !== "letterhead").length === 0 ? (
+                <div style={{ fontSize: 13, color: C.t3, padding: "2px 0" }}>{t("admin.grievanceDetail.noFiles")}</div>
               ) : (
                 <div style={{ display: "grid", gap: 10 }}>
-                  {attachedFiles.map((file) => (
+                  {attachedFiles.filter((f) => f.fileCategory !== "letterhead").map((file) => (
                     <div key={file.id || file.downloadUrl || file.name} style={{ padding: 10, borderRadius: 12, border: `1px solid ${C.border}`, background: C.bgElevated }}>
                       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
                         <div>
@@ -1119,7 +939,7 @@ export default function AdminCaseDetail() {
                           <div style={{ marginTop: 4, fontSize: 12, color: C.t3 }}>{file.mimeType || "Document"}</div>
                         </div>
                         <WorkspaceButton type="button" variant="outline" onClick={() => openDownloadUrl(file.downloadUrl)}>
-                          Download
+                          {t("common.download")}
                         </WorkspaceButton>
                       </div>
                     </div>
@@ -1127,31 +947,60 @@ export default function AdminCaseDetail() {
                 </div>
               )}
             </WorkspaceCard>
+
+            {isGrievanceQueueDetail && isChiefMinister ? (() => {
+              const letterheadFiles = attachedFiles.filter((f) => f.fileCategory === "letterhead");
+              if (letterheadFiles.length === 0 && item.letterheadFile) letterheadFiles.push(item.letterheadFile);
+              return (
+                <WorkspaceCard style={{ marginBottom: 0 }}>
+                  <WorkspaceCardHeader title={t("admin.grievanceDetail.letterHead")} subtitle={t("admin.grievanceDetail.letterHeadSubtitle")} />
+                  {letterheadFiles.length === 0 ? (
+                    <div style={{ fontSize: 13, color: C.t3, padding: "2px 0" }}>{t("admin.grievanceDetail.noLetterhead")}</div>
+                  ) : (
+                    <div style={{ display: "grid", gap: 10 }}>
+                      {letterheadFiles.map((file) => (
+                        <div key={file.id || file.downloadUrl || file.name} style={{ padding: 10, borderRadius: 12, border: `1px solid ${C.border}`, background: C.bgElevated }}>
+                          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
+                            <div>
+                              <div style={{ fontSize: 13, fontWeight: 700, color: C.t1 }}>{file.name}</div>
+                              <div style={{ marginTop: 4, fontSize: 12, color: C.t3 }}>{file.mimeType || t("admin.grievanceQueue.document")}</div>
+                            </div>
+                            <WorkspaceButton type="button" variant="outline" onClick={() => openDownloadUrl(file.downloadUrl)}>
+                              {t("common.download")}
+                            </WorkspaceButton>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </WorkspaceCard>
+              );
+            })() : null}
           </>
         ) : (
           <>
                 <WorkspaceCard
                   style={
-                    isComplaintPoolDetail
+                    isGrievancePoolDetail
                       ? { marginBottom: 0, height: "auto", display: "flex", flexDirection: "column", paddingTop: 14 }
                       : { marginBottom: 0, flex: 1, minHeight: 0, display: "flex", flexDirection: "column", paddingTop: 24 }
                   }
                 >
-              {isComplaintPoolDetail ? (
+              {isGrievancePoolDetail ? (
                 <div style={{ padding: "0 0 14px 0", marginLeft: 2, borderBottom: `1px solid ${C.border}`, marginBottom: 18 }}>
                   <WorkspaceButton
                     type="button"
                     disabled={actionLoading}
-                    onClick={() => runAction("assign", () => apiClient.patch(`/complaints/${id}/assign-self`, {}))}
+                    onClick={() => runAction("assign", () => apiClient.patch(`/grievances/${id}/assign-self`, {}))}
                     style={{ boxShadow: "none" }}
                   >
-                    Assign to Me
+                    {t("admin.grievanceDetail.assignToMe")}
                   </WorkspaceButton>
                 </div>
               ) : (
-                <WorkspaceCardHeader title="Complaint Information" />
+                <WorkspaceCardHeader title={t("admin.grievanceDetail.grievanceInformation")} />
               )}
-              {isResolvedComplaint ? (
+              {isResolvedGrievance ? (
                 <div style={{ paddingBottom: 16, marginBottom: 18, borderBottom: `1px solid ${C.border}` }}>
                   <div
                     style={{
@@ -1170,34 +1019,13 @@ export default function AdminCaseDetail() {
                     }}
                   >
                     <span aria-hidden="true">✓</span>
-                    Resolved
-                  </div>
-                </div>
-              ) : isReassignedComplaint ? (
-                <div style={{ paddingBottom: 16, marginBottom: 18, borderBottom: `1px solid ${C.border}` }}>
-                  <div
-                    style={{
-                      display: "inline-flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      gap: 8,
-                      minHeight: 38,
-                      padding: "0 16px",
-                      borderRadius: 10,
-                      background: C.danger,
-                      color: "#ffffff",
-                      fontSize: 13,
-                      fontWeight: 600,
-                      lineHeight: 1.2,
-                    }}
-                  >
-                    Reassigned
+                    {t("admin.grievanceDetail.resolved")}
                   </div>
                 </div>
               ) : null}
               <div
                 style={
-                  isComplaintPoolDetail
+                  isGrievancePoolDetail
                     ? { display: "grid", gap: 18, paddingRight: 2 }
                     : { display: "grid", gap: 18, flex: 1, minHeight: 0, overflowY: "auto", paddingRight: 2 }
                 }
@@ -1207,9 +1035,9 @@ export default function AdminCaseDetail() {
             </WorkspaceCard>
 
             <WorkspaceCard style={{ marginBottom: 0 }}>
-              <WorkspaceCardHeader title="Complaint Files" subtitle="View the citizen submission files and uploaded complaint artifacts." />
+              <WorkspaceCardHeader title={t("admin.grievanceDetail.grievanceFiles")} subtitle={t("admin.grievanceDetail.filesSubtitle")} />
               {attachedFiles.length === 0 ? (
-                <div style={{ fontSize: 13, color: C.t3, padding: "2px 0" }}>No files attached to this complaint yet.</div>
+                <div style={{ fontSize: 13, color: C.t3, padding: "2px 0" }}>{t("admin.grievanceDetail.noFiles")}</div>
               ) : (
                 <div style={{ display: "grid", gap: 10 }}>
                   {attachedFiles.map((file) => (
@@ -1217,10 +1045,10 @@ export default function AdminCaseDetail() {
                       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
                         <div>
                           <div style={{ fontSize: 13, fontWeight: 700, color: C.t1 }}>{file.name}</div>
-                          <div style={{ marginTop: 4, fontSize: 12, color: C.t3 }}>{file.mimeType || "Document"}</div>
+                          <div style={{ marginTop: 4, fontSize: 12, color: C.t3 }}>{file.mimeType || t("admin.grievanceQueue.document")}</div>
                         </div>
                         <WorkspaceButton type="button" variant="outline" onClick={() => openDownloadUrl(file.downloadUrl)}>
-                          Download
+                          {t("common.download")}
                         </WorkspaceButton>
                       </div>
                     </div>
@@ -1232,140 +1060,65 @@ export default function AdminCaseDetail() {
         )}
       </div>
 
-      {activeAction === "reassign" ? (
-        <ModalShell
-          title="Reassign Complaint"
-          subtitle={isMyCasesDetail ? "Select the admin who should receive this complaint and write the reassignment reason." : "Select the admin who should receive this complaint. Reassignment reason is optional."}
-          onClose={closeActionModal}
-        >
-          <div style={{ display: "grid", gap: 16 }}>
-            <div>
-              <div style={{ fontSize: 11, fontWeight: 700, color: C.t3, textTransform: "uppercase", letterSpacing: ".08em", marginBottom: 8 }}>
-                Assign To Admin
-              </div>
-              <WorkspaceSelect value={complaintForm.reassignTo} onChange={(event) => setComplaintForm((current) => ({ ...current, reassignTo: event.target.value }))}>
-                <option value="">Select admin</option>
-                {matchingAdminOptions.map((admin) => <option key={admin.id} value={admin.id}>{admin.name} · {admin.department}</option>)}
-              </WorkspaceSelect>
-            </div>
-            <div>
-              <div style={{ fontSize: 11, fontWeight: 700, color: C.t3, textTransform: "uppercase", letterSpacing: ".08em", marginBottom: 8 }}>
-                Reason
-              </div>
-              <WorkspaceTextArea
-                rows={6}
-                value={complaintForm.reassignReason}
-                onChange={(event) => setComplaintForm((current) => ({ ...current, reassignReason: event.target.value }))}
-                placeholder="Write the reason for reassignment"
-              />
-              <ErrorText>{reassignReasonError}</ErrorText>
-            </div>
-            <div style={{ display: "flex", justifyContent: "flex-end", gap: 12 }}>
-              {isMyCasesDetail ? <WorkspaceButton type="button" variant="ghost" onClick={closeActionModal} disabled={actionLoading}>Cancel</WorkspaceButton> : null}
-              <WorkspaceButton
-                type="button"
-                disabled={isMyCasesDetail ? actionLoading || !complaintForm.reassignTo || !!reassignReasonError || reassignTrimmed.length < 4 : actionLoading || !complaintForm.reassignTo || !!reassignReasonError}
-                onClick={() => runAction("reassign", () => apiClient.patch(`/complaints/${id}/reassign`, { adminId: complaintForm.reassignTo, reason: reassignTrimmed }))}
-              >
-                Confirm Reassign
-              </WorkspaceButton>
-            </div>
-          </div>
-        </ModalShell>
-      ) : null}
-
-      {activeAction === "escalate" ? (
-        <ModalShell
-          title="Escalate Complaint"
-          subtitle="Write the reason for escalation. This complaint will move back to the complaint pool and appear in Escalated / Reassigned Requests."
-          onClose={closeActionModal}
-        >
-          <div style={{ display: "grid", gap: 16 }}>
-            <div>
-              <div style={{ fontSize: 11, fontWeight: 700, color: C.t3, textTransform: "uppercase", letterSpacing: ".08em", marginBottom: 8 }}>
-                Reason For Escalation
-              </div>
-              <WorkspaceTextArea
-                rows={6}
-                value={complaintForm.escalationReason}
-                onChange={(event) => setComplaintForm((current) => ({ ...current, escalationReason: event.target.value }))}
-                placeholder="Write reasons for escalation"
-              />
-              <ErrorText>{escalationReasonError}</ErrorText>
-            </div>
-            <div style={{ display: "flex", justifyContent: "flex-end", gap: 12 }}>
-              {isMyCasesDetail ? <WorkspaceButton type="button" variant="ghost" onClick={closeActionModal} disabled={actionLoading}>Cancel</WorkspaceButton> : null}
-              <WorkspaceButton
-                type="button"
-                disabled={actionLoading || !!escalationReasonError || escalationTrimmed.length < 4}
-                onClick={() => runAction("escalate", () => apiClient.patch(`/complaints/${id}/escalate`, { reason: escalationTrimmed }))}
-              >
-                Confirm Escalate
-              </WorkspaceButton>
-            </div>
-          </div>
-        </ModalShell>
-      ) : null}
-
       {activeAction === "resolve" ? (
         <ModalShell
-          title="Resolve Complaint"
-          subtitle="Write the resolved summary before confirming. The citizen complaint view will show the case as resolved."
+          title={t("admin.grievanceDetail.resolveModal")}
+          subtitle={t("admin.grievanceDetail.resolveModalSub")}
           onClose={closeActionModal}
         >
           <div style={{ display: "grid", gap: 16 }}>
             <div>
               <div style={{ fontSize: 11, fontWeight: 700, color: C.t3, textTransform: "uppercase", letterSpacing: ".08em", marginBottom: 8 }}>
-                Resolved Summary
+                {t("admin.grievanceDetail.resolvedSummaryLabel")}
               </div>
               <WorkspaceTextArea
                 rows={8}
-                value={complaintForm.resolutionSummary}
-                onChange={(event) => setComplaintForm((current) => ({ ...current, resolutionSummary: event.target.value }))}
-                placeholder="Write the resolved summary"
+                value={grievanceForm.resolutionSummary}
+                onChange={(event) => setGrievanceForm((current) => ({ ...current, resolutionSummary: event.target.value }))}
+                placeholder={t("admin.grievanceDetail.resolvedSummaryPlaceholder")}
               />
-              <div style={{ marginTop: 8, fontSize: 12, color: C.t3 }}>{resolutionWordCount} / 1000 words</div>
+              <div style={{ marginTop: 8, fontSize: 12, color: C.t3 }}>{t("admin.grievanceDetail.wordCountLabel", { count: resolutionWordCount })}</div>
               <ErrorText>{resolutionError}</ErrorText>
             </div>
             <div style={{ display: "flex", justifyContent: "flex-end", gap: 12 }}>
-              {isMyCasesDetail ? <WorkspaceButton type="button" variant="ghost" onClick={closeActionModal} disabled={actionLoading}>Cancel</WorkspaceButton> : null}
+              {isMyCasesDetail ? <WorkspaceButton type="button" variant="ghost" onClick={closeActionModal} disabled={actionLoading}>{t("common.cancel")}</WorkspaceButton> : null}
               <WorkspaceButton
                 type="button"
                 disabled={actionLoading || !!resolutionError || resolutionTrimmed.length < 10}
-                onClick={() => runAction("resolve", () => apiClient.patch(`/complaints/${id}/resolve`, { resolutionSummary: resolutionTrimmed, resolutionDocs: [] }))}
+                onClick={() => runAction("resolve", () => apiClient.patch(`/grievances/${id}/resolve`, { resolutionSummary: resolutionTrimmed, resolutionDocs: [] }))}
               >
-                Confirm Resolve
+                {t("admin.grievanceDetail.confirmResolve")}
               </WorkspaceButton>
             </div>
           </div>
         </ModalShell>
       ) : null}
 
-      {activeAction === "scheduleMeeting" ? (
+      {activeAction === "scheduleAppointment" ? (
         <ModalShell
-          title="Schedule Meeting"
-          subtitle="Choose a future date and time. The existing admin calendar logic stays unchanged."
+          title={t("admin.grievanceDetail.scheduleModal")}
+          subtitle={t("admin.grievanceDetail.scheduleModalSub")}
           onClose={closeActionModal}
         >
           <div style={{ display: "grid", gap: 16 }}>
             <div>
               <div style={{ fontSize: 11, fontWeight: 700, color: C.t3, textTransform: "uppercase", letterSpacing: ".08em", marginBottom: 8 }}>
-                Date And Time
+                {t("admin.grievanceDetail.dateAndTime")}
               </div>
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-                <WorkspaceInput type="date" min={new Date().toISOString().slice(0, 10)} value={complaintForm.scheduleDate} onChange={(event) => setComplaintForm((current) => ({ ...current, scheduleDate: event.target.value }))} />
-                <WorkspaceInput type="time" value={complaintForm.scheduleTime} onChange={(event) => setComplaintForm((current) => ({ ...current, scheduleTime: event.target.value }))} />
+                <WorkspaceInput type="date" min={new Date().toISOString().slice(0, 10)} value={grievanceForm.scheduleDate} onChange={(event) => setGrievanceForm((current) => ({ ...current, scheduleDate: event.target.value }))} />
+                <WorkspaceInput type="time" value={grievanceForm.scheduleTime} onChange={(event) => setGrievanceForm((current) => ({ ...current, scheduleTime: event.target.value }))} />
               </div>
               <ErrorText>{scheduleError}</ErrorText>
             </div>
             <div style={{ display: "flex", justifyContent: "flex-end", gap: 12 }}>
-              {isMyCasesDetail ? <WorkspaceButton type="button" variant="ghost" onClick={closeActionModal} disabled={actionLoading}>Cancel</WorkspaceButton> : null}
+              {isMyCasesDetail ? <WorkspaceButton type="button" variant="ghost" onClick={closeActionModal} disabled={actionLoading}>{t("common.cancel")}</WorkspaceButton> : null}
               <WorkspaceButton
                 type="button"
                 disabled={actionLoading || !scheduledIso || !!scheduleError}
-                onClick={() => runAction("scheduleMeeting", () => apiClient.patch(`/complaints/${id}/schedule-call`, { callScheduledAt: scheduledIso }))}
+                onClick={() => runAction("scheduleAppointment", () => apiClient.patch(`/grievances/${id}/schedule-call`, { callScheduledAt: scheduledIso }))}
               >
-                Confirm Schedule
+                {t("admin.grievanceDetail.confirmSchedule")}
               </WorkspaceButton>
             </div>
           </div>
@@ -1374,31 +1127,31 @@ export default function AdminCaseDetail() {
 
       {activeAction === "logs" ? (
         <ModalShell
-          title="Complaint Logs"
-          subtitle="Select the log type and optionally write the summary before confirming."
+          title={t("admin.grievanceDetail.logsModal")}
+          subtitle={t("admin.grievanceDetail.logsModalSub")}
           onClose={closeActionModal}
         >
           <div style={{ display: "grid", gap: 16 }}>
             <div>
               <div style={{ fontSize: 11, fontWeight: 700, color: C.t3, textTransform: "uppercase", letterSpacing: ".08em", marginBottom: 8 }}>
-                Log Type
+                {t("admin.grievanceDetail.logType")}
               </div>
               {isMyCasesDetail ? (
-                <WorkspaceSelect value={complaintForm.logType} onChange={(event) => setComplaintForm((current) => ({ ...current, logType: event.target.value }))}>
-                  <option value="">Select log type</option>
-                  <option value="phone_call">Phone Call</option>
-                  <option value="mail">Mail</option>
-                  <option value="letter_summary">Letter Summary</option>
+                <WorkspaceSelect value={grievanceForm.logType} onChange={(event) => setGrievanceForm((current) => ({ ...current, logType: event.target.value }))}>
+                  <option value="">{t("admin.grievanceDetail.selectLogType")}</option>
+                  <option value="phone_call">{t("admin.grievanceDetail.phoneCall")}</option>
+                  <option value="mail">{t("admin.grievanceDetail.mail")}</option>
+                  <option value="letter_summary">{t("admin.grievanceDetail.letterSummary")}</option>
                 </WorkspaceSelect>
               ) : (
                 <div style={{ display: "grid", gridTemplateColumns: "repeat(4, minmax(0, 1fr))", gap: 10 }}>
                   {[
-                    ["phone_call", "Phone Call"],
-                    ["letter_summary", "Letter"],
-                    ["mail", "Mail"],
-                    ["meeting", "Meeting"],
+                    ["phone_call", t("admin.grievanceDetail.phoneCall")],
+                    ["letter_summary", t("admin.grievanceDetail.letter")],
+                    ["mail", t("admin.grievanceDetail.mail")],
+                    ["appointment", t("admin.grievanceDetail.logAppointment")],
                   ].map(([value, label]) => {
-                    const checked = complaintForm.logTypes.includes(value);
+                    const checked = grievanceForm.logTypes.includes(value);
                     return (
                       <button
                         key={value}
@@ -1426,23 +1179,23 @@ export default function AdminCaseDetail() {
             </div>
             <div>
               <div style={{ fontSize: 11, fontWeight: 700, color: C.t3, textTransform: "uppercase", letterSpacing: ".08em", marginBottom: 8 }}>
-                Summary
+                {t("admin.grievanceDetail.summaryLabel")}
               </div>
               <WorkspaceTextArea
                 rows={6}
-                value={complaintForm.logSummary}
-                onChange={(event) => setComplaintForm((current) => ({ ...current, logSummary: event.target.value }))}
-                placeholder="Write summary if needed"
+                value={grievanceForm.logSummary}
+                onChange={(event) => setGrievanceForm((current) => ({ ...current, logSummary: event.target.value }))}
+                placeholder={t("admin.grievanceDetail.summaryPlaceholder")}
               />
             </div>
             <div style={{ display: "flex", justifyContent: "flex-end", gap: 12 }}>
-              {isMyCasesDetail ? <WorkspaceButton type="button" variant="ghost" onClick={closeActionModal} disabled={actionLoading}>Cancel</WorkspaceButton> : null}
+              {isMyCasesDetail ? <WorkspaceButton type="button" variant="ghost" onClick={closeActionModal} disabled={actionLoading}>{t("common.cancel")}</WorkspaceButton> : null}
               <WorkspaceButton
                 type="button"
-                disabled={isMyCasesDetail ? actionLoading || !complaintForm.logType : actionLoading || complaintForm.logTypes.length === 0}
-                onClick={() => runAction("logs", () => apiClient.patch(`/complaints/${id}/log`, isMyCasesDetail ? { logType: complaintForm.logType, summary: complaintForm.logSummary.trim() } : { logTypes: complaintForm.logTypes, summary: complaintForm.logSummary.trim() }))}
+                disabled={isMyCasesDetail ? actionLoading || !grievanceForm.logType : actionLoading || grievanceForm.logTypes.length === 0}
+                onClick={() => runAction("logs", () => apiClient.patch(`/grievances/${id}/log`, isMyCasesDetail ? { logType: grievanceForm.logType, summary: grievanceForm.logSummary.trim() } : { logTypes: grievanceForm.logTypes, summary: grievanceForm.logSummary.trim() }))}
               >
-                Confirm Log
+                {t("admin.grievanceDetail.confirmLog")}
               </WorkspaceButton>
             </div>
           </div>
@@ -1450,13 +1203,13 @@ export default function AdminCaseDetail() {
       ) : null}
 
       {activeAction === "reopen" ? (
-        <ModalShell title="Reopen Complaint" subtitle="Write the reason before reopening this complaint." onClose={closeActionModal}>
+        <ModalShell title={t("admin.grievanceDetail.reopenModal")} subtitle={t("admin.grievanceDetail.reopenModalSub")} onClose={closeActionModal}>
           <div style={{ display: "grid", gap: 16 }}>
-            <WorkspaceTextArea value={complaintForm.reopenReason} onChange={(event) => setComplaintForm((current) => ({ ...current, reopenReason: event.target.value }))} rows={6} placeholder="Reason to reopen" />
+            <WorkspaceTextArea value={grievanceForm.reopenReason} onChange={(event) => setGrievanceForm((current) => ({ ...current, reopenReason: event.target.value }))} rows={6} placeholder={t("admin.grievanceDetail.reopenPlaceholder")} />
             <div style={{ display: "flex", justifyContent: "flex-end", gap: 12 }}>
-              {isMyCasesDetail ? <WorkspaceButton type="button" variant="ghost" onClick={closeActionModal} disabled={actionLoading}>Cancel</WorkspaceButton> : null}
-              <WorkspaceButton type="button" disabled={actionLoading || complaintForm.reopenReason.trim().length < 3} onClick={() => runAction("reopen", () => apiClient.patch(`/complaints/${id}/reopen`, { reason: complaintForm.reopenReason.trim() }))}>
-                Confirm Reopen
+              {isMyCasesDetail ? <WorkspaceButton type="button" variant="ghost" onClick={closeActionModal} disabled={actionLoading}>{t("common.cancel")}</WorkspaceButton> : null}
+              <WorkspaceButton type="button" disabled={actionLoading || grievanceForm.reopenReason.trim().length < 3} onClick={() => runAction("reopen", () => apiClient.patch(`/grievances/${id}/reopen`, { reason: grievanceForm.reopenReason.trim() }))}>
+                {t("admin.grievanceDetail.confirmReopen")}
               </WorkspaceButton>
             </div>
           </div>
@@ -1464,13 +1217,13 @@ export default function AdminCaseDetail() {
       ) : null}
 
       {activeAction === "close" ? (
-        <ModalShell title="Close Complaint" subtitle="Write the closure note before confirming." onClose={closeActionModal}>
+        <ModalShell title={t("admin.grievanceDetail.closeModal")} subtitle={t("admin.grievanceDetail.closeModalSub")} onClose={closeActionModal}>
           <div style={{ display: "grid", gap: 16 }}>
-            <WorkspaceTextArea value={complaintForm.closeNote} onChange={(event) => setComplaintForm((current) => ({ ...current, closeNote: event.target.value }))} rows={6} placeholder="Closure note" />
+            <WorkspaceTextArea value={grievanceForm.closeNote} onChange={(event) => setGrievanceForm((current) => ({ ...current, closeNote: event.target.value }))} rows={6} placeholder={t("admin.grievanceDetail.closePlaceholder")} />
             <div style={{ display: "flex", justifyContent: "flex-end", gap: 12 }}>
-              {isMyCasesDetail ? <WorkspaceButton type="button" variant="ghost" onClick={closeActionModal} disabled={actionLoading}>Cancel</WorkspaceButton> : null}
-              <WorkspaceButton type="button" disabled={actionLoading || complaintForm.closeNote.trim().length < 3} onClick={() => runAction("close", () => apiClient.patch(`/complaints/${id}/close`, { note: complaintForm.closeNote.trim() }))}>
-                Confirm Close
+              {isMyCasesDetail ? <WorkspaceButton type="button" variant="ghost" onClick={closeActionModal} disabled={actionLoading}>{t("common.cancel")}</WorkspaceButton> : null}
+              <WorkspaceButton type="button" disabled={actionLoading || grievanceForm.closeNote.trim().length < 3} onClick={() => runAction("close", () => apiClient.patch(`/grievances/${id}/close`, { note: grievanceForm.closeNote.trim() }))}>
+                {t("admin.grievanceDetail.confirmClose")}
               </WorkspaceButton>
             </div>
           </div>

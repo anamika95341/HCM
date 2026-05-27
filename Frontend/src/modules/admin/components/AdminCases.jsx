@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { Eye, ChevronLeft, ChevronRight, Calendar, Search } from "lucide-react";
 import { FiClipboard } from "react-icons/fi";
 import { useLocation, useNavigate } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import { apiClient } from "../../../shared/api/client.js";
 import { useAuth } from "../../../shared/auth/AuthContext.jsx";
 import {
@@ -14,6 +15,8 @@ import {
 } from "../../../shared/components/WorkspaceUI.jsx";
 import { usePortalTheme } from "../../../shared/theme/portalTheme.jsx";
 
+const MONTH_NAMES = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+
 function humanizeStatus(status) {
   return String(status || "")
     .split("_")
@@ -22,63 +25,62 @@ function humanizeStatus(status) {
     .join(" ");
 }
 
-function isResolvedComplaint(status) {
+function isResolvedGrievance(status) {
   return status === "resolved" || status === "completed" || status === "closed";
 }
 
-function isResolvedMeeting(status) {
+function isResolvedAppointment(status) {
   return status === "completed" || status === "cancelled" || status === "rejected";
 }
 
-function complaintRow(item) {
+function grievanceRow(item) {
   return {
     id: item.id,
-    itemType: "complaint",
-    primaryId: item.complaintId || item.id,
-    title: item.title || item.subject || "Untitled Complaint",
-    category: item.complaintType || "-",
+    itemType: "grievance",
+    primaryId: item.grievanceId || item.id,
+    title: item.title || item.subject || "Untitled Grievance",
+    category: item.grievanceType || "-",
     citizenName: item.citizenSnapshot?.name || "-",
     citizenId: item.citizenSnapshot?.citizenId || "-",
     incidentDate: item.incidentDate || item.incident_date || "",
     owner: item.currentOwner || "Admin Pool",
-    reference: item.relatedMeeting?.requestId || item.department || "-",
+    reference: item.relatedAppointment?.requestId || item.department || "-",
     createdAt: item.createdAt || item.created_at,
     updatedAt: item.updatedAt || item.updated_at,
     status: item.status,
     statusLabel: item.statusLabel || humanizeStatus(item.status),
-    handoffType: item.handoffType || "",
-    handoffByAdminUserId: item.handoffByAdminUserId || null,
     route: `/admin/cases/${item.id}`,
   };
 }
 
-function meetingRow(item) {
+function appointmentRow(item) {
   return {
     id: item.id,
-    itemType: "meeting",
+    itemType: "appointment",
     primaryId: item.requestId || item.id,
-    title: item.title || item.purpose || "Untitled Meeting",
+    title: item.title || item.purpose || "Untitled Appointment",
     citizenName: item.citizenSnapshot?.name || "-",
     citizenId: item.citizenSnapshot?.citizenId || "-",
+    state: item.citizenSnapshot?.state || "-",
+    district: item.citizenSnapshot?.district || "-",
     owner: item.currentOwner || "Admin Queue",
-    reference: item.relatedComplaint?.complaintId || item.visitorId || item.meetingDocket || "-",
+    reference: item.relatedGrievance?.grievanceId || item.visitorId || item.appointmentDocket || "-",
     createdAt: item.createdAt || item.created_at,
     updatedAt: item.completedAt || item.completed_at || item.updatedAt || item.updated_at,
     preferredTime: item.preferred_time || "",
     status: item.status,
     statusLabel: humanizeStatus(item.status),
-    route: `/admin/meetings/${item.id}`,
+    route: `/admin/appointments/${item.id}`,
   };
 }
 
 function buildItemRoute(item, tab) {
   const sourceMap = {
-    complaintPool: "complaint-pool",
-    meetingPool: "meeting-pool",
+    grievancePool: "grievance-pool",
+    appointmentPool: "appointment-pool",
     myCases: "my-cases",
-    resolvedComplaints: "resolved-complaints",
-    completedMeetings: "completed-meetings",
-    escalated: "escalated-reassigned",
+    resolvedGrievances: "resolved-grievances",
+    completedAppointments: "completed-appointments",
   };
   const source = sourceMap[tab];
   return source ? `${item.route}?source=${source}` : item.route;
@@ -86,11 +88,10 @@ function buildItemRoute(item, tab) {
 
 function buildWorkQueueTabSearch(tab) {
   const tabMap = {
-    complaintPool: "complaint-pool",
-    meetingPool: "meeting-pool",
-    resolvedComplaints: "resolved-complaints",
-    completedMeetings: "completed-meetings",
-    escalated: "escalated",
+    grievancePool: "grievance-pool",
+    appointmentPool: "appointment-pool",
+    resolvedGrievances: "resolved-grievances",
+    completedAppointments: "completed-appointments",
   };
   const routeTab = tabMap[tab];
   return routeTab ? `?tab=${routeTab}` : "";
@@ -110,7 +111,7 @@ const idColumnStyle = {
   maxWidth: 160,
 };
 
-const complaintPoolColumnStyles = {
+const grievancePoolColumnStyles = {
   primaryId: { width: 180, minWidth: 180, maxWidth: 180 },
   title: { width: "38%" },
   category: { width: "18%" },
@@ -120,33 +121,23 @@ const complaintPoolColumnStyles = {
   action: { width: 84, minWidth: 84, maxWidth: 84 },
 };
 
-const escalatedColumnStyles = {
-  primaryId: { width: 180, minWidth: 180, maxWidth: 180 },
-  title: { width: "26%" },
-  category: { width: "14%" },
-  citizen: { width: "14%" },
-  incidentDate: { width: 118, minWidth: 118, maxWidth: 118 },
-  createdAt: { width: 118, minWidth: 118, maxWidth: 118 },
-  handoffDate: { width: 110, minWidth: 110, maxWidth: 110 },
-  action: { width: 84, minWidth: 84, maxWidth: 84 },
-};
 
-const resolvedComplaintsColumnStyles = {
+const resolvedGrievancesColumnStyles = {
   primaryId: { width: 180, minWidth: 180, maxWidth: 180 },
   title: { width: "38%" },
   category: { width: "18%" },
   citizen: { width: "18%" },
   createdAt: { width: 118, minWidth: 118, maxWidth: 118 },
-  handoffDate: { width: 118, minWidth: 118, maxWidth: 118 },
   action: { width: 84, minWidth: 84, maxWidth: 84 },
 };
 
-const completedMeetingsColumnStyles = {
+const completedAppointmentsColumnStyles = {
   primaryId: { width: 180, minWidth: 180, maxWidth: 180 },
-  title: { width: "40%" },
-  citizen: { width: "16%" },
-  createdAt: { width: 132, minWidth: 132, maxWidth: 132 },
-  handoffDate: { width: 132, minWidth: 132, maxWidth: 132 },
+  title: { width: "30%" },
+  citizen: { width: "14%" },
+  state: { width: "10%" },
+  district: { width: "10%" },
+  createdAt: { width: 118, minWidth: 118, maxWidth: 118 },
   action: { width: 84, minWidth: 84, maxWidth: 84 },
 };
 
@@ -177,7 +168,10 @@ function formatDateValue(date) {
 function formatDisplayDate(value) {
   const parsedDate = parseDateValue(value);
   if (!parsedDate) return "";
-  return parsedDate.toLocaleDateString("en-GB", { day: "2-digit", month: "2-digit", year: "2-digit" });
+  const day = String(parsedDate.getDate()).padStart(2, "0");
+  const mon = MONTH_NAMES[parsedDate.getMonth()];
+  const year = String(parsedDate.getFullYear()).slice(-2);
+  return `${day} ${mon},${year}`;
 }
 
 function buildCalendarDays(monthStart) {
@@ -215,11 +209,10 @@ function formatDateCell(value) {
   if (!value) return "-";
   const parsed = new Date(value);
   if (Number.isNaN(parsed.getTime())) return "-";
-  return parsed.toLocaleDateString("en-GB", {
-    day: "2-digit",
-    month: "2-digit",
-    year: "2-digit",
-  });
+  const day = String(parsed.getDate()).padStart(2, "0");
+  const mon = MONTH_NAMES[parsed.getMonth()];
+  const year = String(parsed.getFullYear()).slice(-2);
+  return `${day} ${mon},${year}`;
 }
 
 function getDateOnlyValue(value) {
@@ -553,24 +546,23 @@ function CustomDateFilter({ value, onChange, placeholder, min, max }) {
 
 export default function AdminCases() {
   const { C } = usePortalTheme();
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const location = useLocation();
   const { session } = useAuth();
   const tableHeaderBackground = C.purple;
   const tableHeaderText = "#FFFFFF";
   const alternateRowBackground = C.name === "dark" ? C.bgElevated : "#F7F1FF";
-  const [complaints, setComplaints] = useState([]);
-  const [meetings, setMeetings] = useState([]);
+  const [grievances, setGrievances] = useState([]);
+  const [appointments, setAppointments] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-  const [tab, setTab] = useState("complaintPool");
+  const [tab, setTab] = useState("appointmentPool");
   const [query, setQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [preferredDateFilter, setPreferredDateFilter] = useState("");
   const [incidentDateFilter, setIncidentDateFilter] = useState("");
   const [createdAtFilter, setCreatedAtFilter] = useState("");
-  const [handoffDateFilter, setHandoffDateFilter] = useState("");
-  const [handoffTypeFilter, setHandoffTypeFilter] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
   const [tabInitialized, setTabInitialized] = useState(false);
   const [hoveredCard, setHoveredCard] = useState(null);
@@ -592,8 +584,8 @@ export default function AdminCases() {
         setError("");
         const response = await apiClient.get("/admin/work-queue");
         if (!active) return;
-        setComplaints(Array.isArray(response.data?.complaints) ? response.data.complaints : []);
-        setMeetings(Array.isArray(response.data?.meetings) ? response.data.meetings : []);
+        setGrievances(Array.isArray(response.data?.grievances) ? response.data.grievances : []);
+        setAppointments(Array.isArray(response.data?.appointments) ? response.data.appointments : []);
       } catch (loadError) {
         if (active) setError(loadError?.response?.data?.error || "Unable to load work queue");
       } finally {
@@ -604,48 +596,41 @@ export default function AdminCases() {
     return () => { active = false; };
   }, [session?.role]);
 
-  const complaintPool = complaints.filter((item) => !item.assignedAdminUserId && !isResolvedComplaint(item.status)).map(complaintRow);
-  const meetingPool = meetings.filter((item) => !item.assignedAdminUserId && !isResolvedMeeting(item.status)).map(meetingRow);
-  const resolvedComplaints = complaints.filter((item) => item.status === "resolved").map(complaintRow);
-  const completedMeetings = meetings.filter((item) => item.status === "completed").map(meetingRow);
-  const escalated = complaints.filter((item) => item.handoffByAdminUserId === session?.user?.id && item.handoffType === "reassigned" && !isResolvedComplaint(item.status)).map(complaintRow);
-
-  const sections = { complaintPool, meetingPool, escalated, resolvedComplaints, completedMeetings };
+  const grievancePool = grievances.filter((item) => !item.assignedAdminUserId && !isResolvedGrievance(item.status)).map(grievanceRow);
+  const appointmentPool = appointments.filter((item) => !item.assignedAdminUserId && !isResolvedAppointment(item.status)).map(appointmentRow);
+  const resolvedGrievances = grievances.filter((item) => item.status === "resolved").map(grievanceRow);
+  const completedAppointments = appointments.filter((item) => item.status === "completed" && item.assignedAdminUserId === session?.user?.id).map(appointmentRow);
+  const sections = { grievancePool, appointmentPool, resolvedGrievances, completedAppointments };
   const today = formatDateValue(new Date());
-  const isMeetingPoolTab = tab === "meetingPool";
-  const isComplaintPoolTab = tab === "complaintPool";
-  const isEscalatedTab = tab === "escalated";
-  const isResolvedComplaintsTab = tab === "resolvedComplaints";
-  const isCompletedMeetingsTab = tab === "completedMeetings";
+  const isAppointmentPoolTab = tab === "appointmentPool";
+  const isGrievancePoolTab = tab === "grievancePool";
+  const isResolvedGrievancesTab = tab === "resolvedGrievances";
+  const isCompletedAppointmentsTab = tab === "completedAppointments";
 
   const activeRows = (sections[tab] || []).filter((item) => {
-    const matchesStatus = isMeetingPoolTab || isComplaintPoolTab || isEscalatedTab || isResolvedComplaintsTab || isCompletedMeetingsTab ? true : statusFilter === "all" || item.status === statusFilter;
-    const haystack = isComplaintPoolTab || isEscalatedTab
+    const matchesStatus = isAppointmentPoolTab || isGrievancePoolTab || isResolvedGrievancesTab || isCompletedAppointmentsTab ? true : statusFilter === "all" || item.status === statusFilter;
+    const haystack = isGrievancePoolTab
       ? [item.primaryId, item.title, item.category, item.citizenName, item.citizenId].filter(Boolean).join(" ").toLowerCase()
-      : isResolvedComplaintsTab
+      : isResolvedGrievancesTab
         ? [item.primaryId, item.title, item.category, item.citizenName].filter(Boolean).join(" ").toLowerCase()
-      : isCompletedMeetingsTab
+      : isCompletedAppointmentsTab
         ? [item.primaryId, item.title, item.citizenName].filter(Boolean).join(" ").toLowerCase()
       : [item.primaryId, item.itemType, item.title, item.citizenName, item.citizenId, item.owner, item.reference, item.statusLabel].filter(Boolean).join(" ").toLowerCase();
     const search = query.trim().toLowerCase();
     const matchesPreferredDate = !preferredDateFilter || getDateOnlyValue(item.preferredTime) === preferredDateFilter;
     const matchesIncidentDate = !incidentDateFilter || getDateOnlyValue(item.incidentDate) === incidentDateFilter;
     const matchesCreatedAt = !createdAtFilter || getDateOnlyValue(item.createdAt) === createdAtFilter;
-    const matchesHandoffDate = !handoffDateFilter || getDateOnlyValue(item.updatedAt) === handoffDateFilter;
-    const matchesHandoffType = true;
-    const matchesDateFilters = isMeetingPoolTab
+    const matchesDateFilters = isAppointmentPoolTab
       ? matchesPreferredDate && matchesCreatedAt
-      : isComplaintPoolTab
+      : isGrievancePoolTab
         ? matchesIncidentDate && matchesCreatedAt
-        : isEscalatedTab
-          ? matchesIncidentDate && matchesCreatedAt && matchesHandoffDate
-          : isResolvedComplaintsTab || isCompletedMeetingsTab
-            ? matchesCreatedAt && matchesHandoffDate
-            : true;
-    return matchesStatus && (!search || haystack.includes(search)) && matchesDateFilters && matchesHandoffType;
+        : isResolvedGrievancesTab || isCompletedAppointmentsTab
+          ? matchesCreatedAt
+          : true;
+    return matchesStatus && (!search || haystack.includes(search)) && matchesDateFilters;
   });
 
-  useEffect(() => { setCurrentPage(1); }, [tab, query, statusFilter, preferredDateFilter, incidentDateFilter, createdAtFilter, handoffDateFilter, handoffTypeFilter, itemsPerPage]);
+  useEffect(() => { setCurrentPage(1); }, [tab, query, statusFilter, preferredDateFilter, incidentDateFilter, createdAtFilter, itemsPerPage]);
 
   const totalPages    = Math.max(1, Math.ceil(activeRows.length / itemsPerPage));
   const paginatedRows = activeRows.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
@@ -657,17 +642,14 @@ export default function AdminCases() {
   const statusOptions = Array.from(new Set((sections[tab] || []).map((item) => item.status).filter(Boolean))).sort();
 
   const tabs = [
-    { id: "complaintPool", label: "Complaint Pool",       count: complaintPool.length },
-    { id: "meetingPool",   label: "Meeting Pool",         count: meetingPool.length   },
-    { id: "escalated",     label: "Reassigned Cases", count: escalated.length },
-    { id: "resolvedComplaints", label: "Resolved Cases", count: resolvedComplaints.length },
-    { id: "completedMeetings", label: "Completed Meetings", count: completedMeetings.length },
+    { id: "appointmentPool", label: t("admin.workQueue.totalAppointmentsInPool"), count: appointmentPool.length },
+    { id: "resolvedGrievances", label: t("admin.workQueue.resolvedGrievances"), count: resolvedGrievances.length },
+    { id: "completedAppointments", label: t("admin.workQueue.completedAppointments"), count: completedAppointments.length },
   ];
-  const workPoolTabs = tabs.filter((item) => item.id === "complaintPool" || item.id === "meetingPool");
-  const isResolvedComplaintsPage = requestedTab === "resolved-complaints";
-  const isCompletedMeetingsPage = requestedTab === "completed-meetings";
-  const isEscalatedPage = requestedTab === "escalated";
-  const showWorkPoolCards = !isResolvedComplaintsPage && !isCompletedMeetingsPage && !isEscalatedPage;
+  const workPoolTabs = tabs.filter((item) => item.id === "appointmentPool");
+  const isResolvedGrievancesPage = requestedTab === "resolved-grievances";
+  const isCompletedAppointmentsPage = requestedTab === "completed-appointments";
+  const showWorkPoolCards = !isResolvedGrievancesPage && !isCompletedAppointmentsPage;
 
   const handleTabChange = (nextTab) => {
     if (nextTab === tab) return;
@@ -688,45 +670,33 @@ export default function AdminCases() {
     setPreferredDateFilter("");
     setIncidentDateFilter("");
     setCreatedAtFilter("");
-    setHandoffDateFilter("");
-    setHandoffTypeFilter("");
   }, [tab]);
 
   useEffect(() => {
-    if (requestedTab === "complaint-pool" && tab !== "complaintPool") {
-      setTab("complaintPool");
+    if (requestedTab === "appointment-pool" && tab !== "appointmentPool") {
+      setTab("appointmentPool");
       setTabInitialized(true);
       return;
     }
-    if (requestedTab === "meeting-pool" && tab !== "meetingPool") {
-      setTab("meetingPool");
+    if (requestedTab === "resolved-grievances" && tab !== "resolvedGrievances") {
+      setTab("resolvedGrievances");
       setTabInitialized(true);
       return;
     }
-    if (requestedTab === "resolved-complaints" && tab !== "resolvedComplaints") {
-      setTab("resolvedComplaints");
-      setTabInitialized(true);
-      return;
-    }
-    if (requestedTab === "completed-meetings" && tab !== "completedMeetings") {
-      setTab("completedMeetings");
-      setTabInitialized(true);
-      return;
-    }
-    if (requestedTab === "escalated" && tab !== "escalated") {
-      setTab("escalated");
+    if (requestedTab === "completed-appointments" && tab !== "completedAppointments") {
+      setTab("completedAppointments");
       setTabInitialized(true);
       return;
     }
     if (!requestedTab && !tabInitialized) {
-      if (tab !== "complaintPool") {
-        setTab("complaintPool");
+      if (tab !== "appointmentPool") {
+        setTab("appointmentPool");
       }
       setTabInitialized(true);
       return;
     }
-    if (!requestedTab && (tab === "resolvedComplaints" || tab === "completedMeetings" || tab === "escalated")) {
-      setTab("complaintPool");
+    if (!requestedTab && (tab === "resolvedGrievances" || tab === "completedAppointments")) {
+      setTab("appointmentPool");
     }
   }, [requestedTab, tab, tabInitialized]);
 
@@ -740,85 +710,72 @@ export default function AdminCases() {
   }, [totalPages]);
 
   const columns = useMemo(() => {
-    if (isComplaintPoolTab) {
+    if (isGrievancePoolTab) {
       return [
-        { key: "primaryId", label: "Complaint Id", align: "left" },
-        { key: "title", label: "Title", align: "left" },
-        { key: "category", label: "Category", align: "left" },
-        { key: "citizen", label: "Citizen Name", align: "left" },
-        { key: "incidentDate", label: "Incident Date", align: "left" },
-        { key: "createdAt", label: "Created At", align: "left" },
-        { key: "action", label: "Action", align: "center" },
+        { key: "primaryId", label: t("admin.workQueue.colGrievanceId"), align: "left" },
+        { key: "title", label: t("admin.workQueue.colTitle"), align: "left" },
+        { key: "category", label: t("admin.workQueue.colCategory"), align: "left" },
+        { key: "citizen", label: t("admin.workQueue.colCitizenName"), align: "left" },
+        { key: "incidentDate", label: t("admin.workQueue.colIncidentDate"), align: "left" },
+        { key: "createdAt", label: t("admin.workQueue.colCreatedAt"), align: "left" },
+        { key: "action", label: t("admin.workQueue.colAction"), align: "center" },
       ];
     }
 
-    if (isEscalatedTab) {
+    if (isResolvedGrievancesTab) {
       return [
-        { key: "primaryId", label: "Complaint Id", align: "left" },
-        { key: "title", label: "Title", align: "left" },
-        { key: "category", label: "Category", align: "left" },
-        { key: "citizen", label: "Citizen Name", align: "left" },
-        { key: "incidentDate", label: "Incident Date", align: "left" },
-        { key: "createdAt", label: "Created At", align: "left" },
-        { key: "handoffDate", label: "Reassigned Date", align: "left" },
-        { key: "action", label: "Action", align: "center" },
+        { key: "primaryId", label: t("admin.workQueue.colGrievanceId"), align: "left" },
+        { key: "title", label: t("admin.workQueue.colTitle"), align: "left" },
+        { key: "category", label: t("admin.workQueue.colCategory"), align: "left" },
+        { key: "citizen", label: t("admin.workQueue.colCitizenName"), align: "left" },
+        { key: "createdAt", label: t("admin.workQueue.colCreatedAt"), align: "left" },
+        { key: "action", label: t("admin.workQueue.colAction"), align: "center" },
       ];
     }
 
-    if (isResolvedComplaintsTab) {
+    if (isCompletedAppointmentsTab) {
       return [
-        { key: "primaryId", label: "Complaint Id", align: "left" },
-        { key: "title", label: "Title", align: "left" },
-        { key: "category", label: "Category", align: "left" },
-        { key: "citizen", label: "Citizen Name", align: "left" },
-        { key: "createdAt", label: "Created At", align: "left" },
-        { key: "handoffDate", label: "Resolved Date", align: "left" },
-        { key: "action", label: "Action", align: "center" },
-      ];
-    }
-
-    if (isCompletedMeetingsTab) {
-      return [
-        { key: "primaryId", label: "Meeting Id", align: "left" },
-        { key: "title", label: "Title", align: "left" },
-        { key: "citizen", label: "Citizen Name", align: "left" },
-        { key: "createdAt", label: "Created At", align: "left" },
-        { key: "handoffDate", label: "Completed Date", align: "left" },
-        { key: "action", label: "Action", align: "center" },
+        { key: "primaryId", label: t("admin.workQueue.colAppointmentId"), align: "left" },
+        { key: "title", label: t("admin.workQueue.colTitle"), align: "left" },
+        { key: "citizen", label: t("admin.workQueue.colCitizenName"), align: "left" },
+        { key: "state", label: t("admin.workQueue.colState"), align: "left" },
+        { key: "district", label: t("admin.workQueue.colDistrict"), align: "left" },
+        { key: "createdAt", label: t("admin.workQueue.colCreatedAt"), align: "left" },
+        { key: "action", label: t("admin.workQueue.colAction"), align: "center" },
       ];
     }
 
     const baseColumns = [
-      { key: "primaryId", label: "ID", align: "left" },
-      { key: "itemType", label: "Type", align: "left" },
-      { key: "title", label: "Title", align: "left" },
-      { key: "citizen", label: "Citizen", align: "left" },
-      { key: "owner", label: "Owner", align: "left" },
-      { key: "reference", label: "Reference", align: "left" },
-      { key: "createdAt", label: "Created", align: "left" },
-      { key: "status", label: "Status", align: "center" },
-      { key: "action", label: "Action", align: "center" },
+      { key: "primaryId", label: t("admin.workQueue.colId"), align: "left" },
+      { key: "itemType", label: t("admin.workQueue.colType"), align: "left" },
+      { key: "title", label: t("admin.workQueue.colTitle"), align: "left" },
+      { key: "citizen", label: t("admin.workQueue.colCitizen"), align: "left" },
+      { key: "owner", label: t("admin.workQueue.colOwner"), align: "left" },
+      { key: "reference", label: t("admin.workQueue.colReference"), align: "left" },
+      { key: "createdAt", label: t("admin.workQueue.colCreated"), align: "left" },
+      { key: "status", label: t("admin.workQueue.colStatus"), align: "center" },
+      { key: "action", label: t("admin.workQueue.colAction"), align: "center" },
     ];
 
     const hiddenColumns = {
-      complaintPool: new Set(["itemType", "owner", "status"]),
-      meetingPool: new Set(["itemType", "owner", "status"]),
-      resolvedComplaints: new Set(["owner"]),
-      completedMeetings: new Set(["owner"]),
-      escalated: new Set(["owner", "reference"]),
+      grievancePool: new Set(["itemType", "owner", "status"]),
+      appointmentPool: new Set(["itemType", "owner", "status"]),
+      resolvedGrievances: new Set(["owner"]),
+      completedAppointments: new Set(["owner"]),
     };
 
     return baseColumns.filter((column) => !hiddenColumns[tab]?.has(column.key));
-  }, [isComplaintPoolTab, isEscalatedTab, isResolvedComplaintsTab, isCompletedMeetingsTab, tab]);
+  }, [isGrievancePoolTab, isResolvedGrievancesTab, isCompletedAppointmentsTab, tab]);
 
-  const meetingPoolColumns = useMemo(() => ([
-    { key: "primaryId", label: "Meeting Id" },
-    { key: "title", label: "Title" },
-    { key: "citizen", label: "Citizen Name" },
-    { key: "preferredTime", label: "Preferred Date" },
-    { key: "createdAt", label: "Created At" },
-    { key: "action", label: "Action" },
-  ]), []);
+  const appointmentPoolColumns = useMemo(() => ([
+    { key: "primaryId", label: t("admin.workQueue.colAppointmentId") },
+    { key: "title", label: t("admin.workQueue.colTitle") },
+    { key: "citizen", label: t("admin.workQueue.colCitizenName") },
+    { key: "state", label: t("admin.workQueue.colState") },
+    { key: "district", label: t("admin.workQueue.colDistrict") },
+    { key: "createdAt", label: t("admin.workQueue.colCreatedAt") },
+    { key: "action", label: t("admin.workQueue.colAction") },
+  ]), [t]);
 
   return (
     <div
@@ -833,20 +790,18 @@ export default function AdminCases() {
     >
       <div style={{ width: "100%", display: "flex", flexDirection: "column", flex: 1, minHeight: 0 }}>
         {/* HEADER */}
-        {isResolvedComplaintsPage || isCompletedMeetingsPage || isEscalatedPage ? (
+        {isResolvedGrievancesPage || isCompletedAppointmentsPage ? (
           <WorkspaceSectionHeader
             title={
-              isResolvedComplaintsPage
-                ? "RESOLVED COMPLAINTS"
-                : isCompletedMeetingsPage
-                  ? "COMPLETED MEETINGS"
-                  : "ESCALATED CASES"
+              isResolvedGrievancesPage
+                ? t("admin.workQueue.resolvedGrievancesHeader")
+                : t("admin.workQueue.completedAppointmentsHeader")
             }
           />
         ) : (
           <div style={{ marginBottom: 18, display: "flex", alignItems: "center", gap: 14 }}>
             <FiClipboard size={18} color={C.purple} />
-            <h1 style={{ margin: 0, fontSize: 20, lineHeight: 1.3, fontWeight: 600, color: C.t1 }}>WORK POOL</h1>
+            <h1 style={{ margin: 0, fontSize: 20, lineHeight: 1.3, fontWeight: 600, color: C.t1 }}>{t("admin.workQueue.appointmentPoolHeader")}</h1>
           </div>
         )}
 
@@ -897,78 +852,42 @@ export default function AdminCases() {
         {/* QUEUE FILTERS */}
         <div style={{ marginBottom: 6 }}>
             <div style={{ marginBottom: 8, display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
-              <div style={{ marginLeft: "auto", width: "50%", minWidth: 520, display: "grid", gap: 12, gridTemplateColumns: isEscalatedTab ? "minmax(0, 3fr) repeat(3, minmax(0, 1fr))" : isResolvedComplaintsTab || isCompletedMeetingsTab ? "minmax(0, 3fr) minmax(0, 1.35fr) minmax(0, 1.35fr)" : isComplaintPoolTab || isMeetingPoolTab ? "minmax(280px, 3fr) minmax(140px, 1fr) minmax(140px, 1fr)" : "minmax(0, 1.6fr) minmax(220px, 0.8fr)" }}>
-              <div className={isComplaintPoolTab || isMeetingPoolTab ? "relative" : undefined}>
-                {isComplaintPoolTab || isMeetingPoolTab ? <Search className="absolute left-3 top-2.5" size={17} style={{ color: C.t3 }} /> : null}
+              <div style={{ marginLeft: "auto", width: "50%", minWidth: 520, display: "grid", gap: 12, gridTemplateColumns: isResolvedGrievancesTab || isCompletedAppointmentsTab ? "minmax(0, 3fr)" : isGrievancePoolTab || isAppointmentPoolTab ? "minmax(280px, 3fr) minmax(140px, 1fr) minmax(140px, 1fr)" : "minmax(0, 1.6fr) minmax(220px, 0.8fr)" }}>
+              <div className={isGrievancePoolTab || isAppointmentPoolTab ? "relative" : undefined}>
+                {isGrievancePoolTab || isAppointmentPoolTab ? <Search className="absolute left-3 top-2.5" size={17} style={{ color: C.t3 }} /> : null}
                 <WorkspaceInput
                   value={query}
                   onChange={(e) => setQuery(e.target.value)}
-                  placeholder={isMeetingPoolTab ? "Search by Meeting ID , Title , Citizen" : isComplaintPoolTab ? "Search by Complaint ID , Title , Category and Citizen" : isEscalatedTab ? "Search by Complaint Id , Title , Category and Citizen name" : isResolvedComplaintsTab ? "Search by Complaint ID , Title , Category and Citizen" : isCompletedMeetingsTab ? "Search by Meeting ID , Title and Citizen" : "Search by ID, title, citizen name..."}
+                  placeholder={isAppointmentPoolTab ? t("admin.workQueue.searchByAppointment") : isGrievancePoolTab ? t("admin.workQueue.searchByGrievance") : isResolvedGrievancesTab ? t("admin.workQueue.searchByGrievance") : isCompletedAppointmentsTab ? t("admin.workQueue.searchByAppointment") : t("admin.workQueue.searchByAll")}
                   style={
-                    isComplaintPoolTab || isMeetingPoolTab
+                    isGrievancePoolTab || isAppointmentPoolTab
                       ? { paddingLeft: 36, minHeight: 34, paddingTop: 0, paddingBottom: 0, fontSize: 11, lineHeight: "34px" }
-                      : isEscalatedTab || isResolvedComplaintsTab || isCompletedMeetingsTab
+                      : isResolvedGrievancesTab || isCompletedAppointmentsTab
                         ? { minHeight: 34, paddingTop: 0, paddingBottom: 0, fontSize: 11, lineHeight: "34px" }
                         : undefined
                   }
                 />
               </div>
-              {isEscalatedTab ? (
+              {isResolvedGrievancesTab || isCompletedAppointmentsTab ? null : isAppointmentPoolTab || isGrievancePoolTab ? (
                 <>
                   <CustomDateFilter
-                    value={incidentDateFilter}
-                    onChange={setIncidentDateFilter}
-                    placeholder="Date of incident"
+                    value={isAppointmentPoolTab ? preferredDateFilter : incidentDateFilter}
+                    onChange={isAppointmentPoolTab ? setPreferredDateFilter : setIncidentDateFilter}
+                    placeholder={isAppointmentPoolTab ? t("admin.workQueue.preferredDate") : t("admin.workQueue.incidentDate")}
                     max={today}
                   />
-                  <CustomDateFilter
-                    value={createdAtFilter}
-                    onChange={setCreatedAtFilter}
-                    placeholder="Created at"
-                    max={today}
-                  />
-                  <CustomDateFilter
-                    value={handoffDateFilter}
-                    onChange={setHandoffDateFilter}
-                    placeholder="Escalated/Reassigned date"
-                    max={today}
-                  />
-                </>
-              ) : isResolvedComplaintsTab || isCompletedMeetingsTab ? (
-                <>
-                  <CustomDateFilter
-                    value={createdAtFilter}
-                    onChange={setCreatedAtFilter}
-                    placeholder="Created at"
-                    max={today}
-                  />
-                  <CustomDateFilter
-                    value={handoffDateFilter}
-                    onChange={setHandoffDateFilter}
-                    placeholder={isResolvedComplaintsTab ? "Resolved date" : "Completed date"}
-                    max={today}
-                  />
-                </>
-              ) : isMeetingPoolTab || isComplaintPoolTab ? (
-                <>
-                  <CustomDateFilter
-                    value={isMeetingPoolTab ? preferredDateFilter : incidentDateFilter}
-                    onChange={isMeetingPoolTab ? setPreferredDateFilter : setIncidentDateFilter}
-                    placeholder={isMeetingPoolTab ? "Preferred Date" : "Incident Date"}
-                    max={today}
-                  />
-                  {isComplaintPoolTab ? (
+                  {isGrievancePoolTab ? (
                     <CustomDateFilter
                       value={createdAtFilter}
                       onChange={setCreatedAtFilter}
-                      placeholder="Created at"
+                      placeholder={t("admin.workQueue.createdAt_filter")}
                       max={today}
                     />
                   ) : (
                     <CustomDateFilter
                       value={createdAtFilter}
                       onChange={setCreatedAtFilter}
-                      placeholder="Created at"
+                      placeholder={t("admin.workQueue.createdAt_filter")}
                       max={today}
                     />
                   )}
@@ -991,7 +910,7 @@ export default function AdminCases() {
                       borderRadius: "var(--portal-radius-sm, 10px)",
                     }}
                   >
-                    <option value="all">All statuses</option>
+                    <option value="all">{t("admin.workQueue.allStatuses")}</option>
                     {statusOptions.map((status) => (
                       <option key={status} value={status}>{humanizeStatus(status)}</option>
                     ))}
@@ -1005,29 +924,30 @@ export default function AdminCases() {
         {/* TABLE / STATES */}
         <div style={{ display: "flex", flexDirection: "column" }}>
           {loading ? (
-            <WorkspaceEmptyState title="Loading work queue..." />
+            <WorkspaceEmptyState title={t("admin.workQueue.loadingWorkQueue")} />
           ) : error ? (
             <WorkspaceCard style={{ color: C.danger, marginBottom: 0 }}>
-              <div style={{ fontSize: 14, fontWeight: 600 }}>Unable to load work queue</div>
+              <div style={{ fontSize: 14, fontWeight: 600 }}>{t("admin.workQueue.unableToLoad")}</div>
               <div style={{ marginTop: 8, fontSize: 12 }}>{error}</div>
             </WorkspaceCard>
           ) : activeRows.length === 0 ? (
-            <WorkspaceEmptyState title="No items found" subtitle="Try adjusting your current search or status filters." />
+            <WorkspaceEmptyState title={t("admin.workQueue.noItems")} subtitle={t("admin.workQueue.noItemsSubtitle")} />
           ) : (
             <div className="hidden lg:block" style={{ border: `1px solid ${C.border}`, borderRadius: 12, overflow: "hidden", display: "flex", flexDirection: "column", marginBottom: 10 }}>
-                {isMeetingPoolTab ? (
+                {isAppointmentPoolTab ? (
                   <table className="w-full text-sm" style={{ borderCollapse: "collapse", tableLayout: "fixed" }}>
                     <colgroup>
                       <col style={{ width: 180, minWidth: 180, maxWidth: 180 }} />
-                      <col style={{ width: "50%" }} />
+                      <col style={{ width: "34%" }} />
                       <col style={{ width: "14%" }} />
-                      <col style={{ width: 132, minWidth: 132, maxWidth: 132 }} />
+                      <col style={{ width: "12%" }} />
+                      <col style={{ width: "12%" }} />
                       <col style={{ width: 118, minWidth: 118, maxWidth: 118 }} />
                       <col style={{ width: 84, minWidth: 84, maxWidth: 84 }} />
                     </colgroup>
                     <thead>
                       <tr>
-                        {meetingPoolColumns.map((column, index) => (
+                        {appointmentPoolColumns.map((column, index) => (
                           <th
                             key={column.key}
                             style={{
@@ -1045,7 +965,7 @@ export default function AdminCases() {
                               borderBottom: `1px solid ${C.border}`,
                               verticalAlign: "middle",
                               borderTopLeftRadius: index === 0 ? 12 : undefined,
-                              borderTopRightRadius: index === meetingPoolColumns.length - 1 ? 12 : undefined,
+                              borderTopRightRadius: index === appointmentPoolColumns.length - 1 ? 12 : undefined,
                             }}
                           >
                             <span
@@ -1084,8 +1004,13 @@ export default function AdminCases() {
                               </div>
                             </td>
                             <td style={{ padding: "10px 16px", fontSize: 13, color: C.t2, verticalAlign: "middle", minWidth: 0, maxWidth: 0 }}>
-                              <span title={toTooltipText(formatDateCell(item.preferredTime))} style={tableCellTextStyle}>
-                                {formatDateCell(item.preferredTime)}
+                              <span title={toTooltipText(item.state)} style={tableCellTextStyle}>
+                                {item.state}
+                              </span>
+                            </td>
+                            <td style={{ padding: "10px 16px", fontSize: 13, color: C.t2, verticalAlign: "middle", minWidth: 0, maxWidth: 0 }}>
+                              <span title={toTooltipText(item.district)} style={tableCellTextStyle}>
+                                {item.district}
                               </span>
                             </td>
                             <td style={{ padding: "10px 16px", fontSize: 13, color: C.t2, verticalAlign: "middle", minWidth: 0, maxWidth: 0 }}>
@@ -1126,17 +1051,15 @@ export default function AdminCases() {
                     </tbody>
                   </table>
                 ) : (
-                  <table className="w-full text-sm" style={isComplaintPoolTab || isEscalatedTab || isResolvedComplaintsTab || isCompletedMeetingsTab ? { borderCollapse: "collapse", tableLayout: "fixed" } : { borderCollapse: "collapse" }}>
+                  <table className="w-full text-sm" style={isGrievancePoolTab || isResolvedGrievancesTab || isCompletedAppointmentsTab ? { borderCollapse: "collapse", tableLayout: "fixed" } : { borderCollapse: "collapse" }}>
                     <colgroup>
-                      {isComplaintPoolTab
-                        ? columns.map((column) => <col key={column.key} style={complaintPoolColumnStyles[column.key]} />)
-                        : isEscalatedTab
-                          ? columns.map((column) => <col key={column.key} style={escalatedColumnStyles[column.key]} />)
-                          : isResolvedComplaintsTab
-                            ? columns.map((column) => <col key={column.key} style={resolvedComplaintsColumnStyles[column.key]} />)
-                            : isCompletedMeetingsTab
-                              ? columns.map((column) => <col key={column.key} style={completedMeetingsColumnStyles[column.key]} />)
-                        : <col style={idColumnStyle} />}
+                      {isGrievancePoolTab
+                        ? columns.map((column) => <col key={column.key} style={grievancePoolColumnStyles[column.key]} />)
+                        : isResolvedGrievancesTab
+                          ? columns.map((column) => <col key={column.key} style={resolvedGrievancesColumnStyles[column.key]} />)
+                          : isCompletedAppointmentsTab
+                            ? columns.map((column) => <col key={column.key} style={completedAppointmentsColumnStyles[column.key]} />)
+                            : <col style={idColumnStyle} />}
                     </colgroup>
                     <thead>
                       <tr>
@@ -1190,7 +1113,7 @@ export default function AdminCases() {
                           }
 
                           if (column.key === "itemType") {
-                            const itemTypeLabel = item.itemType === "complaint" ? "Complaint" : item.itemType === "meeting" ? "Meeting" : item.itemType;
+                            const itemTypeLabel = item.itemType === "grievance" ? "Grievance" : item.itemType === "appointment" ? "Appointment" : item.itemType;
                             return (
                               <td key={column.key} style={{ padding: "10px 16px", fontSize: 13, textTransform: "capitalize", color: C.t2, verticalAlign: "middle", maxWidth: 0 }}>
                                 <span title={toTooltipText(itemTypeLabel)} style={tableCellTextStyle}>
@@ -1224,21 +1147,6 @@ export default function AdminCases() {
                                 <div title={toTooltipText(item.category)} style={tableCellTextStyle}>
                                   {item.category}
                                 </div>
-                              </td>
-                            );
-                          }
-
-                          if (column.key === "handoffType") {
-                            const handoffTypeLabel = item.handoffType === "reassigned"
-                              ? "Reassigned"
-                              : item.handoffType === "escalated"
-                                ? "Escalated"
-                                : "-";
-                            return (
-                              <td key={column.key} style={{ padding: "10px 16px", fontSize: 13, color: C.t2, verticalAlign: "middle", maxWidth: 0 }}>
-                                <span title={toTooltipText(handoffTypeLabel)} style={tableCellTextStyle}>
-                                  {handoffTypeLabel}
-                                </span>
                               </td>
                             );
                           }
@@ -1287,23 +1195,32 @@ export default function AdminCases() {
                             );
                           }
 
+                          if (column.key === "state") {
+                            return (
+                              <td key={column.key} style={{ padding: "10px 16px", fontSize: 13, color: C.t2, verticalAlign: "middle", maxWidth: 0 }}>
+                                <span title={toTooltipText(item.state)} style={tableCellTextStyle}>
+                                  {item.state}
+                                </span>
+                              </td>
+                            );
+                          }
+
+                          if (column.key === "district") {
+                            return (
+                              <td key={column.key} style={{ padding: "10px 16px", fontSize: 13, color: C.t2, verticalAlign: "middle", maxWidth: 0 }}>
+                                <span title={toTooltipText(item.district)} style={tableCellTextStyle}>
+                                  {item.district}
+                                </span>
+                              </td>
+                            );
+                          }
+
                           if (column.key === "createdAt") {
                             const createdAtLabel = formatDateCell(item.createdAt);
                             return (
                               <td key={column.key} style={{ padding: "10px 16px", fontSize: 13, color: C.t2, verticalAlign: "middle", maxWidth: 0, whiteSpace: "nowrap" }}>
                                 <span title={toTooltipText(createdAtLabel)} style={tableCellTextStyle}>
                                   {createdAtLabel}
-                                </span>
-                              </td>
-                            );
-                          }
-
-                          if (column.key === "handoffDate") {
-                            const handoffDateLabel = formatDateCell(item.updatedAt);
-                            return (
-                              <td key={column.key} style={{ padding: "10px 16px", fontSize: 13, color: C.t2, verticalAlign: "middle", maxWidth: 0, whiteSpace: "nowrap" }}>
-                                <span title={toTooltipText(handoffDateLabel)} style={tableCellTextStyle}>
-                                  {handoffDateLabel}
                                 </span>
                               </td>
                             );

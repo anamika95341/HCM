@@ -1,4 +1,5 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { Calendar, ChevronLeft, ChevronRight, Clock, Eye, FileText, Filter, Search } from "lucide-react";
 import { RiTeamLine } from "react-icons/ri";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
@@ -19,6 +20,8 @@ import {
 import { usePortalTheme } from "../../../shared/theme/portalTheme.jsx";
 import { ErrorText, ModalShell, SuccessModal, WorkspaceTextArea } from "./AdminCaseDetail.jsx";
 
+const MONTH_NAMES = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+
 function parseDateValue(value) {
   if (!value) return null;
   const [year, month, day] = value.split("-").map(Number);
@@ -36,7 +39,10 @@ function formatDateValue(date) {
 function formatDisplayDate(value) {
   const parsedDate = parseDateValue(value);
   if (!parsedDate) return "";
-  return parsedDate.toLocaleDateString("en-GB", { day: "2-digit", month: "2-digit", year: "2-digit" });
+  const day = String(parsedDate.getDate()).padStart(2, "0");
+  const mon = MONTH_NAMES[parsedDate.getMonth()];
+  const year = String(parsedDate.getFullYear()).slice(-2);
+  return `${day} ${mon},${year}`;
 }
 
 function buildCalendarDays(monthStart) {
@@ -84,22 +90,20 @@ function formatDateOnly(value) {
   if (!value) return "Not provided";
   const parsed = new Date(value);
   if (Number.isNaN(parsed.getTime())) return "Not provided";
-  return parsed.toLocaleDateString("en-GB", {
-    day: "2-digit",
-    month: "2-digit",
-    year: "2-digit",
-  });
+  const day = String(parsed.getDate()).padStart(2, "0");
+  const mon = MONTH_NAMES[parsed.getMonth()];
+  const year = String(parsed.getFullYear()).slice(-2);
+  return `${day} ${mon},${year}`;
 }
 
 function formatDateTimeLabel(value) {
   if (!value) return "Pending";
   const parsed = new Date(value);
   if (Number.isNaN(parsed.getTime())) return "Pending";
-  const dateLabel = parsed.toLocaleDateString("en-GB", {
-    day: "2-digit",
-    month: "2-digit",
-    year: "2-digit",
-  });
+  const day = String(parsed.getDate()).padStart(2, "0");
+  const mon = MONTH_NAMES[parsed.getMonth()];
+  const yr = String(parsed.getFullYear()).slice(-2);
+  const dateLabel = `${day} ${mon},${yr}`;
   const timeLabel = parsed.toLocaleTimeString("en-IN", {
     hour: "2-digit",
     minute: "2-digit",
@@ -117,8 +121,8 @@ function formatTimeOnly(value) {
   });
 }
 
-function hasMeetingSchedulePassed(meeting) {
-  const referenceValue = meeting?.scheduled_at;
+function hasAppointmentSchedulePassed(appointment) {
+  const referenceValue = appointment?.scheduled_at;
   if (!referenceValue) return false;
   const scheduledAt = new Date(referenceValue);
   if (Number.isNaN(scheduledAt.getTime())) return false;
@@ -150,6 +154,7 @@ function deriveScheduleLocationFields(location) {
 
 function CustomDateFilter({ value, onChange, placeholder, min, max }) {
   const { C } = usePortalTheme();
+  const { t } = useTranslation();
   const [isOpen, setIsOpen] = useState(false);
   const [openDirection, setOpenDirection] = useState("down");
   const [viewMode, setViewMode] = useState("day");
@@ -168,7 +173,7 @@ function CustomDateFilter({ value, onChange, placeholder, min, max }) {
     };
 
     const handlePointerDown = (event) => {
-      const pickerRoot = event.target.closest?.('[data-admin-meeting-date-filter="true"]');
+      const pickerRoot = event.target.closest?.('[data-admin-appointment-date-filter="true"]');
       if (!pickerRoot) {
         setIsOpen(false);
         setViewMode("day");
@@ -215,7 +220,7 @@ function CustomDateFilter({ value, onChange, placeholder, min, max }) {
   }
 
   return (
-    <div ref={rootRef} data-admin-meeting-date-filter="true" style={{ position: "relative", width: "100%" }}>
+    <div ref={rootRef} data-admin-appointment-date-filter="true" style={{ position: "relative", width: "100%" }}>
       <button
         type="button"
         onClick={() => setIsOpen((current) => !current)}
@@ -458,7 +463,7 @@ function CustomDateFilter({ value, onChange, placeholder, min, max }) {
               cursor: "pointer",
             }}
           >
-            Clear
+            {t("admin.appointmentQueue.clearFilter")}
           </button>
         </div>
       ) : null}
@@ -766,6 +771,7 @@ function ScheduleDatePicker({ value, onChange, min, placeholder = "Select start 
 
 function ScheduleTimePicker({ value, onChange, options }) {
   const { C } = usePortalTheme();
+  const { t } = useTranslation();
   const [isOpen, setIsOpen] = useState(false);
   const [openDirection, setOpenDirection] = useState("down");
   const rootRef = useRef(null);
@@ -823,7 +829,7 @@ function ScheduleTimePicker({ value, onChange, options }) {
           cursor: "pointer",
         }}
       >
-        <span>{selectedOption?.label || "Select time slot"}</span>
+        <span>{selectedOption?.label || t("admin.appointmentDetail.selectTimeSlot")}</span>
         <Clock size={16} style={{ color: C.t3 }} />
       </button>
 
@@ -864,7 +870,7 @@ function ScheduleTimePicker({ value, onChange, options }) {
               cursor: "pointer",
             }}
           >
-            Select time slot
+            {t("admin.appointmentDetail.selectTimeSlot")}
           </button>
           {options.map((option) => {
             const isSelected = value === option.value;
@@ -899,20 +905,22 @@ function ScheduleTimePicker({ value, onChange, options }) {
   );
 }
 
-function buildMeetingActions(meeting, adminId) {
-  if (!meeting?.status) return [];
-  const { status, assignedAdminUserId } = meeting;
+function buildAppointmentActions(appointment, adminId, t) {
+  if (!appointment?.status) return [];
+  const { status, assignedAdminUserId } = appointment;
   const isAssigned = assignedAdminUserId === adminId;
   if (!isAssigned) return [];
   const actions = [];
-  if (["pending", "not_verified"].includes(status)) actions.push(["accept", "Accept Meeting"]);
-  if (["pending", "accepted", "verification_pending", "verified", "not_verified"].includes(status)) actions.push(["reject", "Reject Meeting"]);
-  if (["accepted", "not_verified"].includes(status)) actions.push(["sendVerification", "Send for DEO Verification"]);
-  if (["accepted", "verified", "VERIFIED_BY_DEO"].includes(status)) actions.push(["schedule", "Schedule Meeting"]);
+  if (status === "not_verified") return [["reject", t("admin.appointmentDetail.actionReject")]];
+  if (["pending"].includes(status)) actions.push(["accept", t("admin.appointmentDetail.actionAccept")]);
+  if (["pending", "accepted", "verification_pending", "verified"].includes(status)) actions.push(["reject", t("admin.appointmentDetail.actionReject")]);
+  if (["accepted"].includes(status)) actions.push(["sendVerification", t("admin.appointmentDetail.actionSendVerification")]);
+  if (["accepted", "verified", "VERIFIED_BY_DEO"].includes(status)) actions.push(["schedule", t("admin.appointmentDetail.actionSchedule")]);
   if (isScheduledLikeStatus(status)) {
-    actions.push(["reschedule", "Reschedule Meeting"]);
-    actions.push(["complete", "Mark as Completed"]);
-    actions.push(["scheduledReject", "Cancel Meeting"]);
+    actions.push(["logs", t("admin.appointmentDetail.actionLogs")]);
+    actions.push(["reschedule", t("admin.appointmentDetail.actionReschedule")]);
+    actions.push(["scheduledReject", t("admin.appointmentDetail.actionCancel")]);
+    actions.push(["resolve", t("admin.appointmentDetail.actionResolve")]);
   }
   return actions;
 }
@@ -952,11 +960,11 @@ function NoticeBox({ tone, label, value }) {
   );
 }
 
-const MEETING_TIMELINE_STATUSES = new Set(["accepted", "verification_pending", "verified", "scheduled", "cancelled", "rejected", "rescheduled", "completed"]);
+const APPOINTMENT_TIMELINE_STATUSES = new Set(["accepted", "verification_pending", "verified", "scheduled", "cancelled", "rejected", "rescheduled", "completed"]);
 
-function buildMeetingTimeline(history, currentStatus) {
+function buildAppointmentTimeline(history, currentStatus) {
   const filteredHistory = Array.isArray(history)
-    ? history.filter((event) => MEETING_TIMELINE_STATUSES.has(event?.new_status))
+    ? history.filter((event) => APPOINTMENT_TIMELINE_STATUSES.has(event?.new_status))
     : [];
 
   const deduped = filteredHistory.reduce((items, event) => {
@@ -966,39 +974,40 @@ function buildMeetingTimeline(history, currentStatus) {
     return items;
   }, []);
 
-  if (MEETING_TIMELINE_STATUSES.has(currentStatus) && !deduped.some((event) => event.new_status === currentStatus)) {
+  if (APPOINTMENT_TIMELINE_STATUSES.has(currentStatus) && !deduped.some((event) => event.new_status === currentStatus)) {
     deduped.push({ new_status: currentStatus, actor_role: "", created_at: null });
   }
 
   return deduped;
 }
 
-function buildMeetingNoticeItems(meeting) {
-  if (!meeting) return [];
+function buildAppointmentNoticeItems(appointment, t) {
+  if (!appointment) return [];
 
   const hasContent = (value) => typeof value === "string" ? value.trim().length > 0 : Boolean(value);
   const items = [];
-  if (hasContent(meeting.rejection_reason)) items.push({ tone: "red", label: "Rejection Reason", value: meeting.rejection_reason.trim() });
-  if (hasContent(meeting.verification_reason)) items.push({ tone: "amber", label: "Verification Reason", value: meeting.verification_reason.trim() });
-  if (hasContent(meeting.admin_comments)) {
+  if (hasContent(appointment.rejection_reason)) items.push({ tone: "red", label: t("admin.appointmentDetail.noticeRejectionReason"), value: appointment.rejection_reason.trim() });
+  if (hasContent(appointment.verification_reason)) items.push({ tone: "amber", label: t("admin.appointmentDetail.noticeVerificationReason"), value: appointment.verification_reason.trim() });
+  if (hasContent(appointment.admin_comments)) {
     items.push({
       tone: "blue",
-      label: meeting.status === "rescheduled" ? "Rescheduled Reason" : "Schedule Summary",
-      value: meeting.admin_comments.trim(),
+      label: appointment.status === "rescheduled" ? t("admin.appointmentDetail.noticeRescheduledReason") : t("admin.appointmentDetail.noticeScheduleSummary"),
+      value: appointment.admin_comments.trim(),
     });
   }
-  if (hasContent(meeting.completionNote)) items.push({ tone: "green", label: "Completed Summary", value: meeting.completionNote.trim() });
-  if (hasContent(meeting.cancellationReason)) items.push({ tone: "red", label: "Cancellation Reason", value: meeting.cancellationReason.trim() });
+  if (hasContent(appointment.completionNote)) items.push({ tone: "green", label: t("admin.appointmentDetail.noticeCompletedSummary"), value: appointment.completionNote.trim() });
+  if (hasContent(appointment.cancellationReason)) items.push({ tone: "red", label: t("admin.appointmentDetail.noticeCancellationReason"), value: appointment.cancellationReason.trim() });
   return items;
 }
 
-function MeetingTimeline({ history }) {
+function AppointmentTimeline({ history }) {
   const { C } = usePortalTheme();
+  const { t } = useTranslation();
 
   return (
     <div style={{ display: "grid", gap: 18, overflowY: "auto", paddingRight: 6, flex: 1, minHeight: 0 }}>
       {history.length === 0 ? (
-        <p style={{ fontSize: 13, color: C.t3 }}>No timeline events yet.</p>
+        <p style={{ fontSize: 13, color: C.t3 }}>{t("admin.appointmentDetail.noTimelineEvents")}</p>
       ) : (
         history.map((event, index) => (
           <div key={`${event.new_status}-${event.created_at || index}`} className="flex gap-4">
@@ -1014,7 +1023,7 @@ function MeetingTimeline({ history }) {
                 </div>
                 {event.created_at ? (
                   <p style={{ fontSize: 12, color: C.t3, whiteSpace: "nowrap", margin: 0 }}>
-                    {new Date(event.created_at).toLocaleDateString("en-GB", { day: "2-digit", month: "2-digit", year: "2-digit" })}
+                    {(() => { const _d = new Date(event.created_at); return `${String(_d.getDate()).padStart(2,"0")} ${MONTH_NAMES[_d.getMonth()]},${String(_d.getFullYear()).slice(-2)}`; })()}
                   </p>
                 ) : null}
               </div>
@@ -1078,29 +1087,30 @@ function PurpleOutlineButton({ children, style, ...props }) {
   );
 }
 
-export default function AdminMeeting() {
+export default function AdminAppointment() {
   const { C } = usePortalTheme();
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const tableHeaderBackground = C.purple;
   const tableHeaderText = "#FFFFFF";
   const alternateRowBackground = C.name === "dark" ? C.bgElevated : "#F7F1FF";
-  const { meetingId } = useParams();
+  const { appointmentId } = useParams();
   const [searchParams] = useSearchParams();
   const { session } = useAuth();
   const adminId = session?.user?.id;
   const source = searchParams.get("source") || "";
-  const isMeetingPoolDetail = source === "meeting-pool";
-  const isMeetingQueueDetail = source === "meeting-queue";
+  const isAppointmentPoolDetail = source === "appointment-pool";
+  const isAppointmentQueueDetail = source === "appointment-queue";
   const isMyCasesDetail = source === "my-cases";
-  const isResolvedCompletedDetail = source === "resolved-completed" || source === "completed-meetings";
-  const isWorkQueueDetail = isMeetingPoolDetail || isResolvedCompletedDetail;
-  const meetingPoolBackPath = `${PATHS.admin.workQueue}?tab=meeting-pool`;
+  const isResolvedCompletedDetail = source === "resolved-completed" || source === "completed-appointments";
+  const isWorkQueueDetail = isAppointmentPoolDetail || isResolvedCompletedDetail;
+  const appointmentPoolBackPath = `${PATHS.admin.workQueue}?tab=appointment-pool`;
 
-  const [meetings, setMeetings] = useState([]);
+  const [appointments, setAppointments] = useState([]);
   const [workflowDirectory, setWorkflowDirectory] = useState({ deos: [], ministers: [] });
-  const [selectedMeeting, setSelectedMeeting] = useState(null);
+  const [selectedAppointment, setSelectedAppointment] = useState(null);
   const [history, setHistory] = useState([]);
-  const [meetingFiles, setMeetingFiles] = useState([]);
+  const [appointmentFiles, setAppointmentFiles] = useState([]);
   const [loading, setLoading] = useState(true);
   const [detailLoading, setDetailLoading] = useState(false);
   const [error, setError] = useState("");
@@ -1128,9 +1138,9 @@ export default function AdminMeeting() {
   const [rejectReason, setRejectReason] = useState("");
   const [scheduleError, setScheduleError] = useState("");
   const [selectedAction, setSelectedAction] = useState("");
-  const [showBlockedCompletionModal, setShowBlockedCompletionModal] = useState(false);
-  const [completeNote, setCompleteNote] = useState("");
   const [scheduledRejectNote, setScheduledRejectNote] = useState("");
+  const [meetingLogNote, setMeetingLogNote] = useState("");
+  const [resolveNote, setResolveNote] = useState("");
   const [isBackHovered, setIsBackHovered] = useState(false);
   const [hoveredActionId, setHoveredActionId] = useState(null);
   const [currentPage, setCurrentPage] = useState(1);
@@ -1147,45 +1157,45 @@ export default function AdminMeeting() {
     return form.locationOption.trim();
   }
 
-  async function loadMeetingPool() {
+  async function loadAppointmentPool() {
     const [queueResponse, directoryResponse] = await Promise.all([
       apiClient.get("/admin/work-queue"),
       apiClient.get("/admin/workflow-directory"),
     ]);
-    setMeetings(Array.isArray(queueResponse.data?.meetings) ? queueResponse.data.meetings : []);
+    setAppointments(Array.isArray(queueResponse.data?.appointments) ? queueResponse.data.appointments : []);
     setWorkflowDirectory(directoryResponse.data || { deos: [], ministers: [] });
   }
 
-  async function loadMeetingDetail(id) {
+  async function loadAppointmentDetail(id) {
     setDetailLoading(true);
     try {
       const [detailResult, filesResult] = await Promise.allSettled([
-        apiClient.get(`/meetings/${id}/admin-view`),
-        apiClient.get(`/meetings/${id}/files`),
+        apiClient.get(`/appointments/${id}/admin-view`),
+        apiClient.get(`/appointments/${id}/files`),
       ]);
       if (detailResult.status === "rejected") {
         throw detailResult.reason;
       }
       const { data } = detailResult.value;
-      const startParts = splitDateTimeParts(data.meeting?.scheduled_at);
-      const endParts = splitDateTimeParts(data.meeting?.scheduled_end_at);
-      setSelectedMeeting(data.meeting || null);
+      const startParts = splitDateTimeParts(data.appointment?.scheduled_at);
+      const endParts = splitDateTimeParts(data.appointment?.scheduled_end_at);
+      setSelectedAppointment(data.appointment || null);
       setHistory(data.history || []);
-      setMeetingFiles(filesResult.status === "fulfilled" ? (filesResult.value.data?.files || []) : []);
+      setAppointmentFiles(filesResult.status === "fulfilled" ? (filesResult.value.data?.files || []) : []);
       setScheduleForm({
-        ministerId: data.meeting?.ministerId || "",
+        ministerId: data.appointment?.ministerId || "",
         startDate: startParts.date,
         startTime: startParts.time,
         endDate: endParts.date,
         endTime: endParts.time,
-        ...deriveScheduleLocationFields(data.meeting?.scheduled_location || ""),
-        isVip: Boolean(data.meeting?.is_vip),
-        comments: data.meeting?.admin_comments || "",
+        ...deriveScheduleLocationFields(data.appointment?.scheduled_location || ""),
+        isVip: Boolean(data.appointment?.is_vip),
+        comments: data.appointment?.admin_comments || "",
       });
       setScheduleError("");
-      setVerificationForm({ deoId: data.meeting?.assignedDeoId || "" });
+      setVerificationForm({ deoId: data.appointment?.assignedDeoId || "" });
     } catch (detailError) {
-      setError(detailError?.response?.data?.error || "Unable to load meeting details");
+      setError(detailError?.response?.data?.error || "Unable to load appointment details");
     } finally {
       setDetailLoading(false);
     }
@@ -1198,18 +1208,18 @@ export default function AdminMeeting() {
       try {
         setLoading(true);
         setError("");
-        await loadMeetingPool();
+        await loadAppointmentPool();
         if (!active) return;
-        if (meetingId) {
-          await loadMeetingDetail(meetingId);
+        if (appointmentId) {
+          await loadAppointmentDetail(appointmentId);
         } else {
-          setSelectedMeeting(null);
+          setSelectedAppointment(null);
           setHistory([]);
-          setMeetingFiles([]);
+          setAppointmentFiles([]);
         }
       } catch (loadError) {
         if (active) {
-          setError(loadError?.response?.data?.error || "Unable to load meeting pool");
+          setError(loadError?.response?.data?.error || "Unable to load appointment pool");
         }
       } finally {
         if (active) {
@@ -1221,57 +1231,57 @@ export default function AdminMeeting() {
     return () => {
       active = false;
     };
-  }, [meetingId, session?.role]);
+  }, [appointmentId, session?.role]);
 
-  const personalMeetingQueue = useMemo(
-    () => meetings.filter(
-      (meeting) => meeting.assignedAdminUserId === adminId && meeting.status !== "completed"
+  const personalAppointmentQueue = useMemo(
+    () => appointments.filter(
+      (appointment) => appointment.assignedAdminUserId === adminId && appointment.status !== "completed"
     ),
-    [adminId, meetings]
+    [adminId, appointments]
   );
 
-  const filteredMeetingQueue = useMemo(() => {
+  const filteredAppointmentQueue = useMemo(() => {
     const q = query.trim().toLowerCase();
-    return personalMeetingQueue.filter((meeting) => {
+    return personalAppointmentQueue.filter((appointment) => {
       const haystack = [
-        meeting.requestId,
-        meeting.title || meeting.purpose,
-        [meeting.first_name, meeting.last_name].filter(Boolean).join(" "),
+        appointment.requestId,
+        appointment.title || appointment.purpose,
+        [appointment.first_name, appointment.last_name].filter(Boolean).join(" "),
       ]
         .filter(Boolean)
         .join(" ")
         .toLowerCase();
       const matchesSearch = !q || haystack.includes(q);
-      const matchesStatus = statusFilter === "all" || meeting.status === statusFilter;
-      const matchesCreatedAt = !createdAtFilter || getDateOnlyValue(meeting.createdAt || meeting.created_at) === createdAtFilter;
+      const matchesStatus = statusFilter === "all" || appointment.status === statusFilter;
+      const matchesCreatedAt = !createdAtFilter || getDateOnlyValue(appointment.createdAt || appointment.created_at) === createdAtFilter;
       return matchesSearch && matchesStatus && matchesCreatedAt;
     });
-  }, [createdAtFilter, personalMeetingQueue, query, statusFilter]);
+  }, [createdAtFilter, personalAppointmentQueue, query, statusFilter]);
 
-  const meetingStatusOptions = useMemo(
+  const appointmentStatusOptions = useMemo(
     () => {
-      const statuses = new Set(personalMeetingQueue.map((meeting) => meeting.status).filter((status) => status && status !== "pending"));
+      const statuses = new Set(personalAppointmentQueue.map((appointment) => appointment.status).filter((status) => status && status !== "pending"));
       statuses.add("rejected");
       statuses.add("cancelled");
       return Array.from(statuses).sort();
     },
-    [personalMeetingQueue]
+    [personalAppointmentQueue]
   );
 
   const queueStats = useMemo(() => {
-    const scheduled = meetings.filter((meeting) => isScheduledLikeStatus(meeting.status)).length;
+    const scheduled = appointments.filter((appointment) => isScheduledLikeStatus(appointment.status) && appointment.assignedAdminUserId === adminId).length;
     return [
-      { label: "Total Meetings", value: personalMeetingQueue.length },
-      { label: "Scheduled", value: scheduled },
+      { label: t("admin.appointmentQueue.totalAppointments"), value: personalAppointmentQueue.length },
+      { label: t("admin.appointmentQueue.scheduledLabel"), value: scheduled },
     ];
-  }, [meetings, personalMeetingQueue.length]);
+  }, [appointments, personalAppointmentQueue.length, adminId, t]);
 
   useEffect(() => {
     setCurrentPage(1);
   }, [query, statusFilter, createdAtFilter, itemsPerPage]);
 
-  const totalPages = Math.max(1, Math.ceil(filteredMeetingQueue.length / itemsPerPage));
-  const paginatedMeetingQueue = filteredMeetingQueue.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
+  const totalPages = Math.max(1, Math.ceil(filteredAppointmentQueue.length / itemsPerPage));
+  const paginatedAppointmentQueue = filteredAppointmentQueue.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
   const pageNumbers = useMemo(() => {
     if (totalPages <= 1) return [1];
     const pages = new Set([1, totalPages, currentPage - 1, currentPage, currentPage + 1]);
@@ -1292,26 +1302,26 @@ export default function AdminMeeting() {
     const observer = new ResizeObserver(() => updateHeight());
     observer.observe(detailCardRef.current);
     return () => observer.disconnect();
-  }, [selectedMeeting, history, selectedAction, actionError, successMessage]);
+  }, [selectedAppointment, history, selectedAction, actionError, successMessage]);
 
   const availableActions = useMemo(
-    () => buildMeetingActions(selectedMeeting || {}, adminId),
-    [selectedMeeting, adminId]
+    () => buildAppointmentActions(selectedAppointment || {}, adminId, t),
+    [selectedAppointment, adminId, t]
   );
 
-  async function refreshAll(id = meetingId) {
-    await loadMeetingPool();
+  async function refreshAll(id = appointmentId) {
+    await loadAppointmentPool();
     if (id) {
-      await loadMeetingDetail(id);
+      await loadAppointmentDetail(id);
     }
   }
 
-  async function assignMeetingToCurrentAdmin() {
+  async function assignAppointmentToCurrentAdmin() {
     return runAction(
-      () => apiClient.patch(`/meetings/${meetingId}/assign-self`, {}),
+      () => apiClient.patch(`/appointments/${appointmentId}/assign-self`, {}),
       {
-        successMessage: "Meeting successfully assigned to you.",
-        successRedirect: PATHS.admin.meetings,
+        successMessage: t("admin.appointmentDetail.assignedToYou"),
+        successRedirect: PATHS.admin.appointments,
       }
     );
   }
@@ -1326,37 +1336,37 @@ export default function AdminMeeting() {
       }
       setPendingSuccessRedirect(options.successRedirect || "");
       if (options.navigateToPool) {
-        await loadMeetingPool();
-        navigate(isMeetingPoolDetail ? meetingPoolBackPath : isWorkQueueDetail ? PATHS.admin.workQueue : PATHS.admin.meetings);
+        await loadAppointmentPool();
+        navigate(isAppointmentPoolDetail ? appointmentPoolBackPath : isWorkQueueDetail ? PATHS.admin.workQueue : PATHS.admin.appointments);
         return true;
       }
-      if (options.navigateToMeetingQueue) {
-        await loadMeetingPool();
-        navigate(PATHS.admin.meetings);
+      if (options.navigateToAppointmentQueue) {
+        await loadAppointmentPool();
+        navigate(PATHS.admin.appointments);
         return true;
       }
       await refreshAll();
       return true;
     } catch (actionErrorValue) {
-      setActionError(actionErrorValue?.response?.data?.error || "Unable to update meeting");
+      setActionError(actionErrorValue?.response?.data?.error || "Unable to update appointment");
       return false;
     } finally {
       setActionLoading(false);
     }
   }
 
-  async function uploadMeetingPhoto() {
+  async function uploadAppointmentPhoto() {
     if (!uploadFile) return;
     setUploadingFile(true);
     setActionError("");
     try {
       const formData = new FormData();
       formData.append("file", uploadFile);
-      await apiClient.post(`/meetings/${meetingId}/photos`, formData);
-      await loadMeetingDetail(meetingId);
+      await apiClient.post(`/appointments/${appointmentId}/photos`, formData);
+      await loadAppointmentDetail(appointmentId);
       setUploadFile(null);
     } catch (uploadError) {
-      setActionError(uploadError?.response?.data?.error || "Unable to upload meeting photo");
+      setActionError(uploadError?.response?.data?.error || "Unable to upload appointment photo");
     } finally {
       setUploadingFile(false);
     }
@@ -1367,11 +1377,6 @@ export default function AdminMeeting() {
   }
 
   function handleWorkflowActionChange(nextAction) {
-    if (nextAction === "complete" && selectedMeeting && !hasMeetingSchedulePassed(selectedMeeting)) {
-      setSelectedAction("");
-      setShowBlockedCompletionModal(true);
-      return;
-    }
     setSelectedAction(nextAction);
   }
 
@@ -1384,78 +1389,80 @@ export default function AdminMeeting() {
     }
   }
 
-  if (meetingId) {
-    if (loading || detailLoading || !selectedMeeting) {
+  if (appointmentId) {
+    if (loading || detailLoading || !selectedAppointment) {
       return (
         <WorkspacePage width={1200}>
-          {error ? <WorkspaceCard style={{ color: C.danger }}>{error}</WorkspaceCard> : <WorkspaceEmptyState title="Loading meeting details..." />}
+          {error ? <WorkspaceCard style={{ color: C.danger }}>{error}</WorkspaceCard> : <WorkspaceEmptyState title={t("admin.appointmentDetail.loadingDetails")} />}
         </WorkspacePage>
       );
     }
 
-    const isAssignedToCurrentAdmin = selectedMeeting.assignedAdminUserId === adminId;
-    const isUnassignedPoolMeeting = selectedMeeting.status === "pending" && !selectedMeeting.assignedAdminUserId;
-    const canSendVerification = isAssignedToCurrentAdmin && ["accepted", "not_verified", "verification_pending", "verified"].includes(selectedMeeting.status);
-    const canSchedule = isAssignedToCurrentAdmin && ["accepted", "verified", "VERIFIED_BY_DEO", "scheduled", "rescheduled"].includes(selectedMeeting.status);
-    const canUploadPhotos = isAssignedToCurrentAdmin && ["scheduled", "rescheduled", "completed"].includes(selectedMeeting.status);
-    const verificationPending = ["verification_pending", "SENT_FOR_DEO_VERIFICATION"].includes(selectedMeeting.status);
-    const verificationDone = ["verified", "VERIFIED_BY_DEO"].includes(selectedMeeting.status);
-    const meetingScheduled = isScheduledLikeStatus(selectedMeeting.status);
+    const isAssignedToCurrentAdmin = selectedAppointment.assignedAdminUserId === adminId;
+    const isUnassignedPoolAppointment = selectedAppointment.status === "pending" && !selectedAppointment.assignedAdminUserId;
+    const canSendVerification = isAssignedToCurrentAdmin && ["accepted", "verification_pending", "verified"].includes(selectedAppointment.status);
+    const canSchedule = isAssignedToCurrentAdmin && ["accepted", "verified", "VERIFIED_BY_DEO", "scheduled", "rescheduled"].includes(selectedAppointment.status);
+    const canUploadPhotos = isAssignedToCurrentAdmin && ["scheduled", "rescheduled", "completed"].includes(selectedAppointment.status);
+    const verificationPending = ["verification_pending", "SENT_FOR_DEO_VERIFICATION"].includes(selectedAppointment.status);
+    const verificationDone = ["verified", "VERIFIED_BY_DEO"].includes(selectedAppointment.status);
+    const appointmentScheduled = isScheduledLikeStatus(selectedAppointment.status);
     const workflowDisplayLabel =
       verificationPending || verificationDone
-        ? "Send for DEO Verification"
-        : meetingScheduled
-          ? "Meeting Actions"
-          : "Select workflow action";
-    const citizenMeetingFiles = meetingFiles.filter((file) => file.kind !== "meeting_photo");
-    const isCompletedMeetingDetail = selectedMeeting.status === "completed";
-    const isCancelledMeetingDetail = selectedMeeting.status === "cancelled";
-    const showAssignToMeButton = !selectedMeeting.assignedAdminUserId && (isMeetingPoolDetail || isUnassignedPoolMeeting);
-    const showWorkflowActions = !showAssignToMeButton && !isResolvedCompletedDetail && !["completed", "cancelled"].includes(selectedMeeting.status);
+        ? t("admin.appointmentDetail.workflowSendForDeo")
+        : appointmentScheduled
+          ? t("admin.appointmentDetail.workflowActions")
+          : t("admin.appointmentDetail.selectWorkflowAction");
+    const citizenAppointmentFiles = appointmentFiles.filter((file) => file.kind !== "appointment_photo");
+    const isCompletedAppointmentDetail = selectedAppointment.status === "completed";
+    const isCancelledAppointmentDetail = selectedAppointment.status === "cancelled";
+    const showAssignToMeButton = !selectedAppointment.assignedAdminUserId && (isAppointmentPoolDetail || isUnassignedPoolAppointment);
+    const isDeoRejected = selectedAppointment.status === "not_verified";
+    const isAdminRejected = selectedAppointment.status === "rejected";
+    const showWorkflowActions = !showAssignToMeButton && !isResolvedCompletedDetail && !["completed", "cancelled", "rejected"].includes(selectedAppointment.status);
 
     const backPath = isMyCasesDetail
       ? PATHS.admin.cases
-      : source === "meeting-queue"
-          ? PATHS.admin.meetings
-          : isMeetingPoolDetail
-            ? meetingPoolBackPath
+      : source === "appointment-queue"
+          ? PATHS.admin.appointments
+          : isAppointmentPoolDetail
+            ? appointmentPoolBackPath
           : isResolvedCompletedDetail
-            ? `${PATHS.admin.workQueue}?tab=completed-meetings`
-          : isUnassignedPoolMeeting
+            ? `${PATHS.admin.workQueue}?tab=completed-appointments`
+          : isUnassignedPoolAppointment
             ? PATHS.admin.workQueue
-            : PATHS.admin.meetings;
-    const backLabel = isMeetingPoolDetail
-      ? "Back"
+            : PATHS.admin.appointments;
+    const backLabel = isAppointmentPoolDetail
+      ? t("common.back")
       : isResolvedCompletedDetail
-        ? "Back"
+        ? t("common.back")
       : isWorkQueueDetail
-        ? "Back to Work Queue"
-      : isMeetingQueueDetail
-        ? "Back"
-        : "Back to Meeting Queue";
-    const citizenName = [selectedMeeting.first_name, selectedMeeting.last_name].filter(Boolean).join(" ") || "Unknown";
-    const citizenPhone = selectedMeeting.mobile_number || "Not provided";
-    const citizenDistrict = selectedMeeting.citizenSnapshot?.district || "Not provided";
-    const citizenLocalMp = selectedMeeting.citizenSnapshot?.localMp || "Not provided";
-    const createdAtLabel = formatDateOnly(selectedMeeting.createdAt || selectedMeeting.created_at);
-    const updatedAtLabel = formatDateOnly(selectedMeeting.updatedAt || selectedMeeting.updated_at || selectedMeeting.createdAt || selectedMeeting.created_at);
-    const preferredMeetingDateLabel = formatDateOnly(selectedMeeting.preferred_time);
-    const preferredMeetingTimeLabel = formatTimeOnly(selectedMeeting.preferred_time);
-    const meetingStatusLabel = statusLabel(selectedMeeting.status);
-    const citizenContact = selectedMeeting.mobile_number || selectedMeeting.email || "Not provided";
-    const scheduledAtLabel = formatDateTimeLabel(selectedMeeting.scheduled_at);
-    const scheduledLocationLabel = selectedMeeting.scheduled_location || "Pending";
-    const meetingTimeline = buildMeetingTimeline(history, selectedMeeting.status);
-    const meetingNoticeItems = buildMeetingNoticeItems(selectedMeeting);
+        ? t("admin.appointmentDetail.backToWorkQueue")
+      : isAppointmentQueueDetail
+        ? t("common.back")
+        : t("admin.appointmentDetail.backToAppointmentQueue");
+    const citizenName = [selectedAppointment.first_name, selectedAppointment.last_name].filter(Boolean).join(" ") || t("common.unknown");
+    const citizenPhone = selectedAppointment.mobile_number || t("common.notProvided");
+    const citizenDistrict = selectedAppointment.citizenSnapshot?.district || t("common.notProvided");
+    const citizenLocalMp = selectedAppointment.citizenSnapshot?.localMp || t("common.notProvided");
+    const createdAtLabel = formatDateOnly(selectedAppointment.createdAt || selectedAppointment.created_at);
+    const updatedAtLabel = formatDateOnly(selectedAppointment.updatedAt || selectedAppointment.updated_at || selectedAppointment.createdAt || selectedAppointment.created_at);
+    const preferredAppointmentDateLabel = selectedAppointment.preferred_time ? formatDateOnly(selectedAppointment.preferred_time) : t("common.notProvided");
+    const preferredAppointmentTimeLabel = selectedAppointment.preferred_time ? formatTimeOnly(selectedAppointment.preferred_time) : t("common.notProvided");
+    const appointmentStatusLabel = statusLabel(selectedAppointment.status);
+    const citizenContact = selectedAppointment.mobile_number || selectedAppointment.email || t("common.notProvided");
+    const scheduledAtLabel = selectedAppointment.scheduled_at ? formatDateTimeLabel(selectedAppointment.scheduled_at) : t("common.pending");
+    const scheduledLocationLabel = selectedAppointment.scheduled_location || t("common.pending");
+    const appointmentTimeline = buildAppointmentTimeline(history, selectedAppointment.status);
+    const appointmentNoticeItems = buildAppointmentNoticeItems(selectedAppointment, t);
     return (
       <WorkspacePage
         width={1280}
-        outerStyle={isWorkQueueDetail && !isCompletedMeetingDetail ? { height: "calc(100vh - 73px)", overflow: "auto" } : undefined}
-        contentStyle={isWorkQueueDetail && !isCompletedMeetingDetail ? { height: "100%", display: "flex", flexDirection: "column", minHeight: 0 } : undefined}
+        outerStyle={isWorkQueueDetail && !isCompletedAppointmentDetail ? { height: "calc(100vh - 73px)", overflow: "auto" } : undefined}
+        contentStyle={isWorkQueueDetail && !isCompletedAppointmentDetail ? { height: "100%", display: "flex", flexDirection: "column", minHeight: 0 } : undefined}
       >
         <SuccessModal open={!!successMessage} message={successMessage} onClose={handleSuccessModalClose} />
 
-        {isMeetingPoolDetail || isMeetingQueueDetail || isResolvedCompletedDetail ? (
+        {isAppointmentPoolDetail || isAppointmentQueueDetail || isResolvedCompletedDetail ? (
           <div style={{ display: "grid", gridTemplateColumns: "1fr auto 1fr", alignItems: "center", marginBottom: 16, gap: 12 }}>
             <div style={{ justifySelf: "start" }}>
               <button
@@ -1487,12 +1494,12 @@ export default function AdminMeeting() {
                 {backLabel}
               </button>
             </div>
-            <h2 style={{ margin: 0, fontSize: 20, fontWeight: 600, color: C.t1, textAlign: "center" }}>MEETING DETAILS</h2>
+            <h2 style={{ margin: 0, fontSize: 20, fontWeight: 600, color: C.t1, textAlign: "center" }}>{t("admin.appointmentDetail.title")}</h2>
             <div />
           </div>
         ) : (
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16, gap: 12 }}>
-            <h2 style={{ margin: 0, fontSize: 20, fontWeight: 600, color: C.t1 }}>{selectedMeeting.requestId || selectedMeeting.id}</h2>
+            <h2 style={{ margin: 0, fontSize: 20, fontWeight: 600, color: C.t1 }}>{selectedAppointment.requestId || selectedAppointment.id}</h2>
             <button
               type="button"
               onClick={() => {
@@ -1529,14 +1536,14 @@ export default function AdminMeeting() {
           {actionError ? <WorkspaceCard style={{ color: C.danger }}>{actionError}</WorkspaceCard> : null}
 
           <div style={isWorkQueueDetail ? undefined : { maxWidth: 320 }}>
-            {showAssignToMeButton && !isMeetingPoolDetail ? (
+            {showAssignToMeButton && !isAppointmentPoolDetail ? (
               <WorkspaceButton
                 type="button"
                 disabled={actionLoading}
-                onClick={assignMeetingToCurrentAdmin}
+                onClick={assignAppointmentToCurrentAdmin}
                 style={isWorkQueueDetail ? { boxShadow: "none" } : undefined}
               >
-                Assign to Me
+                {t("admin.appointmentDetail.assignToMe")}
               </WorkspaceButton>
             ) : showWorkflowActions && isWorkQueueDetail ? (
               <div>
@@ -1544,7 +1551,7 @@ export default function AdminMeeting() {
                   value={selectedAction}
                   onChange={(event) => handleWorkflowActionChange(event.target.value)}
                 >
-                  <option value="">Select workflow action</option>
+                  <option value="">{t("admin.appointmentDetail.selectWorkflowAction")}</option>
                   {availableActions.map(([value, label]) => (
                     <option key={value} value={value}>{label}</option>
                   ))}
@@ -1554,7 +1561,7 @@ export default function AdminMeeting() {
           </div>
 
           {isWorkQueueDetail ? (
-            isCompletedMeetingDetail ? (
+            isCompletedAppointmentDetail ? (
               <>
                 <div
                   style={{
@@ -1588,57 +1595,57 @@ export default function AdminMeeting() {
                         }}
                       >
                         <span aria-hidden="true">✓</span>
-                        Completed
+                        {t("admin.appointmentDetail.completed")}
                       </div>
                     </div>
                     <div style={{ display: "grid", gap: 18, flex: 1, minHeight: 0, overflowY: "auto", paddingRight: 2 }}>
                       <InlineDetailGrid columns={3}>
-                        <DetailItem label="Meeting Id" value={selectedMeeting.requestId || selectedMeeting.id} />
+                        <DetailItem label={t("admin.appointmentDetail.appointmentId")} value={selectedAppointment.requestId || selectedAppointment.id} />
                         <div />
-                        <DetailItem label="Completion Date" value={formatDateOnly(selectedMeeting.completedAt || selectedMeeting.updated_at || selectedMeeting.updatedAt)} />
+                        <DetailItem label={t("admin.appointmentDetail.completionDate")} value={formatDateOnly(selectedAppointment.completedAt || selectedAppointment.updated_at || selectedAppointment.updatedAt)} />
                       </InlineDetailGrid>
                       <InlineDetailGrid columns={3}>
-                        <DetailItem label="Created At" value={createdAtLabel} />
-                        <DetailItem label="Citizen Name" value={citizenName} />
-                        <DetailItem label="Citizen Phone Number" value={citizenPhone} />
+                        <DetailItem label={t("admin.appointmentDetail.createdAt")} value={createdAtLabel} />
+                        <DetailItem label={t("admin.grievanceDetail.citizenName")} value={citizenName} />
+                        <DetailItem label={t("admin.grievanceDetail.citizenPhone")} value={citizenPhone} />
                       </InlineDetailGrid>
                       <InlineDetailGrid columns={3}>
-                        <DetailItem label="District" value={citizenDistrict} />
-                        <DetailItem label="MP of District" value={citizenLocalMp} />
+                        <DetailItem label={t("admin.workQueue.colDistrict")} value={citizenDistrict} />
+                        <DetailItem label={t("admin.grievanceDetail.mpOfDistrict")} value={citizenLocalMp} />
                         <div />
                       </InlineDetailGrid>
                       <div>
-                        <p style={{ fontSize: 11, color: C.t3, fontWeight: 700, textTransform: "uppercase", letterSpacing: ".08em", marginBottom: 8 }}>Meeting Title</p>
+                        <p style={{ fontSize: 11, color: C.t3, fontWeight: 700, textTransform: "uppercase", letterSpacing: ".08em", marginBottom: 8 }}>{t("admin.appointmentDetail.appointmentTitle")}</p>
                         <p style={{ margin: 0, fontSize: 14, fontWeight: 400, color: C.t1, lineHeight: 1.6, whiteSpace: "pre-wrap", wordBreak: "break-word" }}>
-                          {selectedMeeting.title || selectedMeeting.purpose || "Untitled Meeting"}
+                          {selectedAppointment.title || selectedAppointment.purpose || t("admin.appointmentDetail.untitledAppointment")}
                         </p>
                       </div>
                       <InlineDetailGrid columns={3}>
-                        <DetailItem label="Preferred Date" value={preferredMeetingDateLabel} />
-                        <DetailItem label="Preferred Time" value={preferredMeetingTimeLabel} />
+                        <DetailItem label={t("admin.appointmentDetail.preferredDate")} value={preferredAppointmentDateLabel} />
+                        <DetailItem label={t("admin.appointmentDetail.preferredTime")} value={preferredAppointmentTimeLabel} />
                         <div />
                       </InlineDetailGrid>
                       <InlineDetailGrid columns={3}>
-                        <DetailItem label="Scheduled At" value={scheduledAtLabel} />
-                        <DetailItem label="Scheduled Location" value={scheduledLocationLabel} />
+                        <DetailItem label={t("admin.appointmentDetail.scheduledAt")} value={scheduledAtLabel} />
+                        <DetailItem label={t("admin.appointmentDetail.scheduledLocation")} value={scheduledLocationLabel} />
                         <DetailItem
-                          label="VIP Meeting"
+                          label={t("admin.appointmentDetail.vipAppointment")}
                           value={(
-                            <WorkspaceBadge color={selectedMeeting.is_vip ? C.mint : C.danger} title={selectedMeeting.is_vip ? "Yes" : "No"}>
-                              {selectedMeeting.is_vip ? "Yes" : "No"}
+                            <WorkspaceBadge color={selectedAppointment.is_vip ? C.mint : C.danger} title={selectedAppointment.is_vip ? t("common.yes") : t("common.no")}>
+                              {selectedAppointment.is_vip ? t("common.yes") : t("common.no")}
                             </WorkspaceBadge>
                           )}
                         />
                       </InlineDetailGrid>
                       <div>
-                        <p style={{ fontSize: 11, color: C.t3, fontWeight: 700, textTransform: "uppercase", letterSpacing: ".08em", marginBottom: 8 }}>Purpose Of Meeting</p>
+                        <p style={{ fontSize: 11, color: C.t3, fontWeight: 700, textTransform: "uppercase", letterSpacing: ".08em", marginBottom: 8 }}>{t("admin.appointmentDetail.purposeOfAppointment")}</p>
                         <p style={{ margin: 0, fontSize: 14, fontWeight: 400, color: C.t1, lineHeight: 1.6, whiteSpace: "pre-wrap", wordBreak: "break-word" }}>
-                          {selectedMeeting.purpose || selectedMeeting.description || "Not provided"}
+                          {selectedAppointment.purpose || selectedAppointment.description || t("common.notProvided")}
                         </p>
                       </div>
-                      {meetingNoticeItems.length ? (
+                      {appointmentNoticeItems.length ? (
                         <div className="space-y-3">
-                          {meetingNoticeItems.map((item) => (
+                          {appointmentNoticeItems.map((item) => (
                             <NoticeBox key={`${item.label}-${item.value}`} tone={item.tone} label={item.label} value={item.value} />
                           ))}
                         </div>
@@ -1658,22 +1665,22 @@ export default function AdminMeeting() {
                   >
                     <div className="flex items-center gap-2 mb-6">
                       <FileText size={22} color={C.purple} />
-                      <h2 style={{ fontSize: 24, fontWeight: 700, color: C.t1 }}>Timeline</h2>
+                      <h2 style={{ fontSize: 24, fontWeight: 700, color: C.t1 }}>{t("admin.appointmentDetail.timeline")}</h2>
                     </div>
-                    <MeetingTimeline history={meetingTimeline} />
+                    <AppointmentTimeline history={appointmentTimeline} />
                   </WorkspaceCard>
                 </div>
 
                 <WorkspaceCard style={{ marginBottom: 0 }}>
                 <WorkspaceCardHeader
-                  title="Meeting Files"
-                  subtitle="View the citizen submission files and uploaded meeting artifacts."
+                  title={t("admin.appointmentDetail.appointmentFiles")}
+                  subtitle={t("admin.appointmentDetail.filesSubtitle")}
                 />
-                {meetingFiles.length === 0 ? (
-                  <div style={{ fontSize: 13, color: C.t3, padding: "2px 0" }}>No files attached to this meeting yet.</div>
+                {appointmentFiles.length === 0 ? (
+                  <div style={{ fontSize: 13, color: C.t3, padding: "2px 0" }}>{t("admin.appointmentDetail.noFilesAttached")}</div>
                 ) : (
                     <div style={{ display: "grid", gap: 10 }}>
-                      {meetingFiles.map((file) => (
+                      {appointmentFiles.map((file) => (
                         <div key={file.id} style={{ padding: 10, borderRadius: 12, border: `1px solid ${C.border}`, background: C.bgElevated }}>
                           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
                             <div>
@@ -1685,7 +1692,7 @@ export default function AdminMeeting() {
                               variant="outline"
                               onClick={() => openDownloadUrl(file.downloadUrl)}
                             >
-                              Download
+                              {t("common.download")}
                             </WorkspaceButton>
                           </div>
                         </div>
@@ -1698,89 +1705,89 @@ export default function AdminMeeting() {
               <>
                 <WorkspaceCard
                   style={
-                    isMeetingPoolDetail
+                    isAppointmentPoolDetail
                       ? { marginBottom: 0, height: "auto", display: "flex", flexDirection: "column", paddingTop: 14 }
                       : { marginBottom: 0, flex: 1, minHeight: 0, display: "flex", flexDirection: "column", paddingTop: 24 }
                   }
                 >
-                  {isMeetingPoolDetail ? (
+                  {isAppointmentPoolDetail ? (
                     <div style={{ padding: "0 0 14px 0", marginLeft: 2, borderBottom: `1px solid ${C.border}`, marginBottom: 18 }}>
                       <WorkspaceButton
                         type="button"
                         disabled={actionLoading}
-                        onClick={assignMeetingToCurrentAdmin}
+                        onClick={assignAppointmentToCurrentAdmin}
                         style={{ boxShadow: "none" }}
                       >
-                        Assign to Me
+                        {t("admin.appointmentDetail.assignToMe")}
                       </WorkspaceButton>
                     </div>
                   ) : (
-                    <WorkspaceCardHeader title="Meeting Information" />
+                    <WorkspaceCardHeader title={t("admin.appointmentDetail.appointmentInfo")} />
                   )}
                   <div
                     style={
-                      isMeetingPoolDetail
+                      isAppointmentPoolDetail
                         ? { display: "grid", gap: 18, paddingRight: 2 }
                         : { display: "grid", gap: 18, flex: 1, minHeight: 0, overflowY: "auto", paddingRight: 2 }
                     }
                   >
                     <div className="grid md:grid-cols-3 gap-6">
-                      <DetailItem label="Meeting Id" value={selectedMeeting.requestId || selectedMeeting.id} />
-                      <DetailItem label="Updated At" value={updatedAtLabel} />
+                      <DetailItem label={t("admin.appointmentDetail.appointmentId")} value={selectedAppointment.requestId || selectedAppointment.id} />
+                      <DetailItem label={t("admin.appointmentDetail.updatedAt")} value={updatedAtLabel} />
                       <DetailItem
-                        label="Status"
+                        label={t("common.status")}
                         value={(
                           <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-start", gap: 8 }}>
-                            <WorkspaceBadge status={selectedMeeting.status} title={meetingStatusLabel}>
-                              {meetingStatusLabel}
+                            <WorkspaceBadge status={selectedAppointment.status} title={appointmentStatusLabel}>
+                              {appointmentStatusLabel}
                             </WorkspaceBadge>
                           </div>
                         )}
                       />
                     </div>
                     <div className="grid md:grid-cols-3 gap-6">
-                      <DetailItem label="Created At" value={createdAtLabel} />
-                      <DetailItem label="Citizen Name" value={citizenName} />
-                      <DetailItem label="Citizen Phone Number" value={citizenPhone} />
+                      <DetailItem label={t("admin.appointmentDetail.createdAt")} value={createdAtLabel} />
+                      <DetailItem label={t("admin.grievanceDetail.citizenName")} value={citizenName} />
+                      <DetailItem label={t("admin.grievanceDetail.citizenPhone")} value={citizenPhone} />
                     </div>
                     <div className="grid md:grid-cols-3 gap-6">
-                      <DetailItem label="District" value={citizenDistrict} />
-                      <DetailItem label="MP of District" value={citizenLocalMp} />
+                      <DetailItem label={t("admin.workQueue.colDistrict")} value={citizenDistrict} />
+                      <DetailItem label={t("admin.grievanceDetail.mpOfDistrict")} value={citizenLocalMp} />
                       <div />
                     </div>
                     <div>
-                      <p style={{ fontSize: 11, color: C.t3, fontWeight: 700, textTransform: "uppercase", letterSpacing: ".08em", marginBottom: 8 }}>Meeting Title</p>
+                      <p style={{ fontSize: 11, color: C.t3, fontWeight: 700, textTransform: "uppercase", letterSpacing: ".08em", marginBottom: 8 }}>{t("admin.appointmentDetail.appointmentTitle")}</p>
                       <p style={{ margin: 0, fontSize: 14, fontWeight: 400, color: C.t1, lineHeight: 1.6, whiteSpace: "normal", wordBreak: "break-word" }}>
-                        {selectedMeeting.title || selectedMeeting.purpose || "Untitled Meeting"}
+                        {selectedAppointment.title || selectedAppointment.purpose || t("admin.appointmentDetail.untitledAppointment")}
                       </p>
                     </div>
                     <div className="grid md:grid-cols-3 gap-6">
-                      <DetailItem label="Preferred Date" value={preferredMeetingDateLabel} />
-                      <DetailItem label="Preferred Time" value={preferredMeetingTimeLabel} />
+                      <DetailItem label={t("admin.appointmentDetail.preferredDate")} value={preferredAppointmentDateLabel} />
+                      <DetailItem label={t("admin.appointmentDetail.preferredTime")} value={preferredAppointmentTimeLabel} />
                       <div />
                     </div>
                     <div className="grid md:grid-cols-3 gap-6">
-                      <DetailItem label="Scheduled At" value={scheduledAtLabel} />
-                      <DetailItem label="Scheduled Location" value={scheduledLocationLabel} />
+                      <DetailItem label={t("admin.appointmentDetail.scheduledAt")} value={scheduledAtLabel} />
+                      <DetailItem label={t("admin.appointmentDetail.scheduledLocation")} value={scheduledLocationLabel} />
                       <DetailItem
-                        label="VIP Meeting"
+                        label={t("admin.appointmentDetail.vipAppointment")}
                         value={(
-                          <WorkspaceBadge color={selectedMeeting.is_vip ? C.mint : C.danger} title={selectedMeeting.is_vip ? "Yes" : "No"}>
-                            {selectedMeeting.is_vip ? "Yes" : "No"}
+                          <WorkspaceBadge color={selectedAppointment.is_vip ? C.mint : C.danger} title={selectedAppointment.is_vip ? t("common.yes") : t("common.no")}>
+                            {selectedAppointment.is_vip ? t("common.yes") : t("common.no")}
                           </WorkspaceBadge>
                         )}
                       />
                     </div>
                     <div>
-                      <p style={{ fontSize: 11, color: C.t3, fontWeight: 700, textTransform: "uppercase", letterSpacing: ".08em", marginBottom: 8 }}>Purpose Of Meeting</p>
+                      <p style={{ fontSize: 11, color: C.t3, fontWeight: 700, textTransform: "uppercase", letterSpacing: ".08em", marginBottom: 8 }}>{t("admin.appointmentDetail.purposeOfAppointment")}</p>
                       <p style={{ margin: 0, fontSize: 14, fontWeight: 400, color: C.t1, lineHeight: 1.6, whiteSpace: "pre-wrap", wordBreak: "break-word" }}>
-                        {selectedMeeting.purpose || selectedMeeting.description || "Not provided"}
+                        {selectedAppointment.purpose || selectedAppointment.description || t("common.notProvided")}
                       </p>
                     </div>
                   </div>
-                  {meetingNoticeItems.length ? (
+                  {appointmentNoticeItems.length ? (
                     <div className="mt-6 space-y-3">
-                      {meetingNoticeItems.map((item) => (
+                      {appointmentNoticeItems.map((item) => (
                         <NoticeBox key={`${item.label}-${item.value}`} tone={item.tone} label={item.label} value={item.value} />
                       ))}
                     </div>
@@ -1789,14 +1796,14 @@ export default function AdminMeeting() {
 
                 <WorkspaceCard style={{ marginBottom: 0 }}>
                 <WorkspaceCardHeader
-                  title="Meeting Files"
-                  subtitle="View the citizen submission files and uploaded meeting artifacts."
+                  title={t("admin.appointmentDetail.appointmentFiles")}
+                  subtitle={t("admin.appointmentDetail.filesSubtitle")}
                 />
-                {meetingFiles.length === 0 ? (
-                  <div style={{ fontSize: 13, color: C.t3, padding: "2px 0" }}>No files attached to this meeting yet.</div>
+                {appointmentFiles.length === 0 ? (
+                  <div style={{ fontSize: 13, color: C.t3, padding: "2px 0" }}>{t("admin.appointmentDetail.noFilesAttached")}</div>
                 ) : (
                     <div style={{ display: "grid", gap: 10 }}>
-                      {meetingFiles.map((file) => (
+                      {appointmentFiles.map((file) => (
                         <div key={file.id} style={{ padding: 10, borderRadius: 12, border: `1px solid ${C.border}`, background: C.bgElevated }}>
                           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
                             <div>
@@ -1808,7 +1815,7 @@ export default function AdminMeeting() {
                               variant="outline"
                               onClick={() => openDownloadUrl(file.downloadUrl)}
                             >
-                              Download
+                              {t("common.download")}
                             </WorkspaceButton>
                           </div>
                         </div>
@@ -1842,11 +1849,35 @@ export default function AdminMeeting() {
                           <option key={value} value={value}>{label}</option>
                         ))}
                       </WorkspaceSelect>
-                      {verificationPending ? <div style={{ marginTop: 8, fontSize: 13, fontWeight: 700, color: C.danger }}>Sent for DEO verification</div> : null}
-                      {verificationDone ? <div style={{ marginTop: 8, fontSize: 13, fontWeight: 700, color: C.mint }}>DEO verification successful</div> : null}
-                      {meetingScheduled ? <div style={{ marginTop: 8, fontSize: 13, fontWeight: 700, color: C.mint }}>Meeting has been Scheduled</div> : null}
+                      {isDeoRejected ? <div style={{ marginTop: 8, fontSize: 13, fontWeight: 700, color: C.danger }}>{t("admin.appointmentDetail.deoRejectsVerification")}</div> : null}
+                      {verificationPending ? <div style={{ marginTop: 8, fontSize: 13, fontWeight: 700, color: C.danger }}>{t("admin.appointmentDetail.sentForDeoVerification")}</div> : null}
+                      {verificationDone ? <div style={{ marginTop: 8, fontSize: 13, fontWeight: 700, color: C.mint }}>{t("admin.appointmentDetail.deoVerificationSuccessful")}</div> : null}
+                      {appointmentScheduled ? <div style={{ marginTop: 8, fontSize: 13, fontWeight: 700, color: C.mint }}>{t("admin.appointmentDetail.meetingScheduled")}</div> : null}
                     </div>
-                  ) : isCompletedMeetingDetail ? (
+                  ) : isAdminRejected ? (
+                    <div style={{ paddingBottom: 16, marginBottom: 20, borderBottom: `1px solid ${C.border}` }}>
+                      <div
+                        style={{
+                          display: "inline-flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          minHeight: 38,
+                          padding: "0 16px",
+                          borderRadius: 10,
+                          background: C.danger,
+                          color: "#ffffff",
+                          fontSize: 13,
+                          fontWeight: 600,
+                          lineHeight: 1.2,
+                          cursor: "not-allowed",
+                          userSelect: "none",
+                          opacity: 0.85,
+                        }}
+                      >
+                        {t("admin.appointmentDetail.rejected")}
+                      </div>
+                    </div>
+                  ) : isCompletedAppointmentDetail ? (
                     <div style={{ paddingBottom: 16, marginBottom: 20, borderBottom: `1px solid ${C.border}` }}>
                       <div
                         style={{
@@ -1865,10 +1896,10 @@ export default function AdminMeeting() {
                           userSelect: "none",
                         }}
                       >
-                        Completed
+                        {t("admin.appointmentDetail.completed")}
                       </div>
                     </div>
-                  ) : isCancelledMeetingDetail ? (
+                  ) : isCancelledAppointmentDetail ? (
                     <div style={{ paddingBottom: 16, marginBottom: 20, borderBottom: `1px solid ${C.border}` }}>
                       <div
                         style={{
@@ -1887,81 +1918,81 @@ export default function AdminMeeting() {
                           userSelect: "none",
                         }}
                       >
-                        Cancelled
+                        {t("admin.appointmentDetail.cancelled")}
                       </div>
                     </div>
                   ) : null}
                   <div style={{ display: "grid", gap: 18 }}>
                     <InlineDetailGrid columns={3}>
-                      <DetailItem label="Meeting Id" value={selectedMeeting.requestId || selectedMeeting.id} />
-                      <DetailItem label="Updated At" value={updatedAtLabel} />
+                      <DetailItem label={t("admin.appointmentDetail.appointmentId")} value={selectedAppointment.requestId || selectedAppointment.id} />
+                      <DetailItem label={t("admin.appointmentDetail.updatedAt")} value={updatedAtLabel} />
                       <DetailItem
-                        label="Status"
+                        label={t("common.status")}
                         value={(
                           <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-start", gap: 8 }}>
-                            <WorkspaceBadge status={selectedMeeting.status} title={meetingStatusLabel}>
-                              {meetingStatusLabel}
+                            <WorkspaceBadge status={selectedAppointment.status} title={appointmentStatusLabel}>
+                              {appointmentStatusLabel}
                             </WorkspaceBadge>
                           </div>
                         )}
                       />
                     </InlineDetailGrid>
                     <InlineDetailGrid columns={3}>
-                      <DetailItem label="Created At" value={createdAtLabel} />
-                      <DetailItem label="Citizen Name" value={citizenName} />
-                      <DetailItem label="Citizen Phone Number" value={citizenPhone} />
+                      <DetailItem label={t("admin.appointmentDetail.createdAt")} value={createdAtLabel} />
+                      <DetailItem label={t("admin.grievanceDetail.citizenName")} value={citizenName} />
+                      <DetailItem label={t("admin.grievanceDetail.citizenPhone")} value={citizenPhone} />
                     </InlineDetailGrid>
                     <InlineDetailGrid columns={3}>
-                      <DetailItem label="District" value={citizenDistrict} />
-                      <DetailItem label="MP of District" value={citizenLocalMp} />
+                      <DetailItem label={t("admin.workQueue.colDistrict")} value={citizenDistrict} />
+                      <DetailItem label={t("admin.grievanceDetail.mpOfDistrict")} value={citizenLocalMp} />
                       <div />
                     </InlineDetailGrid>
                     <div>
-                      <p style={{ fontSize: 11, color: C.t3, fontWeight: 700, textTransform: "uppercase", letterSpacing: ".08em", marginBottom: 8 }}>Meeting Title</p>
+                      <p style={{ fontSize: 11, color: C.t3, fontWeight: 700, textTransform: "uppercase", letterSpacing: ".08em", marginBottom: 8 }}>{t("admin.appointmentDetail.appointmentTitle")}</p>
                       <p style={{ margin: 0, fontSize: 14, fontWeight: 400, color: C.t1, lineHeight: 1.6, whiteSpace: "normal", wordBreak: "break-word" }}>
-                        {selectedMeeting.title || selectedMeeting.purpose || "Untitled Meeting"}
+                        {selectedAppointment.title || selectedAppointment.purpose || t("admin.appointmentDetail.untitledAppointment")}
                       </p>
                     </div>
                     <InlineDetailGrid columns={3}>
-                      <DetailItem label="Preferred Date" value={preferredMeetingDateLabel} />
-                      <DetailItem label="Preferred Time" value={preferredMeetingTimeLabel} />
+                      <DetailItem label={t("admin.appointmentDetail.preferredDate")} value={preferredAppointmentDateLabel} />
+                      <DetailItem label={t("admin.appointmentDetail.preferredTime")} value={preferredAppointmentTimeLabel} />
                       <div />
                     </InlineDetailGrid>
                     <InlineDetailGrid columns={3}>
                       <DetailItem
-                        label="Scheduled At"
+                        label={t("admin.appointmentDetail.scheduledAt")}
                         value={(
-                          <WorkspaceBadge status={selectedMeeting.scheduled_at ? "scheduled" : "pending"} color={selectedMeeting.scheduled_at ? C.mint : undefined} title={scheduledAtLabel}>
+                          <WorkspaceBadge status={selectedAppointment.scheduled_at ? "scheduled" : "pending"} color={selectedAppointment.scheduled_at ? C.mint : undefined} title={scheduledAtLabel}>
                             {scheduledAtLabel}
                           </WorkspaceBadge>
                         )}
                       />
                       <DetailItem
-                        label="Scheduled Location"
+                        label={t("admin.appointmentDetail.scheduledLocation")}
                         value={(
-                          <WorkspaceBadge status={selectedMeeting.scheduled_location ? "scheduled" : "pending"} color={selectedMeeting.scheduled_location ? C.mint : undefined} title={scheduledLocationLabel}>
+                          <WorkspaceBadge status={selectedAppointment.scheduled_location ? "scheduled" : "pending"} color={selectedAppointment.scheduled_location ? C.mint : undefined} title={scheduledLocationLabel}>
                             {scheduledLocationLabel}
                           </WorkspaceBadge>
                         )}
                       />
                       <DetailItem
-                        label="VIP Meeting"
+                        label={t("admin.appointmentDetail.vipAppointment")}
                         value={(
-                          <WorkspaceBadge color={selectedMeeting.is_vip ? C.mint : C.danger} title={selectedMeeting.is_vip ? "Yes" : "No"}>
-                            {selectedMeeting.is_vip ? "Yes" : "No"}
+                          <WorkspaceBadge color={selectedAppointment.is_vip ? C.mint : C.danger} title={selectedAppointment.is_vip ? t("common.yes") : t("common.no")}>
+                            {selectedAppointment.is_vip ? t("common.yes") : t("common.no")}
                           </WorkspaceBadge>
                         )}
                       />
                     </InlineDetailGrid>
                     <div>
-                      <p style={{ fontSize: 11, color: C.t3, fontWeight: 700, textTransform: "uppercase", letterSpacing: ".08em", marginBottom: 8 }}>Purpose Of Meeting</p>
+                      <p style={{ fontSize: 11, color: C.t3, fontWeight: 700, textTransform: "uppercase", letterSpacing: ".08em", marginBottom: 8 }}>{t("admin.appointmentDetail.purposeOfAppointment")}</p>
                       <p style={{ margin: 0, fontSize: 14, fontWeight: 400, color: C.t1, lineHeight: 1.6, whiteSpace: "pre-wrap", wordBreak: "break-word" }}>
-                        {selectedMeeting.purpose || "Not provided"}
+                        {selectedAppointment.purpose || t("common.notProvided")}
                       </p>
                     </div>
-                    {meetingNoticeItems.length ? (
+                    {appointmentNoticeItems.length ? (
                       <div className="space-y-3">
-                        {meetingNoticeItems.map((item) => (
+                        {appointmentNoticeItems.map((item) => (
                           <NoticeBox key={`${item.label}-${item.value}`} tone={item.tone} label={item.label} value={item.value} />
                         ))}
                       </div>
@@ -1981,22 +2012,22 @@ export default function AdminMeeting() {
                 >
                   <div className="flex items-center gap-2 mb-6">
                     <FileText size={22} color={C.purple} />
-                    <h2 style={{ fontSize: 24, fontWeight: 700, color: C.t1 }}>Timeline</h2>
+                    <h2 style={{ fontSize: 24, fontWeight: 700, color: C.t1 }}>{t("admin.appointmentDetail.timeline")}</h2>
                   </div>
-                  <MeetingTimeline history={meetingTimeline} />
+                  <AppointmentTimeline history={appointmentTimeline} />
                 </WorkspaceCard>
               </div>
 
               <WorkspaceCard style={{ marginBottom: 0 }}>
                 <WorkspaceCardHeader
-                  title="Meeting Files"
-                  subtitle="View the files uploaded by the citizen."
+                  title={t("admin.appointmentDetail.appointmentFiles")}
+                  subtitle={t("admin.appointmentDetail.citizenFilesSubtitle")}
                 />
-                {citizenMeetingFiles.length === 0 ? (
-                  <div style={{ fontSize: 13, color: C.t3, padding: "2px 0" }}>No files attached to this meeting yet.</div>
+                {citizenAppointmentFiles.length === 0 ? (
+                  <div style={{ fontSize: 13, color: C.t3, padding: "2px 0" }}>{t("admin.appointmentDetail.noFilesAttached")}</div>
                 ) : (
                   <div style={{ display: "grid", gap: 10 }}>
-                    {citizenMeetingFiles.map((file) => (
+                    {citizenAppointmentFiles.map((file) => (
                       <div key={file.id} style={{ padding: 10, borderRadius: 12, border: `1px solid ${C.border}`, background: C.bgElevated }}>
                         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
                           <div>
@@ -2022,24 +2053,24 @@ export default function AdminMeeting() {
 
         {selectedAction === "accept" ? (
           <ModalShell
-            title="Accept Meeting"
-            subtitle="Confirm before accepting this meeting into your workflow."
+            title={t("admin.appointmentDetail.acceptTitle")}
+            subtitle={t("admin.appointmentDetail.acceptSubtitle")}
             onClose={closeActionModal}
           >
             <div style={{ display: "grid", gap: 16 }}>
-              <div style={{ fontSize: 13, color: C.t3 }}>This will move the meeting to the accepted state.</div>
+              <div style={{ fontSize: 13, color: C.t3 }}>{t("admin.appointmentDetail.acceptBody")}</div>
               <div style={{ display: "flex", justifyContent: "flex-end", gap: 12 }}>
                 <WorkspaceButton
                   type="button"
                   disabled={actionLoading}
                   onClick={() =>
                     runAction(
-                      () => apiClient.patch(`/meetings/${meetingId}/accept`, {}),
-                      { successMessage: "Meeting accepted successfully." }
+                      () => apiClient.patch(`/appointments/${appointmentId}/accept`, {}),
+                      { successMessage: t("admin.appointmentDetail.acceptSuccess") }
                     ).then((ok) => { if (ok) setSelectedAction(""); })
                   }
                 >
-                  Confirm Accept
+                  {t("admin.appointmentDetail.confirmAccept")}
                 </WorkspaceButton>
               </div>
             </div>
@@ -2048,28 +2079,28 @@ export default function AdminMeeting() {
 
         {selectedAction === "reject" ? (
           <ModalShell
-            title="Reject Meeting"
-            subtitle="Provide a reason for rejection before confirming."
+            title={t("admin.appointmentDetail.rejectTitle")}
+            subtitle={t("admin.appointmentDetail.rejectSubtitle")}
             onClose={closeActionModal}
           >
             <div style={{ display: "grid", gap: 16 }}>
               <div>
                 <div style={{ fontSize: 11, fontWeight: 700, color: C.t3, textTransform: "uppercase", letterSpacing: ".08em", marginBottom: 8 }}>
-                  Reason For Rejection
+                  {t("admin.appointmentDetail.reasonForRejection")}
                 </div>
-                <WorkspaceTextArea rows={6} value={rejectReason} onChange={(event) => setRejectReason(event.target.value)} placeholder="Enter the rejection reason" />
+                <WorkspaceTextArea rows={6} value={rejectReason} onChange={(event) => setRejectReason(event.target.value)} placeholder={t("admin.appointmentDetail.rejectionReasonPlaceholder")} />
               </div>
               <div style={{ display: "flex", justifyContent: "flex-end", gap: 12 }}>
                 <PurpleOutlineButton
                   disabled={actionLoading || rejectReason.trim().length < 5}
                   onClick={() =>
                     runAction(
-                      () => apiClient.patch(`/meetings/${meetingId}/reject`, { reason: rejectReason }),
-                      { successMessage: "Meeting rejected successfully." }
+                      () => apiClient.patch(`/appointments/${appointmentId}/reject`, { reason: rejectReason }),
+                      { successMessage: t("admin.appointmentDetail.rejectSuccess") }
                     ).then((ok) => { if (ok) setSelectedAction(""); })
                   }
                 >
-                  Confirm
+                  {t("admin.appointmentDetail.confirm")}
                 </PurpleOutlineButton>
               </div>
             </div>
@@ -2078,42 +2109,27 @@ export default function AdminMeeting() {
 
         {selectedAction === "sendVerification" && canSendVerification ? (
           <ModalShell
-            title="Send For DEO Verification"
-            subtitle="Assign a verified DEO to review the accepted meeting."
+            title={t("admin.appointmentDetail.sendVerificationTitle")}
+            subtitle={t("admin.appointmentDetail.sendVerificationSubtitle")}
             onClose={closeActionModal}
           >
             <div style={{ display: "grid", gap: 16 }}>
-              <div>
-                <div style={{ fontSize: 11, fontWeight: 700, color: C.t3, textTransform: "uppercase", letterSpacing: ".08em", marginBottom: 8 }}>
-                  Assign To DEO
-                </div>
-                <WorkspaceSelect
-                  value={verificationForm.deoId}
-                  disabled={verificationPending || verificationDone}
-                  onChange={(event) => setVerificationForm({ deoId: event.target.value })}
-                >
-                  <option value="">Select DEO</option>
-                  {workflowDirectory.deos.map((deo) => (
-                    <option key={deo.id} value={deo.id}>
-                      {[deo.first_name, deo.last_name].filter(Boolean).join(" ")}{deo.designation ? ` · ${deo.designation}` : ""}
-                    </option>
-                  ))}
-                </WorkspaceSelect>
-                {verificationPending ? <div style={{ marginTop: 8, fontSize: 13, fontWeight: 700, color: C.danger }}>Sent for DEO verification</div> : null}
-                {verificationDone ? <div style={{ marginTop: 8, fontSize: 13, fontWeight: 700, color: C.mint }}>Verified by DEO</div> : null}
+              <div style={{ fontSize: 14, color: C.t2, lineHeight: 1.6 }}>
+                {t("admin.appointmentDetail.sendVerificationBody")}
               </div>
               <div style={{ display: "flex", justifyContent: "flex-end", gap: 12 }}>
                 <PurpleOutlineButton
-                  disabled={actionLoading || !verificationForm.deoId || verificationPending || verificationDone}
+                  disabled={actionLoading}
                   style={{ minHeight: 30, padding: "0 10px" }}
-                  onClick={() =>
+                  onClick={() => {
+                    const deoId = workflowDirectory.deos[0]?.id;
                     runAction(
-                      () => apiClient.patch(`/meetings/${meetingId}/assign-verification`, { deoId: verificationForm.deoId }),
-                      { successMessage: "Meeting sent for verification successfully." }
-                    ).then((ok) => { if (ok) setSelectedAction(""); })
-                  }
+                      () => apiClient.patch(`/appointments/${appointmentId}/assign-verification`, { deoId }),
+                      { successMessage: t("admin.appointmentDetail.sendVerificationSuccess") }
+                    ).then((ok) => { if (ok) setSelectedAction(""); });
+                  }}
                 >
-                  Send For Verification
+                  {t("admin.appointmentDetail.send")}
                 </PurpleOutlineButton>
               </div>
             </div>
@@ -2122,53 +2138,13 @@ export default function AdminMeeting() {
 
         {(selectedAction === "schedule" || selectedAction === "reschedule") && canSchedule ? (
           <ModalShell
-            title={selectedAction === "reschedule" ? "Reschedule Meeting" : "Schedule Meeting"}
-            subtitle="Choose the minister, time window, and meeting location before confirming."
+            title={selectedAction === "reschedule" ? t("admin.appointmentDetail.rescheduleTitle") : t("admin.appointmentDetail.scheduleTitle")}
+            subtitle={t("admin.appointmentDetail.scheduleSubtitle")}
             onClose={closeActionModal}
           >
             <div style={{ display: "grid", gap: 16 }}>
-              <label className="flex items-center gap-2" style={{ fontSize: 12, color: C.t2 }}>
-                <input
-                  type="checkbox"
-                  checked={scheduleForm.isVip}
-                  style={{
-                    position: "absolute",
-                    opacity: 0,
-                    pointerEvents: "none",
-                    width: 0,
-                    height: 0,
-                    margin: 0,
-                  }}
-                  onChange={(event) => setScheduleForm((current) => ({ ...current, isVip: event.target.checked }))}
-                />
-                <span
-                  aria-hidden="true"
-                  style={{
-                    width: 15,
-                    height: 15,
-                    display: "inline-block",
-                    borderRadius: 1,
-                    border: scheduleForm.isVip ? "none" : `1px solid ${C.border}`,
-                    background: scheduleForm.isVip
-                      ? `#dc2626 url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12'%3E%3Cpath d='M2.2 6.2 4.8 8.8 9.8 3.8' fill='none' stroke='white' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") center/10px 10px no-repeat`
-                      : C.inp,
-                    flexShrink: 0,
-                  }}
-                />
-                Mark as VIP meeting
-              </label>
-              <div className="grid gap-3 md:grid-cols-2">
-                <WorkspaceSelect
-                  value={scheduleForm.ministerId}
-                  onChange={(event) => setScheduleForm((current) => ({ ...current, ministerId: event.target.value }))}
-                >
-                  <option value="">Select Minister</option>
-                  {workflowDirectory.ministers.map((minister) => (
-                    <option key={minister.id} value={minister.id}>
-                      {[minister.first_name, minister.last_name].filter(Boolean).join(" ")}
-                    </option>
-                  ))}
-                </WorkspaceSelect>
+              <div style={{ display: "grid", gap: 8 }}>
+                <div style={{ fontSize: 11, fontWeight: 700, color: C.t3, textTransform: "uppercase", letterSpacing: ".08em" }}>{t("admin.appointmentDetail.locationLabel")}</div>
                 <WorkspaceSelect
                   value={scheduleForm.locationOption}
                   onChange={(event) =>
@@ -2179,24 +2155,22 @@ export default function AdminMeeting() {
                     }))
                   }
                 >
-                  <option value="">Select Location</option>
+                  <option value="">{t("admin.appointmentDetail.selectLocation")}</option>
                   {SCHEDULE_LOCATION_OPTIONS.map((location) => (
-                    <option key={location} value={location}>
-                      {location}
-                    </option>
+                    <option key={location} value={location}>{location}</option>
                   ))}
                 </WorkspaceSelect>
+                {scheduleForm.locationOption === "Others" ? (
+                  <WorkspaceInput
+                    value={scheduleForm.otherLocation}
+                    onChange={(event) => setScheduleForm((current) => ({ ...current, otherLocation: event.target.value }))}
+                    placeholder={t("admin.appointmentDetail.enterLocation")}
+                  />
+                ) : null}
               </div>
-              {scheduleForm.locationOption === "Others" ? (
-                <WorkspaceInput
-                  value={scheduleForm.otherLocation}
-                  onChange={(event) => setScheduleForm((current) => ({ ...current, otherLocation: event.target.value }))}
-                  placeholder="Enter location"
-                />
-              ) : null}
-              <div className="grid gap-3 md:grid-cols-2">
+              <div style={{ display: "grid", gap: 16, gridTemplateColumns: "1fr 1fr" }}>
                 <div style={{ display: "grid", gap: 8 }}>
-                  <div style={{ fontSize: 11, fontWeight: 700, color: C.t3, textTransform: "uppercase", letterSpacing: ".08em" }}>Start Date</div>
+                  <div style={{ fontSize: 11, fontWeight: 700, color: C.t3, textTransform: "uppercase", letterSpacing: ".08em" }}>{t("admin.appointmentDetail.dateLabel")}</div>
                   <ScheduleDatePicker
                     value={scheduleForm.startDate}
                     onChange={(nextDate) => {
@@ -2204,11 +2178,11 @@ export default function AdminMeeting() {
                       setScheduleForm((current) => ({ ...current, startDate: nextDate }));
                     }}
                     min={formatDateValue(new Date())}
-                    placeholder="Select start date"
+                    placeholder={t("admin.appointmentDetail.selectDate")}
                   />
                 </div>
                 <div style={{ display: "grid", gap: 8 }}>
-                  <div style={{ fontSize: 11, fontWeight: 700, color: C.t3, textTransform: "uppercase", letterSpacing: ".08em" }}>Start Time</div>
+                  <div style={{ fontSize: 11, fontWeight: 700, color: C.t3, textTransform: "uppercase", letterSpacing: ".08em" }}>{t("admin.appointmentDetail.timeLabel")}</div>
                   <ScheduleTimePicker
                     value={scheduleForm.startTime}
                     onChange={(nextTime) => {
@@ -2219,106 +2193,50 @@ export default function AdminMeeting() {
                   />
                 </div>
               </div>
-              <div>
-                <div style={{ display: "grid", gap: 8 }}>
-                  <div style={{ fontSize: 11, fontWeight: 700, color: C.t3, textTransform: "uppercase", letterSpacing: ".08em" }}>Comments</div>
-                  <WorkspaceTextArea rows={6} value={scheduleForm.comments} onChange={(event) => setScheduleForm((current) => ({ ...current, comments: event.target.value }))} placeholder="Comments" />
-                </div>
-                <ErrorText>{scheduleError}</ErrorText>
-              </div>
+              <ErrorText>{scheduleError}</ErrorText>
               <div style={{ display: "flex", justifyContent: "flex-end", gap: 12 }}>
                 <PurpleOutlineButton
-                  disabled={actionLoading || !scheduleForm.ministerId || !scheduleForm.startDate || !scheduleForm.startTime || !getResolvedScheduleLocation()}
+                  disabled={actionLoading || !scheduleForm.startDate || !scheduleForm.startTime || !getResolvedScheduleLocation()}
                   onClick={() => {
                     setScheduleError("");
                     setActionError("");
-                    if (["verification_pending", "SENT_FOR_DEO_VERIFICATION"].includes(selectedMeeting.status)) {
-                      // Reuse the existing error surfaces instead of adding new UI.
-                      setActionError("You cannot schedule this meeting as it is sent for DEO verification.");
-                      setScheduleError("You cannot schedule this meeting as it is sent for DEO verification.");
+                    if (["verification_pending", "SENT_FOR_DEO_VERIFICATION"].includes(selectedAppointment.status)) {
+                      setScheduleError(t("admin.appointmentDetail.scheduleVerificationError"));
                       return;
                     }
                     runAction(
-                      () => apiClient.patch(`/meetings/${meetingId}/schedule`, {
-                        ministerId: scheduleForm.ministerId,
+                      () => apiClient.patch(`/appointments/${appointmentId}/schedule`, {
+                        ministerId: scheduleForm.ministerId || workflowDirectory.ministers[0]?.id,
                         startsAt: combineDateAndTime(scheduleForm.startDate, scheduleForm.startTime),
                         endsAt: addMinutesToDateTime(scheduleForm.startDate, scheduleForm.startTime, 30),
                         location: getResolvedScheduleLocation(),
                         isVip: scheduleForm.isVip,
                         comments: scheduleForm.comments,
                       }),
-                      { successMessage: "Meeting scheduled successfully." }
+                      { successMessage: t("admin.appointmentDetail.meetingScheduledSuccess") }
                     ).then((ok) => { if (ok) setSelectedAction(""); });
                   }}
                 >
-                  {selectedAction === "reschedule" ? "Update Schedule" : "Schedule Meeting"}
+                  {selectedAction === "reschedule" ? t("admin.appointmentDetail.updateSchedule") : t("admin.appointmentDetail.confirm")}
                 </PurpleOutlineButton>
               </div>
             </div>
           </ModalShell>
         ) : null}
 
-        {selectedAction === "complete" ? (
-          <ModalShell
-            title="Mark Meeting As Completed"
-            subtitle="Write completion comments before confirming."
-            onClose={closeActionModal}
-          >
-            <div style={{ display: "grid", gap: 16 }}>
-              <div>
-                <div style={{ fontSize: 11, fontWeight: 700, color: C.t3, textTransform: "uppercase", letterSpacing: ".08em", marginBottom: 8 }}>
-                  Comments
-                </div>
-                <WorkspaceTextArea rows={6} value={completeNote} onChange={(event) => setCompleteNote(event.target.value)} placeholder="Enter comments" />
-              </div>
-              <div style={{ display: "flex", justifyContent: "flex-end", gap: 12 }}>
-                <WorkspaceButton
-                  type="button"
-                  disabled={actionLoading || completeNote.trim().length < 3}
-                  onClick={() =>
-                    runAction(
-                      () => apiClient.patch(`/meetings/${meetingId}/complete`, { reason: completeNote.trim() }),
-                      { successMessage: "Meeting marked as completed." }
-                    ).then((ok) => { if (ok) setSelectedAction(""); })
-                  }
-                >
-                  Confirm Completion
-                </WorkspaceButton>
-              </div>
-            </div>
-          </ModalShell>
-        ) : null}
-
-        {showBlockedCompletionModal ? (
-          <ModalShell
-            title="Meeting Not Yet Completed"
-            onClose={() => setShowBlockedCompletionModal(false)}
-            maxWidth={500}
-            minHeight={260}
-          >
-            <div style={{ display: "grid", gap: 20 }}>
-              <p style={{ margin: 0, fontSize: 14, color: C.t2, lineHeight: 1.7 }}>
-                Meeting is yet not completed. You cannot mark it as completed.
-                <br />
-                You can cancel meeting if required.
-              </p>
-            </div>
-          </ModalShell>
-        ) : null}
-
         {selectedAction === "scheduledReject" ? (
           <ModalShell
-            title="Cancel Meeting"
-            subtitle="Write cancellation comments before confirming."
+            title={t("admin.appointmentDetail.cancelTitle")}
+            subtitle={t("admin.appointmentDetail.cancelSubtitle")}
             onClose={closeActionModal}
             maxWidth={520}
           >
             <div style={{ display: "grid", gap: 16 }}>
               <div>
                 <div style={{ fontSize: 11, fontWeight: 700, color: C.t3, textTransform: "uppercase", letterSpacing: ".08em", marginBottom: 8 }}>
-                  Comments
+                  {t("admin.appointmentDetail.commentsLabel")}
                 </div>
-                <WorkspaceTextArea rows={6} value={scheduledRejectNote} onChange={(event) => setScheduledRejectNote(event.target.value)} placeholder="Enter comments" />
+                <WorkspaceTextArea rows={6} value={scheduledRejectNote} onChange={(event) => setScheduledRejectNote(event.target.value)} placeholder={t("admin.appointmentDetail.enterComments")} />
               </div>
               <div style={{ display: "flex", justifyContent: "flex-end", gap: 12 }}>
                 <WorkspaceButton
@@ -2327,12 +2245,75 @@ export default function AdminMeeting() {
                   disabled={actionLoading || scheduledRejectNote.trim().length < 3}
                   onClick={() =>
                     runAction(
-                      () => apiClient.patch(`/meetings/${meetingId}/cancel`, { reason: scheduledRejectNote.trim() }),
-                      { successMessage: "Meeting cancelled successfully." }
+                      () => apiClient.patch(`/appointments/${appointmentId}/cancel`, { reason: scheduledRejectNote.trim() }),
+                      { successMessage: t("admin.appointmentDetail.cancelSuccess") }
                     ).then((ok) => { if (ok) setSelectedAction(""); })
                   }
                 >
-                  Confirm Cancel
+                  {t("admin.appointmentDetail.confirmCancel")}
+                </WorkspaceButton>
+              </div>
+            </div>
+          </ModalShell>
+        ) : null}
+
+        {selectedAction === "logs" ? (
+          <ModalShell
+            title={t("admin.appointmentDetail.logsTitle")}
+            subtitle={t("admin.appointmentDetail.logsSubtitle")}
+            onClose={closeActionModal}
+            maxWidth={520}
+          >
+            <div style={{ display: "grid", gap: 16 }}>
+              <div>
+                <div style={{ fontSize: 11, fontWeight: 700, color: C.t3, textTransform: "uppercase", letterSpacing: ".08em", marginBottom: 8 }}>
+                  {t("admin.appointmentDetail.meetingNotesLabel")}
+                </div>
+                <WorkspaceTextArea rows={6} value={meetingLogNote} onChange={(event) => setMeetingLogNote(event.target.value)} placeholder={t("admin.appointmentDetail.enterMeetingNotes")} />
+              </div>
+              <div style={{ display: "flex", justifyContent: "flex-end", gap: 12 }}>
+                <PurpleOutlineButton
+                  disabled={actionLoading}
+                  onClick={() =>
+                    runAction(
+                      () => apiClient.patch(`/appointments/${appointmentId}/log`, { notes: meetingLogNote.trim() }),
+                      { successMessage: t("admin.appointmentDetail.logsSuccess") }
+                    ).then((ok) => { if (ok) { setSelectedAction(""); setMeetingLogNote(""); } })
+                  }
+                >
+                  {t("admin.appointmentDetail.saveLogs")}
+                </PurpleOutlineButton>
+              </div>
+            </div>
+          </ModalShell>
+        ) : null}
+
+        {selectedAction === "resolve" ? (
+          <ModalShell
+            title={t("admin.appointmentDetail.resolveTitle")}
+            subtitle={t("admin.appointmentDetail.resolveSubtitle")}
+            onClose={closeActionModal}
+            maxWidth={520}
+          >
+            <div style={{ display: "grid", gap: 16 }}>
+              <div>
+                <div style={{ fontSize: 11, fontWeight: 700, color: C.t3, textTransform: "uppercase", letterSpacing: ".08em", marginBottom: 8 }}>
+                  {t("admin.appointmentDetail.resolutionNoteLabel")}
+                </div>
+                <WorkspaceTextArea rows={6} value={resolveNote} onChange={(event) => setResolveNote(event.target.value)} placeholder={t("admin.appointmentDetail.enterResolutionNote")} />
+              </div>
+              <div style={{ display: "flex", justifyContent: "flex-end", gap: 12 }}>
+                <WorkspaceButton
+                  type="button"
+                  disabled={actionLoading || resolveNote.trim().length < 3}
+                  onClick={() =>
+                    runAction(
+                      () => apiClient.patch(`/appointments/${appointmentId}/complete`, { reason: resolveNote.trim() }),
+                      { successMessage: t("admin.appointmentDetail.resolveSuccess") }
+                    ).then((ok) => { if (ok) { setSelectedAction(""); setResolveNote(""); } })
+                  }
+                >
+                  {t("admin.appointmentDetail.confirmResolve")}
                 </WorkspaceButton>
               </div>
             </div>
@@ -2356,7 +2337,7 @@ export default function AdminMeeting() {
       <div style={{ width: "100%", display: "flex", flexDirection: "column", flex: 1, minHeight: 0 }}>
         <div style={{ marginBottom: 18, display: "flex", alignItems: "center", gap: 14 }}>
           <RiTeamLine size={18} color={C.purple} />
-          <h1 style={{ margin: 0, fontSize: 20, lineHeight: 1.3, fontWeight: 600, color: C.t1 }}>MY MEETINGS</h1>
+          <h1 style={{ margin: 0, fontSize: 20, lineHeight: 1.3, fontWeight: 600, color: C.t1 }}>{t("admin.appointmentQueue.title")}</h1>
         </div>
 
         <div style={{ display: "flex", flexDirection: "column", flex: 1, minHeight: 0 }}>
@@ -2402,21 +2383,21 @@ export default function AdminMeeting() {
                     type="text"
                     value={query}
                     onChange={(event) => setQuery(event.target.value)}
-                    placeholder="Search by Meeting Id , Title and Citizen"
+                    placeholder={t("admin.appointmentQueue.searchPlaceholder")}
                     style={{ paddingLeft: 36, minHeight: 34, paddingTop: 0, paddingBottom: 0, fontSize: 11, lineHeight: "34px" }}
                   />
                 </div>
                 <CustomDateFilter
                   value={createdAtFilter}
                   onChange={setCreatedAtFilter}
-                  placeholder="Created at"
+                  placeholder={t("admin.appointmentQueue.createdAtPlaceholder")}
                   max={formatDateValue(new Date())}
                 />
                 <div className="relative">
                   <Filter className="absolute left-3 top-2.5" size={17} style={{ color: C.t3 }} />
                   <WorkspaceSelect value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)} style={{ paddingLeft: 36, minHeight: 34, paddingTop: 0, paddingBottom: 0, fontSize: 11, lineHeight: "34px" }}>
-                    <option value="all">All Status</option>
-                    {meetingStatusOptions.map((status) => (
+                    <option value="all">{t("admin.appointmentQueue.allStatus")}</option>
+                    {appointmentStatusOptions.map((status) => (
                       <option key={status} value={status}>{statusLabel(status)}</option>
                     ))}
                   </WorkspaceSelect>
@@ -2428,25 +2409,27 @@ export default function AdminMeeting() {
 
           <div style={{ display: "flex", flexDirection: "column" }}>
           {loading ? (
-            <WorkspaceEmptyState title="Loading meeting queue..." />
+            <WorkspaceEmptyState title={t("admin.appointmentQueue.loading")} />
           ) : error ? (
             <WorkspaceCard style={{ color: C.danger }}>{error}</WorkspaceCard>
-          ) : filteredMeetingQueue.length === 0 ? (
-            <WorkspaceEmptyState title="No assigned meetings found" subtitle="Meetings you assign to yourself from the Meeting Pool will appear here." />
+          ) : filteredAppointmentQueue.length === 0 ? (
+            <WorkspaceEmptyState title={t("admin.appointmentQueue.noAppointments")} subtitle={t("admin.appointmentQueue.noAppointmentsSubtitle")} />
           ) : (
             <div className="hidden lg:block" style={{ border: `1px solid ${C.border}`, borderRadius: 12, overflow: "hidden", display: "flex", flexDirection: "column", marginBottom: 10 }}>
                 <table className="w-full text-sm" style={{ borderCollapse: "collapse", tableLayout: "fixed" }}>
                   <colgroup>
                     <col style={{ width: 180, minWidth: 180, maxWidth: 180 }} />
-                    <col style={{ width: "46%" }} />
-                    <col style={{ width: "16%" }} />
+                    <col style={{ width: "34%" }} />
+                    <col style={{ width: "12%" }} />
+                    <col style={{ width: "10%" }} />
+                    <col style={{ width: "10%" }} />
                     <col style={{ width: 118, minWidth: 118, maxWidth: 118 }} />
                     <col style={{ width: 128, minWidth: 128, maxWidth: 128 }} />
                     <col style={{ width: 84, minWidth: 84, maxWidth: 84 }} />
                   </colgroup>
                   <thead>
                     <tr>
-                      {["Meeting Id", "Title", "Citizen", "Created At", "Status", "Action"].map((column, index, all) => (
+                      {[t("admin.appointmentQueue.colAppointmentId"), t("admin.appointmentQueue.colTitle"), t("admin.appointmentQueue.colCitizen"), t("admin.workQueue.colState"), t("admin.workQueue.colDistrict"), t("admin.appointmentQueue.colCreatedAt"), t("admin.appointmentQueue.colStatus"), t("admin.appointmentQueue.colAction")].map((column, index, all) => (
                         <th
                           key={column}
                           style={{
@@ -2459,7 +2442,7 @@ export default function AdminMeeting() {
                             textTransform: "uppercase",
                             letterSpacing: "0.06em",
                             whiteSpace: "nowrap",
-                            textAlign: column === "Status" || column === "Action" ? "center" : "left",
+                            textAlign: index === 6 || index === 7 ? "center" : "left",
                             background: tableHeaderBackground,
                             borderBottom: `1px solid ${C.border}`,
                             verticalAlign: "middle",
@@ -2475,27 +2458,37 @@ export default function AdminMeeting() {
                     </tr>
                   </thead>
                   <tbody>
-                    {paginatedMeetingQueue.map((meeting, index) => {
-                      const citizenLabel = [meeting.first_name, meeting.last_name].filter(Boolean).join(" ") || "Unknown Citizen";
-                      const meetingTitle = meeting.title || meeting.purpose || "Untitled Meeting";
-                      const createdAtLabel = formatDateOnly(meeting.createdAt || meeting.created_at);
-                      const meetingStatusLabel = statusLabel(meeting.status);
-                      const isActionHovered = hoveredActionId === meeting.id;
+                    {paginatedAppointmentQueue.map((appointment, index) => {
+                      const citizenLabel = [appointment.first_name, appointment.last_name].filter(Boolean).join(" ") || t("admin.appointmentQueue.unknownCitizen");
+                      const appointmentTitle = appointment.title || appointment.purpose || t("admin.appointmentDetail.untitledAppointment");
+                      const createdAtLabel = formatDateOnly(appointment.createdAt || appointment.created_at);
+                      const appointmentStatusLabel = statusLabel(appointment.status);
+                      const isActionHovered = hoveredActionId === appointment.id;
                       return (
-                        <tr key={meeting.id} style={{ background: index % 2 === 0 ? C.card : alternateRowBackground, borderBottom: `1px solid ${C.borderLight}`, verticalAlign: "middle" }}>
+                        <tr key={appointment.id} style={{ background: index % 2 === 0 ? C.card : alternateRowBackground, borderBottom: `1px solid ${C.borderLight}`, verticalAlign: "middle" }}>
                           <td style={{ padding: "10px 16px", fontSize: 13, fontWeight: 600, color: C.t2, verticalAlign: "middle" }}>
-                            <span title={meeting.requestId || meeting.id} style={{ display: "block", whiteSpace: "nowrap" }}>
-                              {meeting.requestId || meeting.id}
+                            <span title={appointment.requestId || appointment.id} style={{ display: "block", whiteSpace: "nowrap" }}>
+                              {appointment.requestId || appointment.id}
                             </span>
                           </td>
                           <td style={{ padding: "10px 16px", verticalAlign: "middle", maxWidth: 0 }}>
-                            <div title={meetingTitle} style={{ fontSize: 13, fontWeight: 600, color: C.t1, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-                              {meetingTitle}
+                            <div title={appointmentTitle} style={{ fontSize: 13, fontWeight: 600, color: C.t1, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                              {appointmentTitle}
                             </div>
                           </td>
                           <td style={{ padding: "10px 16px", fontSize: 13, color: C.t2, verticalAlign: "middle", maxWidth: 0 }}>
                             <span title={citizenLabel} style={{ display: "block", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                               {citizenLabel}
+                            </span>
+                          </td>
+                          <td style={{ padding: "10px 16px", fontSize: 13, color: C.t2, verticalAlign: "middle", maxWidth: 0 }}>
+                            <span title={appointment.citizenSnapshot?.state || "-"} style={{ display: "block", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                              {appointment.citizenSnapshot?.state || "-"}
+                            </span>
+                          </td>
+                          <td style={{ padding: "10px 16px", fontSize: 13, color: C.t2, verticalAlign: "middle", maxWidth: 0 }}>
+                            <span title={appointment.citizenSnapshot?.district || "-"} style={{ display: "block", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                              {appointment.citizenSnapshot?.district || "-"}
                             </span>
                           </td>
                           <td style={{ padding: "10px 16px", fontSize: 13, color: C.t2, verticalAlign: "middle", maxWidth: 0 }}>
@@ -2505,19 +2498,19 @@ export default function AdminMeeting() {
                           </td>
                           <td style={{ padding: "10px 16px 10px 8px", textAlign: "center", verticalAlign: "middle", maxWidth: 0 }}>
                             <div style={{ maxWidth: "100%", overflow: "hidden" }}>
-                              <WorkspaceBadge status={meeting.status} title={meetingStatusLabel} style={{ maxWidth: "100%" }}>
-                                {meetingStatusLabel}
+                              <WorkspaceBadge status={appointment.status} title={appointmentStatusLabel} style={{ maxWidth: "100%" }}>
+                                {appointmentStatusLabel}
                               </WorkspaceBadge>
                             </div>
                           </td>
                           <td style={{ width: "1%", padding: "10px 16px", textAlign: "center", verticalAlign: "middle", whiteSpace: "nowrap" }}>
                             <button
                               type="button"
-                              onMouseEnter={() => setHoveredActionId(meeting.id)}
+                              onMouseEnter={() => setHoveredActionId(appointment.id)}
                               onMouseLeave={() => setHoveredActionId(null)}
                               onClick={() => {
                                 setHoveredActionId(null);
-                                navigate(`${PATHS.admin.meetings}/${meeting.id}?source=meeting-queue`);
+                                navigate(`${PATHS.admin.appointments}/${appointment.id}?source=appointment-queue`);
                               }}
                               title="View details"
                               style={{
@@ -2546,7 +2539,7 @@ export default function AdminMeeting() {
                 <div className="flex flex-col md:flex-row md:items-center gap-2 py-1.5" style={{ width: "calc(100% - 24px)", margin: "0 auto" }}>
                   <div className="flex items-center gap-2 md:flex-1 md:basis-0">
                     <span className="portal-citizen-caption" style={{ color: C.t2, whiteSpace: "nowrap" }}>
-                      Show
+                      {t("admin.appointmentQueue.show")}
                     </span>
                     <input
                       type="number"
@@ -2577,12 +2570,12 @@ export default function AdminMeeting() {
                       }}
                     />
                     <span className="portal-citizen-caption" style={{ color: C.t2, whiteSpace: "nowrap" }}>
-                      Entries
+                      {t("admin.appointmentQueue.entries")}
                     </span>
                   </div>
                   <p className="portal-citizen-caption md:order-2" style={{ color: C.t2, margin: 0, whiteSpace: "nowrap", textAlign: "right", flex: 1, flexBasis: 0 }}>
-                    Showing <span style={{ fontWeight: 600 }}>{Math.min((currentPage - 1) * itemsPerPage + 1, filteredMeetingQueue.length)}</span>-<span style={{ fontWeight: 600 }}>{Math.min(currentPage * itemsPerPage, filteredMeetingQueue.length)}</span> of{" "}
-                    <span style={{ fontWeight: 600 }}>{filteredMeetingQueue.length}</span> requests
+                    Showing <span style={{ fontWeight: 600 }}>{Math.min((currentPage - 1) * itemsPerPage + 1, filteredAppointmentQueue.length)}</span>-<span style={{ fontWeight: 600 }}>{Math.min(currentPage * itemsPerPage, filteredAppointmentQueue.length)}</span> of{" "}
+                    <span style={{ fontWeight: 600 }}>{filteredAppointmentQueue.length}</span> {t("admin.appointmentQueue.requests")}
                   </p>
 
                   <div className="flex items-center gap-2 flex-wrap md:flex-1 md:basis-0 md:justify-center md:order-1">

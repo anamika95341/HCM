@@ -6,15 +6,15 @@ const logger = require('../../utils/logger');
 // is not blocked by SMTP/SMS latency (up to 10s per SMTP send).
 const { enqueue, JOBS, buildJobId } = require('../../queues/index');
 const {
-  publishMeetingStatusUpdate,
-  publishComplaintStatusUpdate,
+  publishAppointmentStatusUpdate,
+  publishGrievanceStatusUpdate,
   publishNotificationCreated,
 } = require('../../realtime/wsPublisher');
 
 const ROLE_DEFAULTS = {
   citizen: {
     channels: { app: true, email: true, sms: false },
-    triggers: { meetingStatus: true, complaintStatus: true },
+    triggers: { appointmentStatus: true, grievanceStatus: true },
     digestFrequency: 'realtime',
     deadlineDays: 3,
   },
@@ -32,7 +32,7 @@ const ROLE_DEFAULTS = {
   },
   minister: {
     channels: { app: true, email: true, sms: false },
-    triggers: { newMeeting: true, meetingChange: true, deadline: true, escalation: true, approval: true },
+    triggers: { newAppointment: true, appointmentChange: true, deadline: true, escalation: true, approval: true },
     digestFrequency: 'realtime',
     deadlineDays: 3,
   },
@@ -254,60 +254,60 @@ function toStatusLabel(status) {
     .join(' ');
 }
 
-async function notifyCitizenMeetingStatusUpdate({ citizenId, meetingId, status, note }) {
+async function notifyCitizenAppointmentStatusUpdate({ citizenId, appointmentId, status, note }) {
   try {
-    await publishMeetingStatusUpdate({ citizenId, meetingId, status, note });
+    await publishAppointmentStatusUpdate({ citizenId, appointmentId, status, note });
 
     const statusLabel = toStatusLabel(status);
     const summary = note
-      ? `Your meeting request is now ${statusLabel}. ${note}`
-      : `Your meeting request is now ${statusLabel}.`;
+      ? `Your appointment request is now ${statusLabel}. ${note}`
+      : `Your appointment request is now ${statusLabel}.`;
 
     await createNotification({
       recipientRole: 'citizen',
       recipientId: citizenId,
-      eventType: 'meeting.status.updated',
-      triggerKey: 'meetingStatus',
-      entityType: 'meeting',
-      entityId: meetingId,
-      title: `Meeting ${statusLabel}`,
+      eventType: 'appointment.status.updated',
+      triggerKey: 'appointmentStatus',
+      entityType: 'appointment',
+      entityId: appointmentId,
+      title: `Appointment ${statusLabel}`,
       body: summary,
-      metadata: { status, note: note || null, meetingId },
+      metadata: { status, note: note || null, appointmentId },
     });
   } catch (error) {
-    logger.error('Meeting notification dispatch failed', {
+    logger.error('Appointment notification dispatch failed', {
       citizenId,
-      meetingId,
+      appointmentId,
       status,
       error,
     });
   }
 }
 
-async function notifyCitizenComplaintStatusUpdate({ citizenId, complaintId, status, note }) {
+async function notifyCitizenGrievanceStatusUpdate({ citizenId, grievanceId, status, note }) {
   try {
-    await publishComplaintStatusUpdate({ citizenId, complaintId, status, note });
+    await publishGrievanceStatusUpdate({ citizenId, grievanceId, status, note });
 
     const statusLabel = toStatusLabel(status);
     const summary = note
-      ? `Your complaint is now ${statusLabel}. ${note}`
-      : `Your complaint is now ${statusLabel}.`;
+      ? `Your grievance is now ${statusLabel}. ${note}`
+      : `Your grievance is now ${statusLabel}.`;
 
     await createNotification({
       recipientRole: 'citizen',
       recipientId: citizenId,
-      eventType: 'complaint.status.updated',
-      triggerKey: 'complaintStatus',
-      entityType: 'complaint',
-      entityId: complaintId,
-      title: `Complaint ${statusLabel}`,
+      eventType: 'grievance.status.updated',
+      triggerKey: 'grievanceStatus',
+      entityType: 'grievance',
+      entityId: grievanceId,
+      title: `Grievance ${statusLabel}`,
       body: summary,
-      metadata: { status, note: note || null, complaintId },
+      metadata: { status, note: note || null, grievanceId },
     });
   } catch (error) {
-    logger.error('Complaint notification dispatch failed', {
+    logger.error('Grievance notification dispatch failed', {
       citizenId,
-      complaintId,
+      grievanceId,
       status,
       error,
     });
@@ -436,49 +436,49 @@ async function notifyMasterAdminSecurityAlert({ affectedRole, affectedUserId, se
   });
 }
 
-async function notifyDeoVerificationAssigned({ deoId, meetingId, adminId, meetingTitle }) {
+async function notifyDeoVerificationAssigned({ deoId, appointmentId, adminId, appointmentTitle }) {
   return notifyRecipients('deo', [deoId], async () => ({
-    eventType: 'meeting.verification.assigned',
+    eventType: 'appointment.verification.assigned',
     triggerKey: 'newTask',
-    entityType: 'meeting',
-    entityId: meetingId,
+    entityType: 'appointment',
+    entityId: appointmentId,
     title: 'New Verification Task Assigned',
-    body: `Meeting ${meetingTitle || meetingId} has been assigned to you for verification.`,
+    body: `Appointment ${appointmentTitle || appointmentId} has been assigned to you for verification.`,
     metadata: {
-      meetingId,
+      appointmentId,
       assignedByAdminId: adminId,
       deoId,
     },
   }));
 }
 
-async function notifyAdminMeetingVerified({ adminId, meetingId, deoId, meetingTitle }) {
+async function notifyAdminAppointmentVerified({ adminId, appointmentId, deoId, appointmentTitle }) {
   return notifyAdmin(adminId, {
-    eventType: 'meeting.verified.by_deo',
+    eventType: 'appointment.verified.by_deo',
     triggerKey: 'approval',
-    entityType: 'meeting',
-    entityId: meetingId,
-    title: 'Meeting Verified by DEO',
-    body: `Meeting ${meetingTitle || meetingId} has been verified by the assigned DEO and is ready for scheduling.`,
+    entityType: 'appointment',
+    entityId: appointmentId,
+    title: 'Appointment Verified by DEO',
+    body: `Appointment ${appointmentTitle || appointmentId} has been verified by the assigned DEO and is ready for scheduling.`,
     metadata: {
-      meetingId,
+      appointmentId,
       deoId,
       adminId,
     },
   });
 }
 
-async function notifyAdminPoolMeetingSubmitted({ meetingId, meetingTitle, citizenId, assignedAdminId = null }) {
+async function notifyAdminPoolAppointmentSubmitted({ appointmentId, appointmentTitle, citizenId, assignedAdminId = null }) {
   if (assignedAdminId) {
     return notifyAdmin(assignedAdminId, {
-      eventType: 'meeting.submitted',
+      eventType: 'appointment.submitted',
       triggerKey: 'newTask',
-      entityType: 'meeting',
-      entityId: meetingId,
-      title: 'New Meeting Request Submitted',
-      body: `Meeting ${meetingTitle || meetingId} has been submitted and routed to your desk.`,
+      entityType: 'appointment',
+      entityId: appointmentId,
+      title: 'New Appointment Request Submitted',
+      body: `Appointment ${appointmentTitle || appointmentId} has been submitted and routed to your desk.`,
       metadata: {
-        meetingId,
+        appointmentId,
         citizenId,
         assignedAdminId,
       },
@@ -487,97 +487,57 @@ async function notifyAdminPoolMeetingSubmitted({ meetingId, meetingTitle, citize
 
   return notifyActiveAdmins({
     buildNotification: async () => ({
-      eventType: 'meeting.submitted',
+      eventType: 'appointment.submitted',
       triggerKey: 'newTask',
-      entityType: 'meeting',
-      entityId: meetingId,
-      title: 'New Meeting Request in Meeting Pool',
-      body: `Meeting ${meetingTitle || meetingId} has been submitted by a citizen and is now available in the meeting pool.`,
+      entityType: 'appointment',
+      entityId: appointmentId,
+      title: 'New Appointment Request in Appointment Pool',
+      body: `Appointment ${appointmentTitle || appointmentId} has been submitted by a citizen and is now available in the appointment pool.`,
       metadata: {
-        meetingId,
+        appointmentId,
         citizenId,
       },
     }),
   });
 }
 
-async function notifyAdminPoolComplaintSubmitted({ complaintId, complaintTitle, citizenId }) {
+async function notifyAdminPoolGrievanceSubmitted({ grievanceId, grievanceTitle, citizenId }) {
   return notifyActiveAdmins({
     buildNotification: async () => ({
-      eventType: 'complaint.submitted',
+      eventType: 'grievance.submitted',
       triggerKey: 'newTask',
-      entityType: 'complaint',
-      entityId: complaintId,
-      title: 'New Complaint in Complaint Pool',
-      body: `Complaint ${complaintTitle || complaintId} has been submitted by a citizen and is now available in the complaint pool.`,
+      entityType: 'grievance',
+      entityId: grievanceId,
+      title: 'New Grievance in Grievance Pool',
+      body: `Grievance ${grievanceTitle || grievanceId} has been submitted by a citizen and is now available in the grievance pool.`,
       metadata: {
-        complaintId,
+        grievanceId,
         citizenId,
       },
     }),
   });
 }
 
-async function notifyAdminComplaintEscalatedToPool({ complaintId, complaintTitle, actorAdminId, note }) {
-  return notifyActiveAdmins({
-    excludeAdminId: actorAdminId,
-    buildNotification: async () => ({
-      eventType: 'complaint.escalated.to_pool',
-      triggerKey: 'escalation',
-      entityType: 'complaint',
-      entityId: complaintId,
-      title: 'Complaint Escalated to Pool',
-      body: note
-        ? `Complaint ${complaintTitle || complaintId} was escalated back to the complaint pool. ${note}`
-        : `Complaint ${complaintTitle || complaintId} was escalated back to the complaint pool.`,
-      metadata: {
-        complaintId,
-        actorAdminId,
-        note: note || null,
-      },
-    }),
-  });
-}
-
-async function notifyAdminComplaintReassigned({ complaintId, complaintTitle, actorAdminId, targetAdminId, reason }) {
-  return notifyAdmin(targetAdminId, {
-    eventType: 'complaint.reassigned',
-    triggerKey: 'newTask',
-    entityType: 'complaint',
-    entityId: complaintId,
-    title: 'Complaint Reassigned to You',
-    body: reason
-      ? `Complaint ${complaintTitle || complaintId} was reassigned to your queue. ${reason}`
-      : `Complaint ${complaintTitle || complaintId} was reassigned to your queue.`,
-    metadata: {
-      complaintId,
-      actorAdminId,
-      targetAdminId,
-      reason: reason || null,
-    },
-  });
-}
-
-async function notifyMinisterMeetingScheduled({
+async function notifyMinisterAppointmentScheduled({
   ministerId,
-  meetingId,
-  meetingTitle,
+  appointmentId,
+  appointmentTitle,
   scheduledAt,
   location,
   adminId,
   isRescheduled = false,
   source = 'admin_schedule',
-  entityType = 'meeting',
+  entityType = 'appointment',
 }) {
   return notifyRecipients('minister', [ministerId], async () => ({
-    eventType: isRescheduled ? 'meeting.rescheduled' : 'meeting.scheduled',
-    triggerKey: 'newMeeting',
+    eventType: isRescheduled ? 'appointment.rescheduled' : 'appointment.scheduled',
+    triggerKey: 'newAppointment',
     entityType,
-    entityId: meetingId,
-    title: isRescheduled ? 'Meeting Rescheduled on Your Calendar' : 'New Meeting Scheduled on Your Calendar',
-    body: `${meetingTitle || meetingId} is ${isRescheduled ? 'rescheduled' : 'scheduled'} for ${scheduledAt}${location ? ` at ${location}` : ''}.`,
+    entityId: appointmentId,
+    title: isRescheduled ? 'Appointment Rescheduled on Your Calendar' : 'New Appointment Scheduled on Your Calendar',
+    body: `${appointmentTitle || appointmentId} is ${isRescheduled ? 'rescheduled' : 'scheduled'} for ${scheduledAt}${location ? ` at ${location}` : ''}.`,
     metadata: {
-      meetingId,
+      appointmentId,
       ministerId,
       adminId: adminId || null,
       scheduledAt,
@@ -587,18 +547,18 @@ async function notifyMinisterMeetingScheduled({
   }));
 }
 
-async function notifyMinisterMeetingChanged({ ministerId, meetingId, meetingTitle, changeType, location, scheduledAt, actorRole }) {
+async function notifyMinisterAppointmentChanged({ ministerId, appointmentId, appointmentTitle, changeType, location, scheduledAt, actorRole }) {
   return notifyRecipients('minister', [ministerId], async () => ({
-    eventType: `meeting.${changeType}`,
-    triggerKey: 'meetingChange',
-    entityType: 'meeting',
-    entityId: meetingId,
-    title: changeType === 'cancelled' ? 'Meeting Cancelled' : 'Meeting Updated',
+    eventType: `appointment.${changeType}`,
+    triggerKey: 'appointmentChange',
+    entityType: 'appointment',
+    entityId: appointmentId,
+    title: changeType === 'cancelled' ? 'Appointment Cancelled' : 'Appointment Updated',
     body: changeType === 'cancelled'
-      ? `${meetingTitle || meetingId} has been cancelled.`
-      : `${meetingTitle || meetingId} has been updated${scheduledAt ? ` for ${scheduledAt}` : ''}${location ? ` at ${location}` : ''}.`,
+      ? `${appointmentTitle || appointmentId} has been cancelled.`
+      : `${appointmentTitle || appointmentId} has been updated${scheduledAt ? ` for ${scheduledAt}` : ''}${location ? ` at ${location}` : ''}.`,
     metadata: {
-      meetingId,
+      appointmentId,
       ministerId,
       changeType,
       location: location || null,
@@ -608,13 +568,13 @@ async function notifyMinisterMeetingChanged({ ministerId, meetingId, meetingTitl
   }));
 }
 
-async function notifyAdminScheduledMeetingUpcoming({ adminId, entityType, entityId, title, scheduledAt }) {
+async function notifyAdminScheduledAppointmentUpcoming({ adminId, entityType, entityId, title, scheduledAt }) {
   return notifyAdmin(adminId, {
     eventType: `${entityType}.scheduled.upcoming`,
     triggerKey: 'deadline',
     entityType,
     entityId,
-    title: 'Upcoming Scheduled Meeting',
+    title: 'Upcoming Scheduled Appointment',
     body: `${title || entityId} is scheduled for ${scheduledAt}.`,
     metadata: {
       entityType,
@@ -625,13 +585,13 @@ async function notifyAdminScheduledMeetingUpcoming({ adminId, entityType, entity
   });
 }
 
-async function notifyAdminScheduledMeetingCompleted({ adminId, entityType, entityId, title, completedByRole }) {
+async function notifyAdminScheduledAppointmentCompleted({ adminId, entityType, entityId, title, completedByRole }) {
   return notifyAdmin(adminId, {
     eventType: `${entityType}.scheduled.completed`,
     triggerKey: 'moved',
     entityType,
     entityId,
-    title: 'Scheduled Meeting Completed',
+    title: 'Scheduled Appointment Completed',
     body: `${title || entityId} has been completed${completedByRole ? ` by ${completedByRole}` : ''}.`,
     metadata: {
       entityType,
@@ -642,14 +602,42 @@ async function notifyAdminScheduledMeetingCompleted({ adminId, entityType, entit
   });
 }
 
+async function notifyDeoNewGrievance({ grievanceId, grievanceTitle, citizenId }) {
+  const deoIds = await notificationsRepository.listActiveDeos();
+  return notifyRecipients('deo', deoIds, async () => ({
+    eventType: 'grievance.submitted',
+    triggerKey: 'newTask',
+    entityType: 'grievance',
+    entityId: grievanceId,
+    title: 'New Grievance Requires Letterhead',
+    body: `Grievance ${grievanceTitle || grievanceId} has been submitted. Please generate the letterhead.`,
+    metadata: { grievanceId, citizenId },
+  }));
+}
+
+async function notifyCmAdminNewGrievance({ grievanceId, grievanceTitle, citizenId }) {
+  const adminRepository = require('../admin/admin.repository');
+  const cmAdmin = await adminRepository.findChiefMinisterAdmin();
+  if (!cmAdmin) return null;
+  return notifyAdmin(cmAdmin.id, {
+    eventType: 'grievance.submitted',
+    triggerKey: 'newTask',
+    entityType: 'grievance',
+    entityId: grievanceId,
+    title: 'New Grievance Submitted',
+    body: `Grievance ${grievanceTitle || grievanceId} has been submitted by a citizen.`,
+    metadata: { grievanceId, citizenId },
+  });
+}
+
 module.exports = {
   getNotificationPreferences,
   updateNotificationPreferences,
   listNotifications,
   markNotificationRead,
   markAllNotificationsRead,
-  notifyCitizenMeetingStatusUpdate,
-  notifyCitizenComplaintStatusUpdate,
+  notifyCitizenAppointmentStatusUpdate,
+  notifyCitizenGrievanceStatusUpdate,
   notifyAdmin,
   notifyActiveAdmins,
   notifyActiveMasterAdmins,
@@ -657,13 +645,13 @@ module.exports = {
   notifyMasterAdminAccountVerified,
   notifyMasterAdminSecurityAlert,
   notifyDeoVerificationAssigned,
-  notifyAdminMeetingVerified,
-  notifyAdminPoolMeetingSubmitted,
-  notifyAdminPoolComplaintSubmitted,
-  notifyAdminComplaintEscalatedToPool,
-  notifyAdminComplaintReassigned,
-  notifyMinisterMeetingScheduled,
-  notifyMinisterMeetingChanged,
-  notifyAdminScheduledMeetingUpcoming,
-  notifyAdminScheduledMeetingCompleted,
+  notifyAdminAppointmentVerified,
+  notifyAdminPoolAppointmentSubmitted,
+  notifyAdminPoolGrievanceSubmitted,
+  notifyMinisterAppointmentScheduled,
+  notifyMinisterAppointmentChanged,
+  notifyAdminScheduledAppointmentUpcoming,
+  notifyAdminScheduledAppointmentCompleted,
+  notifyDeoNewGrievance,
+  notifyCmAdminNewGrievance,
 };

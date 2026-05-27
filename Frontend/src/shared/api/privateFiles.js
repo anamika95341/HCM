@@ -2,9 +2,15 @@ import { apiClient } from "./client.js";
 
 const ROLE_MAX_SIZES = Object.freeze({
   citizen: Object.freeze({
-    "application/pdf": 5 * 1024 * 1024,
-    "image/jpeg": 5 * 1024 * 1024,
-    "image/png": 5 * 1024 * 1024,
+    "application/pdf": 10 * 1024 * 1024,
+    "image/jpeg": 10 * 1024 * 1024,
+    "image/png": 10 * 1024 * 1024,
+    "image/webp": 10 * 1024 * 1024,
+    "application/msword": 10 * 1024 * 1024,
+    "application/vnd.openxmlformats-officedocument.wordprocessingml.document": 10 * 1024 * 1024,
+    "application/vnd.ms-excel": 10 * 1024 * 1024,
+    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": 10 * 1024 * 1024,
+    "text/plain": 10 * 1024 * 1024,
   }),
   deo: Object.freeze({
     "application/pdf": 5 * 1024 * 1024,
@@ -26,7 +32,7 @@ const MIME_TO_UI_TYPE = Object.freeze({
 });
 
 export const DEO_ACCEPT = ".pdf,image/jpeg,image/png,video/mp4,video/mpeg,video/webm";
-export const CITIZEN_ACCEPT = ".pdf,image/jpeg,image/png";
+export const CITIZEN_ACCEPT = ".pdf,.jpg,.jpeg,.png,.webp,.doc,.docx,.xls,.xlsx,.txt";
 
 export function getFileUiType(mimeType = "") {
   return MIME_TO_UI_TYPE[mimeType] || "document";
@@ -40,7 +46,7 @@ export function validatePrivateFile(file, role = "deo") {
   const maxSize = ROLE_MAX_SIZES[role]?.[file.type];
   if (!maxSize) {
     if (role === "citizen") {
-      throw new Error("Only PDF, JPG, and PNG files are allowed");
+      throw new Error("Allowed types: PDF, JPG, PNG, WEBP, DOC, DOCX, XLS, XLSX, TXT");
     }
     throw new Error("Only PDF, JPG, PNG, MP4, MPEG, and WEBM files are allowed");
   }

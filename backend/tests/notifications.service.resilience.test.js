@@ -33,8 +33,8 @@ jest.mock('../queues/index', () => ({
 }));
 
 jest.mock('../realtime/wsPublisher', () => ({
-  publishMeetingStatusUpdate: jest.fn(),
-  publishComplaintStatusUpdate: jest.fn(),
+  publishAppointmentStatusUpdate: jest.fn(),
+  publishGrievanceStatusUpdate: jest.fn(),
   publishNotificationCreated: jest.fn(),
 }));
 
@@ -51,9 +51,9 @@ describe('notifications service resilience', () => {
     notificationsRepository.getPreferences.mockResolvedValue(null);
     notificationsRepository.createNotification.mockResolvedValue({
       id: 'notification-1',
-      eventType: 'meeting.scheduled',
-      title: 'Meeting scheduled',
-      body: 'A meeting was scheduled.',
+      eventType: 'appointment.scheduled',
+      title: 'Appointment scheduled',
+      body: 'A appointment was scheduled.',
     });
     notificationsRepository.countUnreadNotifications.mockResolvedValue(3);
     authRepository.findUserById.mockResolvedValue({
@@ -63,11 +63,11 @@ describe('notifications service resilience', () => {
     });
   });
 
-  test('notifyMinisterMeetingScheduled succeeds when email delivery fails', async () => {
-    const result = await notificationsService.notifyMinisterMeetingScheduled({
+  test('notifyMinisterAppointmentScheduled succeeds when email delivery fails', async () => {
+    const result = await notificationsService.notifyMinisterAppointmentScheduled({
       ministerId: 'minister-1',
-      meetingId: 'meeting-1',
-      meetingTitle: 'Budget review',
+      appointmentId: 'appointment-1',
+      appointmentTitle: 'Budget review',
       scheduledAt: '2026-04-08T10:00:00.000Z',
       location: 'Secretariat',
       adminId: null,

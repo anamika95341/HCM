@@ -13,8 +13,8 @@ const adminRoutes = require('./modules/admin/admin.routes');
 const masteradminRoutes = require('./modules/masteradmin/masteradmin.routes');
 const ministerRoutes = require('./modules/minister/minister.routes');
 const deoRoutes = require('./modules/deo/deo.routes');
-const meetingRoutes = require('./modules/meetings/meetings.routes');
-const complaintRoutes = require('./modules/complaints/complaints.routes');
+const appointmentRoutes = require('./modules/appointments/appointments.routes');
+const grievanceRoutes = require('./modules/grievances/grievances.routes');
 const filesRoutes = require('./modules/files/files.routes');
 
 function createApp() {
@@ -75,8 +75,8 @@ function createApp() {
   app.use('/api/v1/masteradmin', masteradminRoutes);
   app.use('/api/v1/minister', ministerRoutes);
   app.use('/api/v1/deo', deoRoutes);
-  app.use('/api/v1/meetings', meetingRoutes);
-  app.use('/api/v1/complaints', complaintRoutes);
+  app.use('/api/v1/appointments', appointmentRoutes);
+  app.use('/api/v1/grievances', grievanceRoutes);
   app.use('/api/v1/files', filesRoutes);
 
   app.use((req, res, next) => {

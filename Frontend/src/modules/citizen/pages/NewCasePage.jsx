@@ -1,12 +1,13 @@
 import { useEffect, useRef, useState } from "react";
 import {
   FileText, CheckCircle, AlertCircle, Users, Upload, Phone,
-  ChevronRight, Calendar, MapPin, Briefcase, X, ArrowRight, Home, Clock,
+  ChevronRight, Calendar, MapPin, X, ArrowRight, Home, Clock,
   File, FileImage, FileSpreadsheet, FileJson, FileAudio,
   FileVideo, FileArchive, FileCode, FileCheck, FileX, FileBarChart,
   Database, Presentation
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import { FaFilePdf } from "react-icons/fa";
 import { sanitizeSelectedFiles as sanitizeUploadedFiles } from "../../../shared/security/files.js";
 import { apiClient } from "../../../shared/api/client.js";
@@ -24,6 +25,7 @@ const ACCEPTED_UPLOAD_TYPES = ".pdf,.png,.jpg,.jpeg,.webp,.xls,.xlsx,.doc,.docx,
 
 function SuccessModal({ open, title, message, onClose }) {
   const { C } = usePortalTheme();
+  const { t } = useTranslation();
   if (!open) return null;
   return (
     <div
@@ -50,7 +52,7 @@ function SuccessModal({ open, title, message, onClose }) {
         <div className="px-6 py-6">
           <p className="text-sm text-center leading-6" style={{ color: C.t3 }}>{message}</p>
           <WorkspaceButton onClick={onClose} style={{ width: "100%", marginTop: 24 }}>
-            Continue
+            {t("common.continue")}
           </WorkspaceButton>
         </div>
       </div>
@@ -85,7 +87,7 @@ function CustomDatePicker({ value, onChange, min, max, placeholder = "Select dat
     updateDirection();
 
     const handlePointerDown = (event) => {
-      const pickerRoot = event.target.closest?.('[data-meeting-date-picker="true"]');
+      const pickerRoot = event.target.closest?.('[data-appointment-date-picker="true"]');
       if (!pickerRoot) {
         setIsOpen(false);
         setViewMode("day");
@@ -116,6 +118,9 @@ function CustomDatePicker({ value, onChange, min, max, placeholder = "Select dat
   const days = buildCalendarDays(monthStart);
   const yearStart = Math.floor(visibleMonth.getFullYear() / 12) * 12;
 
+  const isPrevDisabled = minDate && new Date(visibleMonth.getFullYear(), visibleMonth.getMonth() - 1, 1) < new Date(minDate.getFullYear(), minDate.getMonth(), 1);
+  const isNextDisabled = maxDate && new Date(visibleMonth.getFullYear(), visibleMonth.getMonth() + 1, 1) > new Date(maxDate.getFullYear(), maxDate.getMonth(), 1);
+
   function isMonthDisabled(monthIndex) {
     const firstDay = new Date(visibleMonth.getFullYear(), monthIndex, 1);
     const lastDay = new Date(visibleMonth.getFullYear(), monthIndex + 1, 0);
@@ -133,7 +138,7 @@ function CustomDatePicker({ value, onChange, min, max, placeholder = "Select dat
   }
 
   return (
-    <div ref={rootRef} data-meeting-date-picker="true" style={{ position: "relative" }}>
+    <div ref={rootRef} data-appointment-date-picker="true" style={{ position: "relative" }}>
       <button
         type="button"
         onClick={() => setIsOpen((current) => !current)}
@@ -177,14 +182,16 @@ function CustomDatePicker({ value, onChange, min, max, placeholder = "Select dat
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10, gap: 8 }}>
             <button
               type="button"
+              disabled={isPrevDisabled}
               onClick={() => {
+                if (isPrevDisabled) return;
                 if (viewMode === "year") {
                   setVisibleMonth((current) => new Date(current.getFullYear() - 12, current.getMonth(), 1));
                 } else {
                   setVisibleMonth((current) => new Date(current.getFullYear(), current.getMonth() - 1, 1));
                 }
               }}
-              style={calendarNavButtonStyle(C)}
+              style={{ ...calendarNavButtonStyle(C), opacity: isPrevDisabled ? 0.3 : 1, cursor: isPrevDisabled ? "not-allowed" : "pointer" }}
             >
               <ChevronRight size={16} style={{ transform: "rotate(180deg)" }} />
             </button>
@@ -206,14 +213,16 @@ function CustomDatePicker({ value, onChange, min, max, placeholder = "Select dat
             </div>
             <button
               type="button"
+              disabled={isNextDisabled}
               onClick={() => {
+                if (isNextDisabled) return;
                 if (viewMode === "year") {
                   setVisibleMonth((current) => new Date(current.getFullYear() + 12, current.getMonth(), 1));
                 } else {
                   setVisibleMonth((current) => new Date(current.getFullYear(), current.getMonth() + 1, 1));
                 }
               }}
-              style={calendarNavButtonStyle(C)}
+              style={{ ...calendarNavButtonStyle(C), opacity: isNextDisabled ? 0.3 : 1, cursor: isNextDisabled ? "not-allowed" : "pointer" }}
             >
               <ChevronRight size={16} />
             </button>
@@ -357,7 +366,7 @@ function CustomTimePicker({ value, onChange, options }) {
     updateDirection();
 
     const handlePointerDown = (event) => {
-      const pickerRoot = event.target.closest?.('[data-meeting-time-picker="true"]');
+      const pickerRoot = event.target.closest?.('[data-appointment-time-picker="true"]');
       if (!pickerRoot) {
         setIsOpen(false);
       }
@@ -374,7 +383,7 @@ function CustomTimePicker({ value, onChange, options }) {
   }, [isOpen]);
 
   return (
-    <div ref={rootRef} data-meeting-time-picker="true" style={{ position: "relative" }}>
+    <div ref={rootRef} data-appointment-time-picker="true" style={{ position: "relative" }}>
       <button
         type="button"
         onClick={() => setIsOpen((current) => !current)}
@@ -515,20 +524,6 @@ const getFileIcon = (fileName) => {
   return { icon: <File size={20} className="text-gray-500" />, color: "gray" };
 };
 
-const getFileColorClass = (fileName) => {
-  const { color } = getFileIcon(fileName);
-  const colorMap = {
-    soft: 'bg-slate-50 border-slate-200 group-hover:border-slate-300',
-    red: 'bg-red-50 border-red-200 group-hover:border-red-400',
-    green: 'bg-green-50 border-green-200 group-hover:border-green-400',
-    orange: 'bg-orange-50 border-orange-200 group-hover:border-orange-400',
-    yellow: 'bg-yellow-50 border-yellow-200 group-hover:border-yellow-400',
-    purple: 'bg-purple-50 border-purple-200 group-hover:border-purple-400',
-    pink: 'bg-pink-50 border-pink-200 group-hover:border-pink-400',
-    gray: 'bg-gray-50 border-gray-200 group-hover:border-gray-400'
-  };
-  return colorMap[color] || colorMap.gray;
-};
 
 const formatFileSize = (bytes) => {
   if (bytes === 0) return '0 Bytes';
@@ -584,13 +579,15 @@ const formatDateValue = (date) => {
   return `${year}-${month}-${day}`;
 };
 
+const MONTH_NAMES_SHORT = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+
 const formatDisplayDate = (value) => {
   const parsedDate = parseDateValue(value);
   if (!parsedDate) return "";
   const day = String(parsedDate.getDate()).padStart(2, "0");
-  const month = String(parsedDate.getMonth() + 1).padStart(2, "0");
+  const mon = MONTH_NAMES_SHORT[parsedDate.getMonth()];
   const year = String(parsedDate.getFullYear()).slice(-2);
-  return `${day}/${month}/${year}`;
+  return `${day} ${mon},${year}`;
 };
 
 const buildCalendarDays = (monthStart) => {
@@ -636,17 +633,7 @@ const toIsoFromDateAndSlot = (dateString, timeSlot) => {
 
 export default function HCMNewCasePage() {
   const { C } = usePortalTheme();
-  const complaintCategories = [
-    "Tourism Infrastructure",
-    "Heritage & Monuments",
-    "Cultural Institutions & Activities",
-    "Tourism Services & Visitor Experience",
-    "Constituency Civic Issues",
-    "Government Schemes & Benefits",
-    "Employment & Skill Development",
-    "Public Grievances Against Departments",
-    "Suggestions / Public Feedback",
-  ];
+  const { t } = useTranslation();
 
   const timeSlots = [
     "12:00 AM", "12:30 AM", "01:00 AM", "01:30 AM", "02:00 AM", "02:30 AM",
@@ -667,10 +654,14 @@ export default function HCMNewCasePage() {
   const [isBackHovered, setIsBackHovered] = useState(false);
   const [isAddPersonHovered, setIsAddPersonHovered] = useState(false);
   const [hoveredRemoveIndex, setHoveredRemoveIndex] = useState(null);
+  const [appointmentFileError, setAppointmentFileError] = useState("");
+  const [grievanceFileError, setGrievanceFileError] = useState("");
   const navigate = useNavigate();
+  const appointmentFileInputRef = useRef(null);
+  const grievanceFileInputRef = useRef(null);
   const { session } = useAuth();
 
-  const [meetingForm, setMeetingForm] = useState({
+  const [appointmentForm, setAppointmentForm] = useState({
     title: "",
     purpose: "",
     referralAdminUserId: "",
@@ -680,11 +671,11 @@ export default function HCMNewCasePage() {
     companions: [{ name: "", phone: "" }],
   });
 
-  const [complaintForm, setComplaintForm] = useState({
+  const [grievanceForm, setGrievanceForm] = useState({
     title: "",
     details: "",
-    complaintLocation: "",
-    complaintType: "",
+    state: "",
+    district: "",
     incidentDate: "",
     files: [],
   });
@@ -758,50 +749,50 @@ export default function HCMNewCasePage() {
     }
   };
 
-  const submitMeeting = async (event) => {
+  const submitAppointment = async (event) => {
     event.preventDefault();
     setLoading(true);
     setError("");
 
     try {
-      const referralAdmin = admins.find((admin) => admin.id === meetingForm.referralAdminUserId);
-      const preferredTimeIso = toIsoFromDateAndSlot(meetingForm.preferredDate, meetingForm.preferredTime);
+      const referralAdmin = admins.find((admin) => admin.id === appointmentForm.referralAdminUserId);
+      const preferredTimeIso = toIsoFromDateAndSlot(appointmentForm.preferredDate, appointmentForm.preferredTime);
 
       const payload = new FormData();
-      payload.append("title", meetingForm.title);
-      payload.append("purpose", meetingForm.purpose);
+      payload.append("title", appointmentForm.title);
+      payload.append("purpose", appointmentForm.purpose);
       payload.append("preferredTime", preferredTimeIso);
       payload.append("adminReferral", referralAdmin ? `${referralAdmin.name} · ${referralAdmin.department}` : "");
-      payload.append("referralAdminUserId", meetingForm.referralAdminUserId || "");
+      payload.append("referralAdminUserId", appointmentForm.referralAdminUserId || "");
       payload.append(
         "additionalAttendees",
         JSON.stringify(
-          meetingForm.companions
+          appointmentForm.companions
             .filter((entry) => entry.name.trim() && entry.phone.trim())
             .map((entry) => ({ attendeeName: entry.name.trim(), attendeePhone: entry.phone.trim() }))
         )
       );
-      const { data } = await apiClient.post("/meetings/request", payload, {
+      const { data } = await apiClient.post("/appointments/request", payload, {
         headers: {
           "Content-Type": "multipart/form-data",
           "Idempotency-Key": crypto.randomUUID(),
         },
       });
 
-      if (meetingForm.files.length > 0 && data?.meeting?.id) {
+      if (appointmentForm.files.length > 0 && data?.appointment?.id) {
         try {
           await uploadSelectedFiles({
-            files: meetingForm.files,
-            contextType: "meeting",
-            contextId: data.meeting.id,
+            files: appointmentForm.files,
+            contextType: "appointment",
+            contextId: data.appointment.id,
           });
         } catch (uploadError) {
           setSuccessModal({
             open: true,
-            title: "Meeting Submitted",
-            message: "Your meeting request was submitted, but one or more documents could not be uploaded. Open the meeting details and verify the attached files.",
+            title: t("citizen.newCase.appointmentSubmitted"),
+            message: t("citizen.newCase.appointmentSubmittedPartial"),
           });
-          setMeetingForm({
+          setAppointmentForm({
             title: "",
             purpose: "",
             referralAdminUserId: "",
@@ -816,12 +807,12 @@ export default function HCMNewCasePage() {
 
       setSuccessModal({
         open: true,
-        title: "Meeting Submitted",
+        title: t("citizen.newCase.appointmentSubmitted"),
         message: referralAdmin
-          ? "Your meeting request has been submitted directly to the selected admin's meeting queue."
-          : "Your meeting request has been submitted to the admin meeting pool.",
+          ? t("citizen.newCase.appointmentSubmittedMsgDirect")
+          : t("citizen.newCase.appointmentSubmittedMsgPool"),
       });
-      setMeetingForm({
+      setAppointmentForm({
         title: "",
         purpose: "",
         referralAdminUserId: "",
@@ -831,78 +822,77 @@ export default function HCMNewCasePage() {
         companions: [{ name: "", phone: "" }],
       });
     } catch (submissionError) {
-      setError(submissionError?.response?.data?.error || "Unable to submit the meeting request");
+      setError(submissionError?.response?.data?.error || t("citizen.newCase.unableToSubmitAppointment"));
     } finally {
       setLoading(false);
     }
   };
 
-  const submitComplaint = async (event) => {
+  const submitGrievance = async (event) => {
     event.preventDefault();
     setLoading(true);
     setError("");
 
     try {
       const payload = new FormData();
-      payload.append("subject", complaintForm.title);
-      payload.append("description", complaintForm.details);
-      payload.append("complaintLocation", complaintForm.complaintLocation);
-      payload.append("complaintType", complaintForm.complaintType);
-      payload.append("incidentDate", complaintForm.incidentDate);
+      payload.append("subject", grievanceForm.title);
+      payload.append("description", grievanceForm.details);
+      payload.append("state", grievanceForm.state);
+      payload.append("district", grievanceForm.district);
+      payload.append("incidentDate", grievanceForm.incidentDate);
 
-      const { data } = await apiClient.post("/complaints", payload, {
+      const { data } = await apiClient.post("/grievances", payload, {
         headers: {
           "Content-Type": "multipart/form-data",
           "Idempotency-Key": crypto.randomUUID(),
         },
       });
 
-      if (complaintForm.files.length > 0 && data?.complaint?.id) {
+      let uploadFailed = false;
+      if (grievanceForm.files.length > 0 && data?.grievance?.id) {
         try {
           await uploadSelectedFiles({
-            files: complaintForm.files,
-            contextType: "complaint",
-            contextId: data.complaint.id,
+            files: grievanceForm.files,
+            contextType: "grievance",
+            contextId: data.grievance.id,
           });
-        } catch (uploadError) {
-          setSuccessModal({
-            open: true,
-            title: "Complaint Submitted",
-            message: "Your complaint was submitted, but one or more documents could not be uploaded. Open the complaint details and verify the attached files.",
-          });
-          setComplaintForm({
-            title: "",
-            details: "",
-            complaintLocation: "",
-            complaintType: "",
-            incidentDate: "",
-            files: [],
-          });
-          return;
+        } catch (_uploadError) {
+          uploadFailed = true;
         }
       }
 
       setSuccessModal({
         open: true,
-        title: "Complaint Submitted",
-        message: "Your complaint has been submitted successfully and routed into the admin workflow.",
+        title: t("citizen.newCase.grievanceSubmitted"),
+        message: uploadFailed
+          ? t("citizen.newCase.grievanceSubmittedPartial")
+          : t("citizen.newCase.grievanceSubmittedMsg"),
       });
-      setComplaintForm({
+      setGrievanceForm({
         title: "",
         details: "",
-        complaintLocation: "",
-        complaintType: "",
+        state: "",
+        district: "",
         incidentDate: "",
         files: [],
       });
     } catch (submissionError) {
-      setError(submissionError?.response?.data?.error || "Unable to submit the complaint");
+      setError(submissionError?.response?.data?.error || "Unable to submit the grievance");
     } finally {
       setLoading(false);
     }
   };
 
   const handleFileSelection = (formType, fileList) => {
+    const setFileError = formType === "appointment" ? setAppointmentFileError : setGrievanceFileError;
+    const currentFiles = formType === "appointment" ? appointmentForm.files : grievanceForm.files;
+    const remainingSlots = Math.max(0, 5 - currentFiles.length);
+
+    if (remainingSlots === 0) {
+      setFileError("You can upload a maximum of 5 files.");
+      return;
+    }
+
     const { acceptedFiles, rejectedFiles } = sanitizeUploadedFiles(fileList, FILE_UPLOAD_OPTIONS);
 
     if (rejectedFiles.length > 0) {
@@ -911,34 +901,42 @@ export default function HCMNewCasePage() {
       setError("");
     }
 
-    if (formType === "meeting") {
-      setMeetingForm((current) => ({
+    const filesToAdd = acceptedFiles.slice(0, remainingSlots);
+    if (acceptedFiles.length > remainingSlots) {
+      setFileError(`Only ${filesToAdd.length} file(s) added. Maximum 5 files allowed.`);
+    } else {
+      setFileError("");
+    }
+
+    if (formType === "appointment") {
+      setAppointmentForm((current) => ({
         ...current,
-        files: acceptedFiles,
+        files: [...current.files, ...filesToAdd],
       }));
       return;
     }
 
-    setComplaintForm((current) => ({
+    setGrievanceForm((current) => ({
       ...current,
-      files: acceptedFiles,
+      files: [...current.files, ...filesToAdd],
     }));
   };
 
   const FileCard = ({ file, index, formType }) => {
     const hoverAccent = C.purple;
     const { icon } = getFileIcon(file.name);
-    const colorClass = getFileColorClass(file.name);
     const fileType = getFileTypeLabel(file.name);
 
     const handleRemove = (idx) => {
-      if (formType === 'meeting') {
-        setMeetingForm((current) => ({
+      if (formType === 'appointment') {
+        setAppointmentFileError("");
+        setAppointmentForm((current) => ({
           ...current,
           files: current.files.filter((_, i) => i !== idx),
         }));
       } else {
-        setComplaintForm((current) => ({
+        setGrievanceFileError("");
+        setGrievanceForm((current) => ({
           ...current,
           files: current.files.filter((_, i) => i !== idx),
         }));
@@ -948,7 +946,8 @@ export default function HCMNewCasePage() {
     return (
       <div
         key={index}
-        className={`flex items-center justify-between p-4 ${colorClass} border rounded-xl transition-[opacity,border-color] duration-200 hover:opacity-95 group`}
+        className="flex items-center justify-between p-4 border rounded-xl transition-[opacity,border-color] duration-200 hover:opacity-95 group"
+        style={{ borderColor: `${C.purple}4D` }}
         onClick={(e) => e.preventDefault()}
       >
         <div className="flex items-center gap-3 overflow-hidden flex-1">
@@ -984,17 +983,16 @@ export default function HCMNewCasePage() {
   };
 
   // Check if any companion has an invalid phone number to disable the submit button
-  const isMeetingFormInvalid =
-    !meetingForm.title ||
-    !meetingForm.purpose ||
-    !meetingForm.preferredDate ||
-    !meetingForm.preferredTime ||
-    meetingForm.companions.some(c => c.phone.length > 0 && (!/^[6-9]/.test(c.phone) || c.phone.length < 10));
-  const landingViewportHeight = "calc(100vh - 172px)";
+  const isAppointmentFormInvalid =
+    !appointmentForm.title ||
+    !appointmentForm.purpose ||
+    !appointmentForm.preferredDate ||
+    !appointmentForm.preferredTime ||
+    appointmentForm.companions.some(c => c.phone.length > 0 && (!/^[6-9]/.test(c.phone) || c.phone.length < 10));
   return (
     <WorkspacePage
       width={1440}
-      outerStyle={!activeTab ? { minHeight: "calc(100vh - var(--portal-header-height))" } : undefined}
+      outerStyle={!activeTab ? { height: "100%", overflow: "hidden" } : undefined}
     >
       <SuccessModal
         open={successModal.open}
@@ -1030,11 +1028,11 @@ export default function HCMNewCasePage() {
                 }}
               >
                 <ChevronRight size={16} className="rotate-180" />
-                Back
+                {t("common.back")}
               </button>
             </div>
             <h2 style={{ fontSize: 20, fontWeight: 600, color: C.t1, margin: 0, textAlign: "center" }}>
-              {activeTab === "meeting" ? "MEETING REQUEST" : "SUBMIT COMPLAINT"}
+              {activeTab === "appointment" ? t("citizen.newCase.appointmentFormTitle") : t("citizen.newCase.grievanceFormTitle")}
             </h2>
             <div />
           </div>
@@ -1045,7 +1043,7 @@ export default function HCMNewCasePage() {
           <div className="mb-6 p-4 flex items-start gap-3" style={{ background: `${C.danger}12`, border: `1px solid ${C.danger}4D`, borderRadius: 10 }}>
             <AlertCircle size={20} style={{ color: C.danger, flexShrink: 0, marginTop: 2 }} />
             <div>
-              <h4 style={{ fontWeight: 600, color: C.danger }}>Error</h4>
+              <h4 style={{ fontWeight: 600, color: C.danger }}>{t("common.error")}</h4>
               <p style={{ fontSize: 13, color: C.danger, marginTop: 4 }}>{error}</p>
             </div>
           </div>
@@ -1055,18 +1053,16 @@ export default function HCMNewCasePage() {
         {!activeTab ? (
           <div
             style={{
-              minHeight: landingViewportHeight,
               display: "flex",
               flexDirection: "column",
-              justifyContent: "space-between",
             }}
           >
             <div className="grid md:grid-cols-2 gap-6">
-              {/* MEETING REQUEST */}
+              {/* APPOINTMENT REQUEST */}
               <button
                 onClick={() => {
                   setIsBackHovered(false);
-                  setActiveTab("meeting");
+                  setActiveTab("appointment");
                 }}
                 className="group relative rounded-xl border overflow-hidden text-left transition-all duration-300 hover:-translate-y-1 hover:scale-[1.01] hover:opacity-[0.99]"
                 style={{
@@ -1090,26 +1086,26 @@ export default function HCMNewCasePage() {
                     <Calendar size={26} style={{ color: C.purple }} />
                   </div>
                   <div>
-                    <h3 style={{ fontSize: 22, fontWeight: 600, color: C.t1, marginBottom: 10 }}>Request a Meeting</h3>
+                    <h3 style={{ fontSize: 22, fontWeight: 600, color: C.t1, marginBottom: 10 }}>{t("citizen.newCase.requestAppointment")}</h3>
                     <p style={{ color: C.t2, fontSize: 14, lineHeight: 1.7, marginBottom: 28, maxWidth: 520 }}>
-                      Schedule a meeting with an administration desk. You can specify purpose, add supporting documents, and invite companions.
+                      {t("citizen.newCase.appointmentDesc")}
                     </p>
                   </div>
                   <div
                     className="flex items-center gap-2 font-medium group-hover:gap-3 group-hover:translate-x-1 transition-all duration-300"
                     style={{ color: C.purple, marginTop: 12 }}
                   >
-                    <span>Get Started</span>
+                    <span>{t("common.getStarted")}</span>
                     <ArrowRight size={18} className="group-hover:scale-110 transition-transform duration-300" />
                   </div>
                 </div>
               </button>
 
-              {/* SUBMIT COMPLAINT */}
+              {/* SUBMIT GRIEVANCE */}
               <button
                 onClick={() => {
                   setIsBackHovered(false);
-                  setActiveTab("complaint");
+                  setActiveTab("grievance");
                 }}
                 className="group relative rounded-xl border overflow-hidden text-left transition-all duration-300 hover:-translate-y-1 hover:scale-[1.01] hover:opacity-[0.99]"
                 style={{
@@ -1133,16 +1129,16 @@ export default function HCMNewCasePage() {
                     <FileText size={26} style={{ color: C.mint }} />
                   </div>
                   <div>
-                    <h3 style={{ fontSize: 22, fontWeight: 600, color: C.t1, marginBottom: 10 }}>Submit a Complaint</h3>
+                    <h3 style={{ fontSize: 22, fontWeight: 600, color: C.t1, marginBottom: 10 }}>{t("citizen.newCase.submitGrievance")}</h3>
                     <p style={{ color: C.t2, fontSize: 14, lineHeight: 1.7, marginBottom: 28, maxWidth: 520 }}>
-                      File a formal complaint regarding any civic or government issue. Supports multiple document formats and categories.
+                      {t("citizen.newCase.grievanceDesc")}
                     </p>
                   </div>
                   <div
                     className="flex items-center gap-2 font-medium group-hover:gap-3 group-hover:translate-x-1 transition-all duration-300"
                     style={{ color: C.mint, marginTop: 12 }}
                   >
-                    <span>Get Started</span>
+                    <span>{t("common.getStarted")}</span>
                     <ArrowRight size={18} className="group-hover:scale-110 transition-transform duration-300" />
                   </div>
                 </div>
@@ -1166,7 +1162,7 @@ export default function HCMNewCasePage() {
                   Start a request, attach proof, and track every update from one place.
                 </h2>
                 <p style={{ margin: "12px 0 0", maxWidth: 680, color: C.t2, fontSize: 13, lineHeight: 1.65 }}>
-                  Use meeting requests for appointments with officials, or file a complaint for civic issues that need action. Both services keep your details, documents, and status updates organized inside the portal.
+                  Use appointment requests for appointments with officials, or file a grievance for civic issues that need action. Both services keep your details, documents, and status updates organized inside the portal.
                 </p>
               </div>
               <div style={{ display: "grid", gap: 12, alignContent: "start" }}>
@@ -1187,33 +1183,33 @@ export default function HCMNewCasePage() {
               </div>
             </div>
           </div>
-        ) : activeTab === "meeting" ? (
-          // MEETING FORM
+        ) : activeTab === "appointment" ? (
+          // APPOINTMENT FORM
           <WorkspaceCard style={{ marginBottom: 32 }}>
-            <form onSubmit={submitMeeting} className="space-y-5">
+            <form onSubmit={submitAppointment} className="space-y-5">
               
 
               {/* TITLE */}
               <div>
                 <label className="portal-citizen-label" style={sectionLabelStyle}>
-                  Meeting Title <span style={{ color: C.danger }}>*</span>
+                  {t("citizen.newCase.appointmentTitle")} <span style={{ color: C.danger }}>*</span>
                 </label>
                 <WorkspaceInput
                   required
                   type="text"
                   maxLength={200}
-                  value={meetingForm.title}
+                  value={appointmentForm.title}
                   onChange={(event) =>
-                    setMeetingForm((current) => ({
+                    setAppointmentForm((current) => ({
                       ...current,
                       title: event.target.value,
                     }))
                   }
-                  placeholder="Enter meeting title (e.g. Document Verification)"
+                  placeholder={t("citizen.newCase.appointmentTitlePlaceholder")}
                 />
                 <div style={{ marginTop: 4 }}>
-                  {meetingForm.title.length >= 200 ? (
-                    <div style={errorTextStyle}>Maximum 200 characters allowed.</div>
+                  {appointmentForm.title.length >= 200 ? (
+                    <div style={errorTextStyle}>{t("citizen.newCase.maxChars200")}</div>
                   ) : (
                     <div />
                   )}
@@ -1223,22 +1219,22 @@ export default function HCMNewCasePage() {
               {/* PURPOSE */}
               <div>
                 <label className="portal-citizen-label" style={sectionLabelStyle}>
-                  Purpose of Meeting <span style={{ color: C.danger }}>*</span>
+                  {t("citizen.newCase.purposeLabel")} <span style={{ color: C.danger }}>*</span>
                 </label>
                 <textarea
                   required
                   maxLength={1000}
-                  value={meetingForm.purpose}
+                  value={appointmentForm.purpose}
                   onChange={(event) =>
-                    setMeetingForm((current) => ({ ...current, purpose: event.target.value }))
+                    setAppointmentForm((current) => ({ ...current, purpose: event.target.value }))
                   }
-                  placeholder="Explain the purpose of your meeting request in detail"
+                  placeholder={t("citizen.newCase.purposePlaceholder")}
                   style={textareaStyle}
                   rows={5}
                 />
                 <div style={{ marginTop: 4 }}>
-                  {meetingForm.purpose.length >= 1000 ? (
-                    <div style={errorTextStyle}>Maximum 1000 characters allowed.</div>
+                  {appointmentForm.purpose.length >= 1000 ? (
+                    <div style={errorTextStyle}>{t("citizen.newCase.maxChars1000")}</div>
                   ) : (
                     <div />
                   )}
@@ -1250,27 +1246,27 @@ export default function HCMNewCasePage() {
                   <div>
                     <label className="portal-citizen-label flex items-center gap-2" style={{ ...sectionLabelStyle, display: "flex", alignItems: "center" }}>
                       <Calendar size={16} />
-                      <span>Preferred Date <span style={{ color: C.danger }}>*</span></span>
+                      <span>{t("citizen.newCase.preferredDate")} <span style={{ color: C.danger }}>*</span></span>
                     </label>
                     <CustomDatePicker
-                      value={meetingForm.preferredDate}
+                      value={appointmentForm.preferredDate}
                       onChange={(nextDate) =>
-                        setMeetingForm((current) => ({ ...current, preferredDate: nextDate }))
+                        setAppointmentForm((current) => ({ ...current, preferredDate: nextDate }))
                       }
                       min={getTomorrowDate()}
-                      placeholder="Select preferred date"
+                      placeholder={t("citizen.newCase.preferredDatePlaceholder")}
                     />
                   </div>
 
                   <div>
                     <label className="portal-citizen-label flex items-center gap-2" style={{ ...sectionLabelStyle, display: "flex", alignItems: "center" }}>
                       <Clock size={16} />
-                      <span>Preferred Time <span style={{ color: C.danger }}>*</span></span>
+                      <span>{t("citizen.newCase.preferredTime")} <span style={{ color: C.danger }}>*</span></span>
                     </label>
                     <CustomTimePicker
-                      value={meetingForm.preferredTime}
+                      value={appointmentForm.preferredTime}
                       onChange={(nextTime) =>
-                        setMeetingForm((current) => ({ ...current, preferredTime: nextTime }))
+                        setAppointmentForm((current) => ({ ...current, preferredTime: nextTime }))
                       }
                       options={timeSlots}
                     />
@@ -1279,16 +1275,16 @@ export default function HCMNewCasePage() {
 
                 <div>
                   <label className="portal-citizen-label" style={sectionLabelStyle}>
-                    Admin Desk (Optional)
+                    {t("citizen.newCase.adminDesk")}
                   </label>
                   <WorkspaceSelect
-                    value={meetingForm.referralAdminUserId}
+                    value={appointmentForm.referralAdminUserId}
                     onChange={(event) =>
-                      setMeetingForm((current) => ({ ...current, referralAdminUserId: event.target.value }))
+                      setAppointmentForm((current) => ({ ...current, referralAdminUserId: event.target.value }))
                     }
-                    style={{ width: "100%", minWidth: 0, boxSizing: "border-box", color: meetingForm.referralAdminUserId ? C.t1 : C.t3 }}
+                    style={{ width: "100%", minWidth: 0, boxSizing: "border-box", color: appointmentForm.referralAdminUserId ? C.t1 : C.t3 }}
                   >
-                    <option value="">-- Select an admin desk --</option>
+                    <option value="">{t("citizen.newCase.adminDeskPlaceholder")}</option>
                     {admins.map((admin) => (
                       <option key={admin.id} value={admin.id}>
                         {admin.name ? `${admin.name} (${admin.username})` : admin.username} · {admin.department}
@@ -1301,53 +1297,67 @@ export default function HCMNewCasePage() {
               {/* FILE UPLOAD */}
               <div>
                 <label className="portal-citizen-label" style={sectionLabelStyle}>
-                  Supporting Documents (Optional)
+                  {t("citizen.newCase.supportingDocuments")}
                 </label>
-                <label className="border-2 border-dashed rounded-xl p-6 cursor-pointer transition-colors block" style={{ borderColor: C.border, background: C.bgElevated }}>
-                  <div className="flex items-center gap-4">
+                {appointmentFileError && (
+                  <p style={{ color: C.danger, fontSize: 13, marginBottom: 6, fontWeight: 500 }}>{appointmentFileError}</p>
+                )}
+                <div className="border-2 border-dashed rounded-xl p-6 transition-colors" style={{ borderColor: C.border, background: C.bgElevated }}>
+                  <div
+                    className="flex items-center gap-4 cursor-pointer"
+                    onClick={() => {
+                      if (appointmentForm.files.length >= 5) {
+                        setAppointmentFileError(t("citizen.newCase.maxFiles"));
+                        return;
+                      }
+                      setAppointmentFileError("");
+                      appointmentFileInputRef.current?.click();
+                    }}
+                  >
                     <div className="h-12 w-12 rounded-xl flex items-center justify-center flex-shrink-0" style={{ background: C.card, border: `1px solid ${C.border}` }}>
                       <Upload size={24} style={{ color: C.t3 }} />
                     </div>
                     <div className="flex-1">
-                      <div style={{ fontWeight: 600, color: meetingForm.files.length > 0 ? C.t1 : C.t3 }}>
-                        {meetingForm.files.length > 0
-                          ? `${meetingForm.files.length} file(s) selected`
-                          : "Click to upload or drag and drop"}
+                      <div style={{ fontWeight: 600, color: appointmentForm.files.length > 0 ? C.t1 : C.t3 }}>
+                        {appointmentForm.files.length > 0
+                          ? t("citizen.newCase.filesSelected", { count: appointmentForm.files.length })
+                          : t("citizen.newCase.clickToUpload")}
                       </div>
-                      <p className="portal-citizen-caption" style={{ color: C.t3, marginTop: 4 }}>PDF, images, or office documents</p>
+                      <p className="portal-citizen-caption" style={{ color: C.t3, marginTop: 4 }}>{t("citizen.newCase.fileFormats")}</p>
                     </div>
                   </div>
 
-                  {meetingForm.files.length > 0 && (
+                  {appointmentForm.files.length > 0 && (
                     <div className="mt-4 space-y-2">
-                      {meetingForm.files.map((file, index) => (
-                        <FileCard key={index} file={file} index={index} formType="meeting" />
+                      {appointmentForm.files.map((file, index) => (
+                        <FileCard key={index} file={file} index={index} formType="appointment" />
                       ))}
                     </div>
                   )}
 
                   <input
+                    ref={appointmentFileInputRef}
                     type="file"
                     multiple
                     accept={ACCEPTED_UPLOAD_TYPES}
                     className="hidden"
-                    onChange={(event) => handleFileSelection("meeting", event.target.files)}
+                    onChange={(event) => { handleFileSelection("appointment", event.target.files); event.target.value = ""; }}
                   />
-                </label>
+                </div>
               </div>
 
               {/* COMPANIONS */}
 
                 <label className="portal-citizen-label flex items-center gap-2" style={{ ...sectionLabelStyle, display: "flex", alignItems: "center" }}>
                   <Users size={18} />
-                  <span>Additional Attendees</span>
+                  <span>{t("citizen.newCase.additionalAttendees")}</span>
                 </label>
                 <button
                   type="button"
                   onMouseEnter={() => setIsAddPersonHovered(true)}
                   onMouseLeave={() => setIsAddPersonHovered(false)}
                   onClick={() =>
-                    setMeetingForm((current) => ({
+                    setAppointmentForm((current) => ({
                       ...current,
                       companions: [...current.companions, { name: "", phone: "" }],
                     }))
@@ -1361,10 +1371,10 @@ export default function HCMNewCasePage() {
                     width: "fit-content",
                   }}
                 >
-                  + Add Person
+                  {t("citizen.newCase.addPerson")}
                 </button>
                 <div className="space-y-2.5">
-                  {meetingForm.companions.map((person, index) => {
+                  {appointmentForm.companions.map((person, index) => {
                     // Logic to explicitly check phone validity
                     const isPhoneStartedWrong = person.phone.length > 0 && !/^[6-9]/.test(person.phone);
                     const isPhoneIncomplete = person.phone.length > 0 && person.phone.length < 10 && !isPhoneStartedWrong;
@@ -1378,19 +1388,19 @@ export default function HCMNewCasePage() {
                             maxLength={60}
                             value={person.name}
                             onChange={(event) =>
-                              setMeetingForm((current) => ({
+                              setAppointmentForm((current) => ({
                                 ...current,
                                 companions: current.companions.map((entry, entryIndex) =>
                                   entryIndex === index ? { ...entry, name: event.target.value } : entry
                                 ),
                               }))
                             }
-                            placeholder="Full name"
+                            placeholder={t("citizen.newCase.fullName")}
                             style={textareaStyle}
                           />
                           <div style={{ marginTop: 4 }}>
                             {person.name.length >= 60 ? (
-                              <div style={errorTextStyle}>Maximum 60 characters allowed.</div>
+                              <div style={errorTextStyle}>{t("citizen.newCase.maxChars60")}</div>
                             ) : (
                               <div />
                             )}
@@ -1403,7 +1413,7 @@ export default function HCMNewCasePage() {
                             type="tel"
                             value={person.phone}
                             onChange={(event) =>
-                              setMeetingForm((current) => ({
+                              setAppointmentForm((current) => ({
                                 ...current,
                                 companions: current.companions.map((entry, entryIndex) =>
                                   entryIndex === index
@@ -1412,7 +1422,7 @@ export default function HCMNewCasePage() {
                                 ),
                               }))
                             }
-                            placeholder="Phone number"
+                            placeholder={t("citizen.newCase.phoneNumber")}
                             style={{ 
                               ...textareaStyle, 
                               borderColor: isPhoneStartedWrong || isPhoneIncomplete ? C.danger : C.border 
@@ -1420,10 +1430,10 @@ export default function HCMNewCasePage() {
                           />
                           {/* Conditional Validation Text for Phone */}
                           {isPhoneStartedWrong && (
-                            <div style={errorTextStyle}>Cannot start below 6</div>
+                            <div style={errorTextStyle}>{t("citizen.newCase.phoneStartedWrong")}</div>
                           )}
                           {isPhoneIncomplete && (
-                            <div style={errorTextStyle}>Must be exactly 10 digits</div>
+                            <div style={errorTextStyle}>{t("citizen.newCase.phoneIncomplete")}</div>
                           )}
                         </div>
                         
@@ -1432,7 +1442,7 @@ export default function HCMNewCasePage() {
                           onMouseEnter={() => setHoveredRemoveIndex(index)}
                           onMouseLeave={() => setHoveredRemoveIndex(null)}
                           onClick={() =>
-                            setMeetingForm((current) => ({
+                            setAppointmentForm((current) => ({
                               ...current,
                               companions:
                                 current.companions.length === 1
@@ -1447,7 +1457,7 @@ export default function HCMNewCasePage() {
                             background: hoveredRemoveIndex === index ? C.danger : "transparent",
                           }}
                         >
-                          Remove
+                          {t("citizen.newCase.remove")}
                         </button>
                       </div>
                     );
@@ -1457,36 +1467,36 @@ export default function HCMNewCasePage() {
               {/* SUBMIT */}
               <WorkspaceButton
                 type="submit"
-                disabled={loading || isMeetingFormInvalid}
+                disabled={loading || isAppointmentFormInvalid}
                 style={{ width: "30%", minWidth: 220, padding: "16px 24px", margin: "0 auto", display: "flex", justifyContent: "center" }}
               >
-                {loading ? "Submitting..." : "Submit Meeting Request"}
+                {loading ? t("citizen.newCase.submitting") : t("citizen.newCase.submitRequest")}
               </WorkspaceButton>
             </form>
           </WorkspaceCard>
         ) : (
-          // COMPLAINT FORM
+          // GRIEVANCE FORM
           <WorkspaceCard style={{ marginBottom: 32 }}>
-            <form onSubmit={submitComplaint} className="space-y-8">
+            <form onSubmit={submitGrievance} className="space-y-8">
               
               {/* TITLE */}
               <div>
                 <label className="portal-citizen-label" style={sectionLabelStyle}>
-                  Complaint Title <span style={{ color: C.danger }}>*</span>
+                  {t("citizen.newCase.grievanceTitleLabel")} <span style={{ color: C.danger }}>*</span>
                 </label>
                 <WorkspaceInput
                   required
                   type="text"
                   maxLength={200}
-                  value={complaintForm.title}
+                  value={grievanceForm.title}
                   onChange={(event) =>
-                    setComplaintForm((current) => ({ ...current, title: event.target.value }))
+                    setGrievanceForm((current) => ({ ...current, title: event.target.value }))
                   }
-                  placeholder="Brief title of your complaint"
+                  placeholder={t("citizen.newCase.grievanceTitlePlaceholder")}
                 />
                 <div style={{ marginTop: 4 }}>
-                  {complaintForm.title.length >= 200 ? (
-                    <div style={errorTextStyle}>Maximum 200 characters allowed.</div>
+                  {grievanceForm.title.length >= 200 ? (
+                    <div style={errorTextStyle}>{t("citizen.newCase.maxChars200")}</div>
                   ) : (
                     <div />
                   )}
@@ -1496,22 +1506,22 @@ export default function HCMNewCasePage() {
               {/* DETAILS */}
               <div>
                 <label className="portal-citizen-label" style={sectionLabelStyle}>
-                  Complaint Details <span style={{ color: C.danger }}>*</span>
+                  {t("citizen.newCase.grievanceDetails")} <span style={{ color: C.danger }}>*</span>
                 </label>
                 <textarea
                   required
                   maxLength={1000}
-                  value={complaintForm.details}
+                  value={grievanceForm.details}
                   onChange={(event) =>
-                    setComplaintForm((current) => ({ ...current, details: event.target.value }))
+                    setGrievanceForm((current) => ({ ...current, details: event.target.value }))
                   }
-                  placeholder="Provide detailed description of the issue"
+                  placeholder={t("citizen.newCase.grievanceDetailsPlaceholder")}
                   style={textareaStyle}
                   rows={6}
                 />
                 <div style={{ marginTop: 4 }}>
-                  {complaintForm.details.length >= 1000 ? (
-                    <div style={errorTextStyle}>Maximum 1000 characters allowed.</div>
+                  {grievanceForm.details.length >= 1000 ? (
+                    <div style={errorTextStyle}>{t("citizen.newCase.maxChars1000")}</div>
                   ) : (
                     <div />
                   )}
@@ -1522,54 +1532,48 @@ export default function HCMNewCasePage() {
               <div className="grid md:grid-cols-3 gap-6">
                 <div>
                   <label className="portal-citizen-label flex items-center gap-2" style={{ ...sectionLabelStyle, display: "flex", alignItems: "center" }}>
-                    <Briefcase size={16} />
-                    <span>Category <span style={{ color: C.danger }}>*</span></span>
+                    <MapPin size={16} />
+                    <span>{t("citizen.newCase.stateLabel")} <span style={{ color: C.danger }}>*</span></span>
                   </label>
-                  <WorkspaceSelect
+                  <WorkspaceInput
                     required
-                    value={complaintForm.complaintType}
+                    type="text"
+                    value={grievanceForm.state}
                     onChange={(event) =>
-                      setComplaintForm((current) => ({ ...current, complaintType: event.target.value }))
+                      setGrievanceForm((current) => ({ ...current, state: event.target.value }))
                     }
-                    style={{ color: complaintForm.complaintType ? C.t1 : C.t3 }}
-                  >
-                    <option value="">-- Select category --</option>
-                    {complaintCategories.map((category) => (
-                      <option key={category} value={category}>
-                        {category}
-                      </option>
-                    ))}
-                  </WorkspaceSelect>
+                    placeholder={t("citizen.newCase.statePlaceholder")}
+                  />
                 </div>
 
                 <div>
                   <label className="portal-citizen-label flex items-center gap-2" style={{ ...sectionLabelStyle, display: "flex", alignItems: "center" }}>
                     <MapPin size={16} />
-                    <span>Location <span style={{ color: C.danger }}>*</span></span>
+                    <span>{t("citizen.newCase.districtLabel")} <span style={{ color: C.danger }}>*</span></span>
                   </label>
                   <WorkspaceInput
                     required
                     type="text"
-                    value={complaintForm.complaintLocation}
+                    value={grievanceForm.district}
                     onChange={(event) =>
-                      setComplaintForm((current) => ({ ...current, complaintLocation: event.target.value }))
+                      setGrievanceForm((current) => ({ ...current, district: event.target.value }))
                     }
-                    placeholder="Where did this issue occur?"
+                    placeholder={t("citizen.newCase.districtPlaceholder")}
                   />
                 </div>
 
                 <div>
                   <label className="portal-citizen-label flex items-center gap-2" style={{ ...sectionLabelStyle, display: "flex", alignItems: "center" }}>
                     <Calendar size={16} />
-                    <span>Date of Incident <span style={{ color: C.danger }}>*</span></span>
+                    <span>{t("common.date")} <span style={{ color: C.danger }}>*</span></span>
                   </label>
                   <CustomDatePicker
-                    value={complaintForm.incidentDate}
+                    value={grievanceForm.incidentDate}
                     onChange={(nextDate) =>
-                      setComplaintForm((current) => ({ ...current, incidentDate: nextDate }))
+                      setGrievanceForm((current) => ({ ...current, incidentDate: nextDate }))
                     }
                     max={getTodayDate()}
-                    placeholder="Select incident date"
+                    placeholder={t("citizen.newCase.selectDate")}
                   />
                 </div>
               </div>
@@ -1577,49 +1581,62 @@ export default function HCMNewCasePage() {
               {/* FILE UPLOAD */}
               <div>
                 <label className="portal-citizen-label" style={sectionLabelStyle}>
-                  Supporting Documents
+                  {t("citizen.newCase.supportingDocumentsGrievance")}
                 </label>
-                <label className="border-2 border-dashed rounded-xl p-6 cursor-pointer transition-colors block" style={{ borderColor: C.border, background: C.bgElevated }}>
-                  <div className="flex items-center gap-4">
+                {grievanceFileError && (
+                  <p style={{ color: C.danger, fontSize: 13, marginBottom: 6, fontWeight: 500 }}>{grievanceFileError}</p>
+                )}
+                <div className="border-2 border-dashed rounded-xl p-6 transition-colors" style={{ borderColor: C.border, background: C.bgElevated }}>
+                  <div
+                    className="flex items-center gap-4 cursor-pointer"
+                    onClick={() => {
+                      if (grievanceForm.files.length >= 5) {
+                        setGrievanceFileError(t("citizen.newCase.maxFiles"));
+                        return;
+                      }
+                      setGrievanceFileError("");
+                      grievanceFileInputRef.current?.click();
+                    }}
+                  >
                     <div className="h-12 w-12 rounded-xl flex items-center justify-center flex-shrink-0" style={{ background: C.card, border: `1px solid ${C.border}` }}>
                       <Upload size={24} style={{ color: C.t3 }} />
                     </div>
                     <div className="flex-1">
-                      <div style={{ fontWeight: 600, color: complaintForm.files.length > 0 ? C.t1 : C.t3 }}>
-                        {complaintForm.files.length > 0
-                          ? `${complaintForm.files.length} file(s) selected`
-                          : "Click to upload or drag and drop"}
+                      <div style={{ fontWeight: 600, color: grievanceForm.files.length > 0 ? C.t1 : C.t3 }}>
+                        {grievanceForm.files.length > 0
+                          ? t("citizen.newCase.filesSelected", { count: grievanceForm.files.length })
+                          : t("citizen.newCase.clickToUpload")}
                       </div>
-                      <p className="portal-citizen-caption" style={{ color: C.t3, marginTop: 4 }}>PDF, images, Excel (max 50 MB per file)</p>
+                      <p className="portal-citizen-caption" style={{ color: C.t3, marginTop: 4 }}>{t("citizen.newCase.fileFormatsGrievance")}</p>
                     </div>
                   </div>
 
-                  {/* 🟢 ENHANCED: File List with Full Details */}
-                  {complaintForm.files.length > 0 && (
+                  {grievanceForm.files.length > 0 && (
                     <div className="mt-4 space-y-2">
-                      {complaintForm.files.map((file, index) => (
-                        <FileCard key={index} file={file} index={index} formType="complaint" />
+                      {grievanceForm.files.map((file, index) => (
+                        <FileCard key={index} file={file} index={index} formType="grievance" />
                       ))}
                     </div>
                   )}
 
                   <input
+                    ref={grievanceFileInputRef}
                     type="file"
                     multiple
                     accept={ACCEPTED_UPLOAD_TYPES}
                     className="hidden"
-                    onChange={(event) => handleFileSelection("complaint", event.target.files)}
+                    onChange={(event) => { handleFileSelection("grievance", event.target.files); event.target.value = ""; }}
                   />
-                </label>
+                </div>
               </div>
 
               {/* SUBMIT */}
               <WorkspaceButton
                 type="submit"
-                disabled={loading || !complaintForm.title || !complaintForm.details || !complaintForm.complaintLocation || !complaintForm.complaintType || !complaintForm.incidentDate}
+                disabled={loading || !grievanceForm.title || !grievanceForm.details || !grievanceForm.state || !grievanceForm.district || !grievanceForm.incidentDate}
                 style={{ width: "30%", minWidth: 220, padding: "16px 24px", margin: "0 auto", display: "flex", justifyContent: "center" }}
               >
-                {loading ? "Submitting..." : "Submit Complaint"}
+                {loading ? t("citizen.newCase.submitting") : t("citizen.newCase.submitGrievanceBtn")}
               </WorkspaceButton>
             </form>
           </WorkspaceCard>

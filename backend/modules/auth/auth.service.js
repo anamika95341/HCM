@@ -56,6 +56,20 @@ function publicUser(user, role) {
     };
   }
 
+  if (role === 'admin') {
+    return {
+      id: user.id,
+      username: user.username,
+      firstName: user.first_name,
+      lastName: user.last_name,
+      email: user.email,
+      phoneNumber: user.phone_number,
+      designation: user.designation,
+      status: user.status,
+      adminType: user.admin_type || 'regular',
+    };
+  }
+
   return {
     id: user.id,
     username: user.username,

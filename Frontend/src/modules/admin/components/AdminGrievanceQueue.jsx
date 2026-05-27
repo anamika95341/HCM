@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { Calendar, ChevronLeft, ChevronRight, Eye, Filter, Search } from "lucide-react";
 import { FiFileText } from "react-icons/fi";
 import { useNavigate } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import { PATHS } from "../../../routes/paths.js";
 import { apiClient } from "../../../shared/api/client.js";
 import { useAuth } from "../../../shared/auth/AuthContext.jsx";
@@ -14,6 +15,8 @@ import {
 } from "../../../shared/components/WorkspaceUI.jsx";
 import { usePortalTheme } from "../../../shared/theme/portalTheme.jsx";
 
+const MONTH_NAMES = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+
 function statusLabel(status) {
   return String(status || "")
     .split("_")
@@ -22,11 +25,10 @@ function statusLabel(status) {
     .join(" ");
 }
 
-function complaintQueueStatus(complaint) {
-  if (complaint?.handoffType === "reassigned" && complaint?.status === "assigned") return "reassigned";
-  if (complaint?.status === "assigned") return "accepted";
-  if (["in_review", "call_scheduled", "followup_in_progress"].includes(complaint?.status)) return "complaint_logged";
-  return complaint?.status || "";
+function grievanceQueueStatus(grievance) {
+  if (grievance?.status === "assigned") return "accepted";
+  if (["in_review", "call_scheduled", "followup_in_progress"].includes(grievance?.status)) return "grievance_logged";
+  return grievance?.status || "";
 }
 
 const tableCellTextStyle = {
@@ -37,7 +39,7 @@ const tableCellTextStyle = {
   whiteSpace: "nowrap",
 };
 
-const complaintQueueGridTemplate = "180px minmax(0, 2fr) minmax(0, 1.25fr) minmax(0, 1fr) minmax(0, 0.9fr) 118px 96px 84px";
+const grievanceQueueGridTemplate = "180px minmax(0, 2fr) minmax(0, 1.25fr) minmax(0, 1fr) minmax(0, 0.9fr) 118px 96px 84px";
 
 function parseDateValue(value) {
   if (!value) return null;
@@ -56,7 +58,10 @@ function formatDateValue(date) {
 function formatDisplayDate(value) {
   const parsedDate = parseDateValue(value);
   if (!parsedDate) return "";
-  return parsedDate.toLocaleDateString("en-GB", { day: "2-digit", month: "2-digit", year: "2-digit" });
+  const day = String(parsedDate.getDate()).padStart(2, "0");
+  const mon = MONTH_NAMES[parsedDate.getMonth()];
+  const year = String(parsedDate.getFullYear()).slice(-2);
+  return `${day} ${mon},${year}`;
 }
 
 function buildCalendarDays(monthStart) {
@@ -89,11 +94,10 @@ function formatDateOnly(value) {
   if (!value) return "Not provided";
   const parsed = new Date(value);
   if (Number.isNaN(parsed.getTime())) return "Not provided";
-  return parsed.toLocaleDateString("en-GB", {
-    day: "2-digit",
-    month: "2-digit",
-    year: "2-digit",
-  });
+  const day = String(parsed.getDate()).padStart(2, "0");
+  const mon = MONTH_NAMES[parsed.getMonth()];
+  const year = String(parsed.getFullYear()).slice(-2);
+  return `${day} ${mon},${year}`;
 }
 
 function getDateOnlyValue(value) {
@@ -105,6 +109,7 @@ function getDateOnlyValue(value) {
 
 function CustomDateFilter({ value, onChange, placeholder, min, max }) {
   const { C } = usePortalTheme();
+  const { t } = useTranslation();
   const rootRef = useRef(null);
   const [isOpen, setIsOpen] = useState(false);
   const [openDirection, setOpenDirection] = useState("down");
@@ -123,7 +128,7 @@ function CustomDateFilter({ value, onChange, placeholder, min, max }) {
     };
 
     const handlePointerDown = (event) => {
-      const pickerRoot = event.target.closest?.('[data-admin-complaint-date-filter="true"]');
+      const pickerRoot = event.target.closest?.('[data-admin-grievance-date-filter="true"]');
       if (!pickerRoot) {
         setIsOpen(false);
         setViewMode("day");
@@ -170,7 +175,7 @@ function CustomDateFilter({ value, onChange, placeholder, min, max }) {
   }
 
   return (
-    <div ref={rootRef} data-admin-complaint-date-filter="true" style={{ position: "relative", width: "100%" }}>
+    <div ref={rootRef} data-admin-grievance-date-filter="true" style={{ position: "relative", width: "100%" }}>
       <button
         type="button"
         onClick={() => setIsOpen((current) => !current)}
@@ -392,7 +397,7 @@ function CustomDateFilter({ value, onChange, placeholder, min, max }) {
               cursor: "pointer",
             }}
           >
-            Clear
+            {t("admin.grievanceQueue.clearFilter")}
           </button>
         </div>
       ) : null}
@@ -405,8 +410,9 @@ function toTooltipText(value) {
   return String(value);
 }
 
-export default function AdminComplaintQueue() {
+export default function AdminGrievanceQueue() {
   const { C } = usePortalTheme();
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const tableHeaderBackground = C.purple;
   const tableHeaderText = "#FFFFFF";
@@ -414,7 +420,7 @@ export default function AdminComplaintQueue() {
   const { session } = useAuth();
   const adminId = session?.user?.id;
 
-  const [complaints, setComplaints] = useState([]);
+  const [grievances, setGrievances] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [query, setQuery] = useState("");
@@ -426,22 +432,25 @@ export default function AdminComplaintQueue() {
   const [itemsPerPage, setItemsPerPage] = useState(7);
   const [showEntriesFocused, setShowEntriesFocused] = useState(false);
 
+  const isChiefMinister = session?.user?.adminType === "chief_minister";
+
   useEffect(() => {
     let active = true;
 
-    async function loadComplaintQueue() {
+    async function loadGrievanceQueue() {
       if (!session?.role) {
         return;
       }
       try {
         setLoading(true);
         setError("");
-        const response = await apiClient.get("/admin/work-queue");
+        // CM admin fetches all grievances; regular admin would not see this page
+        const response = await apiClient.get("/grievances/cm-admin/all");
         if (!active) return;
-        setComplaints(Array.isArray(response.data?.complaints) ? response.data.complaints : []);
+        setGrievances(Array.isArray(response.data?.grievances) ? response.data.grievances : []);
       } catch (loadError) {
         if (active) {
-          setError(loadError?.response?.data?.error || "Unable to load complaint queue");
+          setError(loadError?.response?.data?.error || "Unable to load grievance queue");
         }
       } finally {
         if (active) {
@@ -450,60 +459,60 @@ export default function AdminComplaintQueue() {
       }
     }
 
-    loadComplaintQueue();
+    loadGrievanceQueue();
     return () => {
       active = false;
     };
   }, [session?.role]);
 
-  const personalComplaintQueue = useMemo(
-    () => complaints.filter(
-      (complaint) => complaint.assignedAdminUserId === adminId && !["completed", "closed", "resolved", "escalated_to_meeting"].includes(complaint.status)
+  const personalGrievanceQueue = useMemo(
+    () => grievances.filter(
+      (grievance) => !["completed", "closed"].includes(grievance.status)
     ),
-    [adminId, complaints]
+    [grievances]
   );
 
-  const filteredComplaintQueue = useMemo(() => {
+  const filteredGrievanceQueue = useMemo(() => {
     const q = query.trim().toLowerCase();
-    return personalComplaintQueue.filter((complaint) => {
+    return personalGrievanceQueue.filter((grievance) => {
       const haystack = [
-        complaint.complaintId,
-        complaint.title,
-        complaint.complaintType,
-        complaint.citizenSnapshot?.name,
-        complaint.complaintLocation,
+        grievance.grievanceId,
+        grievance.title,
+        grievance.grievanceType,
+        grievance.citizenSnapshot?.name,
+        grievance.grievanceLocation,
       ]
         .filter(Boolean)
         .join(" ")
         .toLowerCase();
       const matchesSearch = !q || haystack.includes(q);
-      const matchesStatus = statusFilter === "all" || complaintQueueStatus(complaint) === statusFilter;
-      const matchesIncidentDate = !incidentDateFilter || getDateOnlyValue(complaint.incidentDate) === incidentDateFilter;
+      const matchesStatus = statusFilter === "all" || grievanceQueueStatus(grievance) === statusFilter;
+      const matchesIncidentDate = !incidentDateFilter || getDateOnlyValue(grievance.incidentDate) === incidentDateFilter;
       return matchesSearch && matchesStatus && matchesIncidentDate;
     });
-  }, [incidentDateFilter, personalComplaintQueue, query, statusFilter]);
+  }, [incidentDateFilter, personalGrievanceQueue, query, statusFilter]);
 
   const statusOptions = useMemo(
-    () => ["accepted", "complaint_logged", "reassigned"],
+    () => ["accepted", "grievance_logged"],
     []
   );
 
   const queueStats = useMemo(() => {
-    const inReview = personalComplaintQueue.filter((complaint) => complaint.status === "in_review").length;
-    const followup = personalComplaintQueue.filter((complaint) => complaint.status === "followup_in_progress").length;
+    const inReview = personalGrievanceQueue.filter((grievance) => grievance.status === "in_review").length;
+    const followup = personalGrievanceQueue.filter((grievance) => grievance.status === "followup_in_progress").length;
     return [
-      { label: "My Complaint Queue", value: personalComplaintQueue.length },
-      { label: "In Review", value: inReview },
-      { label: "Follow Up", value: followup },
+      { label: t("admin.grievanceQueue.myQueue"), value: personalGrievanceQueue.length },
+      { label: t("admin.grievanceQueue.inReview"), value: inReview },
+      { label: t("admin.grievanceQueue.followUp"), value: followup },
     ];
-  }, [personalComplaintQueue]);
+  }, [personalGrievanceQueue]);
 
   useEffect(() => {
     setCurrentPage(1);
-  }, [query, statusFilter, incidentDateFilter, personalComplaintQueue.length, itemsPerPage]);
+  }, [query, statusFilter, incidentDateFilter, personalGrievanceQueue.length, itemsPerPage]);
 
-  const totalPages = Math.max(1, Math.ceil(filteredComplaintQueue.length / itemsPerPage));
-  const paginatedComplaintQueue = filteredComplaintQueue.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
+  const totalPages = Math.max(1, Math.ceil(filteredGrievanceQueue.length / itemsPerPage));
+  const paginatedGrievanceQueue = filteredGrievanceQueue.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
   const pageNumbers = useMemo(() => {
     if (totalPages <= 1) return [1];
     const pages = new Set([1, totalPages, currentPage - 1, currentPage, currentPage + 1]);
@@ -528,7 +537,7 @@ export default function AdminComplaintQueue() {
       <div style={{ width: "100%", display: "flex", flexDirection: "column", flex: 1, minHeight: 0 }}>
         <div style={{ marginBottom: 18, display: "flex", alignItems: "center", gap: 14 }}>
           <FiFileText size={18} color={C.purple} />
-          <h1 style={{ margin: 0, fontSize: 20, lineHeight: 1.3, fontWeight: 600, color: C.t1 }}>MY COMPLAINTS</h1>
+          <h1 style={{ margin: 0, fontSize: 20, lineHeight: 1.3, fontWeight: 600, color: C.t1 }}>{t("admin.grievanceQueue.title")}</h1>
         </div>
 
         <div style={{ display: "flex", flexDirection: "column", flex: 1, minHeight: 0 }}>
@@ -574,22 +583,22 @@ export default function AdminComplaintQueue() {
                     type="text"
                     value={query}
                     onChange={(event) => setQuery(event.target.value)}
-                    placeholder="Search by Complaint Id , Title , Category , Citizen and Location"
+                    placeholder={t("admin.grievanceQueue.searchPlaceholder")}
                     style={{ paddingLeft: 36, minHeight: 34, paddingTop: 0, paddingBottom: 0, fontSize: 11, lineHeight: "34px" }}
                   />
                 </div>
                 <CustomDateFilter
                   value={incidentDateFilter}
                   onChange={setIncidentDateFilter}
-                  placeholder="Date of incident"
+                  placeholder={t("admin.grievanceQueue.datePlaceholder")}
                   max={formatDateValue(new Date())}
                 />
                 <div className="relative">
                   <Filter className="absolute left-3 top-2.5" size={17} style={{ color: C.t3 }} />
                   <WorkspaceSelect value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)} style={{ paddingLeft: 36, minHeight: 34, paddingTop: 0, paddingBottom: 0, fontSize: 11, lineHeight: "34px" }}>
-                    <option value="all">All statuses</option>
+                    <option value="all">{t("admin.grievanceQueue.allStatuses")}</option>
                       {statusOptions.map((status) => (
-                      <option key={status} value={status}>{status === "accepted" ? "Accepted" : status === "complaint_logged" ? "Complaint Logged" : status === "reassigned" ? "Reassigned" : statusLabel(status)}</option>
+                      <option key={status} value={status}>{status === "accepted" ? t("admin.grievanceQueue.accepted") : status === "grievance_logged" ? t("admin.grievanceQueue.grievanceLogged") : statusLabel(status)}</option>
                     ))}
                   </WorkspaceSelect>
                 </div>
@@ -600,27 +609,27 @@ export default function AdminComplaintQueue() {
 
           <div style={{ display: "flex", flexDirection: "column" }}>
           {loading ? (
-            <WorkspaceEmptyState title="Loading complaint queue..." />
+            <WorkspaceEmptyState title={t("admin.grievanceQueue.loading")} />
           ) : error ? (
             <WorkspaceCard style={{ color: C.danger }}>{error}</WorkspaceCard>
-          ) : filteredComplaintQueue.length === 0 ? (
-            <WorkspaceEmptyState title="No assigned complaints found" subtitle="Complaints you assign to yourself will appear here." />
+          ) : filteredGrievanceQueue.length === 0 ? (
+            <WorkspaceEmptyState title={t("admin.grievanceQueue.noGrievances")} subtitle={t("admin.grievanceQueue.noGrievancesSubtitle")} />
           ) : (
             <div className="hidden lg:block" style={{ border: `1px solid ${C.border}`, borderRadius: 12, overflow: "hidden", display: "flex", flexDirection: "column", marginBottom: 10 }}>
               <table className="w-full text-sm" style={{ borderCollapse: "collapse", tableLayout: "fixed" }}>
                 <colgroup>
-                  <col style={{ width: 180, minWidth: 180, maxWidth: 180 }} />
-                  <col style={{ width: "27%" }} />
+                  <col style={{ width: 160, minWidth: 160, maxWidth: 160 }} />
+                  <col style={{ width: "24%" }} />
                   <col style={{ width: "16%" }} />
-                  <col style={{ width: "15%" }} />
-                  <col style={{ width: "14%" }} />
-                  <col style={{ width: 118, minWidth: 118, maxWidth: 118 }} />
-                  <col style={{ width: 96, minWidth: 96, maxWidth: 96 }} />
+                  <col style={{ width: "12%" }} />
+                  <col style={{ width: "12%" }} />
+                  <col style={{ width: 110, minWidth: 110, maxWidth: 110 }} />
+                  <col style={{ width: 120, minWidth: 120, maxWidth: 120 }} />
                   <col style={{ width: 84, minWidth: 84, maxWidth: 84 }} />
                 </colgroup>
                 <thead>
                   <tr>
-                    {["Complaint Id", "Title", "Category", "Citizen", "Location", "Date of Incident", "Status", "Action"].map((column, index, all) => (
+                    {[t("admin.grievanceQueue.colGrievanceId"), t("admin.grievanceQueue.colTitle"), t("admin.grievanceQueue.colCitizen"), t("admin.grievanceQueue.colState"), t("admin.grievanceQueue.colDistrict"), t("admin.grievanceQueue.colDate"), t("admin.grievanceQueue.colStatus"), t("admin.grievanceQueue.colAction")].map((column, index, all) => (
                       <th
                         key={column}
                         style={{
@@ -630,7 +639,7 @@ export default function AdminComplaintQueue() {
                           color: tableHeaderText,
                           textTransform: "uppercase",
                           letterSpacing: "0.06em",
-                          textAlign: column === "Status" || column === "Action" ? "center" : "left",
+                          textAlign: index === 5 || index === 6 || index === 7 ? "center" : "left",
                           whiteSpace: "nowrap",
                           background: tableHeaderBackground,
                           borderBottom: `1px solid ${C.border}`,
@@ -645,53 +654,53 @@ export default function AdminComplaintQueue() {
                   </tr>
                 </thead>
                 <tbody>
-                  {paginatedComplaintQueue.map((complaint, index) => {
-                    const isActionHovered = hoveredActionId === complaint.id;
+                  {paginatedGrievanceQueue.map((grievance, index) => {
+                    const isActionHovered = hoveredActionId === grievance.id;
                     return (
-                      <tr key={complaint.id} style={{ background: index % 2 === 0 ? C.card : alternateRowBackground, borderBottom: `1px solid ${C.borderLight}`, verticalAlign: "middle" }}>
+                      <tr key={grievance.id} style={{ background: index % 2 === 0 ? C.card : alternateRowBackground, borderBottom: `1px solid ${C.borderLight}`, verticalAlign: "middle" }}>
                         <td style={{ padding: "10px 16px", fontSize: 13, fontWeight: 600, color: C.t2, verticalAlign: "middle" }}>
-                          <span title={complaint.complaintId || complaint.id} style={{ ...tableCellTextStyle, fontWeight: 600 }}>
-                            {complaint.complaintId || complaint.id}
+                          <span title={grievance.grievanceId || grievance.id} style={{ ...tableCellTextStyle, fontWeight: 600 }}>
+                            {grievance.grievanceId || grievance.id}
                           </span>
                         </td>
                         <td style={{ padding: "10px 16px", verticalAlign: "middle", maxWidth: 0 }}>
-                          <div title={toTooltipText(complaint.title || "Untitled Complaint")} style={{ fontSize: 13, fontWeight: 600, color: C.t1, ...tableCellTextStyle }}>
-                            {complaint.title || "Untitled Complaint"}
+                          <div title={toTooltipText(grievance.title || t("admin.grievanceQueue.untitled"))} style={{ fontSize: 13, fontWeight: 600, color: C.t1, ...tableCellTextStyle }}>
+                            {grievance.title || t("admin.grievanceQueue.untitled")}
                           </div>
                         </td>
                         <td style={{ padding: "10px 16px", fontSize: 13, color: C.t2, verticalAlign: "middle", maxWidth: 0 }}>
-                          <div title={toTooltipText(complaint.complaintType || "Not provided")} style={tableCellTextStyle}>
-                            {complaint.complaintType || "Not provided"}
+                          <div title={toTooltipText(grievance.citizenSnapshot?.name || t("admin.grievanceQueue.unknownCitizen"))} style={tableCellTextStyle}>
+                            {grievance.citizenSnapshot?.name || t("admin.grievanceQueue.unknownCitizen")}
                           </div>
                         </td>
                         <td style={{ padding: "10px 16px", fontSize: 13, color: C.t2, verticalAlign: "middle", maxWidth: 0 }}>
-                          <div title={toTooltipText(complaint.citizenSnapshot?.name || "Unknown Citizen")} style={tableCellTextStyle}>
-                            {complaint.citizenSnapshot?.name || "Unknown Citizen"}
+                          <div title={toTooltipText(grievance.state || grievance.citizenSnapshot?.state || t("admin.grievanceQueue.notProvided"))} style={tableCellTextStyle}>
+                            {grievance.state || grievance.citizenSnapshot?.state || t("admin.grievanceQueue.notProvided")}
                           </div>
                         </td>
                         <td style={{ padding: "10px 16px", fontSize: 13, color: C.t2, verticalAlign: "middle", maxWidth: 0 }}>
-                          <div title={toTooltipText(complaint.complaintLocation || "Not provided")} style={tableCellTextStyle}>
-                            {complaint.complaintLocation || "Not provided"}
+                          <div title={toTooltipText(grievance.district || grievance.citizenSnapshot?.district || t("admin.grievanceQueue.notProvided"))} style={tableCellTextStyle}>
+                            {grievance.district || grievance.citizenSnapshot?.district || t("admin.grievanceQueue.notProvided")}
                           </div>
                         </td>
-                        <td style={{ padding: "10px 16px", fontSize: 13, color: C.t2, verticalAlign: "middle", whiteSpace: "nowrap" }}>
-                          <span title={toTooltipText(formatDateOnly(complaint.incidentDate))} style={tableCellTextStyle}>
-                            {formatDateOnly(complaint.incidentDate)}
+                        <td style={{ padding: "10px 16px", fontSize: 13, color: C.t2, verticalAlign: "middle", textAlign: "center", whiteSpace: "nowrap" }}>
+                          <span title={toTooltipText(formatDateOnly(grievance.incidentDate))} style={tableCellTextStyle}>
+                            {formatDateOnly(grievance.incidentDate)}
                           </span>
                         </td>
-                        <td style={{ padding: "10px 16px 10px 8px", textAlign: "center", verticalAlign: "middle", whiteSpace: "nowrap" }}>
+                        <td style={{ padding: "10px 8px", textAlign: "center", verticalAlign: "middle" }}>
                           <div style={{ maxWidth: "100%", overflow: "hidden" }}>
-                            <WorkspaceBadge status={complaintQueueStatus(complaint)} color={complaintQueueStatus(complaint) === "reassigned" ? C.danger : complaintQueueStatus(complaint) === "complaint_logged" ? C.warn : undefined} title={complaintQueueStatus(complaint) === "accepted" ? "Accepted" : complaintQueueStatus(complaint) === "complaint_logged" ? "Complaint Logged" : complaintQueueStatus(complaint) === "reassigned" ? "Reassigned" : statusLabel(complaintQueueStatus(complaint))} style={{ maxWidth: "100%" }}>
-                              {complaintQueueStatus(complaint) === "accepted" ? "Accepted" : complaintQueueStatus(complaint) === "complaint_logged" ? "Complaint Logged" : complaintQueueStatus(complaint) === "reassigned" ? "Reassigned" : statusLabel(complaintQueueStatus(complaint))}
+                            <WorkspaceBadge status={grievanceQueueStatus(grievance)} title={statusLabel(grievanceQueueStatus(grievance))} style={{ maxWidth: "100%" }}>
+                              {statusLabel(grievanceQueueStatus(grievance))}
                             </WorkspaceBadge>
                           </div>
                         </td>
                         <td style={{ padding: "10px 16px", textAlign: "center", verticalAlign: "middle", whiteSpace: "nowrap" }}>
                           <button
                             type="button"
-                            onMouseEnter={() => setHoveredActionId(complaint.id)}
+                            onMouseEnter={() => setHoveredActionId(grievance.id)}
                             onMouseLeave={() => setHoveredActionId(null)}
-                            onClick={() => navigate(`${PATHS.admin.cases}/${complaint.id}?source=complaint-queue`)}
+                            onClick={() => navigate(`${PATHS.admin.cases}/${grievance.id}?source=grievance-queue`)}
                             title="View details"
                             style={{
                               minWidth: 0,
@@ -720,7 +729,7 @@ export default function AdminComplaintQueue() {
                 <div className="flex flex-col md:flex-row md:items-center gap-2 py-1.5" style={{ width: "calc(100% - 24px)", margin: "0 auto" }}>
                   <div className="flex items-center gap-2 md:flex-1 md:basis-0">
                     <span className="portal-citizen-caption" style={{ color: C.t2, whiteSpace: "nowrap" }}>
-                      Show
+                      {t("admin.grievanceQueue.show")}
                     </span>
                     <input
                       type="number"
@@ -751,12 +760,12 @@ export default function AdminComplaintQueue() {
                       }}
                     />
                     <span className="portal-citizen-caption" style={{ color: C.t2, whiteSpace: "nowrap" }}>
-                      Entries
+                      {t("admin.grievanceQueue.entries")}
                     </span>
                   </div>
                   <p className="portal-citizen-caption md:order-2" style={{ color: C.t2, margin: 0, whiteSpace: "nowrap", textAlign: "right", flex: 1, flexBasis: 0 }}>
-                    Showing <span style={{ fontWeight: 600 }}>{Math.min((currentPage - 1) * itemsPerPage + 1, filteredComplaintQueue.length)}</span>-<span style={{ fontWeight: 600 }}>{Math.min(currentPage * itemsPerPage, filteredComplaintQueue.length)}</span> of{" "}
-                    <span style={{ fontWeight: 600 }}>{filteredComplaintQueue.length}</span> requests
+                    Showing <span style={{ fontWeight: 600 }}>{Math.min((currentPage - 1) * itemsPerPage + 1, filteredGrievanceQueue.length)}</span>-<span style={{ fontWeight: 600 }}>{Math.min(currentPage * itemsPerPage, filteredGrievanceQueue.length)}</span> of{" "}
+                    <span style={{ fontWeight: 600 }}>{filteredGrievanceQueue.length}</span> {t("admin.grievanceQueue.requests")}
                   </p>
 
                   <div className="flex items-center gap-2 flex-wrap md:flex-1 md:basis-0 md:justify-center md:order-1">

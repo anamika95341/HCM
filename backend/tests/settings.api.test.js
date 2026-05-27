@@ -34,7 +34,7 @@ jest.mock('../modules/citizen/citizen.controller', () => ({
   getProfile: jest.fn((req, res) => res.json({ profile: {} })),
   getDashboard: jest.fn((req, res) => res.json({})),
   getAdminDirectory: jest.fn((req, res) => res.json({ admins: [] })),
-  getMyCases: jest.fn((req, res) => res.json({ complaints: [] })),
+  getMyCases: jest.fn((req, res) => res.json({ grievances: [] })),
   getCaseDetail: jest.fn((req, res) => res.status(404).json({ error: 'Case not found' })),
 }));
 jest.mock('../modules/admin/admin.controller', () => ({

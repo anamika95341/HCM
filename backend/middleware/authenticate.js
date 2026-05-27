@@ -246,7 +246,9 @@ function authenticate(expectedRole) {
         }
       }
 
-      req.user = payload;
+      req.user = matchedRole === 'admin' && user.admin_type
+        ? { ...payload, adminType: user.admin_type }
+        : payload;
       req.authRole = matchedRole;
       req.token = token;
       return next();

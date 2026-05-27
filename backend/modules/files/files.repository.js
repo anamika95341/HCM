@@ -91,38 +91,38 @@ async function listFilesVisibleToRole(visibleToRole, filters = {}) {
   return result.rows;
 }
 
-async function getCitizenMeetingById(meetingId, citizenId) {
+async function getCitizenAppointmentById(appointmentId, citizenId) {
   const result = await pool.query(
     `SELECT id
-       FROM meetings
+       FROM appointments
       WHERE id = $1
         AND citizen_id = $2
       LIMIT 1`,
-    [meetingId, citizenId]
+    [appointmentId, citizenId]
   );
   return result.rows[0] || null;
 }
 
-async function getCitizenComplaintById(complaintId, citizenId) {
+async function getCitizenGrievanceById(grievanceId, citizenId) {
   const result = await pool.query(
     `SELECT id
-       FROM complaints
+       FROM grievances
       WHERE id = $1
         AND citizen_id = $2
       LIMIT 1`,
-    [complaintId, citizenId]
+    [grievanceId, citizenId]
   );
   return result.rows[0] || null;
 }
 
-async function getAssignedMeetingForDeo(meetingId, deoId) {
+async function getAssignedAppointmentForDeo(appointmentId, deoId) {
   const result = await pool.query(
     `SELECT id, minister_id
-       FROM meetings
+       FROM appointments
       WHERE id = $1
         AND (assigned_deo_id = $2 OR status = 'completed')
       LIMIT 1`,
-    [meetingId, deoId]
+    [appointmentId, deoId]
   );
   return result.rows[0] || null;
 }
@@ -139,14 +139,14 @@ async function getDeoCalendarEventById(eventId, deoId) {
   return result.rows[0] || null;
 }
 
-async function hasMinisterMeetingAccess(meetingId, ministerId) {
+async function hasMinisterAppointmentAccess(appointmentId, ministerId) {
   const result = await pool.query(
     `SELECT 1
        FROM minister_calendar_events
-      WHERE meeting_id = $1
+      WHERE appointment_id = $1
         AND minister_id = $2
       LIMIT 1`,
-    [meetingId, ministerId]
+    [appointmentId, ministerId]
   );
   return Boolean(result.rows[0]);
 }
@@ -227,11 +227,11 @@ module.exports = {
   createFile,
   findFileRecordById,
   listFilesVisibleToRole,
-  getCitizenMeetingById,
-  getCitizenComplaintById,
-  getAssignedMeetingForDeo,
+  getCitizenAppointmentById,
+  getCitizenGrievanceById,
+  getAssignedAppointmentForDeo,
   getDeoCalendarEventById,
-  hasMinisterMeetingAccess,
+  hasMinisterAppointmentAccess,
   hasMinisterEventAccess,
   listFilesUploadedByActor,
   listFilesForContext,

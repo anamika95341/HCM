@@ -8,15 +8,15 @@ jest.mock('../config/database', () => ({
   query: jest.fn(),
 }));
 
-jest.mock('../modules/meetings/meetings.repository', () => ({
+jest.mock('../modules/appointments/appointments.repository', () => ({
   createUploadedFile: jest.fn(),
-  createMeeting: jest.fn(),
-  getMeetingById: jest.fn(),
+  createAppointment: jest.fn(),
+  getAppointmentById: jest.fn(),
 }));
 
-jest.mock('../modules/complaints/complaints.repository', () => ({
-  createComplaint: jest.fn(),
-  getComplaintById: jest.fn(),
+jest.mock('../modules/grievances/grievances.repository', () => ({
+  createGrievance: jest.fn(),
+  getGrievanceById: jest.fn(),
 }));
 
 jest.mock('../modules/admin/admin.repository', () => ({
@@ -36,8 +36,8 @@ jest.mock('../utils/audit', () => ({
 }));
 
 jest.mock('../realtime/wsPublisher', () => ({
-  publishMeetingStatusUpdate: jest.fn(),
-  publishComplaintStatusUpdate: jest.fn(),
+  publishAppointmentStatusUpdate: jest.fn(),
+  publishGrievanceStatusUpdate: jest.fn(),
 }));
 
 jest.mock('../utils/logger', () => ({
@@ -48,26 +48,26 @@ jest.mock('../utils/logger', () => ({
 
 const redis = require('../config/redis');
 const pool = require('../config/database');
-const meetingsRepository = require('../modules/meetings/meetings.repository');
-const complaintsRepository = require('../modules/complaints/complaints.repository');
+const appointmentsRepository = require('../modules/appointments/appointments.repository');
+const grievancesRepository = require('../modules/grievances/grievances.repository');
 const adminRepository = require('../modules/admin/admin.repository');
-const meetingsService = require('../modules/meetings/meetings.service');
-const complaintsService = require('../modules/complaints/complaints.service');
+const appointmentsService = require('../modules/appointments/appointments.service');
+const grievancesService = require('../modules/grievances/grievances.service');
 
 describe('submission workflow services', () => {
   beforeEach(() => {
     jest.clearAllMocks();
   });
 
-  test('meeting submission works without an idempotency header when Redis is unavailable', async () => {
+  test('appointment submission works without an idempotency header when Redis is unavailable', async () => {
     redis.get.mockRejectedValue(new Error('redis down'));
     pool.query
       .mockResolvedValueOnce({ rows: [{ id: 'idempo-1' }] })
       .mockResolvedValueOnce({ rows: [] });
-    meetingsRepository.createMeeting.mockResolvedValue({ id: 'meeting-db-1' });
-    meetingsRepository.getMeetingById.mockResolvedValue({ id: 'meeting-db-1', requestId: 'MREQ-2026-000001', status: 'pending' });
+    appointmentsRepository.createAppointment.mockResolvedValue({ id: 'appointment-db-1' });
+    appointmentsRepository.getAppointmentById.mockResolvedValue({ id: 'appointment-db-1', requestId: 'MREQ-2026-000001', status: 'pending' });
 
-    const result = await meetingsService.submitMeetingRequest({
+    const result = await appointmentsService.submitAppointmentRequest({
       citizenId: 'citizen-1',
       body: {
         title: 'Water issue',
@@ -81,29 +81,29 @@ describe('submission workflow services', () => {
       idempotencyKey: '',
     });
 
-    expect(meetingsRepository.createMeeting).toHaveBeenCalledWith(expect.objectContaining({
+    expect(appointmentsRepository.createAppointment).toHaveBeenCalledWith(expect.objectContaining({
       citizenId: 'citizen-1',
       title: 'Water issue',
     }));
     expect(result).toEqual({
-      meeting: { id: 'meeting-db-1', requestId: 'MREQ-2026-000001', status: 'pending' },
+      appointment: { id: 'appointment-db-1', requestId: 'MREQ-2026-000001', status: 'pending' },
     });
     expect(pool.query).toHaveBeenCalledWith(
       expect.stringContaining('INSERT INTO idempotency_requests'),
-      expect.arrayContaining(['meeting_submission', 'citizen-1'])
+      expect.arrayContaining(['appointment_submission', 'citizen-1'])
     );
   });
 
-  test('meeting submission assigns the selected admin desk directly to the meeting queue', async () => {
+  test('appointment submission assigns the selected admin desk directly to the appointment queue', async () => {
     redis.get.mockRejectedValue(new Error('redis down'));
     pool.query
       .mockResolvedValueOnce({ rows: [{ id: 'idempo-3' }] })
       .mockResolvedValueOnce({ rows: [] });
     adminRepository.findActiveAdminById.mockResolvedValue({ id: 'admin-42' });
-    meetingsRepository.createMeeting.mockResolvedValue({ id: 'meeting-db-2' });
-    meetingsRepository.getMeetingById.mockResolvedValue({ id: 'meeting-db-2', requestId: 'MREQ-2026-000002', status: 'pending', assignedAdminUserId: 'admin-42' });
+    appointmentsRepository.createAppointment.mockResolvedValue({ id: 'appointment-db-2' });
+    appointmentsRepository.getAppointmentById.mockResolvedValue({ id: 'appointment-db-2', requestId: 'MREQ-2026-000002', status: 'pending', assignedAdminUserId: 'admin-42' });
 
-    const result = await meetingsService.submitMeetingRequest({
+    const result = await appointmentsService.submitAppointmentRequest({
       citizenId: 'citizen-1',
       body: {
         title: 'Local road repair',
@@ -119,47 +119,47 @@ describe('submission workflow services', () => {
     });
 
     expect(adminRepository.findActiveAdminById).toHaveBeenCalledWith('admin-42');
-    expect(meetingsRepository.createMeeting).toHaveBeenCalledWith(expect.objectContaining({
+    expect(appointmentsRepository.createAppointment).toHaveBeenCalledWith(expect.objectContaining({
       citizenId: 'citizen-1',
       assignedAdminId: 'admin-42',
       adminReferral: 'Admin Name · Roads',
     }));
     expect(result).toEqual({
-      meeting: { id: 'meeting-db-2', requestId: 'MREQ-2026-000002', status: 'pending', assignedAdminUserId: 'admin-42' },
+      appointment: { id: 'appointment-db-2', requestId: 'MREQ-2026-000002', status: 'pending', assignedAdminUserId: 'admin-42' },
     });
   });
 
-  test('complaint submission works without an idempotency header when Redis is unavailable', async () => {
+  test('grievance submission works without an idempotency header when Redis is unavailable', async () => {
     redis.get.mockRejectedValue(new Error('redis down'));
     pool.query
       .mockResolvedValueOnce({ rows: [{ id: 'idempo-2' }] })
       .mockResolvedValueOnce({ rows: [] });
-    complaintsRepository.createComplaint.mockResolvedValue({ id: 'complaint-db-1' });
-    complaintsRepository.getComplaintById.mockResolvedValue({ id: 'complaint-db-1', complaintId: 'COMP-2026-000001', status: 'submitted' });
+    grievancesRepository.createGrievance.mockResolvedValue({ id: 'grievance-db-1' });
+    grievancesRepository.getGrievanceById.mockResolvedValue({ id: 'grievance-db-1', grievanceId: 'COMP-2026-000001', status: 'submitted' });
 
-    const result = await complaintsService.submitComplaint({
+    const result = await grievancesService.submitGrievance({
       citizenId: 'citizen-1',
       body: {
         subject: 'Street light issue',
         description: 'The main street light near the market has been out for two weeks.',
-        complaintLocation: 'Main Market',
-        complaintType: 'Civic',
+        grievanceLocation: 'Main Market',
+        grievanceType: 'Civic',
       },
       file: null,
       reqMeta: { ip: '127.0.0.1', userAgent: 'jest' },
       idempotencyKey: '',
     });
 
-    expect(complaintsRepository.createComplaint).toHaveBeenCalledWith(expect.objectContaining({
+    expect(grievancesRepository.createGrievance).toHaveBeenCalledWith(expect.objectContaining({
       citizenId: 'citizen-1',
       subject: 'Street light issue',
     }));
     expect(result).toEqual({
-      complaint: { id: 'complaint-db-1', complaintId: 'COMP-2026-000001', status: 'submitted' },
+      grievance: { id: 'grievance-db-1', grievanceId: 'COMP-2026-000001', status: 'submitted' },
     });
     expect(pool.query).toHaveBeenCalledWith(
       expect.stringContaining('INSERT INTO idempotency_requests'),
-      expect.arrayContaining(['complaint_submission', 'citizen-1'])
+      expect.arrayContaining(['grievance_submission', 'citizen-1'])
     );
   });
 });

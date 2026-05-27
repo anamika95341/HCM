@@ -9,13 +9,31 @@ async function getCalendar(req, res, next) {
   }
 }
 
-async function getMeetingFiles(req, res, next) {
+async function getAppointmentFiles(req, res, next) {
   try {
-    const result = await ministerService.getMeetingFiles(req.user.sub, req.params.meetingId);
+    const result = await ministerService.getAppointmentFiles(req.user.sub, req.params.appointmentId);
     res.json(result);
   } catch (error) {
     next(error);
   }
 }
 
-module.exports = { getCalendar, getMeetingFiles };
+async function getScheduledGrievances(req, res, next) {
+  try {
+    const grievances = await ministerService.getScheduledGrievances();
+    res.json({ grievances });
+  } catch (error) {
+    next(error);
+  }
+}
+
+async function getAppointmentPool(req, res, next) {
+  try {
+    const result = await ministerService.getAppointmentPool();
+    res.json(result);
+  } catch (error) {
+    next(error);
+  }
+}
+
+module.exports = { getCalendar, getAppointmentFiles, getScheduledGrievances, getAppointmentPool };

@@ -1,6 +1,6 @@
 const adminRepository = require('./admin.repository');
-const meetingsRepository = require('../meetings/meetings.repository');
-const complaintsRepository = require('../complaints/complaints.repository');
+const appointmentsRepository = require('../appointments/appointments.repository');
+const grievancesRepository = require('../grievances/grievances.repository');
 const authRepository = require('../auth/auth.repository');
 const createHttpError = require('http-errors');
 
@@ -8,12 +8,17 @@ async function getDashboard() {
   return adminRepository.getDashboard();
 }
 
-async function getWorkQueue() {
-  const [meetings, complaints] = await Promise.all([
-    meetingsRepository.getMeetingQueue(),
-    complaintsRepository.getComplaintQueue(),
-  ]);
-  return { meetings, complaints };
+async function getWorkQueue(adminType) {
+  if (adminType === 'chief_minister') {
+    const [appointments, grievances] = await Promise.all([
+      appointmentsRepository.getAppointmentQueue(),
+      grievancesRepository.getGrievanceQueue(),
+    ]);
+    return { appointments, grievances };
+  }
+  // Regular admins only see appointments — no grievance pool
+  const appointments = await appointmentsRepository.getAppointmentQueue();
+  return { appointments, grievances: [] };
 }
 
 async function getWorkflowDirectory() {

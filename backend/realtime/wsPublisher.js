@@ -5,14 +5,14 @@ function buildChannel(recipientRole, recipientId) {
   return `${recipientRole}:${recipientId}`;
 }
 
-async function publishMeetingStatusUpdate({ citizenId, meetingId, status, note }) {
+async function publishAppointmentStatusUpdate({ citizenId, appointmentId, status, note }) {
   await redis.publish(
     buildChannel('citizen', citizenId),
     JSON.stringify({
-      event: events.MEETING_STATUS_UPDATED,
+      event: events.APPOINTMENT_STATUS_UPDATED,
       payload: {
         citizenId,
-        meetingId,
+        appointmentId,
         status,
         note,
         timestamp: new Date().toISOString(),
@@ -21,14 +21,14 @@ async function publishMeetingStatusUpdate({ citizenId, meetingId, status, note }
   );
 }
 
-async function publishComplaintStatusUpdate({ citizenId, complaintId, status, note }) {
+async function publishGrievanceStatusUpdate({ citizenId, grievanceId, status, note }) {
   await redis.publish(
     buildChannel('citizen', citizenId),
     JSON.stringify({
-      event: events.COMPLAINT_STATUS_UPDATED,
+      event: events.GRIEVANCE_STATUS_UPDATED,
       payload: {
         citizenId,
-        complaintId,
+        grievanceId,
         status,
         note,
         timestamp: new Date().toISOString(),
@@ -53,7 +53,7 @@ async function publishNotificationCreated({ recipientRole, recipientId, notifica
 
 module.exports = {
   buildChannel,
-  publishMeetingStatusUpdate,
-  publishComplaintStatusUpdate,
+  publishAppointmentStatusUpdate,
+  publishGrievanceStatusUpdate,
   publishNotificationCreated,
 };

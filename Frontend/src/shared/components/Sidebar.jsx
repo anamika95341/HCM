@@ -3,84 +3,116 @@ import {
     FiMenu,
 } from "react-icons/fi";
 import { RiTeamLine } from "react-icons/ri";
-import { RiAlarmWarningLine, RiCheckboxCircleLine } from "react-icons/ri";
+import { RiCheckboxCircleLine } from "react-icons/ri";
 import SidebarItem from "./SidebarItem";
 import { LuBox } from "react-icons/lu";
 import { usePortalTheme } from "../theme/portalTheme.jsx";
 import { PATHS } from "../../routes/paths.js";
 import { useAuth } from "../auth/AuthContext.jsx";
+import { useTranslation } from "react-i18next";
 
 function Sidebar({ collapsed, onToggle }) {
   const { C } = usePortalTheme();
   const { session } = useAuth();
+  const { t } = useTranslation();
   const role = session?.role || "citizen";
+  const adminType = session?.user?.adminType || "regular";
+  const isChiefMinister = role === "admin" && adminType === "chief_minister";
   const useCitizenNavUi = role === "citizen" || role === "admin";
+
+  const regularAdminNav = [
+    { to: PATHS.admin.dashboard, icon: FiHome, label: t("sidebar.dashboard") },
+    {
+      to: PATHS.admin.workQueue,
+      icon: FiClipboard,
+      label: t("sidebar.appointmentPool"),
+      activeMatch: (location, isActive) => {
+        const currentTab = new URLSearchParams(location.search).get("tab");
+        return isActive && (!currentTab || currentTab === "appointment-pool");
+      },
+    },
+    {
+      to: PATHS.admin.appointments,
+      icon: RiTeamLine,
+      label: t("sidebar.myAppointments"),
+      activeMatch: (location, isActive) => {
+        return isActive && location.pathname === PATHS.admin.appointments;
+      },
+    },
+    {
+      to: `${PATHS.admin.workQueue}?tab=completed-appointments`,
+      icon: RiCheckboxCircleLine,
+      label: t("sidebar.completedAppointments"),
+      activeMatch: (location, isActive) => {
+        const params = new URLSearchParams(location.search);
+        return isActive && params.get("tab") === "completed-appointments";
+      },
+    },
+    { to: PATHS.admin.calendar, icon: FiCalendar, label: t("sidebar.calendar") },
+  ];
+
+  const chiefMinisterAdminNav = [
+    { to: PATHS.admin.dashboard, icon: FiHome, label: t("sidebar.dashboard") },
+    {
+      to: PATHS.admin.workQueue,
+      icon: FiClipboard,
+      label: t("sidebar.appointmentPool"),
+      activeMatch: (location, isActive) => {
+        const currentTab = new URLSearchParams(location.search).get("tab");
+        return isActive && (!currentTab || currentTab === "appointment-pool");
+      },
+    },
+    {
+      to: PATHS.admin.appointments,
+      icon: RiTeamLine,
+      label: t("sidebar.myAppointments"),
+      activeMatch: (location, isActive) => {
+        return isActive && location.pathname === PATHS.admin.appointments;
+      },
+    },
+    { to: PATHS.admin.grievanceQueue, icon: FiFileText, label: t("sidebar.myGrievances") },
+    {
+      to: `${PATHS.admin.workQueue}?tab=resolved-grievances`,
+      icon: FiCheckCircle,
+      label: t("sidebar.resolvedGrievances"),
+      activeMatch: (location, isActive) => isActive && new URLSearchParams(location.search).get("tab") === "resolved-grievances",
+    },
+    {
+      to: `${PATHS.admin.workQueue}?tab=completed-appointments`,
+      icon: RiCheckboxCircleLine,
+      label: t("sidebar.completedAppointments"),
+      activeMatch: (location, isActive) => {
+        const params = new URLSearchParams(location.search);
+        return isActive && params.get("tab") === "completed-appointments";
+      },
+    },
+    { to: PATHS.admin.calendar, icon: FiCalendar, label: t("sidebar.calendar") },
+  ];
 
     const navByRole = {
         citizen: [
-            { to: PATHS.citizen.newCase, icon: FiHome, label: "Services" },
-            { to: PATHS.citizen.meetings, icon: RiTeamLine, label: "My Meetings" },
-            { to: PATHS.citizen.cases, icon: LuBox, label: "My Complaints" },
+            { to: PATHS.citizen.newCase, icon: FiHome, label: t("sidebar.services") },
+            { to: PATHS.citizen.appointments, icon: RiTeamLine, label: t("sidebar.myAppointments") },
+            { to: PATHS.citizen.cases, icon: LuBox, label: t("sidebar.myGrievances") },
         ],
-        admin: [
-            { to: PATHS.admin.dashboard, icon: FiHome, label: "Dashboard" },
-            {
-              to: PATHS.admin.workQueue,
-              icon: FiClipboard,
-              label: "Work Pool",
-              activeMatch: (location, isActive) => {
-                const currentTab = new URLSearchParams(location.search).get("tab");
-                return isActive && (!currentTab || currentTab === "complaint-pool" || currentTab === "meeting-pool");
-              },
-            },
-            {
-              to: PATHS.admin.meetings,
-              icon: RiTeamLine,
-              label: "My Meetings",
-              activeMatch: (location, isActive) => {
-                return isActive && location.pathname === PATHS.admin.meetings;
-              },
-            },
-            { to: PATHS.admin.complaintQueue, icon: FiFileText, label: "My Complaints" },
-            {
-              to: `${PATHS.admin.workQueue}?tab=escalated`,
-              icon: RiAlarmWarningLine,
-              label: "Reassigned Cases",
-              activeMatch: (location, isActive) => isActive && new URLSearchParams(location.search).get("tab") === "escalated",
-            },
-            {
-              to: `${PATHS.admin.workQueue}?tab=resolved-complaints`,
-              icon: FiCheckCircle,
-              label: "Resolved Cases",
-              activeMatch: (location, isActive) => isActive && new URLSearchParams(location.search).get("tab") === "resolved-complaints",
-            },
-            {
-              to: `${PATHS.admin.workQueue}?tab=completed-meetings`,
-              icon: RiCheckboxCircleLine,
-              label: "Completed Meetings",
-              activeMatch: (location, isActive) => {
-                const params = new URLSearchParams(location.search);
-                return isActive && params.get("tab") === "completed-meetings";
-              },
-            },
-            { to: PATHS.admin.calendar, icon: FiCalendar, label: "Calendar" },
-        ],
+        admin: isChiefMinister ? chiefMinisterAdminNav : regularAdminNav,
         masteradmin: [
-            { to: PATHS.masteradmin.dashboard, icon: FiHome, label: "Dashboard" },
-            { to: PATHS.masteradmin.createAdmin, icon: RiTeamLine, label: "Create Admin" },
-            { to: PATHS.masteradmin.createDeo, icon: RiTeamLine, label: "Create DEO" },
-            { to: PATHS.masteradmin.manageAdmins, icon: FiClipboard, label: "Manage Admins" },
-            { to: PATHS.masteradmin.manageDeos, icon: FiClipboard, label: "Manage DEOs" },
+            { to: PATHS.masteradmin.dashboard, icon: FiHome, label: t("sidebar.dashboard") },
+            { to: PATHS.masteradmin.createAdmin, icon: RiTeamLine, label: t("sidebar.createAdmin") },
+            { to: PATHS.masteradmin.createDeo, icon: RiTeamLine, label: t("sidebar.createDeo") },
+            { to: PATHS.masteradmin.manageAdmins, icon: FiClipboard, label: t("sidebar.manageAdmins") },
+            { to: PATHS.masteradmin.manageDeos, icon: FiClipboard, label: t("sidebar.manageDeos") },
         ],
         deo: [
-            { to: PATHS.deo.calendarEvents, icon: RiTeamLine, label: "Verification Queue" },
-            { to: PATHS.deo.createEvent, icon: FiCalendar, label: "Create Event" },
-            { to: PATHS.deo.manageEvent, icon: FiClipboard, label: "Manage Event" },
-            { to: PATHS.deo.citizenMeetingFiles, icon: LuBox, label: "Citizen Meeting Files" },
+            { to: PATHS.deo.calendarEvents, icon: RiTeamLine, label: t("sidebar.appointmentVerification") },
+            { to: PATHS.deo.grievances, icon: FiFileText, label: t("sidebar.grievances") },
+            { to: PATHS.deo.createEvent, icon: FiCalendar, label: t("sidebar.createEvent") },
+            { to: PATHS.deo.manageEvent, icon: FiClipboard, label: t("sidebar.manageEvent") },
+            { to: PATHS.deo.citizenAppointmentFiles, icon: LuBox, label: t("sidebar.citizenAppointmentFiles") },
         ],
         minister: [
-            { to: PATHS.minister.dashboard, icon: FiHome, label: "Dashboard" },
-            { to: PATHS.minister.calendar, icon: FiCalendar, label: "Calendar" },
+            { to: PATHS.minister.dashboard, icon: FiHome, label: t("sidebar.dashboard") },
+            { to: PATHS.minister.calendar, icon: FiCalendar, label: t("sidebar.calendar") },
         ],
     };
 
@@ -98,16 +130,16 @@ function Sidebar({ collapsed, onToggle }) {
           fontFamily: useCitizenNavUi ? "var(--portal-citizen-font)" : "inherit",
         }}
       >
-        <SidebarItem type="" collapsed={collapsed} label="Toggle Navigation" isCitizen={useCitizenNavUi}>
+        <SidebarItem type="" collapsed={collapsed} label={t("sidebar.toggleNav")} isCitizen={useCitizenNavUi}>
           <button
             onClick={onToggle}
             style={{
               width: 36,
               height: 36,
               borderRadius: 10,
-              background: useCitizenNavUi ? "transparent" : C.bgElevated,
+              background: "transparent",
               color: C.t2,
-              border: useCitizenNavUi ? "none" : `1px solid ${C.border}`,
+              border: "none",
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
@@ -122,7 +154,7 @@ function Sidebar({ collapsed, onToggle }) {
 
       <div style={{ padding: collapsed ? "12px 8px" : "12px 8px 16px", overflowY: "auto",
          overflowX: "hidden", flex: 1 }}>
-       
+
         <ul style={{ width: "100%", display: "grid", gap: 2, margin: 0, padding: 0, listStyle: "none" }}>
           {navByRole[role].map((item) => (
             <SidebarItem key={item.to} type="NavLink" to={item.to} icon={item.icon} label={item.label} collapsed={collapsed} isCitizen={useCitizenNavUi} activeMatch={item.activeMatch} />

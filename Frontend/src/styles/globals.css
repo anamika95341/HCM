@@ -106,7 +106,8 @@ a:hover {
   letter-spacing: -0.02em;
 }
 
-.portal-shell[data-portal-role="admin"] {
+.portal-shell[data-portal-role="admin"],
+.portal-shell[data-portal-role="deo"] {
   font-family: var(--ep-font-serif);
 }
 
@@ -115,7 +116,20 @@ a:hover {
 .portal-shell[data-portal-role="admin"] .portal-content h3,
 .portal-shell[data-portal-role="admin"] .portal-content h4,
 .portal-shell[data-portal-role="admin"] .portal-content h5,
-.portal-shell[data-portal-role="admin"] .portal-content h6 {
+.portal-shell[data-portal-role="admin"] .portal-content h6,
+.portal-shell[data-portal-role="deo"] .portal-content h1,
+.portal-shell[data-portal-role="deo"] .portal-content h2,
+.portal-shell[data-portal-role="deo"] .portal-content h3,
+.portal-shell[data-portal-role="deo"] .portal-content h4,
+.portal-shell[data-portal-role="deo"] .portal-content h5,
+.portal-shell[data-portal-role="deo"] .portal-content h6 {
+  font-family: var(--ep-font-serif);
+}
+
+.portal-shell[data-portal-role="deo"] button,
+.portal-shell[data-portal-role="deo"] input,
+.portal-shell[data-portal-role="deo"] select,
+.portal-shell[data-portal-role="deo"] textarea {
   font-family: var(--ep-font-serif);
 }
 

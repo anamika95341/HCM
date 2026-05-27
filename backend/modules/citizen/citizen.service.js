@@ -1,26 +1,27 @@
 const citizenRepository = require('./citizen.repository');
-const complaintsRepository = require('../complaints/complaints.repository');
-const meetingsRepository = require('../meetings/meetings.repository');
+const grievancesRepository = require('../grievances/grievances.repository');
+const appointmentsRepository = require('../appointments/appointments.repository');
 const adminRepository = require('../admin/admin.repository');
 const filesService = require('../files/files.service');
+const logger = require('../../utils/logger');
 
 async function getProfile(citizenId) {
   return citizenRepository.findCitizenById(citizenId);
 }
 
 async function getDashboard(citizenId) {
-  const [profile, complaints, meetings] = await Promise.all([
+  const [profile, grievances, appointments] = await Promise.all([
     citizenRepository.findCitizenById(citizenId),
-    complaintsRepository.getCitizenComplaints(citizenId),
-    meetingsRepository.getCitizenMeetings(citizenId),
+    grievancesRepository.getCitizenGrievances(citizenId),
+    appointmentsRepository.getCitizenAppointments(citizenId),
   ]);
 
   return {
     profile,
-    complaintsCount: complaints.length,
-    meetingsCount: meetings.length,
-    latestComplaint: complaints[0] || null,
-    latestMeeting: meetings[0] || null,
+    grievancesCount: grievances.length,
+    appointmentsCount: appointments.length,
+    latestGrievance: grievances[0] || null,
+    latestAppointment: appointments[0] || null,
   };
 }
 
@@ -35,84 +36,70 @@ async function getAdminDirectory() {
 }
 
 async function getMyCases(citizenId) {
-  const complaints = await complaintsRepository.getCitizenComplaints(citizenId);
-  return { complaints };
+  const grievances = await grievancesRepository.getCitizenGrievances(citizenId);
+  return { grievances };
 }
 
 async function getCaseDetail(citizenId, caseId, reqMeta) {
-  const [meeting, complaint] = await Promise.all([
-    meetingsRepository.getCitizenMeetingById(caseId, citizenId),
-    complaintsRepository.getCitizenComplaintById(caseId, citizenId),
+  const [appointment, grievance] = await Promise.all([
+    appointmentsRepository.getCitizenAppointmentById(caseId, citizenId),
+    grievancesRepository.getCitizenGrievanceById(caseId, citizenId),
   ]);
 
-  if (meeting) {
-    const history = await meetingsRepository.getMeetingHistory(caseId);
+  if (appointment) {
+    const history = await appointmentsRepository.getAppointmentHistory(caseId);
     const files = [];
-    try {
-      if (meeting.document_file_id) {
+    if (appointment.document_file_id) {
+      try {
         const document = await filesService.createLegacyDownloadAccess({
-          fileId: meeting.document_file_id,
+          fileId: appointment.document_file_id,
           actorRole: 'citizen',
           actorId: citizenId,
-          scope: { entityType: 'meeting', entityId: caseId },
+          scope: { entityType: 'appointment', entityId: caseId },
         });
-        meeting.document = {
-          ...document.file,
-          downloadUrl: document.downloadUrl,
-        };
-        files.push({
-          ...document.file,
-          fileCategory: 'document',
-          downloadUrl: document.downloadUrl,
-        });
+        appointment.document = { ...document.file, downloadUrl: document.downloadUrl };
+        files.push({ ...document.file, fileCategory: 'document', downloadUrl: document.downloadUrl });
+      } catch (legacyErr) {
+        logger.warn('Failed to generate legacy download URL for appointment', { caseId, citizenId, error: legacyErr.message });
       }
-      const managedFiles = await filesService.listOwnedFiles({
-        actorRole: 'citizen',
-        actorId: citizenId,
-        contextType: 'meeting',
-        contextId: caseId,
-        reqMeta,
-      });
-      meeting.files = [...files, ...managedFiles];
-    } catch (_) {
-      meeting.files = files;
     }
-    return { itemType: 'meeting', caseData: meeting, history };
+    const managedFiles = await filesService.listOwnedFiles({
+      actorRole: 'citizen',
+      actorId: citizenId,
+      contextType: 'appointment',
+      contextId: caseId,
+      reqMeta,
+    });
+    appointment.files = [...files, ...managedFiles];
+    return { itemType: 'appointment', caseData: appointment, history };
   }
 
-  if (complaint) {
-    const history = await complaintsRepository.getComplaintHistory(caseId);
+  if (grievance) {
+    const history = await grievancesRepository.getGrievanceHistory(caseId);
     const files = [];
-    try {
-      if (complaint.document_file_id) {
+    if (grievance.document_file_id) {
+      try {
         const document = await filesService.createLegacyDownloadAccess({
-          fileId: complaint.document_file_id,
+          fileId: grievance.document_file_id,
           actorRole: 'citizen',
           actorId: citizenId,
-          scope: { entityType: 'complaint', entityId: caseId },
+          scope: { entityType: 'grievance', entityId: caseId },
         });
-        complaint.document = {
-          ...document.file,
-          downloadUrl: document.downloadUrl,
-        };
-        files.push({
-          ...document.file,
-          fileCategory: 'document',
-          downloadUrl: document.downloadUrl,
-        });
+        grievance.document = { ...document.file, downloadUrl: document.downloadUrl };
+        files.push({ ...document.file, fileCategory: 'document', downloadUrl: document.downloadUrl });
+      } catch (legacyErr) {
+        logger.warn('Failed to generate legacy download URL for grievance', { caseId, citizenId, error: legacyErr.message });
       }
-      const managedFiles = await filesService.listOwnedFiles({
-        actorRole: 'citizen',
-        actorId: citizenId,
-        contextType: 'complaint',
-        contextId: caseId,
-        reqMeta,
-      });
-      complaint.files = [...files, ...managedFiles];
-    } catch (_) {
-      complaint.files = files;
     }
-    return { itemType: 'complaint', caseData: complaint, history };
+    const managedFiles = await filesService.listOwnedFiles({
+      actorRole: 'citizen',
+      actorId: citizenId,
+      contextType: 'grievance',
+      contextId: caseId,
+      reqMeta,
+    });
+    grievance.files = [...files, ...managedFiles];
+    return { itemType: 'grievance', caseData: grievance, history };
   }
 
   return null;

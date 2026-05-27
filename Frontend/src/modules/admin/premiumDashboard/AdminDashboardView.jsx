@@ -1,26 +1,22 @@
 import { useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { apiClient } from "../../../shared/api/client.js";
 import { useAuth } from "../../../shared/auth/AuthContext.jsx";
 import { usePortalTheme } from "../../../shared/theme/portalTheme.jsx";
-import MeetingsSection, { MeetingStatsPanel } from "./components/MeetingsSection.jsx";
-import ComplaintsSection from "./components/ComplaintsSection.jsx";
+import AppointmentsSection, { AppointmentStatsPanel, OverallAppointmentsSection, AppointmentPoolTrendLine } from "./components/AppointmentsSection.jsx";
+import GrievancesSection from "./components/GrievancesSection.jsx";
 import OverallSection from "./components/OverallSection.jsx";
 import "./Dashboard.css";
 
-// Statuses excluded from Pending Meetings count (admin's own meetings)
-const EXCLUDED_MEETING_STATUSES = new Set([
-  "scheduled",
+const EXCLUDED_APPOINTMENT_STATUSES = new Set([
   "completed",
-  "rescheduled",
   "cancelled",
   "rejected",
 ]);
 
-// Statuses excluded from Pending Complaints count
-const EXCLUDED_COMPLAINT_STATUSES = new Set([
+const EXCLUDED_GRIEVANCE_STATUSES = new Set([
   "call_scheduled",
   "resolved",
-  "reassigned",
   "rescheduled",
   "cancelled",
   "completed",
@@ -55,20 +51,21 @@ function StatCard({ label, value, loading }) {
 }
 
 export default function PremiumAdminDashboard() {
-  const [meetingFilter, setMeetingFilter] = useState("Month");
+  const [appointmentFilter, setAppointmentFilter] = useState("Month");
   const { session } = useAuth();
   const { C, theme } = usePortalTheme();
+  const { t } = useTranslation();
   const adminId = session?.user?.id;
+  const isChiefMinister = session?.user?.adminType === "chief_minister";
 
   const [stats, setStats] = useState({
-    meetingsToday: 0,
-    vipMeetingsToday: 0,
-    complaintsMeetingToday: 0,
-    pendingMeetings: 0,
-    pendingComplaints: 0,
+    appointmentsToday: 0,
+    vipAppointmentsToday: 0,
+    pendingAppointments: 0,
+    pendingGrievances: 0,
   });
-  const [allMeetings, setAllMeetings] = useState([]);
-  const [allComplaints, setAllComplaints] = useState([]);
+  const [allAppointments, setAllAppointments] = useState([]);
+  const [allGrievances, setAllGrievances] = useState([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -81,53 +78,42 @@ export default function PremiumAdminDashboard() {
         const response = await apiClient.get("/admin/work-queue");
         if (!active) return;
 
-        const meetings = Array.isArray(response.data?.meetings) ? response.data.meetings : [];
-        const complaints = Array.isArray(response.data?.complaints) ? response.data.complaints : [];
+        const appointments = Array.isArray(response.data?.appointments) ? response.data.appointments : [];
+        const grievances = Array.isArray(response.data?.grievances) ? response.data.grievances : [];
 
-        // 1. Meetings Today: scheduled/rescheduled with scheduled_at = today
-        const meetingsToday = meetings.filter(
+        const appointmentsToday = appointments.filter(
           (m) =>
             (m.status === "scheduled" || m.status === "rescheduled") &&
-            isSameLocalDay(m.scheduled_at)
+            isSameLocalDay(m.scheduled_at) &&
+            !Boolean(m.is_vip)
         ).length;
 
-        // 2. VIP Meetings Today: same + is_vip flag
-        const vipMeetingsToday = meetings.filter(
+        const vipAppointmentsToday = appointments.filter(
           (m) =>
             (m.status === "scheduled" || m.status === "rescheduled") &&
             isSameLocalDay(m.scheduled_at) &&
             Boolean(m.is_vip)
         ).length;
 
-        // 3. Complaints Meeting Today: scheduled meetings today that came from a complaint
-        const complaintsMeetingToday = meetings.filter(
-          (m) =>
-            (m.status === "scheduled" || m.status === "rescheduled") &&
-            isSameLocalDay(m.scheduled_at) &&
-            Boolean(m.requestId || m.complaintId || m.sourceComplaintId)
-        ).length;
-
-        // 4. Pending Meetings: admin's own meetings, excluding scheduled/completed/rescheduled/cancelled/rejected
-        const pendingMeetings = meetings.filter(
+        const pendingAppointments = appointments.filter(
           (m) =>
             m.assignedAdminUserId === adminId &&
-            !EXCLUDED_MEETING_STATUSES.has(m.status)
+            !EXCLUDED_APPOINTMENT_STATUSES.has(m.status)
         ).length;
 
-        // 5. Pending Complaints: assigned to this admin, excluding call_scheduled/resolved/reassigned/rescheduled/cancelled
-        const pendingComplaints = complaints.filter(
+        const pendingGrievances = grievances.filter(
           (c) =>
             c.assignedAdminUserId === adminId &&
-            !EXCLUDED_COMPLAINT_STATUSES.has(c.status)
+            !EXCLUDED_GRIEVANCE_STATUSES.has(c.status)
         ).length;
 
         if (active) {
-          setStats({ meetingsToday, vipMeetingsToday, complaintsMeetingToday, pendingMeetings, pendingComplaints });
-          setAllMeetings(meetings);
-          setAllComplaints(complaints);
+          setStats({ appointmentsToday, vipAppointmentsToday, pendingAppointments, pendingGrievances });
+          setAllAppointments(appointments);
+          setAllGrievances(grievances);
         }
       } catch {
-        // silently fall back to zeros — cards show — on error
+        // silently fall back to zeros
       } finally {
         if (active) setLoading(false);
       }
@@ -188,29 +174,43 @@ export default function PremiumAdminDashboard() {
   return (
     <div className="adv-dashboard" style={dashboardVars}>
       <div style={{ marginBottom: "1.25rem" }}>
-        <h1 style={{ margin: 0, fontSize: 20, fontWeight: 600, lineHeight: 1.3 }}>HCM Overview</h1>
-        <p style={{ margin: "0.2rem 0 0", fontSize: "0.8rem", color: "var(--db-text-muted)" }}>{dateStr} · Real-time Metrics</p>
+        <h1 style={{ margin: 0, fontSize: 20, fontWeight: 600, lineHeight: 1.3 }}>{t("admin.dashboard.hcmOverview")}</h1>
+        <p style={{ margin: "0.2rem 0 0", fontSize: "0.8rem", color: "var(--db-text-muted)" }}>{dateStr} · {t("admin.dashboard.realtimeMetrics")}</p>
       </div>
 
       <div className="db-exec-grid">
-        <StatCard label="Meetings Today"           value={stats.meetingsToday}         loading={loading} />
-        <StatCard label="VIP Meetings Today"        value={stats.vipMeetingsToday}      loading={loading} />
-        <StatCard label="Complaints Meeting Today"  value={stats.complaintsMeetingToday} loading={loading} />
-        <StatCard label="Pending Meetings"          value={stats.pendingMeetings}       loading={loading} />
-        <StatCard label="Pending Complaints"        value={stats.pendingComplaints}     loading={loading} />
+        <StatCard label={t("admin.dashboard.appointmentsToday")}     value={stats.appointmentsToday}    loading={loading} />
+        <StatCard label={t("admin.dashboard.vipAppointmentsToday")}  value={stats.vipAppointmentsToday} loading={loading} />
+        <StatCard label={t("admin.dashboard.pendingAppointments")}   value={stats.pendingAppointments}  loading={loading} />
+        {isChiefMinister && (
+          <StatCard label={t("admin.dashboard.pendingGrievances")}   value={stats.pendingGrievances}    loading={loading} />
+        )}
       </div>
 
-      <div className="db-section-label">Meetings</div>
+      <div className="db-section-label">{t("admin.dashboard.appointmentsSection")}</div>
       <div className="db-grid-row db-col-7-3">
-        <MeetingsSection filter={meetingFilter} onFilterChange={setMeetingFilter} meetings={allMeetings} adminId={adminId} loading={loading} />
-        <MeetingStatsPanel filter={meetingFilter} meetings={allMeetings} adminId={adminId} loading={loading} />
+        <AppointmentsSection filter={appointmentFilter} onFilterChange={setAppointmentFilter} appointments={allAppointments} adminId={adminId} loading={loading} />
+        <AppointmentStatsPanel filter={appointmentFilter} appointments={allAppointments} adminId={adminId} loading={loading} />
+      </div>
+      <div className="db-grid-row db-col-1-1">
+        <OverallAppointmentsSection appointments={allAppointments} loading={loading} />
+        <AppointmentPoolTrendLine appointments={allAppointments} loading={loading} />
       </div>
 
-      <div className="db-section-label">Complaints</div>
-      <ComplaintsSection complaints={allComplaints} adminId={adminId} loading={loading} />
+      {isChiefMinister && (
+        <>
+          <div className="db-section-label">{t("admin.dashboard.grievancesSection")}</div>
+          <GrievancesSection grievances={allGrievances} adminId={adminId} loading={loading} showReassigned={false} />
+        </>
+      )}
 
-      <div className="db-section-label">Overall</div>
-      <OverallSection meetings={allMeetings} complaints={allComplaints} loading={loading} />
+      <div className="db-section-label">{t("admin.dashboard.overallSection")}</div>
+      <OverallSection
+        appointments={allAppointments}
+        grievances={isChiefMinister ? allGrievances : []}
+        loading={loading}
+        showGrievances={isChiefMinister}
+      />
     </div>
   );
 }

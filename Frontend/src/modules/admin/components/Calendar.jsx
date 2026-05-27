@@ -24,7 +24,7 @@
 //       startsAt: new Date(y, m, d, 10, 0).toISOString(),
 //       endsAt: new Date(y, m, d, 11, 30).toISOString(),
 //       location: "Conference Room A",
-//       type: "Scheduled Meeting",
+//       type: "Scheduled Appointment",
 //       source: "Internal",
 //     },
 //     {
@@ -35,7 +35,7 @@
 //       startsAt: new Date(y, m, d + 1, 14, 0).toISOString(),
 //       endsAt: new Date(y, m, d + 1, 15, 0).toISOString(),
 //       location: "Zoom Meet",
-//       type: "Scheduled Meeting",
+//       type: "Scheduled Appointment",
 //       source: "External",
 //     },
 //     {
@@ -46,7 +46,7 @@
 //       startsAt: new Date(y, m, d + 2, 12, 30).toISOString(),
 //       endsAt: new Date(y, m, d + 2, 14, 0).toISOString(),
 //       location: "Downtown Cafe",
-//       type: "Scheduled Meeting",
+//       type: "Scheduled Appointment",
 //       source: "Internal",
 //     },
 //     {
@@ -57,7 +57,7 @@
 //       startsAt: new Date(y, m, d - 1, 9, 0).toISOString(),
 //       endsAt: new Date(y, m, d - 1, 10, 0).toISOString(),
 //       location: "Google Meet",
-//       type: "Scheduled Meeting",
+//       type: "Scheduled Appointment",
 //       source: "Internal",
 //     }
 //   ];
@@ -100,11 +100,11 @@
 // }
 
 // function getItemTone(item, C) {
-//   if (item.calendarKind === "complaintCall") return C.mint;
-//   return item.type === "VIP Meeting" ? C.warn : C.purple;
+//   if (item.calendarKind === "grievanceCall") return C.mint;
+//   return item.type === "VIP Appointment" ? C.warn : C.purple;
 // }
 
-// function DayMeetingsModal({ date, items, onClose, onSelectMeeting }) {
+// function DayAppointmentsModal({ date, items, onClose, onSelectAppointment }) {
 //   const { C } = usePortalTheme();
 
 //   if (!date) return null;
@@ -124,13 +124,13 @@
 //           <div className="px-6 sm:px-8 py-6 border-b flex items-start justify-between gap-4" style={{ background: C.bgElevated, borderColor: C.border }}>
 //             <div className="min-w-0">
 //               <div style={{ fontSize: 11, fontWeight: 700, color: C.t3, textTransform: "uppercase", letterSpacing: ".1em" }}>
-//                 Meeting Schedule
+//                 Appointment Schedule
 //               </div>
 //               <h3 className="mt-3 text-2xl font-bold break-words" style={{ color: C.t1 }}>
 //                 {date.toLocaleDateString(undefined, { weekday: "long", month: "long", day: "numeric", year: "numeric" })}
 //               </h3>
 //               <div className="mt-2 text-sm" style={{ color: C.t2 }}>
-//                 Total Meetings: {items.length}
+//                 Total Appointments: {items.length}
 //               </div>
 //             </div>
 //             <button
@@ -146,7 +146,7 @@
 
 //           <div className="p-6 sm:p-8 max-h-[320px] overflow-y-auto">
 //             {items.length === 0 ? (
-//               <div style={{ fontSize: 13, color: C.t3, textAlign: "center", padding: "24px 0" }}>No meetings for this date.</div>
+//               <div style={{ fontSize: 13, color: C.t3, textAlign: "center", padding: "24px 0" }}>No appointments for this date.</div>
 //             ) : (
 //               <div className="space-y-3">
 //                 {items.map((item) => {
@@ -155,7 +155,7 @@
 //                     <button
 //                       key={item.id}
 //                       type="button"
-//                       onClick={() => onSelectMeeting(item)}
+//                       onClick={() => onSelectAppointment(item)}
 //                       className="w-full text-left rounded-xl p-4 transition-all"
 //                       style={{ border: `1px solid ${C.border}`, background: C.bgElevated }}
 //                     >
@@ -191,7 +191,7 @@
 //   const { C } = usePortalTheme();
 //   if (!item) return null;
 //   const tone = getItemTone(item, C);
-//   const isComplaintCall = item.calendarKind === "complaintCall";
+//   const isGrievanceCall = item.calendarKind === "grievanceCall";
 
 //   return (
 //     <>
@@ -238,7 +238,7 @@
 //           {/* Tabs */}
 //           <div style={{ padding: "14px 20px", borderBottom: `1px solid ${C.border}`, background: C.card }}>
 //             <WorkspaceTabs
-//               items={isComplaintCall
+//               items={isGrievanceCall
 //                 ? [{ id: "details", label: "Details" }, { id: "edit", label: "Edit" }]
 //                 : [{ id: "details", label: "Details" }, { id: "edit", label: "Edit" }]}
 //               value={mode}
@@ -253,10 +253,10 @@
 //                 <div className="grid sm:grid-cols-2 gap-6 sm:gap-8">
 //                   <div>
 //                     <p style={{ fontSize: 11, fontWeight: 700, color: C.t3, textTransform: "uppercase", letterSpacing: ".1em", marginBottom: 12 }}>
-//                       {isComplaintCall ? "Citizen / Contact" : "Location"}
+//                       {isGrievanceCall ? "Citizen / Contact" : "Location"}
 //                     </p>
 //                     <p style={{ fontSize: 16, color: C.t1, fontWeight: 600 }} className="break-words">
-//                       {isComplaintCall ? item.location || "Contact pending" : item.location || "Location pending"}
+//                       {isGrievanceCall ? item.location || "Contact pending" : item.location || "Location pending"}
 //                     </p>
 //                   </div>
 //                   <div>
@@ -285,7 +285,7 @@
 //                     value={editForm.title}
 //                     onChange={(event) => setEditForm((current) => ({ ...current, title: event.target.value }))}
 //                     style={{ width: "100%", padding: "10px 14px", border: `1px solid ${C.border}`, borderRadius: 10, background: C.inp, color: C.t1, fontSize: 14 }}
-//                     placeholder="Meeting title"
+//                     placeholder="Appointment title"
 //                   />
 //                 </div>
 
@@ -296,7 +296,7 @@
 //                     onChange={(event) => setEditForm((current) => ({ ...current, details: event.target.value }))}
 //                     rows={5}
 //                     style={{ width: "100%", padding: "10px 14px", border: `1px solid ${C.border}`, borderRadius: 10, background: C.inp, color: C.t1, fontSize: 14 }}
-//                     placeholder="Meeting description"
+//                     placeholder="Appointment description"
 //                   />
 //                 </div>
 
@@ -305,8 +305,8 @@
 //                     <label style={{ display: "block", fontSize: 12, fontWeight: 700, color: C.t2, marginBottom: 10 }}>Date</label>
 //                     <input
 //                       type="date"
-//                       value={editForm.meetingDate}
-//                       onChange={(event) => setEditForm((current) => ({ ...current, meetingDate: event.target.value }))}
+//                       value={editForm.appointmentDate}
+//                       onChange={(event) => setEditForm((current) => ({ ...current, appointmentDate: event.target.value }))}
 //                       style={{ width: "100%", padding: "10px 14px", border: `1px solid ${C.border}`, borderRadius: 10, background: C.inp, color: C.t1, fontSize: 14 }}
 //                     />
 //                   </div>
@@ -330,14 +330,14 @@
 //                   </div>
 //                 </div>
 
-//                 {!isComplaintCall && (
+//                 {!isGrievanceCall && (
 //                   <div>
 //                     <label style={{ display: "block", fontSize: 12, fontWeight: 700, color: C.t2, marginBottom: 10 }}>Location</label>
 //                     <input
 //                       value={editForm.location}
 //                       onChange={(event) => setEditForm((current) => ({ ...current, location: event.target.value }))}
 //                       style={{ width: "100%", padding: "10px 14px", border: `1px solid ${C.border}`, borderRadius: 10, background: C.inp, color: C.t1, fontSize: 14 }}
-//                       placeholder="Meeting location"
+//                       placeholder="Appointment location"
 //                     />
 //                   </div>
 //                 )}
@@ -371,7 +371,7 @@
 //   const [selectedDateItems, setSelectedDateItems] = useState(null);
 //   const [modalMode, setModalMode] = useState("details");
 //   const [saving, setSaving] = useState(false);
-//   const [editForm, setEditForm] = useState({ title: "", details: "", meetingDate: "", startTime: "", endTime: "", location: "" });
+//   const [editForm, setEditForm] = useState({ title: "", details: "", appointmentDate: "", startTime: "", endTime: "", location: "" });
 
 //   useEffect(() => {
 //     let mounted = true;
@@ -380,45 +380,45 @@
 //       try {
 //         const queueResponse = await apiClient.get("/admin/work-queue");
 //         const data = queueResponse.data;
-//         const scheduledMeetings = (data.meetings || [])
-//           .filter((meeting) => meeting.status === "scheduled" && meeting.scheduled_at)
-//           .map((meeting) => ({
-//             id: meeting.id,
-//             calendarKind: "meeting",
-//             sourceId: meeting.requestId || meeting.id,
-//             ministerId: meeting.ministerId,
-//             title: meeting.title || meeting.purpose,
-//             details: meeting.admin_comments || meeting.purpose,
-//             startsAt: meeting.scheduled_at,
-//             endsAt: meeting.scheduled_end_at || new Date(new Date(meeting.scheduled_at).getTime() + 30 * 60 * 1000).toISOString(),
-//             location: meeting.scheduled_location || "Location pending",
-//             type: meeting.is_vip ? "VIP Meeting" : "Scheduled Meeting",
-//             source: "Citizen Meeting Workflow",
-//             isVip: Boolean(meeting.is_vip),
+//         const scheduledAppointments = (data.appointments || [])
+//           .filter((appointment) => appointment.status === "scheduled" && appointment.scheduled_at)
+//           .map((appointment) => ({
+//             id: appointment.id,
+//             calendarKind: "appointment",
+//             sourceId: appointment.requestId || appointment.id,
+//             ministerId: appointment.ministerId,
+//             title: appointment.title || appointment.purpose,
+//             details: appointment.admin_comments || appointment.purpose,
+//             startsAt: appointment.scheduled_at,
+//             endsAt: appointment.scheduled_end_at || new Date(new Date(appointment.scheduled_at).getTime() + 30 * 60 * 1000).toISOString(),
+//             location: appointment.scheduled_location || "Location pending",
+//             type: appointment.is_vip ? "VIP Appointment" : "Scheduled Appointment",
+//             source: "Citizen Appointment Workflow",
+//             isVip: Boolean(appointment.is_vip),
 //           }));
 
-//         const scheduledCalls = (data.complaints || [])
-//           .filter((complaint) => complaint.callScheduledAt)
-//           .map((complaint) => {
-//             const startAt = complaint.callScheduledAt;
+//         const scheduledCalls = (data.grievances || [])
+//           .filter((grievance) => grievance.callScheduledAt)
+//           .map((grievance) => {
+//             const startAt = grievance.callScheduledAt;
 //             const endAt = new Date(new Date(startAt).getTime() + 30 * 60 * 1000).toISOString();
 //             return {
-//               id: complaint.id,
-//               calendarKind: "complaintCall",
-//               sourceId: complaint.complaintId || complaint.id,
-//               title: complaint.title || complaint.subject || "Scheduled Call",
-//               details: complaint.description || complaint.details || "Complaint follow-up call",
+//               id: grievance.id,
+//               calendarKind: "grievanceCall",
+//               sourceId: grievance.grievanceId || grievance.id,
+//               title: grievance.title || grievance.subject || "Scheduled Call",
+//               details: grievance.description || grievance.details || "Grievance follow-up call",
 //               startsAt: startAt,
 //               endsAt: endAt,
-//               location: complaint.citizenSnapshot?.name || complaint.currentOwner || "Citizen call",
+//               location: grievance.citizenSnapshot?.name || grievance.currentOwner || "Citizen call",
 //               type: "Scheduled Call",
-//               source: "Complaint Workflow",
-//               callStatus: complaint.status,
+//               source: "Grievance Workflow",
+//               callStatus: grievance.status,
 //             };
 //           });
 
 //         if (mounted) {
-//           const calendarItems = [...scheduledMeetings, ...scheduledCalls];
+//           const calendarItems = [...scheduledAppointments, ...scheduledCalls];
 //           setItems(calendarItems.length ? calendarItems : getStaticData());
 //         }
 //       } catch (loadError) {
@@ -544,14 +544,14 @@
 //     setEditForm({
 //       title: item.title || "",
 //       details: item.details || "",
-//       meetingDate: item.startsAt?.slice(0, 10) || "",
+//       appointmentDate: item.startsAt?.slice(0, 10) || "",
 //       startTime: start ? `${String(start.getHours()).padStart(2, "0")}:${String(start.getMinutes()).padStart(2, "0")}` : "",
 //       endTime: end ? `${String(end.getHours()).padStart(2, "0")}:${String(end.getMinutes()).padStart(2, "0")}` : "",
 //       location: item.location || "",
 //     });
 //   };
 
-//   const openDateMeetings = (date, dayItemsForDate) => {
+//   const openDateAppointments = (date, dayItemsForDate) => {
 //     setCursorDate(startOfDay(date));
 //     setSelectedDateItems({
 //       date: startOfDay(date),
@@ -569,12 +569,12 @@
 
 //   const saveEdit = async () => {
 //     if (!selectedItem) return;
-//     if (selectedItem.calendarKind === "meeting" && !selectedItem.ministerId) {
-//       setError("This meeting cannot be edited from calendar because the assigned minister is missing.");
+//     if (selectedItem.calendarKind === "appointment" && !selectedItem.ministerId) {
+//       setError("This appointment cannot be edited from calendar because the assigned minister is missing.");
 //       return;
 //     }
-//     if (!editForm.meetingDate || !editForm.startTime || !editForm.endTime || (selectedItem.calendarKind === "meeting" && !editForm.location.trim())) {
-//       setError("Date, time, and location are required to update this meeting.");
+//     if (!editForm.appointmentDate || !editForm.startTime || !editForm.endTime || (selectedItem.calendarKind === "appointment" && !editForm.location.trim())) {
+//       setError("Date, time, and location are required to update this appointment.");
 //       return;
 //     }
 
@@ -582,20 +582,20 @@
 //     setError("");
 
 //     try {
-//       if (selectedItem.calendarKind === "complaintCall") {
+//       if (selectedItem.calendarKind === "grievanceCall") {
 //         await apiClient.patch(
-//           `/complaints/${selectedItem.id}/schedule-call`,
+//           `/grievances/${selectedItem.id}/schedule-call`,
 //           {
-//             callScheduledAt: new Date(`${editForm.meetingDate}T${editForm.startTime}`).toISOString(),
+//             callScheduledAt: new Date(`${editForm.appointmentDate}T${editForm.startTime}`).toISOString(),
 //           },
 //         );
 //       } else {
 //         await apiClient.patch(
-//           `/meetings/${selectedItem.id}/schedule`,
+//           `/appointments/${selectedItem.id}/schedule`,
 //           {
 //             ministerId: selectedItem.ministerId,
-//             startsAt: new Date(`${editForm.meetingDate}T${editForm.startTime}`).toISOString(),
-//             endsAt: new Date(`${editForm.meetingDate}T${editForm.endTime}`).toISOString(),
+//             startsAt: new Date(`${editForm.appointmentDate}T${editForm.startTime}`).toISOString(),
+//             endsAt: new Date(`${editForm.appointmentDate}T${editForm.endTime}`).toISOString(),
 //             location: editForm.location,
 //             isVip: selectedItem.isVip || false,
 //             comments: editForm.details,
@@ -607,9 +607,9 @@
 //         ...selectedItem,
 //         title: editForm.title,
 //         details: editForm.details,
-//         startsAt: new Date(`${editForm.meetingDate}T${editForm.startTime}`).toISOString(),
-//         endsAt: new Date(`${editForm.meetingDate}T${editForm.endTime}`).toISOString(),
-//         location: selectedItem.calendarKind === "complaintCall" ? selectedItem.location : editForm.location,
+//         startsAt: new Date(`${editForm.appointmentDate}T${editForm.startTime}`).toISOString(),
+//         endsAt: new Date(`${editForm.appointmentDate}T${editForm.endTime}`).toISOString(),
+//         location: selectedItem.calendarKind === "grievanceCall" ? selectedItem.location : editForm.location,
 //         isVip: selectedItem.isVip || false,
 //       };
 
@@ -624,7 +624,7 @@
 //         };
 //       });
 //     } catch (saveError) {
-//       setError(saveError?.response?.data?.error || "Unable to save meeting changes");
+//       setError(saveError?.response?.data?.error || "Unable to save appointment changes");
 //     } finally {
 //       setSaving(false);
 //     }
@@ -775,7 +775,7 @@
 //                       return (
 //                         <div
 //                           key={day.toISOString()}
-//                           onClick={() => openDateMeetings(day, dayItemsForDate)}
+//                           onClick={() => openDateAppointments(day, dayItemsForDate)}
 //                           style={{
 //                             height: `calc((100vh - 280px) / ${rowsCount})`,
 //                             minHeight: 70,
@@ -826,7 +826,7 @@
 //                                 textAlign: "center",
 //                               }}
 //                             >
-//                               {dayItemsForDate.length} meeting{dayItemsForDate.length !== 1 ? "s" : ""}
+//                               {dayItemsForDate.length} appointment{dayItemsForDate.length !== 1 ? "s" : ""}
 //                             </div>
 //                           )}
 //                         </div>
@@ -854,7 +854,7 @@
 //                           cursor: "pointer",
 //                           transition: "border-color 0.15s ease, background 0.15s ease",
 //                         }}
-//                         onClick={() => openDateMeetings(day.date, day.items)}
+//                         onClick={() => openDateAppointments(day.date, day.items)}
 //                         onMouseEnter={(event) => {
 //                           if (!isSelected) event.currentTarget.style.borderColor = `${C.purple}40`;
 //                         }}
@@ -898,7 +898,7 @@
 //                                 textAlign: "center",
 //                               }}
 //                             >
-//                               {day.items.length} meeting{day.items.length !== 1 ? "s" : ""}
+//                               {day.items.length} appointment{day.items.length !== 1 ? "s" : ""}
 //                             </div>
 //                           ) : (
 //                             <div style={{ fontSize: 11, color: C.t3 }}>No events</div>
@@ -948,11 +948,11 @@
 //                                 {formatTime(item.startsAt)} – {formatTime(item.endsAt)}
 //                               </div>
 //                               <div style={{ fontSize: 12, color: C.t3 }}>
-//                                 {item.location || (item.calendarKind === "complaintCall" ? "Contact pending" : "Location pending")}
+//                                 {item.location || (item.calendarKind === "grievanceCall" ? "Contact pending" : "Location pending")}
 //                               </div>
 //                             </div>
 //                             <WorkspaceBadge color={tone}>
-//                               {item.calendarKind === "complaintCall" ? "Call" : item.type === "VIP Meeting" ? "VIP" : "Standard"}
+//                               {item.calendarKind === "grievanceCall" ? "Call" : item.type === "VIP Appointment" ? "VIP" : "Standard"}
 //                             </WorkspaceBadge>
 //                           </div>
 //                         </button>
@@ -972,7 +972,7 @@
 //                     <div style={{ fontSize: 11, fontWeight: 700, color: C.t3, textTransform: "uppercase", letterSpacing: ".1em", marginBottom: 4 }}>
 //                       Upcoming
 //                     </div>
-//                     <h3 className="text-lg font-bold" style={{ color: C.t1 }}>Next Meetings</h3>
+//                     <h3 className="text-lg font-bold" style={{ color: C.t1 }}>Next Appointments</h3>
 //                   </div>
 //                   <div style={{ background: `${C.purple}15`, padding: 8, borderRadius: "50%", color: C.purple }}>
 //                     <CalendarIcon size={18} />
@@ -981,7 +981,7 @@
 
 //                 <div className="space-y-4 max-h-[600px] overflow-y-auto">
 //                 {upcomingGroups.length === 0 ? (
-//                   <div style={{ fontSize: 13, color: C.t3 }}>No meetings scheduled for today or tomorrow.</div>
+//                   <div style={{ fontSize: 13, color: C.t3 }}>No appointments scheduled for today or tomorrow.</div>
 //                 ) : (
 //                   upcomingGroups.map((group) => (
 //                     <div key={group.key}>
@@ -1044,11 +1044,11 @@
 //           </div>
 //         )}
 
-//       <DayMeetingsModal
+//       <DayAppointmentsModal
 //         date={selectedDateItems?.date || null}
 //         items={selectedDateItems?.items || []}
 //         onClose={() => setSelectedDateItems(null)}
-//         onSelectMeeting={(item) => {
+//         onSelectAppointment={(item) => {
 //           setSelectedDateItems(null);
 //           openItem(item);
 //         }}
@@ -1096,7 +1096,7 @@ const getStaticData = () => {
       startsAt: new Date(y, m, d, 10, 0).toISOString(),
       endsAt: new Date(y, m, d, 11, 30).toISOString(),
       location: "Conference Room A",
-      type: "Scheduled Meeting",
+      type: "Scheduled Appointment",
       source: "Internal",
     },
     {
@@ -1107,7 +1107,7 @@ const getStaticData = () => {
       startsAt: new Date(y, m, d + 1, 14, 0).toISOString(),
       endsAt: new Date(y, m, d + 1, 15, 0).toISOString(),
       location: "Zoom Meet",
-      type: "Scheduled Meeting",
+      type: "Scheduled Appointment",
       source: "External",
     },
     {
@@ -1118,7 +1118,7 @@ const getStaticData = () => {
       startsAt: new Date(y, m, d + 2, 12, 30).toISOString(),
       endsAt: new Date(y, m, d + 2, 14, 0).toISOString(),
       location: "Downtown Cafe",
-      type: "Scheduled Meeting",
+      type: "Scheduled Appointment",
       source: "Internal",
     },
     {
@@ -1129,7 +1129,7 @@ const getStaticData = () => {
       startsAt: new Date(y, m, d - 1, 9, 0).toISOString(),
       endsAt: new Date(y, m, d - 1, 10, 0).toISOString(),
       location: "Google Meet",
-      type: "Scheduled Meeting",
+      type: "Scheduled Appointment",
       source: "Internal",
     },
   ];
@@ -1167,14 +1167,15 @@ function formatTime(dateString) {
   return new Date(dateString).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
 }
 
+const MONTH_ABBR = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+
 function formatAdminDate(value) {
   const parsed = value instanceof Date ? value : new Date(value);
   if (Number.isNaN(parsed.getTime())) return "";
-  return parsed.toLocaleDateString("en-GB", {
-    day: "2-digit",
-    month: "2-digit",
-    year: "2-digit",
-  });
+  const day = String(parsed.getDate()).padStart(2, "0");
+  const mon = MONTH_ABBR[parsed.getMonth()];
+  const year = String(parsed.getFullYear()).slice(-2);
+  return `${day} ${mon},${year}`;
 }
 
 function sortByStartTime(items) {
@@ -1182,21 +1183,22 @@ function sortByStartTime(items) {
 }
 
 function getItemTone(item, C) {
-  if (item.calendarKind === "complaintCall") return C.mint;
-  if (item.meetingStatus === "cancelled") return C.danger;
-  return item.type === "VIP Meeting" ? C.warn : C.purple;
+  if (item.calendarKind === "grievanceCall") return C.mint;
+  if (item.appointmentStatus === "cancelled") return C.danger;
+  if (item.isOwn === false) return "#3b82f6";
+  return item.type === "VIP Appointment" ? C.warn : C.purple;
 }
 
 function getItemBadgeLabel(item) {
-  if (item.calendarKind === "complaintCall") return "Call";
-  if (item.meetingStatus === "cancelled") return "Cancelled";
-  if (item.type === "VIP Meeting") return "VIP";
-  return "Meeting";
+  if (item.calendarKind === "grievanceCall") return "Call";
+  if (item.appointmentStatus === "cancelled") return "Cancelled";
+  if (item.type === "VIP Appointment") return "VIP";
+  return "Appointment";
 }
 
-// ── DayMeetingsPanel — Side drawer ─────────────────────────────────────────────
+// ── DayAppointmentsPanel — Side drawer ─────────────────────────────────────────────
 
-function DayMeetingsPanel({ date, items, onClose, onSelectMeeting, isVisible }) {
+function DayAppointmentsPanel({ date, items, onClose, onSelectAppointment, isVisible }) {
   const { C } = usePortalTheme();
 
   return (
@@ -1252,6 +1254,24 @@ function DayMeetingsPanel({ date, items, onClose, onSelectMeeting, isVisible }) 
           >
             {date ? formatAdminDate(date) : ""}
           </h3>
+          {items.length > 0 && (() => {
+            const appts = items.filter((i) => i.calendarKind === "appointment");
+            const grieves = items.filter((i) => i.calendarKind === "grievanceCall");
+            return (
+              <div style={{ display: "flex", gap: 6, marginTop: 8, flexWrap: "wrap" }}>
+                {appts.length > 0 && (
+                  <span style={{ fontSize: 10, fontWeight: 600, padding: "2px 8px", borderRadius: 99, background: `${C.purple}12`, color: C.purple, border: `1px solid ${C.purple}25` }}>
+                    {appts.length} appt{appts.length !== 1 ? "s" : ""}
+                  </span>
+                )}
+                {grieves.length > 0 && (
+                  <span style={{ fontSize: 10, fontWeight: 600, padding: "2px 8px", borderRadius: 99, background: `${C.mint}12`, color: C.mint, border: `1px solid ${C.mint}25` }}>
+                    {grieves.length} grievance{grieves.length !== 1 ? "s" : ""}
+                  </span>
+                )}
+              </div>
+            );
+          })()}
         </div>
         <button
           type="button"
@@ -1306,7 +1326,7 @@ function DayMeetingsPanel({ date, items, onClose, onSelectMeeting, isVisible }) 
                 <button
                   key={item.id}
                   type="button"
-                  onClick={() => onSelectMeeting(item)}
+                  onClick={() => onSelectAppointment(item)}
                   style={{
                     width: "100%",
                     textAlign: "left",
@@ -1385,14 +1405,14 @@ function DayMeetingsPanel({ date, items, onClose, onSelectMeeting, isVisible }) 
   );
 }
 
-// ── Meeting Detail Modal ──────────────────────────────────────────────────────
+// ── Appointment Detail Modal ──────────────────────────────────────────────────────
 
 function Modal({ item, mode, editForm, setEditForm, onClose, onSave, onModeChange, saving }) {
   const { C } = usePortalTheme();
   if (!item) return null;
   const tone = getItemTone(item, C);
-  const isComplaintCall = item.calendarKind === "complaintCall";
-  const isCancelledMeeting = item.meetingStatus === "cancelled";
+  const isGrievanceCall = item.calendarKind === "grievanceCall";
+  const isCancelledAppointment = item.appointmentStatus === "cancelled";
 
   return (
     <>
@@ -1497,7 +1517,7 @@ function Modal({ item, mode, editForm, setEditForm, onClose, onSave, onModeChang
           {/* Fixed Tabs */}
           <div style={{ padding: "12px 28px", borderBottom: `1px solid ${C.border}`, background: C.card, flexShrink: 0 }}>
             <WorkspaceTabs
-              items={isCancelledMeeting ? [{ id: "details", label: "Details" }] : [{ id: "details", label: "Details" }, { id: "edit", label: "Edit" }]}
+              items={(isCancelledAppointment || (item.calendarKind === "appointment" && !item.isOwn)) ? [{ id: "details", label: "Details" }] : [{ id: "details", label: "Details" }, { id: "edit", label: "Edit" }]}
               value={mode}
               onChange={onModeChange}
             />
@@ -1510,10 +1530,10 @@ function Modal({ item, mode, editForm, setEditForm, onClose, onSave, onModeChang
                 <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 24 }}>
                   <div>
                     <p style={{ fontSize: 11, fontWeight: 700, color: C.t3, textTransform: "uppercase", letterSpacing: ".1em", marginBottom: 10, margin: 0 }}>
-                      {isComplaintCall ? "Citizen / Contact" : "Location"}
+                      {isGrievanceCall ? "Citizen / Contact" : "Location"}
                     </p>
                     <p style={{ fontSize: 15, color: C.t1, fontWeight: 600, margin: 0, wordBreak: "break-word" }}>
-                      {isComplaintCall ? item.location || "Contact pending" : item.location || "Location pending"}
+                      {isGrievanceCall ? item.location || "Contact pending" : item.location || "Location pending"}
                     </p>
                   </div>
                   <div>
@@ -1550,7 +1570,7 @@ function Modal({ item, mode, editForm, setEditForm, onClose, onSave, onModeChang
                     }}
                     onFocus={(e) => { e.currentTarget.style.borderColor = C.purple; }}
                     onBlur={(e) => { e.currentTarget.style.borderColor = C.border; }}
-                    placeholder="Meeting description"
+                    placeholder="Appointment description"
                   />
                 </div>
                 <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 12 }}>
@@ -1558,8 +1578,8 @@ function Modal({ item, mode, editForm, setEditForm, onClose, onSave, onModeChang
                     <label style={{ display: "block", fontSize: 12, fontWeight: 600, color: C.t2, marginBottom: 8 }}>Date</label>
                     <input
                       type="date"
-                      value={editForm.meetingDate}
-                      onChange={(event) => setEditForm((current) => ({ ...current, meetingDate: event.target.value }))}
+                      value={editForm.appointmentDate}
+                      onChange={(event) => setEditForm((current) => ({ ...current, appointmentDate: event.target.value }))}
                       style={{
                         width: "100%",
                         padding: "10px 12px",
@@ -1618,7 +1638,7 @@ function Modal({ item, mode, editForm, setEditForm, onClose, onSave, onModeChang
                     />
                   </div>
                 </div>
-                {!isComplaintCall && (
+                {!isGrievanceCall && (
                   <div>
                     <label style={{ display: "block", fontSize: 12, fontWeight: 600, color: C.t2, marginBottom: 8 }}>Location</label>
                     <input
@@ -1637,7 +1657,7 @@ function Modal({ item, mode, editForm, setEditForm, onClose, onSave, onModeChang
                       }}
                       onFocus={(e) => { e.currentTarget.style.borderColor = C.purple; }}
                       onBlur={(e) => { e.currentTarget.style.borderColor = C.border; }}
-                      placeholder="Meeting location"
+                      placeholder="Appointment location"
                     />
                   </div>
                 )}
@@ -1721,7 +1741,7 @@ export default function Calendar() {
   const [selectedDateItems, setSelectedDateItems] = useState(null);
   const [modalMode, setModalMode] = useState("details");
   const [saving, setSaving] = useState(false);
-  const [editForm, setEditForm] = useState({ title: "", details: "", meetingDate: "", startTime: "", endTime: "", location: "" });
+  const [editForm, setEditForm] = useState({ title: "", details: "", appointmentDate: "", startTime: "", endTime: "", location: "" });
 
   useEffect(() => {
     let mounted = true;
@@ -1730,52 +1750,53 @@ export default function Calendar() {
       try {
         const queueResponse = await apiClient.get("/admin/work-queue");
         const data = queueResponse.data;
-        const scheduledMeetings = (data.meetings || [])
-          .filter((meeting) => ["scheduled", "rescheduled", "cancelled"].includes(meeting.status) && meeting.scheduled_at)
-          .map((meeting) => ({
-            id: meeting.id,
-            calendarKind: "meeting",
-            sourceId: meeting.requestId || meeting.id,
-            ministerId: meeting.ministerId,
-            title: meeting.title || meeting.purpose,
-            details: meeting.admin_comments || meeting.purpose,
-            startsAt: meeting.scheduled_at,
-            endsAt: meeting.scheduled_end_at || new Date(new Date(meeting.scheduled_at).getTime() + 30 * 60 * 1000).toISOString(),
-            location: meeting.scheduled_location || "Location pending",
-            type: meeting.status === "cancelled"
-              ? "Cancelled Meeting"
-              : meeting.is_vip
-                ? "VIP Meeting"
-                : meeting.status === "rescheduled"
-                  ? "Rescheduled Meeting"
-                  : "Scheduled Meeting",
-            source: "Citizen Meeting Workflow",
-            isVip: Boolean(meeting.is_vip),
-            meetingStatus: meeting.status,
+        const scheduledAppointments = (data.appointments || [])
+          .filter((appointment) => ["scheduled", "rescheduled", "cancelled"].includes(appointment.status) && appointment.scheduled_at)
+          .map((appointment) => ({
+            id: appointment.id,
+            calendarKind: "appointment",
+            sourceId: appointment.requestId || appointment.id,
+            ministerId: appointment.ministerId,
+            title: appointment.title || appointment.purpose,
+            details: appointment.admin_comments || appointment.purpose,
+            startsAt: appointment.scheduled_at,
+            endsAt: appointment.scheduled_end_at || new Date(new Date(appointment.scheduled_at).getTime() + 30 * 60 * 1000).toISOString(),
+            location: appointment.scheduled_location || "Location pending",
+            type: appointment.status === "cancelled"
+              ? "Cancelled Appointment"
+              : appointment.is_vip
+                ? "VIP Appointment"
+                : appointment.status === "rescheduled"
+                  ? "Rescheduled Appointment"
+                  : "Scheduled Appointment",
+            source: "Citizen Appointment Workflow",
+            isVip: Boolean(appointment.is_vip),
+            appointmentStatus: appointment.status,
+            isOwn: appointment.assignedAdminUserId === session?.user?.id,
           }));
 
-        const scheduledCalls = (data.complaints || [])
-          .filter((complaint) => complaint.callScheduledAt)
-          .map((complaint) => {
-            const startAt = complaint.callScheduledAt;
+        const scheduledCalls = (data.grievances || [])
+          .filter((grievance) => grievance.callScheduledAt)
+          .map((grievance) => {
+            const startAt = grievance.callScheduledAt;
             const endAt = new Date(new Date(startAt).getTime() + 30 * 60 * 1000).toISOString();
             return {
-              id: complaint.id,
-              calendarKind: "complaintCall",
-              sourceId: complaint.complaintId || complaint.id,
-              title: complaint.title || complaint.subject || "Scheduled Call",
-              details: complaint.description || complaint.details || "Complaint follow-up call",
+              id: grievance.id,
+              calendarKind: "grievanceCall",
+              sourceId: grievance.grievanceId || grievance.id,
+              title: grievance.title || grievance.subject || "Scheduled Call",
+              details: grievance.description || grievance.details || "Grievance follow-up call",
               startsAt: startAt,
               endsAt: endAt,
-              location: complaint.citizenSnapshot?.name || complaint.currentOwner || "Citizen call",
+              location: grievance.citizenSnapshot?.name || grievance.currentOwner || "Citizen call",
               type: "Scheduled Call",
-              source: "Complaint Workflow",
-              callStatus: complaint.status,
+              source: "Grievance Workflow",
+              callStatus: grievance.status,
             };
           });
 
         if (mounted) {
-          const calendarItems = [...scheduledMeetings, ...scheduledCalls];
+          const calendarItems = [...scheduledAppointments, ...scheduledCalls];
           setItems(calendarItems.length ? calendarItems : getStaticData());
         }
       } catch (loadError) {
@@ -1868,14 +1889,14 @@ export default function Calendar() {
     setEditForm({
       title: item.title || "",
       details: item.details || "",
-      meetingDate: item.startsAt?.slice(0, 10) || "",
+      appointmentDate: item.startsAt?.slice(0, 10) || "",
       startTime: start ? `${String(start.getHours()).padStart(2, "0")}:${String(start.getMinutes()).padStart(2, "0")}` : "",
       endTime: end ? `${String(end.getHours()).padStart(2, "0")}:${String(end.getMinutes()).padStart(2, "0")}` : "",
       location: item.location || "",
     });
   };
 
-  const openDateMeetings = (date, dayItemsForDate) => {
+  const openDateAppointments = (date, dayItemsForDate) => {
     setCursorDate(startOfDay(date));
     setSelectedDateItems({
       date: startOfDay(date),
@@ -1893,12 +1914,13 @@ export default function Calendar() {
 
   const saveEdit = async () => {
     if (!selectedItem) return;
-    if (selectedItem.calendarKind === "meeting" && !selectedItem.ministerId) {
-      setError("This meeting cannot be edited from calendar because the assigned minister is missing.");
+    if (selectedItem.calendarKind === "appointment" && !selectedItem.isOwn) return;
+    if (selectedItem.calendarKind === "appointment" && !selectedItem.ministerId) {
+      setError("This appointment cannot be edited from calendar because the assigned minister is missing.");
       return;
     }
-    if (!editForm.meetingDate || !editForm.startTime || !editForm.endTime || (selectedItem.calendarKind === "meeting" && !editForm.location.trim())) {
-      setError("Date, time, and location are required to update this meeting.");
+    if (!editForm.appointmentDate || !editForm.startTime || !editForm.endTime || (selectedItem.calendarKind === "appointment" && !editForm.location.trim())) {
+      setError("Date, time, and location are required to update this appointment.");
       return;
     }
 
@@ -1906,15 +1928,15 @@ export default function Calendar() {
     setError("");
 
     try {
-      if (selectedItem.calendarKind === "complaintCall") {
-        await apiClient.patch(`/complaints/${selectedItem.id}/schedule-call`, {
-          callScheduledAt: new Date(`${editForm.meetingDate}T${editForm.startTime}`).toISOString(),
+      if (selectedItem.calendarKind === "grievanceCall") {
+        await apiClient.patch(`/grievances/${selectedItem.id}/schedule-call`, {
+          callScheduledAt: new Date(`${editForm.appointmentDate}T${editForm.startTime}`).toISOString(),
         });
       } else {
-        await apiClient.patch(`/meetings/${selectedItem.id}/schedule`, {
+        await apiClient.patch(`/appointments/${selectedItem.id}/schedule`, {
           ministerId: selectedItem.ministerId,
-          startsAt: new Date(`${editForm.meetingDate}T${editForm.startTime}`).toISOString(),
-          endsAt: new Date(`${editForm.meetingDate}T${editForm.endTime}`).toISOString(),
+          startsAt: new Date(`${editForm.appointmentDate}T${editForm.startTime}`).toISOString(),
+          endsAt: new Date(`${editForm.appointmentDate}T${editForm.endTime}`).toISOString(),
           location: editForm.location,
           isVip: selectedItem.isVip || false,
           comments: editForm.details,
@@ -1925,9 +1947,9 @@ export default function Calendar() {
         ...selectedItem,
         title: editForm.title,
         details: editForm.details,
-        startsAt: new Date(`${editForm.meetingDate}T${editForm.startTime}`).toISOString(),
-        endsAt: new Date(`${editForm.meetingDate}T${editForm.endTime}`).toISOString(),
-        location: selectedItem.calendarKind === "complaintCall" ? selectedItem.location : editForm.location,
+        startsAt: new Date(`${editForm.appointmentDate}T${editForm.startTime}`).toISOString(),
+        endsAt: new Date(`${editForm.appointmentDate}T${editForm.endTime}`).toISOString(),
+        location: selectedItem.calendarKind === "grievanceCall" ? selectedItem.location : editForm.location,
         isVip: selectedItem.isVip || false,
       };
 
@@ -1941,7 +1963,7 @@ export default function Calendar() {
         };
       });
     } catch (saveError) {
-      setError(saveError?.response?.data?.error || "Unable to save meeting changes");
+      setError(saveError?.response?.data?.error || "Unable to save appointment changes");
     } finally {
       setSaving(false);
     }
@@ -1988,12 +2010,12 @@ export default function Calendar() {
               transition: "width 0.35s cubic-bezier(0.4, 0, 0.2, 1)", // 🔥 ADD THIS
             }}
           >
-            <DayMeetingsPanel
+            <DayAppointmentsPanel
               date={selectedDateItems?.date || null}
               items={selectedDateItems?.items || []}
               isVisible={!!selectedDateItems}
               onClose={() => setSelectedDateItems(null)}
-              onSelectMeeting={(item) => {
+              onSelectAppointment={(item) => {
                 openItem(item);
               }}
             />
@@ -2109,7 +2131,7 @@ export default function Calendar() {
 
             {/* ── Month View ── */}
             {view === "month" && (
-              <div style={{ flex: 1, display: "flex", flexDirection: "column", minHeight: 0, overflow: "hidden" }}>
+              <div style={{ flex: 1, display: "flex", flexDirection: "column", minHeight: 0, overflow: "auto" }}>
                 {/* Day Headers */}
                 <div
                   style={{
@@ -2141,7 +2163,7 @@ export default function Calendar() {
                   style={{
                     display: "grid",
                     gridTemplateColumns: "repeat(7, 1fr)",
-                    gridTemplateRows: `repeat(${rowsCount}, 1fr)`,
+                    gridTemplateRows: `repeat(${rowsCount}, minmax(78px, 1fr))`,
                     gap: 10,
                     flex: 1,
                     minHeight: 0,
@@ -2156,7 +2178,7 @@ export default function Calendar() {
                     return (
                       <div
                         key={day.toISOString()}
-                        onClick={() => openDateMeetings(day, dayItemsForDate)}
+                        onClick={() => openDateAppointments(day, dayItemsForDate)}
                         style={{
                           borderRadius: 10,
                           border: `1px solid ${isSelected ? C.purple : C.border}`,
@@ -2194,27 +2216,25 @@ export default function Calendar() {
                           {day.getDate()}
                         </div>
 
-                        {/* Meetings Badge */}
-                        {dayItemsForDate.length > 0 && (
-                          <div
-                            style={{
-                              fontSize: 10,
-                              fontWeight: 600,
-                              color: C.purple,
-                              background: `${C.purple}10`,
-                              border: `1px solid ${C.purple}25`,
-                              borderRadius: 6,
-                              padding: "4px 8px",
-                              textAlign: "center",
-                              whiteSpace: "nowrap",
-                              overflow: "hidden",
-                              textOverflow: "ellipsis",
-                              marginTop: "auto",
-                            }}
-                          >
-                            {dayItemsForDate.length} meeting{dayItemsForDate.length !== 1 ? "s" : ""}
-                          </div>
-                        )}
+                        {/* Appointments & Grievances Badges */}
+                        {(() => {
+                          const appts = dayItemsForDate.filter((i) => i.calendarKind === "appointment");
+                          const grieves = dayItemsForDate.filter((i) => i.calendarKind === "grievanceCall");
+                          return (
+                            <div style={{ display: "flex", flexDirection: "column", gap: 4, marginTop: "auto" }}>
+                              {appts.length > 0 && (
+                                <div style={{ fontSize: 10, fontWeight: 600, color: C.purple, background: `${C.purple}10`, border: `1px solid ${C.purple}25`, borderRadius: 6, padding: "4px 8px", textAlign: "center", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                                  {appts.length} appt{appts.length !== 1 ? "s" : ""}
+                                </div>
+                              )}
+                              {grieves.length > 0 && (
+                                <div style={{ fontSize: 10, fontWeight: 600, color: C.mint, background: `${C.mint}10`, border: `1px solid ${C.mint}25`, borderRadius: 6, padding: "4px 8px", textAlign: "center", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                                  {grieves.length} grievance{grieves.length !== 1 ? "s" : ""}
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })()}
                       </div>
                     );
                   })}
@@ -2242,7 +2262,7 @@ export default function Calendar() {
                         display: "flex",
                         flexDirection: "column",
                       }}
-                      onClick={() => openDateMeetings(day.date, day.items)}
+                      onClick={() => openDateAppointments(day.date, day.items)}
                       onMouseEnter={(e) => {
                         if (!isSelected) e.currentTarget.style.borderColor = `${C.purple}60`;
                       }}
@@ -2272,22 +2292,24 @@ export default function Calendar() {
                         </div>
                       </div>
                       <div style={{ marginTop: "auto" }}>
-                        {day.items.length > 0 ? (
-                          <div
-                            style={{
-                              fontSize: 11,
-                              fontWeight: 600,
-                              color: C.purple,
-                              background: `${C.purple}10`,
-                              border: `1px solid ${C.purple}25`,
-                              borderRadius: 6,
-                              padding: "6px 10px",
-                              textAlign: "center",
-                            }}
-                          >
-                            {day.items.length} meeting{day.items.length !== 1 ? "s" : ""}
-                          </div>
-                        ) : (
+                        {day.items.length > 0 ? (() => {
+                          const appts = day.items.filter((i) => i.calendarKind === "appointment");
+                          const grieves = day.items.filter((i) => i.calendarKind === "grievanceCall");
+                          return (
+                            <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                              {appts.length > 0 && (
+                                <div style={{ fontSize: 11, fontWeight: 600, color: C.purple, background: `${C.purple}10`, border: `1px solid ${C.purple}25`, borderRadius: 6, padding: "6px 10px", textAlign: "center" }}>
+                                  {appts.length} appt{appts.length !== 1 ? "s" : ""}
+                                </div>
+                              )}
+                              {grieves.length > 0 && (
+                                <div style={{ fontSize: 11, fontWeight: 600, color: C.mint, background: `${C.mint}10`, border: `1px solid ${C.mint}25`, borderRadius: 6, padding: "6px 10px", textAlign: "center" }}>
+                                  {grieves.length} grievance{grieves.length !== 1 ? "s" : ""}
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })() : (
                           <div style={{ fontSize: 11, color: C.t3 }}>No events</div>
                         )}
                       </div>
@@ -2336,7 +2358,7 @@ export default function Calendar() {
                               {formatTime(item.startsAt)} – {formatTime(item.endsAt)}
                             </div>
                             <div style={{ fontSize: 12, color: C.t3 }}>
-                              {item.location || (item.calendarKind === "complaintCall" ? "Contact pending" : "Location pending")}
+                              {item.location || (item.calendarKind === "grievanceCall" ? "Contact pending" : "Location pending")}
                             </div>
                           </div>
                           <WorkspaceBadge color={tone}>
@@ -2385,7 +2407,7 @@ export default function Calendar() {
             {/* Upcoming Items */}
             <div style={{ flex: 1, overflowY: "auto" }}>
               {visibleUpcomingItems.length === 0 ? (
-                <div style={{ fontSize: 13, color: C.t3 }}>No upcoming meetings.</div>
+                <div style={{ fontSize: 13, color: C.t3 }}>No upcoming appointments.</div>
               ) : (
                 <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
                   {visibleUpcomingItems.slice(0, 5).map((item) => {
@@ -2451,7 +2473,7 @@ export default function Calendar() {
         </div>
       )}
 
-      {/* Meeting Detail Modal */}
+      {/* Appointment Detail Modal */}
       <Modal
         item={selectedItem}
         mode={modalMode}

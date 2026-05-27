@@ -1,19 +1,21 @@
 import { useEffect, useRef, useState } from "react";
 import { FiBell, FiLogOut, FiMoon, FiSettings, FiSun, FiUser } from "react-icons/fi";
 import { useLocation, useNavigate } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import { usePortalTheme } from "../theme/portalTheme.jsx";
 import { PATHS } from "../../routes/paths.js";
 import { sanitizeImageSrc } from "../security/url.js";
 import { useAuth } from "../auth/AuthContext.jsx";
 import { useNotifications } from "../notifications/NotificationContext.jsx";
+import { useLanguage } from "../i18n/LanguageContext.jsx";
 
-const WORKSPACE_TITLES = [
-  { match: "/citizen/", title: "Citizen Services" },
-  { match: "/masteradmin/", title: "Master Admin" },
-  { match: "/admin/", title: "Admin Workspace" },
-  { match: "/Minister/", title: "Minister Portal" },
-  { match: "/DEO/", title: "DEO Workspace" },
-  { match: "/settings", title: "Settings" },
+const WORKSPACE_TITLE_KEYS = [
+  { match: "/citizen/", key: "header.citizenServices" },
+  { match: "/masteradmin/", key: "header.masterAdmin" },
+  { match: "/admin/", key: "header.adminWorkspace" },
+  { match: "/Minister/", key: "header.ministerPortal" },
+  { match: "/DEO/", key: "header.deoWorkspace" },
+  { match: "/settings", key: "header.settings" },
 ];
 
 
@@ -25,6 +27,8 @@ const Header = () => {
   const { C, theme, toggleTheme } = usePortalTheme();
   const { session, logout } = useAuth();
   const { notifications, unreadCount, markRead, markAllRead } = useNotifications();
+  const { language, toggleLanguage } = useLanguage();
+  const { t } = useTranslation();
   const useCitizenNavUi = session?.role === "citizen" || session?.role === "admin";
 
   const [open, setOpen] = useState(false);
@@ -38,7 +42,8 @@ const Header = () => {
   };
 
   const safeAvatar = sanitizeImageSrc(currentUser.avatar);
-  const workspaceTitle = WORKSPACE_TITLES.find((item) => location.pathname.startsWith(item.match))?.title || "Unified Portal";
+  const workspaceTitleKey = WORKSPACE_TITLE_KEYS.find((item) => location.pathname.startsWith(item.match))?.key;
+  const workspaceTitle = workspaceTitleKey ? t(workspaceTitleKey) : t("header.unifiedPortal");
 
   useEffect(() => {
     const handler = (event) => {
@@ -77,10 +82,11 @@ const Header = () => {
       </div>
 
       <div style={{ display: "flex", alignItems: "center", gap: 8, position: "relative" }} ref={ref}>
+        <LanguageToggle language={language} onToggle={toggleLanguage} C={C} isCitizen={useCitizenNavUi} />
         <HeaderIcon
           icon={theme === "dark" ? FiSun : FiMoon}
           onClick={toggleTheme}
-          title={theme === "dark" ? "Switch to Light Mode" : "Switch to Dark Mode"}
+          title={theme === "dark" ? t("header.switchToLight") : t("header.switchToDark")}
           isCitizen={useCitizenNavUi}
         />
         <HeaderIcon
@@ -90,7 +96,7 @@ const Header = () => {
             setOpen(false);
             setNotificationsOpen((value) => !value);
           }}
-          title="Notifications"
+          title={t("header.notifications")}
           isCitizen={useCitizenNavUi}
         />
 
@@ -106,10 +112,10 @@ const Header = () => {
             height: 36,
             borderRadius: 999,
             cursor: "pointer",
-            border: useCitizenNavUi ? "none" : open ? `2px solid ${C.purple}` : `1px solid ${C.border}`,
+            border: "none",
             overflow: "hidden",
-            background: useCitizenNavUi ? C.purple : C.purpleDim,
-            color: useCitizenNavUi ? "#FFFFFF" : C.purple,
+            background: C.purple,
+            color: "#FFFFFF",
             transition: "background var(--portal-duration-fast) ease, border-color var(--portal-duration-fast) ease, transform var(--portal-duration-fast) ease",
             flexShrink: 0,
           }}
@@ -128,8 +134,8 @@ const Header = () => {
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
-                background: useCitizenNavUi ? C.purple : C.purpleDim,
-                color: useCitizenNavUi ? "#FFFFFF" : C.purple,
+                background: C.purple,
+                color: "#FFFFFF",
                 fontWeight: 700,
                 fontSize: 13,
                 fontFamily: useCitizenNavUi ? "var(--portal-citizen-font)" : "inherit",
@@ -167,9 +173,9 @@ const Header = () => {
               }}
             >
               <div>
-                <p className={useCitizenNavUi ? "portal-citizen-value" : undefined} style={{ color: C.t1, fontWeight: 700, fontSize: useCitizenNavUi ? 14 : 13 }}>Notifications</p>
+                <p className={useCitizenNavUi ? "portal-citizen-value" : undefined} style={{ color: C.t1, fontWeight: 700, fontSize: useCitizenNavUi ? 14 : 13 }}>{t("header.notifications")}</p>
                 <p className={useCitizenNavUi ? "portal-citizen-caption" : undefined} style={{ color: C.t3, fontSize: 12, marginTop: 2 }}>
-                  {unreadCount > 0 ? `${unreadCount} unread` : "All caught up"}
+                  {unreadCount > 0 ? t("header.unread", { count: unreadCount }) : t("header.allCaughtUp")}
                 </p>
               </div>
               <button
@@ -187,14 +193,14 @@ const Header = () => {
                   fontFamily: useCitizenNavUi ? "var(--portal-citizen-font)" : "inherit",
                 }}
               >
-                Mark all read
+                {t("header.markAllRead")}
               </button>
             </div>
 
             <div style={{ maxHeight: 360, overflowY: "auto", padding: 8 }}>
               {notifications.length === 0 ? (
                 <div className={useCitizenNavUi ? "portal-citizen-caption" : undefined} style={{ padding: 16, color: C.t3, fontSize: 12, textAlign: "center" }}>
-                  No notifications yet.
+                  {t("header.noNotifications")}
                 </div>
               ) : (
                 notifications.slice(0, 8).map((item, index) => (
@@ -297,14 +303,50 @@ const Header = () => {
             </div>
 
             <ul style={{ padding: "8px 0", margin: 0, listStyle: "none" }}>
-              <MenuItem icon={FiUser} label="Profile & Account" onClick={() => { navigate(`${PATHS.settings}?tab=profile`); setOpen(false); }} />
-              <MenuItem icon={FiSettings} label="Notifications" onClick={() => { navigate(`${PATHS.settings}?tab=notifications`); setOpen(false); }} />
-              <MenuItem icon={FiLogOut} label="Logout" danger onClick={async () => { setOpen(false); await logout(); navigate(PATHS.login); }} />
+              <MenuItem icon={FiUser} label={t("header.profileAccount")} onClick={() => { navigate(`${PATHS.settings}?tab=profile`); setOpen(false); }} />
+              <MenuItem icon={FiSettings} label={t("header.notificationsMenu")} onClick={() => { navigate(`${PATHS.settings}?tab=notifications`); setOpen(false); }} />
+              <MenuItem icon={FiLogOut} label={t("header.logout")} danger onClick={async () => { setOpen(false); await logout(); navigate(PATHS.login); }} />
             </ul>
           </div>
         )}
       </div>
     </header>
+  );
+};
+
+const LanguageToggle = ({ language, onToggle, C, isCitizen = false }) => {
+  const [hovered, setHovered] = useState(false);
+  const { t } = useTranslation();
+  return (
+    <button
+      type="button"
+      onClick={onToggle}
+      title={language === "en" ? t("header.switchToHindi") : t("header.switchToEnglish")}
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+      style={{
+        height: 36,
+        minWidth: 42,
+        paddingLeft: 8,
+        paddingRight: 8,
+        borderRadius: 10,
+        border: `1px solid ${hovered ? C.purple : C.border}`,
+        background: hovered ? C.purple : "transparent",
+        color: hovered ? "#FFFFFF" : C.t2,
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        transition: "background var(--portal-duration-fast) ease, border-color var(--portal-duration-fast) ease, color var(--portal-duration-fast) ease",
+        cursor: "pointer",
+        fontSize: 12,
+        fontWeight: 700,
+        letterSpacing: ".04em",
+        fontFamily: language === "hi" ? "'Noto Sans Devanagari', sans-serif" : "inherit",
+        flexShrink: 0,
+      }}
+    >
+      {language === "en" ? "हिं" : "EN"}
+    </button>
   );
 };
 
@@ -324,9 +366,9 @@ const HeaderIcon = ({ icon: Icon, dot, onClick, title, isCitizen = false }) => {
         width: 36,
         height: 36,
         borderRadius: 10,
-        border: isCitizen ? "none" : `1px solid ${hovered ? `${C.purple}40` : C.border}`,
-        background: hovered ? C.purple : isCitizen ? "transparent" : C.bgElevated,
-        color: hovered ? "#FFFFFF" : isCitizen ? C.t2 : C.t2,
+        border: "none",
+        background: hovered ? C.purple : "transparent",
+        color: hovered ? "#FFFFFF" : C.t2,
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
