@@ -4,7 +4,6 @@ import { apiClient } from "../../../shared/api/client.js";
 import { useAuth } from "../../../shared/auth/AuthContext.jsx";
 import { usePortalTheme } from "../../../shared/theme/portalTheme.jsx";
 import AppointmentsSection, { AppointmentStatsPanel, OverallAppointmentsSection, AppointmentPoolTrendLine } from "./components/AppointmentsSection.jsx";
-import GrievancesSection from "./components/GrievancesSection.jsx";
 import OverallSection from "./components/OverallSection.jsx";
 import "./Dashboard.css";
 
@@ -14,14 +13,6 @@ const EXCLUDED_APPOINTMENT_STATUSES = new Set([
   "rejected",
 ]);
 
-const EXCLUDED_GRIEVANCE_STATUSES = new Set([
-  "call_scheduled",
-  "resolved",
-  "rescheduled",
-  "cancelled",
-  "completed",
-  "closed",
-]);
 
 function isSameLocalDay(dateValue) {
   if (!dateValue) return false;
@@ -56,16 +47,13 @@ export default function PremiumAdminDashboard() {
   const { C, theme } = usePortalTheme();
   const { t } = useTranslation();
   const adminId = session?.user?.id;
-  const isChiefMinister = session?.user?.adminType === "chief_minister";
 
   const [stats, setStats] = useState({
     appointmentsToday: 0,
     vipAppointmentsToday: 0,
     pendingAppointments: 0,
-    pendingGrievances: 0,
   });
   const [allAppointments, setAllAppointments] = useState([]);
-  const [allGrievances, setAllGrievances] = useState([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -79,7 +67,6 @@ export default function PremiumAdminDashboard() {
         if (!active) return;
 
         const appointments = Array.isArray(response.data?.appointments) ? response.data.appointments : [];
-        const grievances = Array.isArray(response.data?.grievances) ? response.data.grievances : [];
 
         const appointmentsToday = appointments.filter(
           (m) =>
@@ -101,16 +88,9 @@ export default function PremiumAdminDashboard() {
             !EXCLUDED_APPOINTMENT_STATUSES.has(m.status)
         ).length;
 
-        const pendingGrievances = grievances.filter(
-          (c) =>
-            c.assignedAdminUserId === adminId &&
-            !EXCLUDED_GRIEVANCE_STATUSES.has(c.status)
-        ).length;
-
         if (active) {
-          setStats({ appointmentsToday, vipAppointmentsToday, pendingAppointments, pendingGrievances });
+          setStats({ appointmentsToday, vipAppointmentsToday, pendingAppointments });
           setAllAppointments(appointments);
-          setAllGrievances(grievances);
         }
       } catch {
         // silently fall back to zeros
@@ -182,9 +162,6 @@ export default function PremiumAdminDashboard() {
         <StatCard label={t("admin.dashboard.appointmentsToday")}     value={stats.appointmentsToday}    loading={loading} />
         <StatCard label={t("admin.dashboard.vipAppointmentsToday")}  value={stats.vipAppointmentsToday} loading={loading} />
         <StatCard label={t("admin.dashboard.pendingAppointments")}   value={stats.pendingAppointments}  loading={loading} />
-        {isChiefMinister && (
-          <StatCard label={t("admin.dashboard.pendingGrievances")}   value={stats.pendingGrievances}    loading={loading} />
-        )}
       </div>
 
       <div className="db-section-label">{t("admin.dashboard.appointmentsSection")}</div>
@@ -197,19 +174,12 @@ export default function PremiumAdminDashboard() {
         <AppointmentPoolTrendLine appointments={allAppointments} loading={loading} />
       </div>
 
-      {isChiefMinister && (
-        <>
-          <div className="db-section-label">{t("admin.dashboard.grievancesSection")}</div>
-          <GrievancesSection grievances={allGrievances} adminId={adminId} loading={loading} showReassigned={false} />
-        </>
-      )}
-
       <div className="db-section-label">{t("admin.dashboard.overallSection")}</div>
       <OverallSection
         appointments={allAppointments}
-        grievances={isChiefMinister ? allGrievances : []}
+        grievances={[]}
         loading={loading}
-        showGrievances={isChiefMinister}
+        showGrievances={false}
       />
     </div>
   );

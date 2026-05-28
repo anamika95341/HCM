@@ -2,7 +2,8 @@ import { useEffect, useState } from "react";
 import { apiClient } from "../../shared/api/client.js";
 import { useAuth } from "../../shared/auth/AuthContext.jsx";
 import { usePortalTheme } from "../../shared/theme/portalTheme.jsx";
-import { OverallAppointmentsSection, OverallAppointmentStatsPanel } from "../admin/premiumDashboard/components/AppointmentsSection.jsx";
+import { OverallAppointmentsSection, OverallAppointmentStatsPanel, AppointmentPoolTrendLine } from "../admin/premiumDashboard/components/AppointmentsSection.jsx";
+import OverallSection from "../admin/premiumDashboard/components/OverallSection.jsx";
 import "../admin/premiumDashboard/Dashboard.css";
 
 function StatCard({ label, value, loading }) {
@@ -113,11 +114,22 @@ export default function MinisterDashboard() {
         <StatCard label="Cancelled"          value={stats.cancelled} loading={loading} />
       </div>
 
-      <div className="db-section-label">Appointments</div>
+      <div className="db-section-label">Overall Appointments</div>
       <div className="db-grid-row db-col-7-3">
         <OverallAppointmentsSection appointments={allAppointments} loading={loading} />
         <OverallAppointmentStatsPanel appointments={allAppointments} loading={loading} />
       </div>
+      <div style={{ marginBottom: "1rem" }}>
+        <AppointmentPoolTrendLine appointments={allAppointments} loading={loading} />
+      </div>
+
+      <div className="db-section-label">Overall Analytics</div>
+      <OverallSection
+        appointments={allAppointments}
+        grievances={[]}
+        loading={loading}
+        showGrievances={false}
+      />
     </div>
   );
 }

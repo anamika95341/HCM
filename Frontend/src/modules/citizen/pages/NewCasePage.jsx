@@ -772,10 +772,12 @@ export default function HCMNewCasePage() {
             .map((entry) => ({ attendeeName: entry.name.trim(), attendeePhone: entry.phone.trim() }))
         )
       );
+      const xsrfMatch = document.cookie.match(/(?:^|;\s*)XSRF-TOKEN=([^;]*)/);
+      const xsrfToken = xsrfMatch ? decodeURIComponent(xsrfMatch[1]) : null;
       const { data } = await apiClient.post("/appointments/request", payload, {
         headers: {
-          "Content-Type": "multipart/form-data",
           "Idempotency-Key": crypto.randomUUID(),
+          ...(xsrfToken && { "X-XSRF-TOKEN": xsrfToken }),
         },
       });
 
@@ -841,10 +843,12 @@ export default function HCMNewCasePage() {
       payload.append("district", grievanceForm.district);
       payload.append("incidentDate", grievanceForm.incidentDate);
 
+      const xsrfMatchG = document.cookie.match(/(?:^|;\s*)XSRF-TOKEN=([^;]*)/);
+      const xsrfTokenG = xsrfMatchG ? decodeURIComponent(xsrfMatchG[1]) : null;
       const { data } = await apiClient.post("/grievances", payload, {
         headers: {
-          "Content-Type": "multipart/form-data",
           "Idempotency-Key": crypto.randomUUID(),
+          ...(xsrfTokenG && { "X-XSRF-TOKEN": xsrfTokenG }),
         },
       });
 
