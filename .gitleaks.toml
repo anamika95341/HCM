@@ -1,0 +1,8 @@
+[allowlist]
+description = "False-positive suppressions"
+
+# meeting.pass_s3_key is an S3 object path, not a secret.
+# Gitleaks triggers on 'pass_s3_key' due to the word 'key'.
+commits = [
+  "53c27b9675def59adb5e4e4bd49f8fce26f1472d",
+]
