@@ -46,6 +46,13 @@ const AUTH_ENDPOINTS = [
   "/auth/minister/logout",
 ];
 
+// Background poll endpoints — if refresh fails on these, do NOT log the user out.
+// They are non-critical and fire automatically; a stale token on a background
+// request should not destroy an otherwise active session.
+const SILENT_POLL_ENDPOINTS = [
+  "/notifications",
+];
+
 function looksLikeHtmlDocument(payload) {
   return typeof payload === "string" && /^\s*<(!DOCTYPE|html)\b/i.test(payload);
 }
@@ -70,6 +77,11 @@ apiClient.interceptors.response.use(
     const isAuthEndpoint = AUTH_ENDPOINTS.some((path) =>
       originalRequest?.url?.includes(path),
     );
+    // Silent-poll endpoints (e.g. notification polling) should never force logout
+    // if their refresh fails — they are background requests, not user-initiated actions.
+    const isSilentPoll = SILENT_POLL_ENDPOINTS.some((path) =>
+      originalRequest?.url?.includes(path),
+    ) || Boolean(originalRequest?._suppressLogout);
 
     if (
       error?.response?.status === 401 &&
@@ -92,7 +104,8 @@ apiClient.interceptors.response.use(
           return apiClient(originalRequest);
         } catch (refreshError) {
           drainQueue(refreshError);
-          if (typeof unauthorizedHandler === "function") {
+          // Only force a full logout for user-initiated requests, not background polls.
+          if (!isSilentPoll && typeof unauthorizedHandler === "function") {
             unauthorizedHandler();
           }
           return Promise.reject(refreshError);
@@ -101,7 +114,7 @@ apiClient.interceptors.response.use(
         }
       }
 
-      if (typeof unauthorizedHandler === "function") {
+      if (!isSilentPoll && typeof unauthorizedHandler === "function") {
         unauthorizedHandler();
       }
     }
