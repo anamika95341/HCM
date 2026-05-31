@@ -2,8 +2,63 @@ import { useState } from "react";
 import { Outlet } from "react-router-dom";
 import Sidebar from "../shared/components/Sidebar.jsx";
 import Header from "../shared/components/Header.jsx";
-import { useAuth } from "../shared/auth/AuthContext.jsx";
+import { useAuth, useSessionExpired } from "../shared/auth/AuthContext.jsx";
 import { usePortalTheme } from "../shared/theme/portalTheme.jsx";
+
+function SessionExpiredBanner() {
+  const [visible, setVisible] = useState(false);
+  const { C } = usePortalTheme();
+
+  useSessionExpired(() => {
+    setVisible(true);
+    setTimeout(() => setVisible(false), 5000);
+  });
+
+  if (!visible) return null;
+  return (
+    <div
+      role="alert"
+      style={{
+        position: "fixed",
+        top: 20,
+        left: "50%",
+        transform: "translateX(-50%)",
+        zIndex: 9999,
+        background: "#7c3aed",
+        color: "#fff",
+        padding: "12px 24px",
+        borderRadius: 10,
+        fontSize: 14,
+        fontWeight: 500,
+        boxShadow: "0 4px 24px rgba(0,0,0,0.25)",
+        display: "flex",
+        alignItems: "center",
+        gap: 10,
+        animation: "fadeInDown 0.3s ease",
+        whiteSpace: "nowrap",
+      }}
+    >
+      <span style={{ fontSize: 18 }}>⚠️</span>
+      Your session has expired. Please log in again.
+      <button
+        onClick={() => setVisible(false)}
+        style={{
+          background: "none",
+          border: "none",
+          color: "#fff",
+          cursor: "pointer",
+          fontSize: 18,
+          lineHeight: 1,
+          padding: "0 0 0 8px",
+          opacity: 0.7,
+        }}
+        aria-label="Dismiss"
+      >
+        ×
+      </button>
+    </div>
+  );
+}
 
 function Layout() {
   const [collapsed, setCollapsed] = useState(false);
@@ -27,6 +82,8 @@ function Layout() {
         "--portal-modal-offset-left": `${modalOffsetLeft}px`,
       }}
     >
+      <SessionExpiredBanner />
+
       <aside
         style={{
           width: sidebarWidth,

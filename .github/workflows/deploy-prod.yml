@@ -61,5 +61,8 @@ jobs:
 
       - name: Deploy on EC2
         run: |
-          ssh -p "${{ secrets.EC2_SSH_PORT || '22' }}" "${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }}" \
-            "cd '${{ secrets.EC2_APP_DIR }}' && chmod +x scripts/deploy-prod.sh && ./scripts/deploy-prod.sh '${{ secrets.EC2_APP_DIR }}'"
+          ssh -p "${{ secrets.EC2_SSH_PORT || '22' }}" \
+            -o ServerAliveInterval=30 \
+            -o ServerAliveCountMax=10 \
+            "${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }}" \
+            "cd '${{ secrets.EC2_APP_DIR }}' && chmod +x scripts/deploy-prod.sh && DOCKER_BUILDKIT=1 COMPOSE_DOCKER_CLI_BUILD=1 ./scripts/deploy-prod.sh '${{ secrets.EC2_APP_DIR }}'"

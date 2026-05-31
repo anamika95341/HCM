@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useMemo, useRef, useState } from "react";
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { apiClient, setRefreshHandler, setUnauthorizedHandler } from "../api/client.js";
 
 const AuthContext = createContext(null);
@@ -55,15 +55,27 @@ export function AuthProvider({ children }) {
 
   useEffect(() => {
     setUnauthorizedHandler(() => {
+      // Fire a DOM event so any mounted page can show a toast before redirect
+      try {
+        window.dispatchEvent(new CustomEvent("session:expired"));
+      } catch {
+        // ignore
+      }
       setSession(null);
     });
 
     setRefreshHandler(async () => {
       const current = sessionRef.current;
-      if (!current?.role) throw new Error("Not authenticated");
+      // If no current session in state, still attempt refresh using the cookie —
+      // the server is the source of truth. Only bail if we get a 401 back.
       const { data } = await apiClient.post("/auth/token/refresh");
       if (!data?.user) throw new Error("Refresh failed");
-      setSession((prev) => ({ ...prev, user: data.user }));
+      setSession((prev) => ({
+        ...prev,
+        user: data.user,
+        // Preserve role from existing session or fall back to the one in the response
+        role: prev?.role || current?.role,
+      }));
     });
 
     return () => {
@@ -141,6 +153,7 @@ export function AuthProvider({ children }) {
       isAuthenticated: Boolean(session?.role),
       isLoading,
     }),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     [session, isLoading],
   );
 
@@ -153,4 +166,25 @@ export function useAuth() {
     throw new Error("useAuth must be used within AuthProvider");
   }
   return context;
+}
+
+/**
+ * Call this hook in any page/layout to register a callback when the server
+ * force-expires a session (idle timeout, deploy restart, token replay).
+ * The callback fires once before the user is redirected to login.
+ *
+ * Usage:
+ *   useSessionExpired(() => toast.error("Your session expired. Please log in again."));
+ */
+export function useSessionExpired(onExpired) {
+  const handlerRef = useRef(onExpired);
+  useEffect(() => { handlerRef.current = onExpired; }, [onExpired]);
+
+  useEffect(() => {
+    function handler() {
+      try { handlerRef.current?.(); } catch { /* ignore */ }
+    }
+    window.addEventListener("session:expired", handler);
+    return () => window.removeEventListener("session:expired", handler);
+  }, []);
 }

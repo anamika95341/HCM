@@ -422,6 +422,18 @@ a:hover {
   }
 }
 
+@keyframes fadeInDown {
+  from {
+    opacity: 0;
+    transform: translate(-50%, -16px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translate(-50%, 0);
+  }
+}
+
 .portal-citizen-page {
   min-height: 100%;
   overflow-x: hidden;

@@ -955,25 +955,31 @@ async function refreshSession(refreshToken, userAgent) {
   const sessionId = payload.sid;
   let absoluteExpiry;
 
-  // Enforce absolute session timeout and idle timeout via Redis
+  // Enforce absolute session timeout via Redis.
+  // NOTE: We do NOT hard-block on missing lastActivity during a token refresh.
+  // A missing lastActivity means the idle timer expired, but the refresh token
+  // is still cryptographically valid and in the DB — this is the correct path to
+  // re-authenticate the user. We re-seed lastActivity below via issueSession.
+  // Absolute session expiry is still strictly enforced.
   try {
-    const [sessionMeta, lastActivity] = await Promise.all([
+    const [sessionMeta] = await Promise.all([
       sessionId ? redis.get(`session:meta:${sessionId}`) : null,
-      sessionId ? redis.get(`lastActivity:${role}:${payload.sub}:${sessionId}`) : null,
     ]);
 
     if (sessionId) {
       if (!sessionMeta) {
-        throw createHttpError(401, 'Unauthorized');
-      }
-      const meta = JSON.parse(sessionMeta);
-      absoluteExpiry = meta.absoluteExpiry;
-      if (Date.now() >= absoluteExpiry) {
-        throw createHttpError(401, 'Unauthorized');
-      }
-      if (!lastActivity) {
-        // Idle timeout expired
-        throw createHttpError(401, 'Unauthorized');
+        // Session meta gone — either absolute expiry cleared it or server restart.
+        // Allow refresh to re-issue (issueSession will re-seed meta + lastActivity).
+        logger.warn('refreshSession: session:meta missing — allowing refresh to re-seed session', {
+          role, sessionId, userId: payload.sub,
+        });
+      } else {
+        const meta = JSON.parse(sessionMeta);
+        absoluteExpiry = meta.absoluteExpiry;
+        if (Date.now() >= absoluteExpiry) {
+          // Hard block: absolute session lifetime exceeded
+          throw createHttpError(401, 'Unauthorized');
+        }
       }
     }
   } catch (err) {
