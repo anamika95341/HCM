@@ -5,6 +5,7 @@ backend/.env
 backend/.env.*
 Frontend/.env
 Frontend/.env.*
+!backend/.env.example
 
 # Git worktrees
 .worktrees/

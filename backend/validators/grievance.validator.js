@@ -1,6 +1,6 @@
 const { z } = require('zod');
 
-const complaintStatusUpdateSchema = z.object({
+const grievanceStatusUpdateSchema = z.object({
   status: z.enum([
     'submitted',
     'assigned',
@@ -11,35 +11,29 @@ const complaintStatusUpdateSchema = z.object({
     'resolved',
     'rejected',
     'completed',
-    'escalated_to_meeting',
   ]),
   note: z.string().min(3).max(2000),
 });
 
-const assignComplaintSchema = z.object({});
+const assignGrievanceSchema = z.object({});
 
-const reassignComplaintSchema = z.object({
-  adminId: z.string().uuid(),
-  reason: z.string().trim().max(500).optional().or(z.literal('')),
-});
-
-const complaintDepartmentSchema = z.object({
+const grievanceDepartmentSchema = z.object({
   department: z.string().min(2).max(150),
   officerName: z.string().max(150).optional().or(z.literal('')),
   officerContact: z.string().max(255).optional().or(z.literal('')),
   manualContact: z.string().max(255).optional().or(z.literal('')),
 });
 
-const complaintScheduleCallSchema = z.object({
+const grievanceScheduleCallSchema = z.object({
   callScheduledAt: z.string().datetime(),
 });
 
-const complaintLogSchema = z.object({
-  logTypes: z.array(z.enum(['phone_call', 'mail', 'letter_summary', 'meeting'])).min(1).max(4),
+const grievanceLogSchema = z.object({
+  logTypes: z.array(z.enum(['phone_call', 'mail', 'letter_summary', 'appointment'])).min(1).max(4),
   summary: z.string().trim().max(3000).optional().or(z.literal('')),
 });
 
-const complaintResolveSchema = z.object({
+const grievanceResolveSchema = z.object({
   resolutionSummary: z.string().trim().min(10).refine((value) => {
     const wordCount = value.split(/\s+/).filter(Boolean).length;
     return wordCount <= 1000;
@@ -49,27 +43,21 @@ const complaintResolveSchema = z.object({
   })).max(10).default([]),
 });
 
-const complaintEscalateSchema = z.object({
-  reason: z.string().trim().min(4).max(500),
-});
-
-const complaintReopenSchema = z.object({
+const grievanceReopenSchema = z.object({
   reason: z.string().min(3).max(2000),
 });
 
-const complaintCloseSchema = z.object({
+const grievanceCloseSchema = z.object({
   note: z.string().min(3).max(2000),
 });
 
 module.exports = {
-  complaintStatusUpdateSchema,
-  assignComplaintSchema,
-  reassignComplaintSchema,
-  complaintDepartmentSchema,
-  complaintScheduleCallSchema,
-  complaintLogSchema,
-  complaintResolveSchema,
-  complaintEscalateSchema,
-  complaintReopenSchema,
-  complaintCloseSchema,
+  grievanceStatusUpdateSchema,
+  assignGrievanceSchema,
+  grievanceDepartmentSchema,
+  grievanceScheduleCallSchema,
+  grievanceLogSchema,
+  grievanceResolveSchema,
+  grievanceReopenSchema,
+  grievanceCloseSchema,
 };

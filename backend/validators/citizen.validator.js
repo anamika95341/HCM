@@ -60,15 +60,15 @@ const citizenResetPasswordSchema = z.object({
   path: ['confirmPassword'],
 });
 
-const complaintSchema = z.object({
+const grievanceSchema = z.object({
   subject: z.string().min(5).max(255),
   description: z.string().min(10).max(5000),
-  complaintLocation: z.string().max(500).optional().or(z.literal('')),
-  complaintType: z.string().max(120).optional().or(z.literal('')),
+  state: z.string().min(2).max(120),
+  district: z.string().min(2).max(120),
   incidentDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
 });
 
-const meetingRequestSchema = z.object({
+const appointmentRequestSchema = z.object({
   title: z.string().min(5).max(255),
   purpose: z.string().min(10).max(3000),
   preferredTime: z.string().datetime().optional().or(z.literal('')),
@@ -82,6 +82,6 @@ module.exports = {
   citizenLoginSchema,
   citizenForgotPasswordSchema,
   citizenResetPasswordSchema,
-  complaintSchema,
-  meetingRequestSchema,
+  grievanceSchema,
+  appointmentRequestSchema,
 };

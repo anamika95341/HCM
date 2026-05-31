@@ -4,14 +4,15 @@ const createHttpError = require('http-errors');
 const { sanitizeText } = require('../../utils/sanitize');
 const { writeAuditLog } = require('../../utils/audit');
 const filesRepository = require('../files/files.repository');
-const { notifyMinisterMeetingScheduled } = require('../notifications/notifications.service');
+const filesService = require('../files/files.service');
+const { notifyMinisterAppointmentScheduled } = require('../notifications/notifications.service');
 
-async function getAssignedMeetings(deoId) {
-  return deoRepository.getAssignedMeetings(deoId);
+async function getAssignedAppointments(deoId) {
+  return deoRepository.getAssignedAppointments(deoId);
 }
 
 function mapFileType(file) {
-  if (file.entity_type === 'meeting_photo' || file.mime_type?.startsWith('image/')) return 'photo';
+  if (file.entity_type === 'appointment_photo' || file.mime_type?.startsWith('image/')) return 'photo';
   if (file.mime_type?.startsWith('video/')) return 'video';
   return 'document';
 }
@@ -34,25 +35,41 @@ function formatFileSize(bytes = 0) {
   return `${bytes} B`;
 }
 
-async function getCompletedMeetings(deoId) {
-  const meetings = await deoRepository.getCompletedMeetings();
+async function getCompletedAppointments(deoId, reqMeta) {
+  const appointments = await deoRepository.getCompletedAppointments();
   return Promise.all(
-    meetings.map(async (meeting) => {
-      const [legacyFiles, uploadedFiles] = await Promise.all([
-        deoRepository.listMeetingFilesForDeo(meeting.id),
+    appointments.map(async (appointment) => {
+      const [legacyFiles, uploadedFiles, citizenFiles] = await Promise.all([
+        deoRepository.listAppointmentFilesForDeo(appointment.id),
         filesRepository.listFilesForContext('deo', {
-          contextType: 'meeting',
-          contextId: meeting.id,
+          contextType: 'appointment',
+          contextId: appointment.id,
+        }),
+        filesService.listCitizenFilesForContext({
+          contextType: 'appointment',
+          contextId: appointment.id,
+          reqMeta,
         }),
       ]);
 
       const files = [
+        ...citizenFiles.map((file) => ({
+          id: file.id,
+          name: file.name,
+          type: mapFileType({ mime_type: file.mimeType, entity_type: file.fileCategory }),
+          size: formatFileSize(file.size),
+          mimeType: file.mimeType,
+          createdAt: file.createdAt,
+          kind: file.fileCategory || 'document',
+          uploadedBy: 'citizen',
+          downloadUrl: file.downloadUrl,
+        })),
         ...legacyFiles.map(mapManagedFile),
         ...uploadedFiles.map(mapManagedFile),
       ];
 
       return {
-        ...meeting,
+        ...appointment,
         files,
       };
     })
@@ -91,10 +108,10 @@ async function createCalendarEvent(deoId, body, reqMeta) {
     metadata: { ministerId: body.ministerId },
   });
 
-  await notifyMinisterMeetingScheduled({
+  await notifyMinisterAppointmentScheduled({
     ministerId: body.ministerId,
-    meetingId: event.id,
-    meetingTitle: event.title,
+    appointmentId: event.id,
+    appointmentTitle: event.title,
     scheduledAt: body.startsAt,
     location: sanitizeText(body.location),
     adminId: null,
@@ -123,4 +140,149 @@ async function getCalendarEvents(deoId) {
   );
 }
 
-module.exports = { getAssignedMeetings, getCompletedMeetings, listMinisters, createCalendarEvent, getCalendarEvents };
+async function getGrievancesForDeo() {
+  const grievancesRepository = require('../grievances/grievances.repository');
+  return grievancesRepository.getSubmittedGrievancesForDeo();
+}
+
+async function submitGrievanceForCitizen({ deoId, body, documentFiles = [], letterheadFiles = [] }) {
+  const grievancesRepository = require('../grievances/grievances.repository');
+  const appointmentsRepository = require('../appointments/appointments.repository');
+  const { persistPrivateUpload } = require('../../middleware/uploadHandler');
+
+  if (!letterheadFiles.length) throw createHttpError(400, 'Letterhead file is required');
+  if (!body.office || !body.office.trim()) throw createHttpError(400, 'Office is required');
+  if (!body.citizenName || !body.citizenName.trim()) throw createHttpError(400, 'Citizen name is required');
+
+  // Upload document files first to get the primary ID, then link all to the grievance after creation
+  const documentFileRecords = [];
+  for (const file of documentFiles) {
+    const stored = await persistPrivateUpload(file, 'documents');
+    const record = await appointmentsRepository.createUploadedFile(stored, {
+      entityType: 'grievance_document',
+      uploadedByRole: 'deo',
+      uploadedById: deoId,
+    });
+    documentFileRecords.push(record);
+  }
+
+  const createdGrievance = await grievancesRepository.createGrievance({
+    citizenId: null,
+    citizenName: sanitizeText(body.citizenName),
+    citizenPhone: body.mobileNumber ? sanitizeText(body.mobileNumber) : null,
+    subject: sanitizeText(body.subject),
+    description: sanitizeText(body.description),
+    state: sanitizeText(body.state),
+    district: sanitizeText(body.district),
+    incidentDate: body.incidentDate || null,
+    documentFileId: documentFileRecords[0]?.id || null,
+    actorRole: 'deo',
+    actorId: deoId,
+  });
+
+  // Link all document files to the grievance so the CM admin can see all of them
+  if (documentFileRecords.length) {
+    await appointmentsRepository.linkUploadedFilesToEntity(
+      documentFileRecords.map((r) => r.id),
+      createdGrievance.id
+    );
+  }
+
+  // Persist all letterhead files; use first one for updateGrievanceLetterhead
+  let primaryLetterheadId = null;
+  for (const [i, file] of letterheadFiles.entries()) {
+    const stored = await persistPrivateUpload(file, 'documents');
+    const record = await appointmentsRepository.createUploadedFile(stored, {
+      entityType: 'grievance_letterhead',
+      entityId: createdGrievance.id,
+      uploadedByRole: 'deo',
+      uploadedById: deoId,
+    });
+    if (i === 0) primaryLetterheadId = record.id;
+  }
+
+  await grievancesRepository.updateGrievanceLetterhead({
+    grievanceId: createdGrievance.id,
+    deoId,
+    office: sanitizeText(body.office),
+    fileId: primaryLetterheadId,
+  });
+
+  const cmAdmin = await adminRepository.findChiefMinisterAdmin();
+  if (cmAdmin) {
+    await grievancesRepository.updateGrievanceStatus({
+      grievanceId: createdGrievance.id,
+      status: 'assigned',
+      previousStatus: 'submitted',
+      actorRole: 'system',
+      actorId: null,
+      note: 'Submitted by DEO — auto-assigned to Chief Minister admin',
+      patch: { assigned_admin_id: cmAdmin.id },
+    });
+  }
+
+  await writeAuditLog({
+    actorRole: 'deo',
+    actorId: deoId,
+    entityType: 'grievance',
+    entityId: createdGrievance.id,
+    action: 'grievance_submitted_by_deo',
+    metadata: { citizenName: sanitizeText(body.citizenName), mobileNumber: body.mobileNumber || null },
+  });
+
+  return { grievanceId: createdGrievance.grievance_id, message: 'Grievance submitted successfully' };
+}
+
+async function getAppointmentDetailForDeo(appointmentId, deoId, reqMeta) {
+  const row = await deoRepository.getAssignedAppointmentDetail(appointmentId, deoId);
+  if (!row) {
+    throw createHttpError(404, 'Appointment not found');
+  }
+
+  const files = await filesService.listCitizenFilesForContext({
+    contextType: 'appointment',
+    contextId: appointmentId,
+    reqMeta,
+  });
+
+  const adminName = [row.admin_first_name, row.admin_last_name].filter(Boolean).join(' ');
+
+  return {
+    id: row.id,
+    requestId: row.request_id,
+    title: row.title,
+    purpose: row.purpose,
+    description: row.purpose,
+    status: row.status,
+    createdAt: row.created_at,
+    adminComments: row.admin_comments,
+    verificationReason: row.verification_reason,
+    citizenName: [row.first_name, row.last_name].filter(Boolean).join(' '),
+    citizenCode: row.citizen_id,
+    mobileNumber: row.mobile_number,
+    email: row.email,
+    state: row.citizen_state,
+    district: row.citizen_city,
+    verificationAdmin: adminName ? `${adminName}${row.admin_designation ? ` · ${row.admin_designation}` : ''}` : '',
+    files,
+  };
+}
+
+async function getGrievanceDetailForDeo(grievanceId, reqMeta) {
+  const grievancesRepository = require('../grievances/grievances.repository');
+  const grievance = await grievancesRepository.getGrievanceById(grievanceId);
+  if (!grievance) {
+    throw createHttpError(404, 'Grievance not found');
+  }
+
+  const citizenFiles = await filesService.listCitizenFilesForContext({
+    contextType: 'grievance',
+    contextId: grievanceId,
+    reqMeta,
+  });
+
+  grievance.files = citizenFiles;
+  return grievance;
+}
+
+module.exports = { getAssignedAppointments, getAppointmentDetailForDeo, getCompletedAppointments, listMinisters, createCalendarEvent, getCalendarEvents, getGrievancesForDeo, getGrievanceDetailForDeo, submitGrievanceForCitizen };

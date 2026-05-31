@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import { Eye, Calendar, Search, Filter, ChevronLeft, ChevronRight } from "lucide-react";
 import { apiClient } from "../../../shared/api/client.js";
 import { useAuth } from "../../../shared/auth/AuthContext.jsx";
@@ -13,7 +14,7 @@ import {
 } from "../../../shared/components/WorkspaceUI.jsx";
 import { usePortalTheme } from "../../../shared/theme/portalTheme.jsx";
 
-function meetingStatus(item) {
+function appointmentStatus(item) {
   const status = item.status || "pending";
   const label = String(status)
     .split("_")
@@ -37,13 +38,15 @@ function formatDateValue(date) {
   return `${year}-${month}-${day}`;
 }
 
+const MONTH_NAMES = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+
 function formatDisplayDate(value) {
   const parsedDate = parseDateValue(value);
   if (!parsedDate) return "";
   const day = String(parsedDate.getDate()).padStart(2, "0");
-  const month = String(parsedDate.getMonth() + 1).padStart(2, "0");
+  const mon = MONTH_NAMES[parsedDate.getMonth()];
   const year = String(parsedDate.getFullYear()).slice(-2);
-  return `${day}/${month}/${year}`;
+  return `${day} ${mon},${year}`;
 }
 
 function buildCalendarDays(monthStart) {
@@ -84,9 +87,9 @@ function formatTableDate(value) {
   const parsed = new Date(value);
   if (Number.isNaN(parsed.getTime())) return "";
   const day = String(parsed.getDate()).padStart(2, "0");
-  const month = String(parsed.getMonth() + 1).padStart(2, "0");
+  const mon = MONTH_NAMES[parsed.getMonth()];
   const year = String(parsed.getFullYear()).slice(-2);
-  return `${day}/${month}/${year}`;
+  return `${day} ${mon},${year}`;
 }
 
 function CustomDateFilter({ value, onChange, placeholder, max }) {
@@ -110,7 +113,7 @@ function CustomDateFilter({ value, onChange, placeholder, max }) {
     };
 
     const handlePointerDown = (event) => {
-      const pickerRoot = event.target.closest?.('[data-citizen-meeting-date-filter="true"]');
+      const pickerRoot = event.target.closest?.('[data-citizen-appointment-date-filter="true"]');
       if (!pickerRoot) {
         setIsOpen(false);
         setViewMode("day");
@@ -150,7 +153,7 @@ function CustomDateFilter({ value, onChange, placeholder, max }) {
   }
 
   return (
-    <div ref={rootRef} data-citizen-meeting-date-filter="true" style={{ position: "relative", width: "100%" }}>
+    <div ref={rootRef} data-citizen-appointment-date-filter="true" style={{ position: "relative", width: "100%" }}>
       <button
         type="button"
         onClick={() => setIsOpen((current) => !current)}
@@ -394,29 +397,29 @@ const idColumnStyle = {
 };
 
 const titleColumnStyle = {
-  width: "32%",
+  width: "26%",
 };
 
 const dateColumnStyle = {
-  width: 132,
-  minWidth: 132,
-  maxWidth: 132,
-};
-
-const locationColumnStyle = {
-  width: "16%",
-};
-
-const statusColumnStyle = {
   width: 120,
   minWidth: 120,
   maxWidth: 120,
 };
 
+const locationColumnStyle = {
+  width: "19%",
+};
+
+const statusColumnStyle = {
+  width: 150,
+  minWidth: 150,
+  maxWidth: 150,
+};
+
 const actionColumnStyle = {
-  width: 96,
-  minWidth: 96,
-  maxWidth: 96,
+  width: 70,
+  minWidth: 70,
+  maxWidth: 70,
 };
 
 function toTooltipText(value) {
@@ -424,8 +427,9 @@ function toTooltipText(value) {
   return String(value);
 }
 
-export default function MeetingList() {
+export default function AppointmentList() {
   const { C } = usePortalTheme();
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const { session } = useAuth();
   const { eventVersion } = useNotifications();
@@ -433,7 +437,7 @@ export default function MeetingList() {
   const tableHeaderText = "#FFFFFF";
   const alternateRowBackground = C.name === "dark" ? C.card : "#F7F1FF";
   const pageHeight = "calc(100vh - 73px)";
-  const [meetings, setMeetings] = useState([]);
+  const [appointments, setAppointments] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [hoveredActionId, setHoveredActionId] = useState(null);
@@ -449,15 +453,15 @@ export default function MeetingList() {
   useEffect(() => {
     let mounted = true;
 
-    async function loadMeetings() {
+    async function loadAppointments() {
       try {
-        const { data } = await apiClient.get("/meetings/my");
+        const { data } = await apiClient.get("/appointments/my");
         if (mounted) {
-          setMeetings(data.meetings || []);
+          setAppointments(data.appointments || []);
         }
       } catch (loadError) {
         if (mounted) {
-          setError(loadError?.response?.data?.error || "Unable to load meetings");
+          setError(loadError?.response?.data?.error || t("citizen.appointments.unableToLoad"));
         }
       } finally {
         if (mounted) {
@@ -467,7 +471,7 @@ export default function MeetingList() {
     }
 
     if (session?.role) {
-      loadMeetings();
+      loadAppointments();
     }
 
     return () => {
@@ -477,17 +481,17 @@ export default function MeetingList() {
 
   // Unified items calculation with filtering and sorting
   const items = useMemo(() => {
-    const meetingItems = meetings.map((item) => ({
+    const appointmentItems = appointments.map((item) => ({
       ...item,
-      itemType: "meeting",
+      itemType: "appointment",
       primaryTitle: item.title,
       primaryId: item.requestId || item.id, // Fallback to id if requestId isn't present
-    })).sort((a, b) => new Date(b.created_at || 0) - new Date(a.created_at || 0));
+    })).sort((a, b) => new Date(b.createdAt || b.created_at || 0) - new Date(a.createdAt || a.created_at || 0));
 
-    return meetingItems.filter((item) => {
-      const statusObj = meetingStatus(item);
+    return appointmentItems.filter((item) => {
+      const statusObj = appointmentStatus(item);
       const statusOk = filters.status === "all" || statusObj.value === filters.status;
-      const createdAtValue = getDateOnlyValue(item.created_at);
+      const createdAtValue = getDateOnlyValue(item.createdAt || item.created_at);
       const createdAtOk = !filters.createdAt || createdAtValue === filters.createdAt;
       const q = filters.q.trim().toLowerCase();
       
@@ -499,7 +503,7 @@ export default function MeetingList() {
       
       return statusOk && createdAtOk && (!q || searchText.includes(q));
     });
-  }, [meetings, filters]);
+  }, [appointments, filters]);
 
   // Pagination Math
   const totalPages = Math.ceil(items.length / itemsPerPage) || 1;
@@ -511,8 +515,8 @@ export default function MeetingList() {
   }, [currentPage, totalPages]);
   // Dynamic Status Options for the dropdown
   const statusOptions = useMemo(() => {
-    return Array.from(new Set(meetings.map((item) => item.status).filter(Boolean))).sort();
-  }, [meetings]);
+    return Array.from(new Set(appointments.map((item) => item.status).filter(Boolean))).sort();
+  }, [appointments]);
 
   useEffect(() => {
     setCurrentPage((page) => Math.min(page, totalPages));
@@ -532,7 +536,7 @@ export default function MeetingList() {
         <div style={{ width: "100%", display: "flex", flexDirection: "column", flex: 1, minHeight: 0 }}>
         <div style={{ marginBottom: 18, display: "flex", alignItems: "center", gap: 10 }}>
           <Calendar size={20} style={{ color: C.purple, flexShrink: 0 }} />
-          <h1 style={{ margin: 0, fontSize: 20, lineHeight: 1.3, fontWeight: 600, color: C.t1 }}>MY MEETINGS</h1>
+          <h1 style={{ margin: 0, fontSize: 20, lineHeight: 1.3, fontWeight: 600, color: C.t1 }}>{t("citizen.appointments.title")}</h1>
         </div>
 
         <div style={{ marginBottom: 14, display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
@@ -545,7 +549,7 @@ export default function MeetingList() {
                     setFilters((current) => ({ ...current, q: event.target.value }));
                     setCurrentPage(1);
                   }}
-                  placeholder="Search by Meeting Id , Title and Location"
+                  placeholder={t("citizen.appointments.searchPlaceholder")}
                   style={{ paddingLeft: 36, minHeight: 34, paddingTop: 0, paddingBottom: 0, fontSize: 11, lineHeight: "34px" }}
                 />
               </div>
@@ -555,7 +559,7 @@ export default function MeetingList() {
                   setFilters((current) => ({ ...current, createdAt: nextValue }));
                   setCurrentPage(1);
                 }}
-                placeholder="Created At"
+                placeholder={t("citizen.appointments.createdAtPlaceholder")}
                 max={todayDate}
               />
               <div className="relative">
@@ -568,7 +572,7 @@ export default function MeetingList() {
                 }}
                 style={{ paddingLeft: 36, minHeight: 34, paddingTop: 0, paddingBottom: 0, fontSize: 11, lineHeight: "34px" }}
               >
-                  <option value="all">All status</option>
+                  <option value="all">{t("citizen.appointments.allStatus")}</option>
                   {statusOptions.map((status) => (
                     <option key={status} value={status}>
                       {status.replace(/_/g, " ").charAt(0).toUpperCase() + status.replace(/_/g, " ").slice(1)}
@@ -580,13 +584,13 @@ export default function MeetingList() {
         </div>
 
         <div style={{ display: "flex", flexDirection: "column" }}>
-          {loading && <WorkspaceEmptyState title="Loading your meetings..." />}
+          {loading && <WorkspaceEmptyState title={t("citizen.appointments.loadingAppointments")} />}
           {error && <div style={{ color: C.danger, padding: "12px 0" }}>{error}</div>}
 
           {!loading && !error && (
             <>
               {items.length === 0 ? (
-                <WorkspaceEmptyState title="No meeting requests found" subtitle="Try adjusting your filters." />
+                <WorkspaceEmptyState title={t("citizen.appointments.noAppointments")} subtitle={t("citizen.appointments.noAppointmentsSubtitle")} />
               ) : (
                 <>
                   <div className="hidden lg:block" style={{ border: `1px solid ${C.border}`, borderRadius: 12, overflow: "hidden", display: "flex", flexDirection: "column", marginBottom: 10 }}>
@@ -594,28 +598,28 @@ export default function MeetingList() {
                           <colgroup>
                             <col style={idColumnStyle} />
                             <col style={titleColumnStyle} />
-                            <col style={dateColumnStyle} />
-                            <col style={dateColumnStyle} />
                             <col style={locationColumnStyle} />
+                            <col style={dateColumnStyle} />
+                            <col style={dateColumnStyle} />
                             <col style={statusColumnStyle} />
                             <col style={actionColumnStyle} />
                           </colgroup>
                           <thead>
                             <tr>
-                              <th style={{ padding: "13px 16px", fontSize: 10, fontWeight: 600, color: tableHeaderText, textTransform: "uppercase", letterSpacing: "0.06em", textAlign: "left", whiteSpace: "nowrap", background: tableHeaderBackground, borderBottom: `1px solid ${C.border}`, verticalAlign: "middle", borderTopLeftRadius: 12 }}>Meeting ID</th>
-                              <th style={{ padding: "13px 16px", fontSize: 10, fontWeight: 600, color: tableHeaderText, textTransform: "uppercase", letterSpacing: "0.06em", textAlign: "left", whiteSpace: "nowrap", background: tableHeaderBackground, borderBottom: `1px solid ${C.border}`, verticalAlign: "middle" }}>Title</th>
-                              <th style={{ padding: "13px 16px", fontSize: 10, fontWeight: 600, color: tableHeaderText, textTransform: "uppercase", letterSpacing: "0.06em", textAlign: "left", whiteSpace: "nowrap", background: tableHeaderBackground, borderBottom: `1px solid ${C.border}`, verticalAlign: "middle" }}>Created At</th>
-                              <th style={{ padding: "13px 16px", fontSize: 10, fontWeight: 600, color: tableHeaderText, textTransform: "uppercase", letterSpacing: "0.06em", textAlign: "left", whiteSpace: "nowrap", background: tableHeaderBackground, borderBottom: `1px solid ${C.border}`, verticalAlign: "middle" }}>Scheduled Date</th>
-                              <th style={{ padding: "13px 16px", fontSize: 10, fontWeight: 600, color: tableHeaderText, textTransform: "uppercase", letterSpacing: "0.06em", textAlign: "left", whiteSpace: "nowrap", background: tableHeaderBackground, borderBottom: `1px solid ${C.border}`, verticalAlign: "middle" }}>Scheduled Location</th>
-                              <th style={{ width: "1%", padding: "13px 16px", fontSize: 10, fontWeight: 600, color: tableHeaderText, textTransform: "uppercase", letterSpacing: "0.06em", textAlign: "left", whiteSpace: "nowrap", background: tableHeaderBackground, borderBottom: `1px solid ${C.border}`, verticalAlign: "middle" }}>Status</th>
-                              <th style={{ width: "1%", padding: "13px 16px", fontSize: 10, fontWeight: 600, color: tableHeaderText, textTransform: "uppercase", letterSpacing: "0.06em", textAlign: "center", whiteSpace: "nowrap", background: tableHeaderBackground, borderBottom: `1px solid ${C.border}`, verticalAlign: "middle", borderTopRightRadius: 12 }}>Action</th>
+                              <th style={{ padding: "13px 16px", fontSize: 10, fontWeight: 600, color: tableHeaderText, textTransform: "uppercase", letterSpacing: "0.06em", textAlign: "left", whiteSpace: "nowrap", background: tableHeaderBackground, borderBottom: `1px solid ${C.border}`, verticalAlign: "middle", borderTopLeftRadius: 12 }}>{t("citizen.appointments.colAppointmentId")}</th>
+                              <th style={{ padding: "13px 16px", fontSize: 10, fontWeight: 600, color: tableHeaderText, textTransform: "uppercase", letterSpacing: "0.06em", textAlign: "left", whiteSpace: "nowrap", background: tableHeaderBackground, borderBottom: `1px solid ${C.border}`, verticalAlign: "middle" }}>{t("citizen.appointments.colTitle")}</th>
+                              <th style={{ padding: "13px 16px", fontSize: 10, fontWeight: 600, color: tableHeaderText, textTransform: "uppercase", letterSpacing: "0.06em", textAlign: "left", whiteSpace: "nowrap", background: tableHeaderBackground, borderBottom: `1px solid ${C.border}`, verticalAlign: "middle" }}>{t("citizen.appointments.colScheduledLocation")}</th>
+                              <th style={{ padding: "13px 16px", fontSize: 10, fontWeight: 600, color: tableHeaderText, textTransform: "uppercase", letterSpacing: "0.06em", textAlign: "left", whiteSpace: "nowrap", background: tableHeaderBackground, borderBottom: `1px solid ${C.border}`, verticalAlign: "middle" }}>{t("citizen.appointments.colScheduledDate")}</th>
+                              <th style={{ padding: "13px 16px", fontSize: 10, fontWeight: 600, color: tableHeaderText, textTransform: "uppercase", letterSpacing: "0.06em", textAlign: "left", whiteSpace: "nowrap", background: tableHeaderBackground, borderBottom: `1px solid ${C.border}`, verticalAlign: "middle" }}>{t("citizen.appointments.colCreatedAt")}</th>
+                              <th style={{ padding: "13px 16px", fontSize: 10, fontWeight: 600, color: tableHeaderText, textTransform: "uppercase", letterSpacing: "0.06em", textAlign: "left", whiteSpace: "nowrap", background: tableHeaderBackground, borderBottom: `1px solid ${C.border}`, verticalAlign: "middle" }}>{t("citizen.appointments.colStatus")}</th>
+                              <th style={{ width: "1%", padding: "13px 16px", fontSize: 10, fontWeight: 600, color: tableHeaderText, textTransform: "uppercase", letterSpacing: "0.06em", textAlign: "center", whiteSpace: "nowrap", background: tableHeaderBackground, borderBottom: `1px solid ${C.border}`, verticalAlign: "middle", borderTopRightRadius: 12 }}>{t("citizen.appointments.colAction")}</th>
                             </tr>
                           </thead>
                           <tbody>
                             {paginatedItems.map((item, index) => {
-                              const statusObj = meetingStatus(item);
+                              const statusObj = appointmentStatus(item);
                               const scheduledDateLabel = formatTableDate(item.scheduled_at);
-                              const createdAtLabel = formatTableDate(item.created_at);
+                              const createdAtLabel = formatTableDate(item.createdAt || item.created_at);
                               const locationLabel = item.scheduled_location || "";
                               const isActionHovered = hoveredActionId === item.id;
 
@@ -633,10 +637,14 @@ export default function MeetingList() {
                                       {item.primaryTitle}
                                     </span>
                                   </td>
-                                  <td style={{ padding: "10px 16px", fontSize: 13, color: C.t2, verticalAlign: "middle", whiteSpace: "nowrap" }}>
-                                    <span title={toTooltipText(createdAtLabel)} style={tableCellTextStyle}>
-                                      {createdAtLabel || "--"}
-                                    </span>
+                                  <td style={{ padding: "10px 8px 10px 16px", fontSize: 13, color: C.t2, verticalAlign: "middle" }}>
+                                    {locationLabel ? (
+                                      <span title={toTooltipText(locationLabel)} style={tableCellTextStyle}>
+                                        {locationLabel}
+                                      </span>
+                                    ) : (
+                                      <WorkspaceBadge status="pending" title={t("citizen.appointments.statusPending")} style={{ maxWidth: "100%" }}>{t("citizen.appointments.statusPending")}</WorkspaceBadge>
+                                    )}
                                   </td>
                                   <td style={{ padding: "10px 16px", fontSize: 13, color: C.t2, verticalAlign: "middle", whiteSpace: "nowrap" }}>
                                     {scheduledDateLabel ? (
@@ -644,19 +652,15 @@ export default function MeetingList() {
                                         {scheduledDateLabel}
                                       </span>
                                     ) : (
-                                      <WorkspaceBadge status="pending" title="Pending" style={{ maxWidth: "100%" }}>Pending</WorkspaceBadge>
+                                      <WorkspaceBadge status="pending" title={t("citizen.appointments.statusPending")} style={{ maxWidth: "100%" }}>{t("citizen.appointments.statusPending")}</WorkspaceBadge>
                                     )}
                                   </td>
-                                  <td style={{ padding: "10px 8px 10px 16px", fontSize: 13, color: C.t2, verticalAlign: "middle" }}>
-                                    {locationLabel ? (
-                                      <span title={toTooltipText(locationLabel)} style={tableCellTextStyle}>
-                                        {locationLabel}
-                                      </span>
-                                    ) : (
-                                      <WorkspaceBadge status="pending" title="Pending" style={{ maxWidth: "100%" }}>Pending</WorkspaceBadge>
-                                    )}
+                                  <td style={{ padding: "10px 16px", fontSize: 13, color: C.t2, verticalAlign: "middle", whiteSpace: "nowrap" }}>
+                                    <span title={toTooltipText(createdAtLabel)} style={tableCellTextStyle}>
+                                      {createdAtLabel || "--"}
+                                    </span>
                                   </td>
-                                  <td style={{ width: "1%", padding: "10px 16px 10px 8px", verticalAlign: "middle", whiteSpace: "nowrap" }}>
+                                  <td style={{ padding: "10px 16px 10px 8px", verticalAlign: "middle", whiteSpace: "nowrap" }}>
                                     <WorkspaceBadge status={statusObj.value} title={statusObj.label} style={{ maxWidth: "100%" }}>{statusObj.label}</WorkspaceBadge>
                                   </td>
                                   <td style={{ width: "1%", padding: "10px 16px", textAlign: "center", verticalAlign: "middle", whiteSpace: "nowrap" }}>
@@ -664,7 +668,7 @@ export default function MeetingList() {
                                       type="button"
                                       onMouseEnter={() => setHoveredActionId(item.id)}
                                       onMouseLeave={() => setHoveredActionId(null)}
-                                      onClick={() => navigate(`/citizen/meetings/${item.id}`, { state: { meetingData: item, itemType: item.itemType } })}
+                                      onClick={() => navigate(`/citizen/appointments/${item.id}`, { state: { appointmentData: item, itemType: item.itemType } })}
                                       title="View details"
                                       style={{
                                         minWidth: 0,
@@ -841,17 +845,17 @@ export default function MeetingList() {
 
                   <div className="lg:hidden space-y-3">
                     {paginatedItems.map((item) => {
-                      const statusObj = meetingStatus(item);
+                      const statusObj = appointmentStatus(item);
                       const scheduledDateLabel = formatTableDate(item.scheduled_at);
                       const locationLabel = item.scheduled_location || "";
-                      const createdAtLabel = formatTableDate(item.created_at);
+                      const createdAtLabel = formatTableDate(item.createdAt || item.created_at);
 
                       return (
                         <div key={`${item.itemType}-${item.id}`} style={{ border: `1px solid ${C.border}`, borderRadius: 12, padding: 16, background: C.card }}>
                           <div className="flex items-start justify-between gap-3 mb-3">
                             <div className="flex-1">
                               <div className="portal-citizen-label" style={{ color: C.t3, marginBottom: 6 }}>
-                                Meeting ID: {item.primaryId || "-"}
+                                Appointment ID: {item.primaryId || "-"}
                               </div>
                               <h3 style={{ margin: 0, fontWeight: 700, color: C.t1, lineHeight: 1.5, wordBreak: "break-word" }}>{item.primaryTitle}</h3>
                             </div>
@@ -870,7 +874,7 @@ export default function MeetingList() {
                               {scheduledDateLabel ? (
                                 <p className="portal-citizen-value" style={{ margin: 0, color: C.t2, fontWeight: 600 }}>{scheduledDateLabel}</p>
                               ) : (
-                                <WorkspaceBadge status="pending" title="Pending">Pending</WorkspaceBadge>
+                                <WorkspaceBadge status="pending" title={t("citizen.appointments.statusPending")}>{t("citizen.appointments.statusPending")}</WorkspaceBadge>
                               )}
                             </div>
                             <div className="col-span-2" style={{ background: C.bgElevated, border: `1px solid ${C.border}`, borderRadius: 10, padding: 12 }}>
@@ -878,14 +882,14 @@ export default function MeetingList() {
                               {locationLabel ? (
                                 <p className="portal-citizen-value" style={{ margin: 0, color: C.t2, fontWeight: 600 }}>{locationLabel}</p>
                               ) : (
-                                <WorkspaceBadge status="pending" title="Pending">Pending</WorkspaceBadge>
+                                <WorkspaceBadge status="pending" title={t("citizen.appointments.statusPending")}>{t("citizen.appointments.statusPending")}</WorkspaceBadge>
                               )}
                             </div>
                           </div>
 
                           <WorkspaceButton
                             type="button"
-                            onClick={() => navigate(`/citizen/meetings/${item.id}`, { state: { meetingData: item, itemType: item.itemType } })}
+                            onClick={() => navigate(`/citizen/appointments/${item.id}`, { state: { appointmentData: item, itemType: item.itemType } })}
                             variant="outline"
                             style={{ width: "100%" }}
                           >
@@ -924,7 +928,7 @@ export default function MeetingList() {
 // } from "../../../shared/components/WorkspaceUI.jsx";
 // import { usePortalTheme } from "../../../shared/theme/portalTheme.jsx";
 
-// function meetingStatus(item) {
+// function appointmentStatus(item) {
 //   const status = item.status || "pending";
 //   const label = String(status)
 //     .split("_")
@@ -953,7 +957,7 @@ export default function MeetingList() {
 //   return String(value);
 // }
 
-// export default function MeetingList() {
+// export default function AppointmentList() {
 //   const { C } = usePortalTheme();
 //   const navigate = useNavigate();
 //   const { session } = useAuth();
@@ -963,7 +967,7 @@ export default function MeetingList() {
 //   const alternateRowBackground = C.name === "dark" ? C.card : "#F7F1FF";
 //   const pageHeight = "calc(100vh - 73px)";
 
-//   const [meetings, setMeetings] = useState([]);
+//   const [appointments, setAppointments] = useState([]);
 //   const [loading, setLoading] = useState(true);
 //   const [error, setError] = useState("");
 //   const [hoveredActionId, setHoveredActionId] = useState(null);
@@ -977,15 +981,15 @@ export default function MeetingList() {
 //   useEffect(() => {
 //     let mounted = true;
 
-//     async function loadMeetings() {
+//     async function loadAppointments() {
 //       try {
-//         const { data } = await apiClient.get("/meetings/my");
+//         const { data } = await apiClient.get("/appointments/my");
 //         if (mounted) {
-//           setMeetings(data.meetings || []);
+//           setAppointments(data.appointments || []);
 //         }
 //       } catch (loadError) {
 //         if (mounted) {
-//           setError(loadError?.response?.data?.error || "Unable to load meetings");
+//           setError(loadError?.response?.data?.error || t("citizen.appointments.unableToLoad"));
 //         }
 //       } finally {
 //         if (mounted) {
@@ -995,7 +999,7 @@ export default function MeetingList() {
 //     }
 
 //     if (session?.role) {
-//       loadMeetings();
+//       loadAppointments();
 //     }
 
 //     return () => {
@@ -1005,15 +1009,15 @@ export default function MeetingList() {
 
 //   // Unified items calculation with filtering and sorting
 //   const items = useMemo(() => {
-//     const meetingItems = meetings.map((item) => ({
+//     const appointmentItems = appointments.map((item) => ({
 //       ...item,
-//       itemType: "meeting",
+//       itemType: "appointment",
 //       primaryTitle: item.title,
 //       primaryId: item.requestId || item.id, // Fallback to id if requestId isn't present
-//     })).sort((a, b) => new Date(b.created_at || 0) - new Date(a.created_at || 0));
+//     })).sort((a, b) => new Date(b.createdAt || b.created_at || 0) - new Date(a.createdAt || a.created_at || 0));
 
-//     return meetingItems.filter((item) => {
-//       const statusObj = meetingStatus(item);
+//     return appointmentItems.filter((item) => {
+//       const statusObj = appointmentStatus(item);
 //       const statusOk = filters.status === "all" || statusObj.value === filters.status;
 //       const q = filters.q.trim().toLowerCase();
 
@@ -1027,7 +1031,7 @@ export default function MeetingList() {
 
 //       return statusOk && (!q || searchText.includes(q));
 //     });
-//   }, [meetings, filters]);
+//   }, [appointments, filters]);
 
 //   // Pagination Math
 //   const totalPages = Math.ceil(items.length / itemsPerPage) || 1;
@@ -1035,8 +1039,8 @@ export default function MeetingList() {
 
 //   // Dynamic Status Options for the dropdown
 //   const statusOptions = useMemo(() => {
-//     return Array.from(new Set(meetings.map((item) => item.status).filter(Boolean))).sort();
-//   }, [meetings]);
+//     return Array.from(new Set(appointments.map((item) => item.status).filter(Boolean))).sort();
+//   }, [appointments]);
 
 //   return (
 //     <div
@@ -1051,7 +1055,7 @@ export default function MeetingList() {
 //       <div style={{ width: "100%", display: "flex", flexDirection: "column", flex: 1, minHeight: 0 }}>
 //         <div style={{ marginBottom: 24, display: "flex", alignItems: "center", gap: 10 }}>
 //           <Calendar size={20} style={{ color: C.purple, flexShrink: 0 }} />
-//           <h1 style={{ margin: 0, fontSize: 20, lineHeight: 1.3, fontWeight: 600, color: C.t1 }}>MY MEETINGS</h1>
+//           <h1 style={{ margin: 0, fontSize: 20, lineHeight: 1.3, fontWeight: 600, color: C.t1 }}>{t("citizen.appointments.title")}</h1>
 //         </div>
 
 //         <div style={{ marginBottom: 20 }}>
@@ -1090,13 +1094,13 @@ export default function MeetingList() {
 //         </div>
 
 //         <div style={{ flex: 1, minHeight: 0, display: "flex", flexDirection: "column" }}>
-//           {loading && <WorkspaceEmptyState title="Loading your meetings..." />}
+//           {loading && <WorkspaceEmptyState title={t("citizen.appointments.loadingAppointments")} />}
 //           {error && <div style={{ color: C.danger, padding: "12px 0" }}>{error}</div>}
 
 //           {!loading && !error && (
 //             <>
 //               {items.length === 0 ? (
-//                 <WorkspaceEmptyState title="No meeting requests found" subtitle="Try adjusting your filters." />
+//                 <WorkspaceEmptyState title={t("citizen.appointments.noAppointments")} subtitle={t("citizen.appointments.noAppointmentsSubtitle")} />
 //               ) : (
 //                 <>
 //                   <div className="hidden lg:block" style={{ border: `1px solid ${C.border}`, borderRadius: 12, overflow: "hidden", display: "flex", flexDirection: "column", flex: 1, minHeight: 0 }}>
@@ -1112,8 +1116,8 @@ export default function MeetingList() {
 //                       </colgroup>
 //                       <thead>
 //                         <tr>
-//                           <th style={{ padding: "13px 16px", fontSize: 10, fontWeight: 600, color: tableHeaderText, textTransform: "uppercase", letterSpacing: "0.06em", textAlign: "left", whiteSpace: "nowrap", background: tableHeaderBackground, borderBottom: `1px solid ${C.border}`, verticalAlign: "middle" }}>Meeting ID</th>
-//                           <th style={{ padding: "13px 16px", fontSize: 10, fontWeight: 600, color: tableHeaderText, textTransform: "uppercase", letterSpacing: "0.06em", textAlign: "left", whiteSpace: "nowrap", background: tableHeaderBackground, borderBottom: `1px solid ${C.border}`, verticalAlign: "middle" }}>Meeting Title</th>
+//                           <th style={{ padding: "13px 16px", fontSize: 10, fontWeight: 600, color: tableHeaderText, textTransform: "uppercase", letterSpacing: "0.06em", textAlign: "left", whiteSpace: "nowrap", background: tableHeaderBackground, borderBottom: `1px solid ${C.border}`, verticalAlign: "middle" }}>Appointment ID</th>
+//                           <th style={{ padding: "13px 16px", fontSize: 10, fontWeight: 600, color: tableHeaderText, textTransform: "uppercase", letterSpacing: "0.06em", textAlign: "left", whiteSpace: "nowrap", background: tableHeaderBackground, borderBottom: `1px solid ${C.border}`, verticalAlign: "middle" }}>Appointment Title</th>
 //                           <th style={{ padding: "13px 16px", fontSize: 10, fontWeight: 600, color: tableHeaderText, textTransform: "uppercase", letterSpacing: "0.06em", textAlign: "left", whiteSpace: "nowrap", background: tableHeaderBackground, borderBottom: `1px solid ${C.border}`, verticalAlign: "middle" }}>Created At</th>
 //                           <th style={{ padding: "13px 16px", fontSize: 10, fontWeight: 600, color: tableHeaderText, textTransform: "uppercase", letterSpacing: "0.06em", textAlign: "left", whiteSpace: "nowrap", background: tableHeaderBackground, borderBottom: `1px solid ${C.border}`, verticalAlign: "middle" }}>Scheduled Time</th>
 //                           <th style={{ padding: "13px 16px", fontSize: 10, fontWeight: 600, color: tableHeaderText, textTransform: "uppercase", letterSpacing: "0.06em", textAlign: "left", whiteSpace: "nowrap", background: tableHeaderBackground, borderBottom: `1px solid ${C.border}`, verticalAlign: "middle" }}>Location</th>
@@ -1123,7 +1127,7 @@ export default function MeetingList() {
 //                       </thead>
 //                       <tbody>
 //                         {paginatedItems.map((item, index) => {
-//                           const statusObj = meetingStatus(item);
+//                           const statusObj = appointmentStatus(item);
 //                           const scheduledTimeLabel = item.scheduled_at ? new Date(item.scheduled_at).toLocaleString("en-IN", { dateStyle: "medium", timeStyle: "short" }) : "-";
 //                           const createdAtLabel = item.created_at ? new Date(item.created_at).toLocaleDateString("en-IN", { dateStyle: "medium" }) : "--";
 //                           const locationLabel = item.scheduled_location || "-";
@@ -1166,7 +1170,7 @@ export default function MeetingList() {
 //                                   type="button"
 //                                   onMouseEnter={() => setHoveredActionId(item.id)}
 //                                   onMouseLeave={() => setHoveredActionId(null)}
-//                                   onClick={() => navigate(`/citizen/meetings/${item.id}`, { state: { meetingData: item, itemType: item.itemType } })}
+//                                   onClick={() => navigate(`/citizen/appointments/${item.id}`, { state: { appointmentData: item, itemType: item.itemType } })}
 //                                   title="View details"
 //                                   style={{
 //                                     minWidth: 0,
@@ -1232,7 +1236,7 @@ export default function MeetingList() {
 
 //                   <div className="lg:hidden space-y-3">
 //                     {paginatedItems.map((item) => {
-//                       const statusObj = meetingStatus(item);
+//                       const statusObj = appointmentStatus(item);
 //                       const scheduledTimeLabel = item.scheduled_at ? new Date(item.scheduled_at).toLocaleString("en-IN", { dateStyle: "medium", timeStyle: "short" }) : "-";
 //                       const locationLabel = item.scheduled_location || "-";
 //                       const createdAtLabel = item.created_at ? new Date(item.created_at).toLocaleDateString("en-IN", { dateStyle: "medium" }) : "--";
@@ -1242,7 +1246,7 @@ export default function MeetingList() {
 //                           <div className="flex items-start justify-between gap-3 mb-3">
 //                             <div className="flex-1">
 //                               <div style={{ fontSize: 11, color: C.t3, marginBottom: 6, fontWeight: 600 }}>
-//                                 Meeting ID: {item.primaryId || "-"}
+//                                 Appointment ID: {item.primaryId || "-"}
 //                               </div>
 //                               <h3 style={{ margin: 0, fontWeight: 700, color: C.t1, lineHeight: 1.5, wordBreak: "break-word" }}>{item.primaryTitle}</h3>
 //                             </div>
@@ -1268,7 +1272,7 @@ export default function MeetingList() {
 
 //                           <WorkspaceButton
 //                             type="button"
-//                             onClick={() => navigate(`/citizen/meetings/${item.id}`, { state: { meetingData: item, itemType: item.itemType } })}
+//                             onClick={() => navigate(`/citizen/appointments/${item.id}`, { state: { appointmentData: item, itemType: item.itemType } })}
 //                             variant="outline"
 //                             style={{ width: "100%" }}
 //                           >

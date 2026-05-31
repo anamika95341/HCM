@@ -1,0 +1,8 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(node -e \"require\\('dotenv'\\).config\\(\\); const pool = require\\('./config/database'\\); pool.query\\('SELECT 1'\\).then\\(\\(\\) => { console.log\\('DB connected'\\); pool.end\\(\\); }\\).catch\\(e => { console.error\\('DB error:', e.message\\); pool.end\\(\\); }\\);\")",
+      "Bash(docker exec hcm-postgres-1 *)"
+    ]
+  }
+}

@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import { Eye, FileText, Search, Filter, Calendar, ChevronLeft, ChevronRight } from "lucide-react";
 import { apiClient } from "../../../shared/api/client.js";
 import { useAuth } from "../../../shared/auth/AuthContext.jsx";
@@ -38,13 +39,15 @@ function formatDateValue(date) {
   return `${year}-${month}-${day}`;
 }
 
+const MONTH_NAMES = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+
 function formatDisplayDate(value) {
   const parsedDate = parseDateValue(value);
   if (!parsedDate) return "";
   const day = String(parsedDate.getDate()).padStart(2, "0");
-  const month = String(parsedDate.getMonth() + 1).padStart(2, "0");
+  const mon = MONTH_NAMES[parsedDate.getMonth()];
   const year = String(parsedDate.getFullYear()).slice(-2);
-  return `${day}/${month}/${year}`;
+  return `${day} ${mon},${year}`;
 }
 
 function buildCalendarDays(monthStart) {
@@ -90,9 +93,9 @@ function formatIncidentDate(value) {
   const parsed = new Date(value);
   if (Number.isNaN(parsed.getTime())) return "";
   const day = String(parsed.getDate()).padStart(2, "0");
-  const month = String(parsed.getMonth() + 1).padStart(2, "0");
+  const mon = MONTH_NAMES[parsed.getMonth()];
   const year = String(parsed.getFullYear()).slice(-2);
-  return `${day}/${month}/${year}`;
+  return `${day} ${mon},${year}`;
 }
 
 function CustomDateFilter({ value, onChange, placeholder, max }) {
@@ -116,7 +119,7 @@ function CustomDateFilter({ value, onChange, placeholder, max }) {
     };
 
     const handlePointerDown = (event) => {
-      const pickerRoot = event.target.closest?.('[data-citizen-complaint-date-filter="true"]');
+      const pickerRoot = event.target.closest?.('[data-citizen-grievance-date-filter="true"]');
       if (!pickerRoot) {
         setIsOpen(false);
         setViewMode("day");
@@ -156,7 +159,7 @@ function CustomDateFilter({ value, onChange, placeholder, max }) {
   }
 
   return (
-    <div ref={rootRef} data-citizen-complaint-date-filter="true" style={{ position: "relative", width: "100%" }}>
+    <div ref={rootRef} data-citizen-grievance-date-filter="true" style={{ position: "relative", width: "100%" }}>
       <button
         type="button"
         onClick={() => setIsOpen((current) => !current)}
@@ -393,33 +396,19 @@ const tableCellTextStyle = {
 };
 
 const idColumnStyle = {
-  width: 180,
-  minWidth: 180,
-  maxWidth: 180,
+  width: 155,
+  minWidth: 155,
+  maxWidth: 155,
 };
 
 const titleColumnStyle = {
-  width: "26%",
+  width: "28%",
 };
 
-const categoryColumnStyle = {
-  width: "19%",
-};
-
-const locationColumnStyle = {
-  width: "16%",
-};
-
-const incidentDateColumnStyle = {
-  width: 128,
-  minWidth: 128,
-  maxWidth: 128,
-};
-
-const statusColumnStyle = {
-  width: 120,
-  minWidth: 120,
-  maxWidth: 120,
+const fixedColumnStyle = {
+  width: 130,
+  minWidth: 130,
+  maxWidth: 130,
 };
 
 const actionColumnStyle = {
@@ -435,6 +424,7 @@ function toTooltipText(value) {
 
 export default function MyCases() {
   const { C } = usePortalTheme();
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const { session } = useAuth();
   const { eventVersion } = useNotifications();
@@ -442,7 +432,7 @@ export default function MyCases() {
   const tableHeaderText = "#FFFFFF";
   const alternateRowBackground = C.name === "dark" ? C.card : "#F7F1FF";
   const pageHeight = "calc(100vh - 73px)";
-  const [complaints, setComplaints] = useState([]);
+  const [grievances, setGrievances] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [hoveredActionId, setHoveredActionId] = useState(null);
@@ -460,11 +450,11 @@ export default function MyCases() {
       try {
         const { data: response } = await apiClient.get("/citizen/my-cases");
         if (mounted) {
-          setComplaints(response.complaints || []);
+          setGrievances(response.grievances || []);
         }
       } catch (loadError) {
         if (mounted) {
-          setError(loadError?.response?.data?.error || "Unable to load your complaints");
+          setError(loadError?.response?.data?.error || t("citizen.myCases.unableToLoad"));
         }
       } finally {
         if (mounted) {
@@ -483,27 +473,26 @@ export default function MyCases() {
   }, [session?.role, eventVersion]);
 
   const items = useMemo(() => {
-    const complaintItems = complaints.map((item) => ({
+    const grievanceItems = grievances.map((item) => ({
       ...item,
-      itemType: "complaint",
+      itemType: "grievance",
       primaryTitle: item.title || item.subject,
-      primaryId: item.complaintId,
+      primaryId: item.grievanceId,
     })).sort((a, b) => new Date(b.updatedAt || b.updated_at || b.createdAt || b.created_at || 0) - new Date(a.updatedAt || a.updated_at || a.createdAt || a.created_at || 0));
 
-    return complaintItems.filter((item) => {
+    return grievanceItems.filter((item) => {
       const status = citizenStatus(item);
       const statusOk = filters.status === "all" || status.value === filters.status;
       const incidentDateOk = !filters.incidentDate || getIncidentDateOnlyValue(item) === filters.incidentDate;
       const q = filters.q.trim().toLowerCase();
       const searchText = [
-        item.primaryTitle,
         item.primaryId,
-        item.complaintType,
-        item.complaintLocation,
+        item.state,
+        item.district,
       ].filter(Boolean).join(" ").toLowerCase();
       return statusOk && incidentDateOk && (!q || searchText.includes(q));
     });
-  }, [complaints, filters]);
+  }, [grievances, filters]);
 
   const totalPages = Math.ceil(items.length / itemsPerPage) || 1;
   const paginatedItems = items.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
@@ -514,8 +503,8 @@ export default function MyCases() {
   }, [currentPage, totalPages]);
 
   const statusOptions = useMemo(() => {
-    return Array.from(new Set(complaints.map((item) => item.status).filter(Boolean))).sort();
-  }, [complaints]);
+    return Array.from(new Set(grievances.map((item) => item.status).filter(Boolean))).sort();
+  }, [grievances]);
 
   useEffect(() => {
     setCurrentPage((page) => Math.min(page, totalPages));
@@ -535,7 +524,7 @@ export default function MyCases() {
       <div style={{ width: "100%", display: "flex", flexDirection: "column", flex: 1, minHeight: 0 }}>
         <div style={{ marginBottom: 18, display: "flex", alignItems: "center", gap: 10 }}>
           <FileText size={20} style={{ color: C.purple, flexShrink: 0 }} />
-          <h1 style={{ margin: 0, fontSize: 20, lineHeight: 1.3, fontWeight: 600, color: C.t1 }}>MY COMPLAINTS</h1>
+          <h1 style={{ margin: 0, fontSize: 20, lineHeight: 1.3, fontWeight: 600, color: C.t1 }}>{t("citizen.myCases.title")}</h1>
         </div>
 
         <div style={{ marginBottom: 14, display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
@@ -548,7 +537,7 @@ export default function MyCases() {
                   setFilters((current) => ({ ...current, q: event.target.value }));
                   setCurrentPage(1);
                 }}
-                placeholder="Search by Complaint Id , Title , Category and Location"
+                placeholder={t("citizen.myCases.searchPlaceholder")}
                 style={{ paddingLeft: 36, minHeight: 34, paddingTop: 0, paddingBottom: 0, fontSize: 11, lineHeight: "34px" }}
               />
             </div>
@@ -558,7 +547,7 @@ export default function MyCases() {
                 setFilters((current) => ({ ...current, incidentDate: nextValue }));
                 setCurrentPage(1);
               }}
-              placeholder="Date of Incident"
+              placeholder={t("citizen.myCases.datePlaceholder")}
               max={todayDate}
             />
             <div className="relative">
@@ -571,7 +560,7 @@ export default function MyCases() {
                 }}
                 style={{ paddingLeft: 36, minHeight: 34, paddingTop: 0, paddingBottom: 0, fontSize: 11, lineHeight: "34px" }}
               >
-                <option value="all">All status</option>
+                <option value="all">{t("citizen.myCases.allStatus")}</option>
                 {statusOptions.map((status) => (
                   <option key={status} value={status}>
                     {status.replace(/_/g, " ").charAt(0).toUpperCase() + status.replace(/_/g, " ").slice(1)}
@@ -583,14 +572,14 @@ export default function MyCases() {
         </div>
 
         <div style={{ display: "flex", flexDirection: "column" }}>
-          {loading && <WorkspaceEmptyState title="Loading your complaints..." />}
+          {loading && <WorkspaceEmptyState title={t("citizen.myCases.loadingGrievances")} />}
 
           {error && <div style={{ color: C.danger, padding: "12px 0" }}>{error}</div>}
 
           {!loading && !error && (
             <>
               {items.length === 0 ? (
-                <WorkspaceEmptyState title="No complaints found" subtitle="Try adjusting your filters." />
+                <WorkspaceEmptyState title={t("citizen.myCases.noGrievances")} subtitle={t("citizen.myCases.noGrievancesSubtitle")} />
               ) : (
                 <>
                   <div className="hidden lg:block" style={{ border: `1px solid ${C.border}`, borderRadius: 12, overflow: "hidden", display: "flex", flexDirection: "column", marginBottom: 10 }}>
@@ -598,28 +587,28 @@ export default function MyCases() {
                       <colgroup>
                         <col style={idColumnStyle} />
                         <col style={titleColumnStyle} />
-                        <col style={categoryColumnStyle} />
-                        <col style={locationColumnStyle} />
-                        <col style={incidentDateColumnStyle} />
-                        <col style={statusColumnStyle} />
+                        <col style={fixedColumnStyle} />
+                        <col style={fixedColumnStyle} />
+                        <col style={fixedColumnStyle} />
+                        <col style={fixedColumnStyle} />
                         <col style={actionColumnStyle} />
                       </colgroup>
                       <thead>
                         <tr>
-                          <th style={{ padding: "13px 16px", fontSize: 10, fontWeight: 600, color: tableHeaderText, textTransform: "uppercase", letterSpacing: "0.06em", textAlign: "left", whiteSpace: "nowrap", background: tableHeaderBackground, borderBottom: `1px solid ${C.border}`, verticalAlign: "middle", borderTopLeftRadius: 12 }}>Complaint ID</th>
-                          <th style={{ padding: "13px 16px", fontSize: 10, fontWeight: 600, color: tableHeaderText, textTransform: "uppercase", letterSpacing: "0.06em", textAlign: "left", whiteSpace: "nowrap", background: tableHeaderBackground, borderBottom: `1px solid ${C.border}`, verticalAlign: "middle" }}>Title</th>
-                          <th style={{ padding: "13px 16px", fontSize: 10, fontWeight: 600, color: tableHeaderText, textTransform: "uppercase", letterSpacing: "0.06em", textAlign: "left", whiteSpace: "nowrap", background: tableHeaderBackground, borderBottom: `1px solid ${C.border}`, verticalAlign: "middle" }}>Category</th>
-                          <th style={{ padding: "13px 16px", fontSize: 10, fontWeight: 600, color: tableHeaderText, textTransform: "uppercase", letterSpacing: "0.06em", textAlign: "left", whiteSpace: "nowrap", background: tableHeaderBackground, borderBottom: `1px solid ${C.border}`, verticalAlign: "middle" }}>Location</th>
-                          <th style={{ padding: "13px 16px", fontSize: 10, fontWeight: 600, color: tableHeaderText, textTransform: "uppercase", letterSpacing: "0.06em", textAlign: "left", whiteSpace: "nowrap", background: tableHeaderBackground, borderBottom: `1px solid ${C.border}`, verticalAlign: "middle" }}>Date of Incident</th>
-                          <th style={{ width: "1%", padding: "13px 16px", fontSize: 10, fontWeight: 600, color: tableHeaderText, textTransform: "uppercase", letterSpacing: "0.06em", textAlign: "left", whiteSpace: "nowrap", background: tableHeaderBackground, borderBottom: `1px solid ${C.border}`, verticalAlign: "middle" }}>Status</th>
-                          <th style={{ width: "1%", padding: "13px 16px", fontSize: 10, fontWeight: 600, color: tableHeaderText, textTransform: "uppercase", letterSpacing: "0.06em", textAlign: "center", whiteSpace: "nowrap", background: tableHeaderBackground, borderBottom: `1px solid ${C.border}`, verticalAlign: "middle", borderTopRightRadius: 12 }}>Action</th>
+                          <th style={{ padding: "13px 16px", fontSize: 10, fontWeight: 600, color: tableHeaderText, textTransform: "uppercase", letterSpacing: "0.06em", textAlign: "left", whiteSpace: "nowrap", background: tableHeaderBackground, borderBottom: `1px solid ${C.border}`, verticalAlign: "middle", borderTopLeftRadius: 12 }}>{t("citizen.myCases.colGrievanceId")}</th>
+                          <th style={{ padding: "13px 16px", fontSize: 10, fontWeight: 600, color: tableHeaderText, textTransform: "uppercase", letterSpacing: "0.06em", textAlign: "left", whiteSpace: "nowrap", background: tableHeaderBackground, borderBottom: `1px solid ${C.border}`, verticalAlign: "middle" }}>{t("citizen.myCases.colTitle")}</th>
+                          <th style={{ padding: "13px 16px", fontSize: 10, fontWeight: 600, color: tableHeaderText, textTransform: "uppercase", letterSpacing: "0.06em", textAlign: "left", whiteSpace: "nowrap", background: tableHeaderBackground, borderBottom: `1px solid ${C.border}`, verticalAlign: "middle" }}>{t("citizen.myCases.colState")}</th>
+                          <th style={{ padding: "13px 16px", fontSize: 10, fontWeight: 600, color: tableHeaderText, textTransform: "uppercase", letterSpacing: "0.06em", textAlign: "left", whiteSpace: "nowrap", background: tableHeaderBackground, borderBottom: `1px solid ${C.border}`, verticalAlign: "middle" }}>{t("citizen.myCases.colDistrict")}</th>
+                          <th style={{ padding: "13px 16px", fontSize: 10, fontWeight: 600, color: tableHeaderText, textTransform: "uppercase", letterSpacing: "0.06em", textAlign: "left", whiteSpace: "nowrap", background: tableHeaderBackground, borderBottom: `1px solid ${C.border}`, verticalAlign: "middle" }}>{t("citizen.myCases.colDate")}</th>
+                          <th style={{ padding: "13px 16px", fontSize: 10, fontWeight: 600, color: tableHeaderText, textTransform: "uppercase", letterSpacing: "0.06em", textAlign: "left", whiteSpace: "nowrap", background: tableHeaderBackground, borderBottom: `1px solid ${C.border}`, verticalAlign: "middle" }}>{t("citizen.myCases.colStatus")}</th>
+                          <th style={{ width: "1%", padding: "13px 16px", fontSize: 10, fontWeight: 600, color: tableHeaderText, textTransform: "uppercase", letterSpacing: "0.06em", textAlign: "center", whiteSpace: "nowrap", background: tableHeaderBackground, borderBottom: `1px solid ${C.border}`, verticalAlign: "middle", borderTopRightRadius: 12 }}>{t("citizen.myCases.colAction")}</th>
                         </tr>
                       </thead>
                       <tbody>
                         {paginatedItems.map((item, index) => {
                           const status = citizenStatus(item);
-                          const categoryLabel = item.complaintType || "-";
-                          const locationLabel = item.complaintLocation || "-";
+                          const stateLabel = item.state || "-";
+                          const districtLabel = item.district || "-";
                           const incidentDateLabel = formatIncidentDate(getIncidentDateValue(item));
                           const rowBackground = index % 2 === 0 ? C.card : alternateRowBackground;
                           const isActionHovered = hoveredActionId === item._id;
@@ -637,13 +626,13 @@ export default function MyCases() {
                                 </div>
                               </td>
                               <td style={{ padding: "10px 16px", fontSize: 13, color: C.t2, verticalAlign: "middle" }}>
-                                <span title={toTooltipText(categoryLabel)} style={tableCellTextStyle}>
-                                  {categoryLabel}
+                                <span title={toTooltipText(stateLabel)} style={tableCellTextStyle}>
+                                  {stateLabel}
                                 </span>
                               </td>
                               <td style={{ padding: "10px 16px", fontSize: 13, color: C.t2, verticalAlign: "middle" }}>
-                                <span title={toTooltipText(locationLabel)} style={tableCellTextStyle}>
-                                  {locationLabel}
+                                <span title={toTooltipText(districtLabel)} style={tableCellTextStyle}>
+                                  {districtLabel}
                                 </span>
                               </td>
                               <td style={{ padding: "10px 16px", fontSize: 13, color: C.t2, verticalAlign: "middle", whiteSpace: "nowrap" }}>
@@ -651,7 +640,7 @@ export default function MyCases() {
                                   {incidentDateLabel || "--"}
                                 </span>
                               </td>
-                              <td style={{ width: "1%", padding: "10px 16px", verticalAlign: "middle", whiteSpace: "nowrap" }}>
+                              <td style={{ padding: "10px 16px", verticalAlign: "middle", whiteSpace: "nowrap" }}>
                                 <WorkspaceBadge status={status.value} title={status.label} style={{ maxWidth: "100%" }}>{status.label}</WorkspaceBadge>
                               </td>
                               <td style={{ width: "1%", padding: "10px 16px", textAlign: "center", verticalAlign: "middle", whiteSpace: "nowrap" }}>
@@ -837,8 +826,8 @@ export default function MyCases() {
                   <div className="lg:hidden space-y-3 pb-2">
                     {paginatedItems.map((item) => {
                       const status = citizenStatus(item);
-                      const categoryLabel = item.complaintType || "-";
-                      const locationLabel = item.complaintLocation || "-";
+                      const stateLabel = item.state || "-";
+                      const districtLabel = item.district || "-";
                       const incidentDateLabel = formatIncidentDate(getIncidentDateValue(item));
 
                       return (
@@ -855,15 +844,15 @@ export default function MyCases() {
 
                           <div className="grid grid-cols-1 gap-3 mb-3 text-xs">
                             <div style={{ background: C.bgElevated, border: `1px solid ${C.border}`, borderRadius: 10, padding: 12 }}>
-                              <p className="portal-citizen-label" style={{ textTransform: "uppercase", color: C.t3, marginBottom: 4 }}>Category</p>
-                              <p className="portal-citizen-value" style={{ color: C.t2, fontWeight: 600 }}>{categoryLabel}</p>
+                              <p className="portal-citizen-label" style={{ textTransform: "uppercase", color: C.t3, marginBottom: 4 }}>State</p>
+                              <p className="portal-citizen-value" style={{ color: C.t2, fontWeight: 600 }}>{stateLabel}</p>
                             </div>
                             <div style={{ background: C.bgElevated, border: `1px solid ${C.border}`, borderRadius: 10, padding: 12 }}>
-                              <p className="portal-citizen-label" style={{ textTransform: "uppercase", color: C.t3, marginBottom: 4 }}>Location</p>
-                              <p className="portal-citizen-value" style={{ color: C.t2, fontWeight: 600 }}>{locationLabel}</p>
+                              <p className="portal-citizen-label" style={{ textTransform: "uppercase", color: C.t3, marginBottom: 4 }}>District</p>
+                              <p className="portal-citizen-value" style={{ color: C.t2, fontWeight: 600 }}>{districtLabel}</p>
                             </div>
                             <div style={{ background: C.bgElevated, border: `1px solid ${C.border}`, borderRadius: 10, padding: 12 }}>
-                              <p className="portal-citizen-label" style={{ textTransform: "uppercase", color: C.t3, marginBottom: 4 }}>Date of Incident</p>
+                              <p className="portal-citizen-label" style={{ textTransform: "uppercase", color: C.t3, marginBottom: 4 }}>Date</p>
                               <p className="portal-citizen-value" style={{ color: C.t2, fontWeight: 600 }}>{incidentDateLabel || "--"}</p>
                             </div>
                           </div>

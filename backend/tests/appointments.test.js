@@ -1,9 +1,9 @@
-const { meetingRequestSchema } = require('../validators/citizen.validator');
-const { meetingScheduleSchema } = require('../validators/meeting.validator');
+const { appointmentRequestSchema } = require('../validators/citizen.validator');
+const { appointmentScheduleSchema } = require('../validators/appointment.validator');
 
-describe('meeting validators', () => {
-  test('accepts a valid meeting request', () => {
-    const result = meetingRequestSchema.safeParse({
+describe('appointment validators', () => {
+  test('accepts a valid appointment request', () => {
+    const result = appointmentRequestSchema.safeParse({
       title: 'Water supply issue',
       purpose: 'Need to discuss a constituency issue in detail.',
       preferredTime: '2026-03-25T10:30:00.000Z',
@@ -17,7 +17,7 @@ describe('meeting validators', () => {
   });
 
   test('rejects invalid schedule payload', () => {
-    const result = meetingScheduleSchema.safeParse({
+    const result = appointmentScheduleSchema.safeParse({
       ministerId: 'not-a-uuid',
       startsAt: '2026-03-20T10:00:00.000Z',
       endsAt: '2026-03-20T11:00:00.000Z',

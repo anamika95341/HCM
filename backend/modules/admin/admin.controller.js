@@ -11,7 +11,8 @@ async function getDashboard(req, res, next) {
 
 async function getWorkQueue(req, res, next) {
   try {
-    const queue = await adminService.getWorkQueue();
+    const adminType = req.user?.adminType || 'regular';
+    const queue = await adminService.getWorkQueue(adminType);
     res.json(queue);
   } catch (error) {
     next(error);

@@ -19,11 +19,11 @@ BEGIN
   IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'otp_purpose_type') THEN
     CREATE TYPE otp_purpose_type AS ENUM ('registration_verification', 'login_2fa', 'password_reset');
   END IF;
-  IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'complaint_status_type') THEN
-    CREATE TYPE complaint_status_type AS ENUM ('submitted', 'assigned', 'in_review', 'department_contact_identified', 'call_scheduled', 'followup_in_progress', 'resolved', 'rejected', 'completed', 'escalated_to_meeting');
+  IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'grievance_status_type') THEN
+    CREATE TYPE grievance_status_type AS ENUM ('submitted', 'assigned', 'in_review', 'department_contact_identified', 'call_scheduled', 'followup_in_progress', 'resolved', 'rejected', 'completed', 'escalated_to_appointment');
   END IF;
-  IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'meeting_status_type') THEN
-    CREATE TYPE meeting_status_type AS ENUM ('pending', 'accepted', 'rejected', 'verification_pending', 'verified', 'not_verified', 'scheduled', 'rescheduled', 'completed', 'cancelled');
+  IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'appointment_status_type') THEN
+    CREATE TYPE appointment_status_type AS ENUM ('pending', 'accepted', 'rejected', 'verification_pending', 'verified', 'not_verified', 'scheduled', 'rescheduled', 'completed', 'cancelled');
   END IF;
 END $$;
 
@@ -145,7 +145,7 @@ CREATE TABLE IF NOT EXISTS ministers (
 CREATE TABLE IF NOT EXISTS minister_calendar_events (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   minister_id UUID NOT NULL REFERENCES ministers(id) ON DELETE CASCADE,
-  meeting_id UUID UNIQUE,
+  appointment_id UUID UNIQUE,
   title VARCHAR(255) NOT NULL,
   who_to_meet VARCHAR(255),
   starts_at TIMESTAMPTZ NOT NULL,
@@ -209,7 +209,7 @@ CREATE INDEX IF NOT EXISTS idx_deos_master_admin_created
   ON deos (created_by_master_admin_id, created_at DESC);
 
 
--- 005_create_meetings.sql
+-- 005_create_meetings.sql → renamed to appointments
 
 CREATE TABLE IF NOT EXISTS uploaded_files (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -225,20 +225,20 @@ CREATE TABLE IF NOT EXISTS uploaded_files (
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
-CREATE TABLE IF NOT EXISTS meetings (
+CREATE TABLE IF NOT EXISTS appointments (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   request_id VARCHAR(32) UNIQUE NOT NULL,
   citizen_id UUID NOT NULL REFERENCES citizens(id) ON DELETE CASCADE,
   assigned_admin_id UUID REFERENCES admins(id) ON DELETE SET NULL,
   assigned_deo_id UUID REFERENCES deos(id) ON DELETE SET NULL,
   minister_id UUID REFERENCES ministers(id) ON DELETE SET NULL,
-  linked_complaint_id UUID,
+  linked_grievance_id UUID,
   title VARCHAR(255) NOT NULL,
   purpose TEXT NOT NULL,
   preferred_time TIMESTAMPTZ,
   admin_referral TEXT,
   document_file_id UUID REFERENCES uploaded_files(id) ON DELETE SET NULL,
-  status meeting_status_type NOT NULL DEFAULT 'pending',
+  status appointment_status_type NOT NULL DEFAULT 'pending',
   rejection_reason TEXT,
   verification_reason TEXT,
   verification_notes TEXT,
@@ -247,57 +247,58 @@ CREATE TABLE IF NOT EXISTS meetings (
   scheduled_location TEXT,
   is_vip BOOLEAN NOT NULL DEFAULT FALSE,
   visitor_id VARCHAR(32),
-  meeting_docket VARCHAR(32),
+  appointment_docket VARCHAR(32),
   admin_comments TEXT,
   completion_note TEXT,
   cancellation_reason TEXT,
   completed_at TIMESTAMPTZ,
   cancelled_at TIMESTAMPTZ,
-  pass_s3_key TEXT,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
 ALTER TABLE minister_calendar_events
-  ADD CONSTRAINT minister_calendar_events_meeting_fk
-  FOREIGN KEY (meeting_id) REFERENCES meetings(id) ON DELETE SET NULL;
+  ADD CONSTRAINT minister_calendar_events_appointment_fk
+  FOREIGN KEY (appointment_id) REFERENCES appointments(id) ON DELETE SET NULL;
 
-CREATE TABLE IF NOT EXISTS meeting_additional_attendees (
+CREATE TABLE IF NOT EXISTS appointment_additional_attendees (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  meeting_id UUID NOT NULL REFERENCES meetings(id) ON DELETE CASCADE,
+  appointment_id UUID NOT NULL REFERENCES appointments(id) ON DELETE CASCADE,
   attendee_name VARCHAR(150) NOT NULL,
   attendee_phone VARCHAR(15) NOT NULL,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
-CREATE TABLE IF NOT EXISTS meeting_status_history (
+CREATE TABLE IF NOT EXISTS appointment_status_history (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  meeting_id UUID NOT NULL REFERENCES meetings(id) ON DELETE CASCADE,
-  previous_status meeting_status_type,
-  new_status meeting_status_type NOT NULL,
+  appointment_id UUID NOT NULL REFERENCES appointments(id) ON DELETE CASCADE,
+  previous_status appointment_status_type,
+  new_status appointment_status_type NOT NULL,
   actor_role VARCHAR(50) NOT NULL,
   actor_id UUID,
   note TEXT,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
-CREATE INDEX IF NOT EXISTS idx_meetings_citizen_id ON meetings (citizen_id, created_at DESC);
-CREATE INDEX IF NOT EXISTS idx_meetings_admin_queue ON meetings (status, assigned_admin_id, created_at DESC);
-CREATE INDEX IF NOT EXISTS idx_meetings_request_id ON meetings (request_id);
-CREATE INDEX IF NOT EXISTS idx_meetings_linked_complaint ON meetings (linked_complaint_id);
+CREATE INDEX IF NOT EXISTS idx_appointments_citizen_id ON appointments (citizen_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_appointments_admin_queue ON appointments (status, assigned_admin_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_appointments_request_id ON appointments (request_id);
+CREATE INDEX IF NOT EXISTS idx_appointments_linked_grievance ON appointments (linked_grievance_id);
 
 
--- 006_create_complaints.sql
+-- 006_create_complaints.sql → renamed to grievances
 
-CREATE TABLE IF NOT EXISTS complaints (
+CREATE TABLE IF NOT EXISTS grievances (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  complaint_id VARCHAR(32) UNIQUE NOT NULL,
-  citizen_id UUID NOT NULL REFERENCES citizens(id) ON DELETE CASCADE,
+  grievance_id VARCHAR(32) UNIQUE NOT NULL,
+  citizen_id UUID REFERENCES citizens(id) ON DELETE SET NULL,
+  citizen_name  VARCHAR(255),
+  citizen_phone VARCHAR(50),
   assigned_admin_id UUID REFERENCES admins(id) ON DELETE SET NULL,
   subject VARCHAR(255) NOT NULL,
   description TEXT NOT NULL,
-  complaint_location TEXT,
-  complaint_type VARCHAR(120),
+  state VARCHAR(120),
+  district VARCHAR(120),
   incident_date DATE,
   department VARCHAR(150),
   officer_name VARCHAR(150),
@@ -306,13 +307,13 @@ CREATE TABLE IF NOT EXISTS complaints (
   call_scheduled_at TIMESTAMPTZ,
   call_outcome TEXT,
   document_file_id UUID REFERENCES uploaded_files(id) ON DELETE SET NULL,
-  status complaint_status_type NOT NULL DEFAULT 'submitted',
+  status grievance_status_type NOT NULL DEFAULT 'submitted',
   resolution_note TEXT,
   resolution_summary TEXT,
   resolution_document_names JSONB NOT NULL DEFAULT '[]'::jsonb,
   status_reason TEXT,
   reopened_count INTEGER NOT NULL DEFAULT 0,
-  related_meeting_id UUID REFERENCES meetings(id) ON DELETE SET NULL,
+  related_appointment_id UUID REFERENCES appointments(id) ON DELETE SET NULL,
   handoff_type VARCHAR(32),
   handoff_by_admin_id UUID REFERENCES admins(id) ON DELETE SET NULL,
   handoff_to_admin_id UUID REFERENCES admins(id) ON DELETE SET NULL,
@@ -321,26 +322,26 @@ CREATE TABLE IF NOT EXISTS complaints (
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
-CREATE TABLE IF NOT EXISTS complaint_status_history (
+CREATE TABLE IF NOT EXISTS grievance_status_history (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  complaint_id UUID NOT NULL REFERENCES complaints(id) ON DELETE CASCADE,
-  previous_status complaint_status_type,
-  new_status complaint_status_type NOT NULL,
+  grievance_id UUID NOT NULL REFERENCES grievances(id) ON DELETE CASCADE,
+  previous_status grievance_status_type,
+  new_status grievance_status_type NOT NULL,
   actor_role VARCHAR(50) NOT NULL,
   actor_id UUID,
   note TEXT,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
-CREATE INDEX IF NOT EXISTS idx_complaints_citizen_id ON complaints (citizen_id, created_at DESC);
-CREATE INDEX IF NOT EXISTS idx_complaints_status ON complaints (status, assigned_admin_id, created_at DESC);
-CREATE INDEX IF NOT EXISTS idx_complaints_complaint_id ON complaints (complaint_id);
-CREATE INDEX IF NOT EXISTS idx_complaints_related_meeting ON complaints (related_meeting_id);
-CREATE INDEX IF NOT EXISTS idx_complaints_handoff_tracking ON complaints (handoff_type, handoff_by_admin_id, handoff_to_admin_id, updated_at DESC);
+CREATE INDEX IF NOT EXISTS idx_grievances_citizen_id ON grievances (citizen_id, created_at DESC) WHERE citizen_id IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_grievances_status ON grievances (status, assigned_admin_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_grievances_grievance_id ON grievances (grievance_id);
+CREATE INDEX IF NOT EXISTS idx_grievances_related_appointment ON grievances (related_appointment_id);
+CREATE INDEX IF NOT EXISTS idx_grievances_handoff_tracking ON grievances (handoff_type, handoff_by_admin_id, handoff_to_admin_id, updated_at DESC);
 
-ALTER TABLE meetings
-  ADD CONSTRAINT meetings_linked_complaint_fk
-  FOREIGN KEY (linked_complaint_id) REFERENCES complaints(id) ON DELETE SET NULL;
+ALTER TABLE appointments
+  ADD CONSTRAINT appointments_linked_grievance_fk
+  FOREIGN KEY (linked_grievance_id) REFERENCES grievances(id) ON DELETE SET NULL;
 
 
 -- 007_create_otp_records.sql
@@ -430,7 +431,7 @@ CREATE INDEX IF NOT EXISTS idx_audit_logs_entity ON audit_logs (entity_type, ent
 DO $$
 BEGIN
   IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'file_context_type') THEN
-    CREATE TYPE file_context_type AS ENUM ('meeting', 'complaint', 'event', 'general');
+    CREATE TYPE file_context_type AS ENUM ('appointment', 'grievance', 'event', 'general');
   END IF;
 
   IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'file_status_type') THEN
@@ -500,3 +501,27 @@ CREATE INDEX IF NOT EXISTS idx_notifications_recipient_created
 
 CREATE INDEX IF NOT EXISTS idx_notifications_recipient_unread
   ON notifications (recipient_role, recipient_id, is_read, created_at DESC);
+
+
+-- 019_add_admin_type_cm_grievance_fields.sql
+
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'admin_type_enum') THEN
+    CREATE TYPE admin_type_enum AS ENUM ('regular', 'chief_minister');
+  END IF;
+END $$;
+
+ALTER TABLE admins
+  ADD COLUMN IF NOT EXISTS admin_type admin_type_enum NOT NULL DEFAULT 'regular';
+
+CREATE INDEX IF NOT EXISTS idx_admins_type ON admins (admin_type);
+
+ALTER TABLE grievances
+  ADD COLUMN IF NOT EXISTS deo_office VARCHAR(255),
+  ADD COLUMN IF NOT EXISTS deo_letterhead_generated_at TIMESTAMPTZ,
+  ADD COLUMN IF NOT EXISTS letterhead_deo_id UUID REFERENCES deos(id) ON DELETE SET NULL;
+
+CREATE INDEX IF NOT EXISTS idx_grievances_letterhead
+  ON grievances (deo_letterhead_generated_at, status)
+  WHERE deo_letterhead_generated_at IS NOT NULL;

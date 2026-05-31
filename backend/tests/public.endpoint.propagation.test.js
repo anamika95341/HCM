@@ -1,12 +1,12 @@
-jest.mock('../modules/meetings/meetings.repository', () => ({
-  getCitizenMeetingById: jest.fn(),
-  getMeetingHistory: jest.fn(),
+jest.mock('../modules/appointments/appointments.repository', () => ({
+  getCitizenAppointmentById: jest.fn(),
+  getAppointmentHistory: jest.fn(),
 }));
 
-jest.mock('../modules/complaints/complaints.repository', () => ({
-  getCitizenComplaintById: jest.fn(),
-  getComplaintHistory: jest.fn(),
-  getCitizenComplaints: jest.fn(),
+jest.mock('../modules/grievances/grievances.repository', () => ({
+  getCitizenGrievanceById: jest.fn(),
+  getGrievanceHistory: jest.fn(),
+  getCitizenGrievances: jest.fn(),
 }));
 
 jest.mock('../modules/citizen/citizen.repository', () => ({
@@ -41,12 +41,12 @@ jest.mock('../modules/files/files.service', () => ({
   listOwnedFiles: jest.fn(),
 }));
 
-const meetingsRepository = require('../modules/meetings/meetings.repository');
-const complaintsRepository = require('../modules/complaints/complaints.repository');
+const appointmentsRepository = require('../modules/appointments/appointments.repository');
+const grievancesRepository = require('../modules/grievances/grievances.repository');
 const filesService = require('../modules/files/files.service');
 const citizenService = require('../modules/citizen/citizen.service');
-const complaintsService = require('../modules/complaints/complaints.service');
-const meetingsService = require('../modules/meetings/meetings.service');
+const grievancesService = require('../modules/grievances/grievances.service');
+const appointmentsService = require('../modules/appointments/appointments.service');
 
 describe('public endpoint propagation', () => {
   beforeEach(() => {
@@ -59,13 +59,13 @@ describe('public endpoint propagation', () => {
   });
 
   test('citizen case detail forwards reqMeta to owned file signing', async () => {
-    meetingsRepository.getCitizenMeetingById.mockResolvedValue({
-      id: 'meeting-1',
+    appointmentsRepository.getCitizenAppointmentById.mockResolvedValue({
+      id: 'appointment-1',
       document_file_id: null,
     });
-    meetingsRepository.getMeetingHistory.mockResolvedValue([]);
+    appointmentsRepository.getAppointmentHistory.mockResolvedValue([]);
 
-    await citizenService.getCaseDetail('citizen-1', 'meeting-1', {
+    await citizenService.getCaseDetail('citizen-1', 'appointment-1', {
       publicEndpoint: 'https://portal.example.com',
     });
 
@@ -76,14 +76,14 @@ describe('public endpoint propagation', () => {
     }));
   });
 
-  test('citizen complaint detail forwards reqMeta to owned file signing', async () => {
-    complaintsRepository.getCitizenComplaintById.mockResolvedValue({
-      id: 'complaint-1',
+  test('citizen grievance detail forwards reqMeta to owned file signing', async () => {
+    grievancesRepository.getCitizenGrievanceById.mockResolvedValue({
+      id: 'grievance-1',
       document_file_id: null,
     });
-    complaintsRepository.getComplaintHistory.mockResolvedValue([]);
+    grievancesRepository.getGrievanceHistory.mockResolvedValue([]);
 
-    await complaintsService.getCitizenComplaintDetail('complaint-1', 'citizen-1', {
+    await grievancesService.getCitizenGrievanceDetail('grievance-1', 'citizen-1', {
       publicEndpoint: 'https://portal.example.com',
     });
 
@@ -94,14 +94,14 @@ describe('public endpoint propagation', () => {
     }));
   });
 
-  test('citizen meeting detail forwards reqMeta to owned file signing', async () => {
-    meetingsRepository.getCitizenMeetingById.mockResolvedValue({
-      id: 'meeting-1',
+  test('citizen appointment detail forwards reqMeta to owned file signing', async () => {
+    appointmentsRepository.getCitizenAppointmentById.mockResolvedValue({
+      id: 'appointment-1',
       document_file_id: null,
     });
-    meetingsRepository.getMeetingHistory.mockResolvedValue([]);
+    appointmentsRepository.getAppointmentHistory.mockResolvedValue([]);
 
-    await meetingsService.getCitizenMeetingDetail('meeting-1', 'citizen-1', {
+    await appointmentsService.getCitizenAppointmentDetail('appointment-1', 'citizen-1', {
       publicEndpoint: 'https://portal.example.com',
     });
 

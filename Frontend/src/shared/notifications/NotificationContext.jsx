@@ -165,8 +165,8 @@ export function NotificationProvider({ children }) {
           }
 
           if (
-            message.event === "meeting.status.updated" ||
-            message.event === "complaint.status.updated" ||
+            message.event === "appointment.status.updated" ||
+            message.event === "grievance.status.updated" ||
             message.event === "notification.created"
           ) {
             setEventVersion((value) => value + 1);

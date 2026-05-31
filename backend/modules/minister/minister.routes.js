@@ -20,11 +20,13 @@ router.patch('/me/notifications', notificationsController.updatePreferences);
 router.get('/notifications', notificationsController.listNotifications);
 router.post('/notifications/read-all', notificationsController.markAllNotificationsRead);
 router.patch('/notifications/:notificationId/read', notificationsController.markNotificationRead);
+router.get('/appointment-pool', ministerController.getAppointmentPool);
 router.get('/calendar', ministerController.getCalendar);
+router.get('/scheduled-grievances', ministerController.getScheduledGrievances);
 router.get(
-  '/calendar/:meetingId/files',
-  validateRequest(z.object({ meetingId: z.string().uuid() }), 'params'),
-  ministerController.getMeetingFiles
+  '/calendar/:appointmentId/files',
+  validateRequest(z.object({ appointmentId: z.string().uuid() }), 'params'),
+  ministerController.getAppointmentFiles
 );
 
 module.exports = router;

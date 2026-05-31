@@ -5,6 +5,7 @@ import { useAuth } from "../../shared/auth/AuthContext.jsx";
 import { useNotifications } from "../../shared/notifications/NotificationContext.jsx";
 import { getRoleSettings } from "./roleSettingsConfig.js";
 import { changePassword, fetchProfile, updateProfile } from "./settingsApi.js";
+import { useTranslation } from "react-i18next";
 
 const useTheme = usePortalTheme;
 
@@ -222,6 +223,7 @@ const SH = ({ icon, title, sub }) => {
 // ═══════════════════════════════════════════
 const ProfileSection = ({ permissions, profile, role, onProfileSaved }) => {
   const { C } = useTheme();
+  const { t } = useTranslation();
 
   const buildName = (p) =>
     [p?.first_name, p?.middle_name, p?.last_name].filter(Boolean).join(' ').trim();
@@ -395,13 +397,13 @@ const ProfileSection = ({ permissions, profile, role, onProfileSaved }) => {
 
   return (
     <div style={{ animation: 'fadeIn 0.3s ease' }}>
-      <SH icon="person" title="Profile & Account Settings" />
+      <SH icon="person" title={t("settings.profileSection.title")} />
 
       <Card>
-        <CH title="Personal Information" />
+        <CH title={t("settings.profileSection.personalInfo")} />
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0 24px' }}>
           <Inp
-            label="Full Name"
+            label={t("settings.profileSection.displayName")}
             value={name}
             set={permissions.nameReadOnly ? undefined : setName}
             readOnly={permissions.nameReadOnly}
@@ -409,14 +411,14 @@ const ProfileSection = ({ permissions, profile, role, onProfileSaved }) => {
           />
           {permissions.showDesignation && (
             <Inp
-              label="Designation"
+              label={t("settings.profileSection.designation")}
               value={designation}
               set={permissions.designationReadOnly ? undefined : setDesignation}
               readOnly={permissions.designationReadOnly}
             />
           )}
           <Inp
-            label="Contact Number"
+            label={t("settings.profileSection.contact")}
             value={contact}
             set={permissions.phoneReadOnly ? undefined : setContact}
             readOnly={permissions.phoneReadOnly}
@@ -424,7 +426,7 @@ const ProfileSection = ({ permissions, profile, role, onProfileSaved }) => {
             type="tel"
           />
           <Inp
-            label="Official Email"
+            label={t("settings.profileSection.officialEmail")}
             value={email}
             set={permissions.emailReadOnly ? undefined : setEmail}
             readOnly={permissions.emailReadOnly}
@@ -433,7 +435,7 @@ const ProfileSection = ({ permissions, profile, role, onProfileSaved }) => {
           />
           {permissions.showIdentifier && (
             <Inp
-              label={permissions.identifierLabel}
+              label={permissions.identifierLabel ? t(permissions.identifierLabel) : ''}
               value={identifier}
               readOnly
               icon="person"
@@ -441,14 +443,14 @@ const ProfileSection = ({ permissions, profile, role, onProfileSaved }) => {
           )}
           {permissions.showCreatedBy && (
             <Inp
-              label={permissions.createdByLabel || 'Created By'}
+              label={permissions.createdByLabel ? t(permissions.createdByLabel) : t("settings.profileSection.createdBy")}
               value={createdBy}
               readOnly
             />
           )}
           {permissions.showVerificationStatus && (
             <Inp
-              label="Verification Status"
+              label={t("settings.profileSection.verificationStatus")}
               value={verificationStatus}
               readOnly
             />
@@ -460,9 +462,9 @@ const ProfileSection = ({ permissions, profile, role, onProfileSaved }) => {
           </div>
         )}
         <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 12, paddingTop: 8 }}>
-          <Btn label="Discard" variant="ghost" onClick={handleDiscard} />
+          <Btn label={t("settings.profileSection.discard")} variant="ghost" onClick={handleDiscard} />
           <Btn
-            label={saving ? 'Saving…' : 'Save Changes'}
+            label={saving ? t("settings.profileSection.saving") : t("settings.profileSection.save")}
             variant="outline"
             icon="check"
             onClick={handleSave}
@@ -470,19 +472,19 @@ const ProfileSection = ({ permissions, profile, role, onProfileSaved }) => {
         </div>
         {(permissions.show2FA || permissions.showSmsOtp || permissions.showChangePassword) && (
           <div style={{ marginTop: 28, paddingTop: 24, borderTop: `1px solid ${C.border}` }}>
-          <CH title="Security Settings" />
+          <CH title={t("settings.profileSection.securitySettings")} />
           {permissions.show2FA && (
             <TR
-              label="Two-Factor Authentication (2FA)"
-              note="Require OTP verification at every login session"
+              label={t("settings.profileSection.twoFA")}
+              note={t("settings.profileSection.twoFANote")}
               on={twoFA}
               set={setTwoFA}
             />
           )}
           {permissions.showSmsOtp && (
             <TR
-              label="SMS OTP Configuration"
-              note="Receive one-time passwords via registered mobile number"
+              label={t("settings.profileSection.smsOTP")}
+              note={t("settings.profileSection.smsOTPNote")}
               on={smsOTP}
               set={setSmsOTP}
             />
@@ -492,7 +494,7 @@ const ProfileSection = ({ permissions, profile, role, onProfileSaved }) => {
               {!passwordOpen && (
                 <div style={{ display: 'flex', gap: 12, marginTop: 20 }}>
                   <Btn
-                    label="Change Password"
+                    label={t("settings.profileSection.changePassword")}
                     variant="outline"
                     icon="lock"
                     onClick={() => {
@@ -506,12 +508,12 @@ const ProfileSection = ({ permissions, profile, role, onProfileSaved }) => {
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '0 24px' }}>
                     <div>
                       <Inp
-                        label="Current Password"
+                        label={t("settings.profileSection.currentPassword")}
                         value={currentPassword}
                         set={(value) => handlePasswordFieldChange(setCurrentPassword, setCurrentPasswordError, value)}
                         type="password"
                         icon="lock"
-                        placeholder="Enter current password"
+                        placeholder={t("settings.profileSection.enterCurrentPassword")}
                       />
                       {currentPasswordError && (
                         <div style={{ fontSize: 12, color: C.danger, marginTop: -8, marginBottom: 12 }}>
@@ -521,12 +523,12 @@ const ProfileSection = ({ permissions, profile, role, onProfileSaved }) => {
                     </div>
                     <div>
                       <Inp
-                        label="New Password"
+                        label={t("settings.profileSection.newPassword")}
                         value={newPassword}
                         set={(value) => handlePasswordFieldChange(setNewPassword, setNewPasswordError, value)}
                         type="password"
                         icon="lock"
-                        placeholder="Enter new password"
+                        placeholder={t("settings.profileSection.enterNewPassword")}
                       />
                       {newPasswordError && (
                         <div style={{ fontSize: 12, color: C.danger, marginTop: -8, marginBottom: 12 }}>
@@ -536,12 +538,12 @@ const ProfileSection = ({ permissions, profile, role, onProfileSaved }) => {
                     </div>
                     <div>
                       <Inp
-                        label="Confirm New Password"
+                        label={t("settings.profileSection.confirmPassword")}
                         value={confirmPassword}
                         set={(value) => handlePasswordFieldChange(setConfirmPassword, setConfirmPasswordError, value)}
                         type="password"
                         icon="lock"
-                        placeholder="Confirm new password"
+                        placeholder={t("settings.profileSection.confirmNewPasswordPlaceholder")}
                       />
                       {confirmPasswordError && (
                         <div style={{ fontSize: 12, color: C.danger, marginTop: -8, marginBottom: 12 }}>
@@ -562,7 +564,7 @@ const ProfileSection = ({ permissions, profile, role, onProfileSaved }) => {
                   )}
                   <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 12, marginTop: 18 }}>
                     <Btn
-                      label="Discard"
+                      label={t("settings.profileSection.discard")}
                       variant="ghost"
                       onClick={() => {
                         resetPasswordForm();
@@ -570,7 +572,7 @@ const ProfileSection = ({ permissions, profile, role, onProfileSaved }) => {
                       }}
                     />
                     <Btn
-                      label={passwordSaving ? 'Updating…' : 'Update Password'}
+                      label={passwordSaving ? t("settings.profileSection.updating") : t("settings.profileSection.updatePassword")}
                       variant="outline"
                       icon="check"
                       onClick={handlePasswordSave}
@@ -650,6 +652,7 @@ const ProfileSection = ({ permissions, profile, role, onProfileSaved }) => {
 // ═══════════════════════════════════════════
 const NotificationsSection = ({ permissions }) => {
   const { C } = useTheme();
+  const { t } = useTranslation();
   const { preferences, savePreferences } = useNotifications();
   const syncingRef = useRef(false);
 
@@ -662,9 +665,9 @@ const NotificationsSection = ({ permissions }) => {
   const [days, setDays] = useState(3);
 
   const allDigestOptions = [
-    { id: 'realtime', label: 'Real-Time', icon: 'bell' },
-    { id: 'daily', label: 'Daily Digest', icon: 'clock' },
-    { id: 'weekly', label: 'Weekly Summary', icon: 'calendar' },
+    { id: 'realtime', label: t("settings.notificationsSection.realtime"), icon: 'bell' },
+    { id: 'daily', label: t("settings.notificationsSection.daily"), icon: 'clock' },
+    { id: 'weekly', label: t("settings.notificationsSection.weekly"), icon: 'calendar' },
   ];
   const digestOptions = allDigestOptions.filter(o =>
     permissions.digestOptions.includes(o.id)
@@ -712,16 +715,16 @@ const NotificationsSection = ({ permissions }) => {
 
   return (
     <div style={{ animation: 'fadeIn 0.3s ease' }}>
-      <SH icon="bell" title="Notification & Alert Preferences" />
+      <SH icon="bell" title={t("settings.notificationsSection.title")} />
 
       <Card>
-        <CH title="Notification Channels" divider={false} />
+        <CH title={t("settings.notificationsSection.channels")} divider={false} />
         <div style={{ display: 'grid', gridTemplateColumns: permissions.showSmsChannel ? '1fr 1fr 1fr' : '1fr 1fr', gap: 16 }}>
           {[
-            { k: 'app', icon: 'bell', label: 'In-App Notifications', sub: 'Bell icon in the top navigation bar', color: C.mint },
-            { k: 'email', icon: 'mail', label: 'Email Alerts', sub: 'Sent to your registered email address', color: C.mint },
+            { k: 'app', icon: 'bell', label: t("settings.notificationsSection.inApp"), sub: t("settings.notificationsSection.inAppNote"), color: C.mint },
+            { k: 'email', icon: 'mail', label: t("settings.notificationsSection.emailAlerts"), sub: t("settings.notificationsSection.emailAlertsNote"), color: C.mint },
             permissions.showSmsChannel
-              ? { k: 'sms', icon: 'phone', label: 'SMS Alerts', sub: 'Sent to your registered mobile number', color: C.mint }
+              ? { k: 'sms', icon: 'phone', label: t("settings.notificationsSection.smsAlerts"), sub: t("settings.notificationsSection.smsAlertsNote"), color: C.mint }
               : null,
           ].filter(Boolean).map(item => (
             <div key={item.k} style={{ border: `1px solid ${ch[item.k] ? item.color + '40' : C.border}`, borderRadius: 12, padding: 14, background: ch[item.k] ? item.color + '0a' : C.bgElevated, transition: 'all 0.2s ease' }}>
@@ -740,16 +743,16 @@ const NotificationsSection = ({ permissions }) => {
         </div>
 
         <div style={{ marginTop: 28, paddingTop: 24, borderTop: `1px solid ${C.border}` }}>
-        <CH title="Trigger Configurations" divider={false} />
+        <CH title={t("settings.notificationsSection.triggerConfig")} divider={false} />
         {permissions.triggers.map(item => (
           <TR
             key={item.k}
             label={
               <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-                {item.label}
+                {t(item.label)}
                 {item.badge && (
                   <Badge
-                    label={item.badge}
+                    label={t(item.badge)}
                     color={item.badgeType === 'danger' ? C.danger : C.warn}
                   />
                 )}
@@ -757,12 +760,12 @@ const NotificationsSection = ({ permissions }) => {
             }
             on={tr[item.k] ?? true}
             set={v => setTr(p => ({ ...p, [item.k]: v }))}
-            divider={item.k === 'complaintStatus'}
+            divider={item.k === 'grievanceStatus'}
           />
         ))}
         {hasDeadlineTrigger && tr[deadlineTriggerKey] && (
           <div style={{ marginTop: 16, padding: 16, background: C.purpleDim, border: `1px solid ${C.purple}4D`, borderRadius: 10, display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
-            <span style={{ fontSize: 13, color: C.t2 }}>Alert me</span>
+            <span style={{ fontSize: 13, color: C.t2 }}>{t("settings.notificationsSection.alertMe")}</span>
             <input
               type="number"
               value={days}
@@ -771,21 +774,21 @@ const NotificationsSection = ({ permissions }) => {
               onChange={e => setDays(+e.target.value)}
               style={{ width: 60, padding: '8px 12px', border: `1px solid ${C.border}`, borderRadius: 8, fontSize: 14, color: C.purple, fontWeight: 700, textAlign: 'center', background: C.inp }}
             />
-            <span style={{ fontSize: 13, color: C.t2 }}>days before the due date</span>
+            <span style={{ fontSize: 13, color: C.t2 }}>{t("settings.notificationsSection.daysBeforeDue")}</span>
           </div>
         )}
 
         <div style={{ marginTop: 28 }}>
-        <CH title="Email Digest Frequency" divider={false} />
+        <CH title={t("settings.notificationsSection.digestFrequency")} divider={false} />
         <PillSegmented
           options={digestOptions}
           value={digest}
           onChange={setDigest}
         />
         <div style={{ fontSize: 12, color: C.t3, marginTop: 12, lineHeight: 1.5 }}>
-          {digest === 'realtime' && 'Instant alert for every update'}
-          {digest === 'daily' && 'Morning pendency report at 8:00 AM'}
-          {digest === 'weekly' && 'Comprehensive overview every Monday'}
+          {digest === 'realtime' && t("settings.notificationsSection.realtimeNote")}
+          {digest === 'daily' && t("settings.notificationsSection.dailyNote")}
+          {digest === 'weekly' && t("settings.notificationsSection.weeklyNote")}
         </div>
         </div>
         </div>
@@ -854,6 +857,7 @@ export default function Setting() {
 
 function ThemePreviewCard({ label, selected, onClick, preview }) {
   const { C } = useTheme();
+  const { t } = useTranslation();
 
   return (
     <button
@@ -882,7 +886,7 @@ function ThemePreviewCard({ label, selected, onClick, preview }) {
       </div>
       <div style={{ padding: '10px 14px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: selected ? C.purpleDim : C.bgElevated }}>
         <span style={{ fontSize: 12, fontWeight: 600, color: selected ? C.purple : C.t2 }}>{label}</span>
-        {selected ? <Ico n="check" s={13} c={C.purple} /> : <span style={{ fontSize: 11, color: C.t3 }}>Apply</span>}
+        {selected ? <Ico n="check" s={13} c={C.purple} /> : <span style={{ fontSize: 11, color: C.t3 }}>{t("settings.appearanceSection.apply")}</span>}
       </div>
     </button>
   );

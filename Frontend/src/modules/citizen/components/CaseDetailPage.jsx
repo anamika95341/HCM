@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { ChevronRight } from "lucide-react";
+import { useTranslation } from "react-i18next";
 import { apiClient } from "../../../shared/api/client.js";
 import { openDownloadUrl } from "../../../shared/api/downloads.js";
 import { useAuth } from "../../../shared/auth/AuthContext.jsx";
@@ -24,14 +25,16 @@ function formatActorRole(role) {
     .join(" ");
 }
 
+const MONTH_NAMES = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+
 function formatCitizenDate(value) {
   if (!value) return "";
   const parsed = new Date(value);
   if (Number.isNaN(parsed.getTime())) return "";
   const day = String(parsed.getDate()).padStart(2, "0");
-  const month = String(parsed.getMonth() + 1).padStart(2, "0");
+  const mon = MONTH_NAMES[parsed.getMonth()];
   const year = String(parsed.getFullYear()).slice(-2);
-  return `${day}/${month}/${year}`;
+  return `${day} ${mon},${year}`;
 }
 
 function formatCitizenDateTime(value) {
@@ -45,6 +48,7 @@ function formatCitizenDateTime(value) {
 
 function DetailBlock({ label, value, multiline = false, compact = false }) {
   const { C } = usePortalTheme();
+  const { t } = useTranslation();
   return (
     <div
       style={{
@@ -73,7 +77,7 @@ function DetailBlock({ label, value, multiline = false, compact = false }) {
           wordBreak: "break-word",
         }}
       >
-        {value || <span style={{ color: C.t3, fontStyle: "italic" }}>Not provided</span>}
+        {value || <span style={{ color: C.t3, fontStyle: "italic" }}>{t("citizen.caseDetail.notProvided")}</span>}
       </div>
     </div>
   );
@@ -88,6 +92,7 @@ function getAttachedFiles(item) {
 
 export default function CaseDetailsPage() {
   const { C } = usePortalTheme();
+  const { t } = useTranslation();
   const location = useLocation();
   const navigate = useNavigate();
   const { id } = useParams();
@@ -167,7 +172,7 @@ export default function CaseDetailsPage() {
     return (
       <div className="portal-citizen-page" style={{ minHeight: "100%", padding: "16px 20px 12px" }}>
         <div style={{ width: "100%", maxWidth: 1320, margin: "0 auto" }}>
-          <WorkspaceEmptyState title="Loading complaint details..." />
+          <WorkspaceEmptyState title={t("citizen.caseDetail.loading")} />
         </div>
       </div>
     );
@@ -178,16 +183,16 @@ export default function CaseDetailsPage() {
       <div className="portal-citizen-page" style={{ minHeight: "100%", padding: "16px 20px 12px" }}>
         <div style={{ width: "100%", maxWidth: 1320, margin: "0 auto" }}>
           <WorkspaceCard style={{ textAlign: "center" }}>
-            <p style={{ color: C.t2, fontWeight: 600, marginBottom: 16 }}>{error || "Case details not found"}</p>
+            <p style={{ color: C.t2, fontWeight: 600, marginBottom: 16 }}>{error || t("citizen.caseDetail.notFound")}</p>
           </WorkspaceCard>
         </div>
       </div>
     );
   }
 
-  const isMeeting = itemType === "meeting";
-  const complaintTitle = caseData.title || caseData.subject;
-  const complaintId = caseData.complaintId || caseData.id;
+  const isAppointment = itemType === "appointment";
+  const grievanceTitle = caseData.title || caseData.subject;
+  const grievanceId = caseData.grievanceId || caseData.id;
   const attachedFiles = getAttachedFiles(caseData);
   const hasUploadedDocument = attachedFiles.length > 0;
   const createdLabel = caseData.createdAt || caseData.created_at
@@ -196,6 +201,8 @@ export default function CaseDetailsPage() {
   const incidentDateLabel = caseData.incidentDate
     ? formatCitizenDate(caseData.incidentDate)
     : "Not provided";
+  const stateLabel = caseData.state || "Not provided";
+  const districtLabel = caseData.district || "Not provided";
 
   return (
     <div
@@ -228,11 +235,11 @@ export default function CaseDetailsPage() {
                 }}
               >
                 <ChevronRight size={16} className="rotate-180" />
-                Back
+                {t("common.back")}
               </button>
             </div>
             <h2 style={{ fontSize: 20, fontWeight: 600, color: C.t1, margin: 0, textAlign: "center" }}>
-              {isMeeting ? "MEETING DETAILS" : "COMPLAINT DETAILS"}
+              {isAppointment ? t("citizen.caseDetail.appointmentDetailsTitle") : t("citizen.caseDetail.grievanceDetailsTitle")}
             </h2>
             <div />
           </div>
@@ -241,8 +248,8 @@ export default function CaseDetailsPage() {
             <div ref={informationCardRef} style={{ minHeight: 0 }}>
               <WorkspaceCard style={{ marginBottom: 0 }}>
                 <div className="grid md:grid-cols-3 gap-4">
-                  <DetailBlock label="Complaint ID" value={complaintId} compact />
-                  <DetailBlock label="Created At" value={createdLabel} compact />
+                  <DetailBlock label={t("citizen.caseDetail.grievanceIdLabel")} value={grievanceId} compact />
+                  <DetailBlock label={t("citizen.caseDetail.createdAt")} value={createdLabel} compact />
                   <div style={{ padding: "0 0 14px" }}>
                     <div
                       style={{
@@ -254,26 +261,26 @@ export default function CaseDetailsPage() {
                       }}
                       className="portal-citizen-label"
                     >
-                      Status
+                      {t("common.status")}
                     </div>
                     <WorkspaceBadge status={caseData.status}>{formatStatus(caseData.status)}</WorkspaceBadge>
                   </div>
                 </div>
 
                 <div style={{ marginTop: 16 }}>
-                  <DetailBlock label="Complaint Title" value={complaintTitle} multiline compact />
+                  <DetailBlock label={t("citizen.caseDetail.grievanceTitleLabel")} value={grievanceTitle} multiline compact />
                 </div>
 
                 <div className="grid md:grid-cols-3 gap-4" style={{ marginTop: 16 }}>
-                  <DetailBlock label="Complaint Location" value={caseData.complaintLocation || "Not provided"} compact />
-                  <DetailBlock label="Date of Incident" value={incidentDateLabel} compact />
-                  <DetailBlock label="Category" value={caseData.complaintType || "Not provided"} compact />
+                  <DetailBlock label={t("citizen.caseDetail.state")} value={stateLabel} compact />
+                  <DetailBlock label={t("citizen.caseDetail.district")} value={districtLabel} compact />
+                  <DetailBlock label={t("common.date")} value={incidentDateLabel} compact />
                 </div>
 
                 <div style={{ marginTop: 16 }}>
                   <DetailBlock
-                    label="Complaint Description"
-                    value={caseData.description || "No description available"}
+                    label={t("citizen.caseDetail.grievanceDescription")}
+                    value={caseData.description || t("citizen.caseDetail.noDescription")}
                     multiline
                     compact
                   />
@@ -292,7 +299,7 @@ export default function CaseDetailsPage() {
                       letterSpacing: ".08em",
                     }}
                   >
-                    Documents
+                    {t("citizen.caseDetail.documents")}
                   </div>
                   <div
                     style={{
@@ -318,14 +325,14 @@ export default function CaseDetailsPage() {
                               variant="outline"
                               onClick={() => openDownloadUrl(file.downloadUrl)}
                             >
-                              Download
+                              {t("common.download")}
                             </WorkspaceButton>
                           </div>
                         ))}
                       </div>
                     ) : (
                       <div className="portal-citizen-value" style={{ color: C.t1, fontWeight: 500 }}>
-                        No documents uploaded
+                        {t("citizen.caseDetail.noDocuments")}
                       </div>
                     )}
                   </div>
@@ -349,12 +356,12 @@ export default function CaseDetailsPage() {
                 }}
               >
                 <div style={{ fontSize: 16, fontWeight: 700, color: C.t1, marginBottom: 16, flexShrink: 0 }}>
-                  Timeline
+                  {t("citizen.caseDetail.timeline")}
                 </div>
 
                 <div style={{ flex: 1, minHeight: 0, paddingRight: 0, overflowY: isDesktopLayout && timelineCardHeight ? "auto" : "visible" }}>
                   {history.length === 0 ? (
-                    <p className="portal-citizen-caption" style={{ color: C.t3 }}>No timeline entries yet.</p>
+                    <p className="portal-citizen-caption" style={{ color: C.t3 }}>{t("citizen.caseDetail.noTimeline")}</p>
                   ) : (
                     <div className="space-y-4">
                       {history.map((entry, index) => (

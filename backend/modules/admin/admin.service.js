@@ -1,18 +1,24 @@
 const adminRepository = require('./admin.repository');
-const meetingsRepository = require('../meetings/meetings.repository');
-const complaintsRepository = require('../complaints/complaints.repository');
-const ministerRepository = require('../minister/minister.repository');
+const appointmentsRepository = require('../appointments/appointments.repository');
+const grievancesRepository = require('../grievances/grievances.repository');
+const authRepository = require('../auth/auth.repository');
+const createHttpError = require('http-errors');
 
 async function getDashboard() {
   return adminRepository.getDashboard();
 }
 
-async function getWorkQueue() {
-  const [meetings, complaints] = await Promise.all([
-    meetingsRepository.getMeetingQueue(),
-    complaintsRepository.getComplaintQueue(),
-  ]);
-  return { meetings, complaints };
+async function getWorkQueue(adminType) {
+  if (adminType === 'chief_minister') {
+    const [appointments, grievances] = await Promise.all([
+      appointmentsRepository.getAppointmentQueue(),
+      grievancesRepository.getGrievanceQueue(),
+    ]);
+    return { appointments, grievances };
+  }
+  // Regular admins only see appointments — no grievance pool
+  const appointments = await appointmentsRepository.getAppointmentQueue();
+  return { appointments, grievances: [] };
 }
 
 async function getWorkflowDirectory() {
@@ -47,15 +53,4 @@ async function listDeos() {
   };
 }
 
-async function getCalendar() {
-  const [ministerCalendarEvents, complaintCalendarEvents] = await Promise.all([
-    ministerRepository.getAllCalendarEvents(),
-    complaintsRepository.listScheduledComplaintCalendarEvents(),
-  ]);
-
-  return [...ministerCalendarEvents, ...complaintCalendarEvents].sort(
-    (left, right) => new Date(left.starts_at).getTime() - new Date(right.starts_at).getTime()
-  );
-}
-
-module.exports = { getDashboard, getWorkQueue, getWorkflowDirectory, listDeos, getCalendar };
+module.exports = { getDashboard, getWorkQueue, getWorkflowDirectory, listDeos };

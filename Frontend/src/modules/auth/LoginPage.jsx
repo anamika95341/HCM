@@ -21,14 +21,15 @@ import {
   Users,
 } from "lucide-react";
 import { useLocation, useNavigate } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import { usePortalTheme } from "../../shared/theme/portalTheme.jsx";
 import { getHomePathForRole, PATHS } from "../../routes/paths.js";
 import { useAuth } from "../../shared/auth/AuthContext.jsx";
 import { apiClient } from "../../shared/api/client.js";
 import { RECAPTCHA_SITE_KEY } from "../../shared/config/env.js";
 import { normalizeInputText, toSafeUserMessage } from "../../shared/security/text.js";
-import citizenMeetingArt from "../../assets/citizen/ChatGPT Image Apr 16, 2026, 11_27_23 PM.png";
-import citizenComplaintArt from "../../assets/citizen/ChatGPT Image Apr 16, 2026, 11_29_03 PM.png";
+import citizenAppointmentArt from "../../assets/citizen/ChatGPT Image Apr 16, 2026, 11_27_23 PM.png";
+import citizenGrievanceArt from "../../assets/citizen/ChatGPT Image Apr 16, 2026, 11_29_03 PM.png";
 import serviceNorthArt from "../../assets/citizen/north.png";
 import serviceEastArt from "../../assets/citizen/east.png";
 import serviceSouthArt from "../../assets/citizen/south.png";
@@ -41,46 +42,40 @@ import serviceFeatureArtFive from "../../assets/citizen/ChatGPT Image May 1, 202
 import serviceFeatureArtSix from "../../assets/citizen/ChatGPT Image May 1, 2026, 01_56_01 AM.png";
 import servicesSectionArt from "../../assets/citizen/Services.png";
 
-const ROLE_COPY = {
-  citizen: {
-    title: "Citizen Portal",
-    subtitle: "",
-    identifierLabel: "Citizen ID",
-    identifierPlaceholder: "CTZ-2026-00000001",
-  },
-  admin: {
-    title: "Admin Portal",
-    subtitle: "",
-    identifierLabel: "Username or Email",
-    identifierPlaceholder: "admin.user or admin@gov.in",
-  },
-  masteradmin: {
-    title: "Master Admin Portal",
-    subtitle: "Sign in with your username or email to manage admin and DEO access securely.",
-    identifierLabel: "Username or Email",
-    identifierPlaceholder: "masteradmin.user or masteradmin@gov.in",
-  },
-  deo: {
-    title: "DEO Portal",
-    subtitle: "",
-    identifierLabel: "Username or Email",
-    identifierPlaceholder: "deo.user or deo@gov.in",
-  },
-  minister: {
-    title: "Minister Portal",
-    subtitle: "",
-    identifierLabel: "Username or Email",
-    identifierPlaceholder: "minister.user or minister@gov.in",
-  },
-};
-
-const CITIZEN_SECTIONS = [
-  { id: "home", label: "Home" },
-  { id: "about", label: "About Us" },
-  { id: "services", label: "Services" },
-  { id: "media", label: "Media" },
-  { id: "contact", label: "Contact Us" },
-];
+function getRoleCopy(role, t) {
+  return {
+    citizen: {
+      title: t("login.citizenPortal"),
+      subtitle: "",
+      identifierLabel: t("login.citizenId"),
+      identifierPlaceholder: t("login.citizenIdPlaceholder"),
+    },
+    admin: {
+      title: t("login.adminPortal"),
+      subtitle: "",
+      identifierLabel: t("login.usernameOrEmail"),
+      identifierPlaceholder: "admin.user or admin@gov.in",
+    },
+    masteradmin: {
+      title: t("login.masterAdminPortal"),
+      subtitle: t("login.masterAdminSubtitle"),
+      identifierLabel: t("login.usernameOrEmail"),
+      identifierPlaceholder: "masteradmin.user or masteradmin@gov.in",
+    },
+    deo: {
+      title: t("login.deoPortal"),
+      subtitle: "",
+      identifierLabel: t("login.usernameOrEmail"),
+      identifierPlaceholder: "deo.user or deo@gov.in",
+    },
+    minister: {
+      title: t("login.ministerPortal"),
+      subtitle: "",
+      identifierLabel: t("login.usernameOrEmail"),
+      identifierPlaceholder: "minister.user or minister@gov.in",
+    },
+  }[role] || {};
+}
 
 const CITIZEN_LOGIN_ID_MAX_LENGTH = 20;
 const CITIZEN_LOGIN_PASSWORD_MAX_LENGTH = 25;
@@ -93,14 +88,14 @@ const NATIONAL_EMBLEM_SRC = "https://upload.wikimedia.org/wikipedia/commons/5/55
 
 const ABOUT_FEATURES = [
   {
-    image: citizenMeetingArt,
-    title: "Meeting Requests",
-    description: "As a citizen, people can request meetings with ministers by logging in to the portal and submitting a formal meeting request with the required details. The platform is designed to make the process simple, transparent, and easy to follow from start to finish. After a request is submitted, citizens can monitor its progress through the portal and stay informed about whether it is under review, approved, rescheduled, or closed. This helps users avoid repeated follow-up visits and gives them a single place to check official updates. The meeting workflow also improves communication by keeping request information organized, visible, and aligned with the government process used for public interaction and scheduling.",
+    image: citizenAppointmentArt,
+    title: "Appointment Requests",
+    description: "As a citizen, people can request appointments with ministers by logging in to the portal and submitting a formal appointment request with the required details. The platform is designed to make the process simple, transparent, and easy to follow from start to finish. After a request is submitted, citizens can monitor its progress through the portal and stay informed about whether it is under review, approved, rescheduled, or closed. This helps users avoid repeated follow-up visits and gives them a single place to check official updates. The appointment workflow also improves communication by keeping request information organized, visible, and aligned with the government process used for public interaction and scheduling.",
   },
   {
-    image: citizenComplaintArt,
-    title: "Complaints",
-    description: "Citizens can use the complaint service to raise issues, submit supporting details, and report concerns through a structured digital process inside the portal. The system helps ensure that complaints are recorded properly and moved through the appropriate workflow for review and action. Once a complaint is created, citizens can log in at any time to track status updates, understand whether the matter is pending, in progress, resolved, or requires further clarification, and remain informed without depending on offline follow-up. This improves visibility and accountability while giving people a reliable channel to communicate service-related problems. The complaint workflow supports better coordination, faster response handling, and clearer updates for citizens throughout the process.",
+    image: citizenGrievanceArt,
+    title: "Grievances",
+    description: "Citizens can use the grievance service to raise issues, submit supporting details, and report concerns through a structured digital process inside the portal. The system helps ensure that grievances are recorded properly and moved through the appropriate workflow for review and action. Once a grievance is created, citizens can log in at any time to track status updates, understand whether the matter is pending, in progress, resolved, or requires further clarification, and remain informed without depending on offline follow-up. This improves visibility and accountability while giving people a reliable channel to communicate service-related problems. The grievance workflow supports better coordination, faster response handling, and clearer updates for citizens throughout the process.",
   },
 ];
 
@@ -176,6 +171,7 @@ export default function LoginPage({ defaultRole = "citizen" }) {
   const location = useLocation();
   const { C, theme, toggleTheme } = usePortalTheme();
   const { session, login, isAuthenticated } = useAuth();
+  const { t } = useTranslation();
 
   const role = useMemo(() => {
     if (location.pathname === PATHS.masteradminLogin) return "masteradmin";
@@ -185,7 +181,15 @@ export default function LoginPage({ defaultRole = "citizen" }) {
     return defaultRole;
   }, [defaultRole, location.pathname]);
 
-  const roleCopy = ROLE_COPY[role];
+  const roleCopy = getRoleCopy(role, t);
+
+  const CITIZEN_SECTIONS = [
+    { id: "home", label: t("login.nav.home") },
+    { id: "about", label: t("login.nav.aboutUs") },
+    { id: "services", label: t("login.nav.services") },
+    { id: "media", label: t("login.nav.media") },
+    { id: "contact", label: t("login.nav.contactUs") },
+  ];
   const [identifier, setIdentifier] = useState("");
   const [password, setPassword] = useState("");
   const [citizenLoginErrors, setCitizenLoginErrors] = useState({
@@ -325,7 +329,7 @@ export default function LoginPage({ defaultRole = "citizen" }) {
 
     try {
       await login({ role, identifier, password });
-      setSuccess("Authentication successful. Redirecting to the workspace.");
+      setSuccess(t("login.authSuccess"));
     } catch (authError) {
       setError(toSafeUserMessage(authError, "Authentication failed"));
     } finally {
@@ -344,7 +348,7 @@ export default function LoginPage({ defaultRole = "citizen" }) {
     setSuccess("");
 
     if (hasRequiredFieldError) {
-      setRegisterSubmitError("Please fill asterisk marked fields.");
+      setRegisterSubmitError(t("login.register.fillAsterix"));
       return;
     }
 
@@ -354,7 +358,7 @@ export default function LoginPage({ defaultRole = "citizen" }) {
     }
 
     if (hasOtherValidationError) {
-      setRegisterSubmitError("Please correct the highlighted fields.");
+      setRegisterSubmitError(t("login.register.correctFields"));
       return;
     }
 
@@ -370,7 +374,7 @@ export default function LoginPage({ defaultRole = "citizen" }) {
       });
       setPendingCitizenUserId(data.citizen.id);
       setCitizenMode("verify");
-      setSuccess("Registration submitted. Enter the email OTP to activate the account.");
+      setSuccess(t("login.register.registrationSuccess"));
     } catch (requestError) {
       setError(extractErrorMessage(requestError, "Unable to register citizen account"));
     } finally {
@@ -601,6 +605,7 @@ export default function LoginPage({ defaultRole = "citizen" }) {
           isMobile={isMobile}
           setMobileNavOpen={setMobileNavOpen}
           onNavigate={handleCitizenNav}
+          sections={CITIZEN_SECTIONS}
         />
 
         <main>
@@ -657,7 +662,7 @@ export default function LoginPage({ defaultRole = "citizen" }) {
           <PortalSection
             id="about"
             C={C}
-            title="About Us"
+            title={t("login.about.title")}
             titleColor={theme === "light" ? CITIZEN_HERO_PURPLE : undefined}
           >
             <div style={{ display: "grid", gap: 18 }}>
@@ -716,7 +721,7 @@ export default function LoginPage({ defaultRole = "citizen" }) {
           <PortalSection
             id="services"
             C={C}
-            title="Services"
+            title={t("login.services.title")}
             titleColor={theme === "light" ? CITIZEN_HERO_PURPLE : undefined}
           >
             <div
@@ -726,21 +731,21 @@ export default function LoginPage({ defaultRole = "citizen" }) {
               }}
             >
               <div style={{ display: "grid", gap: 10 }}>
-                <h3 style={{ margin: 0, fontSize: 18, lineHeight: 1.3, fontWeight: 700, color: C.t1 }}>Meeting Requests</h3>
+                <h3 style={{ margin: 0, fontSize: 18, lineHeight: 1.3, fontWeight: 700, color: C.t1 }}>Appointment Requests</h3>
                 <p style={{ margin: 0, fontSize: 15, lineHeight: 1.9, color: C.t2 }}>
-                  The meeting request service is designed to help citizens connect with ministers through an organized and official digital process. Instead of depending only on manual communication, repeated follow-up, or physical visits to different offices, citizens can log in to the portal and raise a meeting request directly from a structured interface. The workflow guides users to submit the necessary information in a clear format so that the request can be reviewed properly by the concerned authority. This makes the process more systematic and reduces confusion for citizens who want to approach the ministry for genuine matters that require discussion, representation, or clarification.
+                  The appointment request service is designed to help citizens connect with ministers through an organized and official digital process. Instead of depending only on manual communication, repeated follow-up, or physical visits to different offices, citizens can log in to the portal and raise a appointment request directly from a structured interface. The workflow guides users to submit the necessary information in a clear format so that the request can be reviewed properly by the concerned authority. This makes the process more systematic and reduces confusion for citizens who want to approach the ministry for genuine matters that require discussion, representation, or clarification.
                 </p>
                 <p style={{ margin: 0, fontSize: 15, lineHeight: 1.9, color: C.t2 }}>
-                  Once a meeting request is submitted, the portal helps citizens track the request from one stage to the next. Users can return to the portal and review whether the request is under review, accepted, rescheduled, pending additional action, or closed. This tracking ability is important because it gives citizens visibility into the progress of their request without requiring them to repeatedly contact offices for updates. The portal therefore acts not only as a submission platform, but also as a communication channel that supports accountability, clarity, and confidence throughout the request lifecycle.
+                  Once a appointment request is submitted, the portal helps citizens track the request from one stage to the next. Users can return to the portal and review whether the request is under review, accepted, rescheduled, pending additional action, or closed. This tracking ability is important because it gives citizens visibility into the progress of their request without requiring them to repeatedly contact offices for updates. The portal therefore acts not only as a submission platform, but also as a communication channel that supports accountability, clarity, and confidence throughout the request lifecycle.
                 </p>
               </div>
               <div style={{ display: "grid", gap: 10 }}>
-                <h3 style={{ margin: 0, fontSize: 18, lineHeight: 1.3, fontWeight: 700, color: C.t1 }}>Submit Complaints</h3>
+                <h3 style={{ margin: 0, fontSize: 18, lineHeight: 1.3, fontWeight: 700, color: C.t1 }}>Submit Grievances</h3>
                 <p style={{ margin: 0, fontSize: 15, lineHeight: 1.9, color: C.t2 }}>
-                  The complaint service gives citizens a formal way to raise concerns, report issues, and submit grievances through the same portal. This service is useful for people who need to bring service-related matters, local issues, administrative concerns, or public-facing problems to the attention of the responsible system. Citizens can enter complaint details in the portal, provide supporting information, and use a structured workflow that makes the complaint easier to record, review, and route appropriately. Compared with fragmented or offline processes, this approach creates a single place where complaints can be managed more consistently and transparently.
+                  The grievance service gives citizens a formal way to raise concerns, report issues, and submit grievances through the same portal. This service is useful for people who need to bring service-related matters, local issues, administrative concerns, or public-facing problems to the attention of the responsible system. Citizens can enter grievance details in the portal, provide supporting information, and use a structured workflow that makes the grievance easier to record, review, and route appropriately. Compared with fragmented or offline processes, this approach creates a single place where grievances can be managed more consistently and transparently.
                 </p>
                 <p style={{ margin: 0, fontSize: 15, lineHeight: 1.9, color: C.t2 }}>
-                  After a complaint is submitted, the citizen can monitor its progress through the portal in the same way as a meeting request. This means the user can see whether the complaint is pending, in progress, resolved, or needs more clarification. The ability to track complaint status online improves trust in the process because citizens are not left uncertain about what happened after submission. Together, the meeting request and complaint services make this website a practical citizen interface for official communication. The portal improves access, saves time, supports better follow-up, and provides a more transparent experience for people who want to engage with the government through clear digital workflows.
+                  After a grievance is submitted, the citizen can monitor its progress through the portal in the same way as a appointment request. This means the user can see whether the grievance is pending, in progress, resolved, or needs more clarification. The ability to track grievance status online improves trust in the process because citizens are not left uncertain about what happened after submission. Together, the appointment request and grievance services make this website a practical citizen interface for official communication. The portal improves access, saves time, supports better follow-up, and provides a more transparent experience for people who want to engage with the government through clear digital workflows.
                 </p>
               </div>
               <img
@@ -760,7 +765,7 @@ export default function LoginPage({ defaultRole = "citizen" }) {
           <PortalSection
             id="media"
             C={C}
-            title="Media"
+            title={t("login.media.title")}
             titleColor={theme === "light" ? CITIZEN_HERO_PURPLE : undefined}
           >
             {(() => {
@@ -846,7 +851,7 @@ export default function LoginPage({ defaultRole = "citizen" }) {
           <PortalSection
             id="contact"
             C={C}
-            title="Contact Us"
+            title={t("login.contact.title")}
             titleColor={theme === "light" ? CITIZEN_HERO_PURPLE : undefined}
           >
             <div
@@ -865,10 +870,10 @@ export default function LoginPage({ defaultRole = "citizen" }) {
                 }}
               >
                 <div style={{ display: "grid", gap: 14, marginTop: 22 }}>
-                  <ContactField C={C} theme={theme} icon={<Users size={18} />} label="Department" value="Ministry of Tourism" />
-                  <ContactField C={C} theme={theme} icon={<Building2 size={18} />} label="Office" value="1st Floor, Transport Bhawan" />
-                  <ContactField C={C} theme={theme} icon={<MapPin size={18} />} label="Address" value="1, Parliament Street, New Delhi - 110001" />
-                  <ContactField C={C} theme={theme} icon={<Phone size={18} />} label="Directory" value="See the Ministry telephone directory on the official Contact Us page." />
+                  <ContactField C={C} theme={theme} icon={<Users size={18} />} label={t("login.contact.department")} value={t("login.contact.departmentValue")} />
+                  <ContactField C={C} theme={theme} icon={<Building2 size={18} />} label={t("login.contact.office")} value={t("login.contact.officeValue")} />
+                  <ContactField C={C} theme={theme} icon={<MapPin size={18} />} label={t("login.contact.address")} value={t("login.contact.addressValue")} />
+                  <ContactField C={C} theme={theme} icon={<Phone size={18} />} label={t("login.contact.directory")} value={t("login.contact.directoryValue")} />
                 </div>
               </div>
 
@@ -936,9 +941,9 @@ export default function LoginPage({ defaultRole = "citizen" }) {
                 flexWrap: "wrap",
               }}
             >
-              <div style={{ fontSize: 14, fontWeight: 600, color: C.t1 }}>HCM Project</div>
+              <div style={{ fontSize: 14, fontWeight: 600, color: C.t1 }}>{t("login.footer.title")}</div>
               <div style={{ fontSize: 13, lineHeight: 1.7, color: C.t2 }}>
-                Citizen services portal for meeting requests, complaints, and public engagement.
+                {t("login.footer.desc")}
               </div>
             </div>
           </footer>
@@ -1159,7 +1164,7 @@ export default function LoginPage({ defaultRole = "citizen" }) {
                 />
               </Field>
 
-              <Field label="Password" icon={<Lock size={16} color={C.t3} />} error={citizenLoginErrors.password}>
+              <Field label={t("login.password")} icon={<Lock size={16} color={C.t3} />} error={citizenLoginErrors.password}>
                 <input
                   type={showPassword ? "text" : "password"}
                   value={password}
@@ -1208,7 +1213,7 @@ export default function LoginPage({ defaultRole = "citizen" }) {
                   cursor: loading ? "wait" : "pointer",
                 }}
               >
-                {loading ? "Authenticating..." : "Sign In"}
+                {loading ? t("login.authenticating") : t("login.signIn")}
                 {!loading && <ArrowRight size={15} />}
               </button>
 
@@ -1233,7 +1238,7 @@ export default function LoginPage({ defaultRole = "citizen" }) {
                     }}
                     style={footerLinkStyle(C, citizenLightLoginAccent)}
                   >
-                    New Registration
+                    {t("login.newRegistration")}
                   </button>
                   <button
                     type="button"
@@ -1244,7 +1249,7 @@ export default function LoginPage({ defaultRole = "citizen" }) {
                     }}
                     style={footerLinkStyle(C, citizenLightLoginAccent)}
                   >
-                    Forgot Password?
+                    {t("login.forgotPassword")}
                   </button>
                 </div>
               )}
@@ -1302,40 +1307,40 @@ export default function LoginPage({ defaultRole = "citizen" }) {
           ) : role === "citizen" && citizenMode === "register" ? (
             <form onSubmit={handleCitizenRegister} noValidate style={{ display: "grid", gap: 6, marginTop: 10 }}>
               <div style={{ display: "grid", gridTemplateColumns: viewportWidth < 640 ? "1fr" : "repeat(3, minmax(0, 1fr))", gap: 8 }}>
-                <Field label="First Name" icon={null} required error={getRegisterFieldError("firstName")} compact>
-                  <input maxLength={CITIZEN_NAME_MAX_LENGTH} value={registerForm.firstName} onChange={(event) => handleRegisterFieldChange("firstName", event.target.value)} placeholder="First name" style={fieldStyle(C, false, false, shouldHighlightRegisterField("firstName"), true)} />
+                <Field label={t("login.register.firstName")} icon={null} required error={getRegisterFieldError("firstName")} compact>
+                  <input maxLength={CITIZEN_NAME_MAX_LENGTH} value={registerForm.firstName} onChange={(event) => handleRegisterFieldChange("firstName", event.target.value)} placeholder={t("login.register.firstName")} style={fieldStyle(C, false, false, shouldHighlightRegisterField("firstName"), true)} />
                 </Field>
-                <Field label="Middle Name" icon={null} error={getRegisterFieldError("middleName")} compact>
-                  <input maxLength={CITIZEN_NAME_MAX_LENGTH} value={registerForm.middleName} onChange={(event) => handleRegisterFieldChange("middleName", event.target.value)} placeholder="Middle name" style={fieldStyle(C, false, false, shouldHighlightRegisterField("middleName"), true)} />
+                <Field label={t("login.register.middleName")} icon={null} error={getRegisterFieldError("middleName")} compact>
+                  <input maxLength={CITIZEN_NAME_MAX_LENGTH} value={registerForm.middleName} onChange={(event) => handleRegisterFieldChange("middleName", event.target.value)} placeholder={t("login.register.middleName")} style={fieldStyle(C, false, false, shouldHighlightRegisterField("middleName"), true)} />
                 </Field>
-                <Field label="Last Name" icon={null} required error={getRegisterFieldError("lastName")} compact>
-                  <input maxLength={CITIZEN_NAME_MAX_LENGTH} value={registerForm.lastName} onChange={(event) => handleRegisterFieldChange("lastName", event.target.value)} placeholder="Last name" style={fieldStyle(C, false, false, shouldHighlightRegisterField("lastName"), true)} />
+                <Field label={t("login.register.lastName")} icon={null} required error={getRegisterFieldError("lastName")} compact>
+                  <input maxLength={CITIZEN_NAME_MAX_LENGTH} value={registerForm.lastName} onChange={(event) => handleRegisterFieldChange("lastName", event.target.value)} placeholder={t("login.register.lastName")} style={fieldStyle(C, false, false, shouldHighlightRegisterField("lastName"), true)} />
                 </Field>
               </div>
 
               <div style={{ display: "grid", gridTemplateColumns: viewportWidth < 640 ? "1fr" : "repeat(3, minmax(0, 1fr))", gap: 8 }}>
-                <Field label="Sex" icon={<Users size={16} color={C.t3} />} required error={getRegisterFieldError("sex")} compact>
+                <Field label={t("login.register.sex")} icon={<Users size={16} color={C.t3} />} required error={getRegisterFieldError("sex")} compact>
                   <select value={registerForm.sex} onChange={(event) => handleRegisterFieldChange("sex", event.target.value)} style={fieldStyle(C, true, false, shouldHighlightRegisterField("sex"), true)}>
-                    <option value="">Select sex</option>
-                    <option value="male">Male</option>
-                    <option value="female">Female</option>
-                    <option value="other">Other</option>
+                    <option value="">{t("common.select")} {t("login.register.sex")}</option>
+                    <option value="male">{t("login.register.male")}</option>
+                    <option value="female">{t("login.register.female")}</option>
+                    <option value="other">{t("login.register.other")}</option>
                   </select>
                 </Field>
-                <Field label="Age" icon={null} required error={getRegisterFieldError("age")} compact>
-                  <input value={registerForm.age} onChange={(event) => handleRegisterFieldChange("age", event.target.value)} inputMode="numeric" placeholder="Age" style={fieldStyle(C, false, false, shouldHighlightRegisterField("age"), true)} />
+                <Field label={t("login.register.age")} icon={null} required error={getRegisterFieldError("age")} compact>
+                  <input value={registerForm.age} onChange={(event) => handleRegisterFieldChange("age", event.target.value)} inputMode="numeric" placeholder={t("login.register.age")} style={fieldStyle(C, false, false, shouldHighlightRegisterField("age"), true)} />
                 </Field>
-                <Field label="Email" icon={<Mail size={16} color={C.t3} />} required error={getRegisterFieldError("email")} compact>
-                  <input type="email" value={registerForm.email} onChange={(event) => handleRegisterFieldChange("email", event.target.value)} placeholder="Email address" style={fieldStyle(C, true, false, shouldHighlightRegisterField("email"), true)} />
+                <Field label={t("login.register.email")} icon={<Mail size={16} color={C.t3} />} required error={getRegisterFieldError("email")} compact>
+                  <input type="email" value={registerForm.email} onChange={(event) => handleRegisterFieldChange("email", event.target.value)} placeholder={t("login.register.email")} style={fieldStyle(C, true, false, shouldHighlightRegisterField("email"), true)} />
                 </Field>
               </div>
 
               <div style={{ display: "grid", gridTemplateColumns: viewportWidth < 640 ? "1fr" : "repeat(2, minmax(0, 1fr))", gap: 8 }}>
-                <Field label="Aadhaar Number" icon={<Shield size={16} color={C.t3} />} required error={getRegisterFieldError("aadhaarNumber")} compact>
-                  <input value={registerForm.aadhaarNumber} onChange={(event) => handleRegisterFieldChange("aadhaarNumber", event.target.value)} placeholder="12-digit Aadhaar number" style={fieldStyle(C, true, false, shouldHighlightRegisterField("aadhaarNumber"), true)} />
+                <Field label={t("login.register.aadhaar")} icon={<Shield size={16} color={C.t3} />} required error={getRegisterFieldError("aadhaarNumber")} compact>
+                  <input value={registerForm.aadhaarNumber} onChange={(event) => handleRegisterFieldChange("aadhaarNumber", event.target.value)} placeholder={t("login.aadhaarPlaceholder")} style={fieldStyle(C, true, false, shouldHighlightRegisterField("aadhaarNumber"), true)} />
                 </Field>
-                <Field label="Mobile Number" icon={<Phone size={16} color={C.t3} />} required error={getRegisterFieldError("mobileNumber")} compact>
-                  <input value={registerForm.mobileNumber} onChange={(event) => handleRegisterFieldChange("mobileNumber", event.target.value)} placeholder="Mobile number" style={fieldStyle(C, true, false, shouldHighlightRegisterField("mobileNumber"), true)} />
+                <Field label={t("login.register.mobile")} icon={<Phone size={16} color={C.t3} />} required error={getRegisterFieldError("mobileNumber")} compact>
+                  <input value={registerForm.mobileNumber} onChange={(event) => handleRegisterFieldChange("mobileNumber", event.target.value)} placeholder={t("login.register.mobile")} style={fieldStyle(C, true, false, shouldHighlightRegisterField("mobileNumber"), true)} />
                 </Field>
               </div>
 
@@ -1343,23 +1348,23 @@ export default function LoginPage({ defaultRole = "citizen" }) {
                 <Field label="Pincode" icon={<MapPin size={16} color={C.t3} />} required error={getRegisterFieldError("pincode")} compact>
                   <input value={registerForm.pincode} onChange={(event) => handleRegisterFieldChange("pincode", event.target.value)} placeholder="Pincode" style={fieldStyle(C, true, false, shouldHighlightRegisterField("pincode"), true)} />
                 </Field>
-                <Field label="City" icon={<Building2 size={16} color={C.t3} />} required error={getRegisterFieldError("city")} compact>
-                  <input value={registerForm.city} onChange={(event) => handleRegisterFieldChange("city", event.target.value)} placeholder="City" style={fieldStyle(C, true, false, shouldHighlightRegisterField("city"), true)} />
+                <Field label={t("login.register.city")} icon={<Building2 size={16} color={C.t3} />} required error={getRegisterFieldError("city")} compact>
+                  <input value={registerForm.city} onChange={(event) => handleRegisterFieldChange("city", event.target.value)} placeholder={t("login.register.city")} style={fieldStyle(C, true, false, shouldHighlightRegisterField("city"), true)} />
                 </Field>
-                <Field label="State" icon={<Landmark size={16} color={C.t3} />} required error={getRegisterFieldError("state")} compact>
-                  <input value={registerForm.state} onChange={(event) => handleRegisterFieldChange("state", event.target.value)} placeholder="State" style={fieldStyle(C, true, false, shouldHighlightRegisterField("state"), true)} />
+                <Field label={t("login.register.state")} icon={<Landmark size={16} color={C.t3} />} required error={getRegisterFieldError("state")} compact>
+                  <input value={registerForm.state} onChange={(event) => handleRegisterFieldChange("state", event.target.value)} placeholder={t("login.register.state")} style={fieldStyle(C, true, false, shouldHighlightRegisterField("state"), true)} />
                 </Field>
-                <Field label="MP of District" icon={<Landmark size={16} color={C.t3} />} compact>
-                  <input value={registerForm.mpDistrict} readOnly placeholder="MP of District" style={fieldStyle(C, true, false, false, true)} />
+                <Field label={t("login.register.district")} icon={<Landmark size={16} color={C.t3} />} compact>
+                  <input value={registerForm.mpDistrict} readOnly placeholder={t("login.register.district")} style={fieldStyle(C, true, false, false, true)} />
                 </Field>
               </div>
 
               <div style={{ display: "grid", gridTemplateColumns: viewportWidth < 640 ? "1fr" : "repeat(2, minmax(0, 1fr))", gap: 8 }}>
-                <Field label="Password" icon={<Lock size={16} color={C.t3} />} required error={getRegisterFieldError("password")} compact>
-                  <input type="password" maxLength={CITIZEN_REGISTER_PASSWORD_MAX_LENGTH} value={registerForm.password} onChange={(event) => handleRegisterFieldChange("password", event.target.value)} placeholder="Password" style={fieldStyle(C, true, false, shouldHighlightRegisterField("password"), true)} />
+                <Field label={t("login.register.password")} icon={<Lock size={16} color={C.t3} />} required error={getRegisterFieldError("password")} compact>
+                  <input type="password" maxLength={CITIZEN_REGISTER_PASSWORD_MAX_LENGTH} value={registerForm.password} onChange={(event) => handleRegisterFieldChange("password", event.target.value)} placeholder={t("login.register.password")} style={fieldStyle(C, true, false, shouldHighlightRegisterField("password"), true)} />
                 </Field>
-                <Field label="Confirm Password" icon={<Lock size={16} color={C.t3} />} required error={getRegisterFieldError("confirmPassword")} compact>
-                  <input type="password" maxLength={CITIZEN_REGISTER_PASSWORD_MAX_LENGTH} value={registerForm.confirmPassword} onChange={(event) => handleRegisterFieldChange("confirmPassword", event.target.value)} placeholder="Confirm password" style={fieldStyle(C, true, false, shouldHighlightRegisterField("confirmPassword"), true)} />
+                <Field label={t("login.register.confirmPassword")} icon={<Lock size={16} color={C.t3} />} required error={getRegisterFieldError("confirmPassword")} compact>
+                  <input type="password" maxLength={CITIZEN_REGISTER_PASSWORD_MAX_LENGTH} value={registerForm.confirmPassword} onChange={(event) => handleRegisterFieldChange("confirmPassword", event.target.value)} placeholder={t("login.register.confirmPassword")} style={fieldStyle(C, true, false, shouldHighlightRegisterField("confirmPassword"), true)} />
                 </Field>
               </div>
 
@@ -1373,7 +1378,7 @@ export default function LoginPage({ defaultRole = "citizen" }) {
                   onMouseEnter={(e) => applyCitizenActionHoverState(e.currentTarget, true, theme === "dark" ? C.purple : CITIZEN_HERO_PURPLE)}
                   onMouseLeave={(e) => applyCitizenActionHoverState(e.currentTarget, false, theme === "dark" ? C.purple : CITIZEN_HERO_PURPLE)}
                 >
-                  {loading ? "Submitting..." : "Create Citizen Account"}
+                  {loading ? t("login.register.registering") : t("login.register.submitRegistration")}
                 </button>
                 <button
                   type="button"
@@ -1385,17 +1390,17 @@ export default function LoginPage({ defaultRole = "citizen" }) {
                   onMouseEnter={(e) => applyCitizenActionHoverState(e.currentTarget, true, theme === "dark" ? C.purple : CITIZEN_HERO_PURPLE)}
                   onMouseLeave={(e) => applyCitizenActionHoverState(e.currentTarget, false, theme === "dark" ? C.purple : CITIZEN_HERO_PURPLE)}
                 >
-                  Back to Login
+                  {t("login.backToLogin")}
                 </button>
               </div>
             </form>
           ) : role === "citizen" && citizenMode === "verify" ? (
             <form onSubmit={handleCitizenVerification} style={{ display: "grid", gap: 18 }}>
-              <Field label="Email OTP" icon={<Shield size={16} color={C.t3} />}>
-                <input value={verificationOtp} onChange={(event) => setVerificationOtp(event.target.value.replace(/\D/g, "").slice(0, 6))} required placeholder="Enter 6-digit OTP" style={fieldStyle(C)} />
+              <Field label={t("login.otp")} icon={<Shield size={16} color={C.t3} />}>
+                <input value={verificationOtp} onChange={(event) => setVerificationOtp(event.target.value.replace(/\D/g, "").slice(0, 6))} required placeholder={t("login.enterOtp")} style={fieldStyle(C)} />
               </Field>
               <button type="submit" disabled={loading} style={primaryButtonStyle(C)}>
-                {loading ? "Verifying..." : "Verify Registration"}
+                {loading ? t("login.verifying") : t("login.verifyAccount")}
               </button>
               <button
                 type="button"
@@ -1405,46 +1410,46 @@ export default function LoginPage({ defaultRole = "citizen" }) {
                 }}
                 style={secondaryButtonStyle(C)}
               >
-                Back to Login
+                {t("login.backToLogin")}
               </button>
             </form>
           ) : role === "citizen" && citizenMode === "forgot" ? (
             <form onSubmit={handleCitizenForgotPassword} style={{ display: "grid", gap: 18 }}>
-              <Field label="Aadhaar Number" icon={<Shield size={16} color={C.t3} />}>
+              <Field label={t("login.aadhaarNumber")} icon={<Shield size={16} color={C.t3} />}>
                 <input value={forgotForm.aadhaarNumber} onChange={(event) => setForgotForm((current) => ({ ...current, aadhaarNumber: event.target.value.replace(/\D/g, "").slice(0, 12) }))} required style={fieldStyle(C)} />
               </Field>
-              <Field label="Email" icon={<Mail size={16} color={C.t3} />}>
+              <Field label={t("login.register.email")} icon={<Mail size={16} color={C.t3} />}>
                 <input type="email" value={forgotForm.email} onChange={(event) => setForgotForm((current) => ({ ...current, email: event.target.value }))} style={fieldStyle(C)} />
               </Field>
               <button type="submit" disabled={loading} style={primaryButtonStyle(C)}>
-                {loading ? "Sending..." : "Send Reset OTP"}
+                {loading ? t("login.sending") : t("login.sendResetOtp")}
               </button>
               <button type="button" onClick={() => setCitizenMode("reset")} style={secondaryTextButtonStyle(C)}>
                 Already have reset OTP?
               </button>
               <button type="button" onClick={() => setCitizenMode("login")} style={secondaryButtonStyle(C)}>
-                Back to Login
+                {t("login.backToLogin")}
               </button>
             </form>
           ) : role === "citizen" && citizenMode === "reset" ? (
             <form onSubmit={handleCitizenResetPassword} style={{ display: "grid", gap: 18 }}>
-              <Field label="Citizen ID" icon={<Mail size={16} color={C.t3} />}>
+              <Field label={t("login.citizenIdLabel")} icon={<Mail size={16} color={C.t3} />}>
                 <input value={resetForm.citizenId} onChange={(event) => setResetForm((current) => ({ ...current, citizenId: event.target.value }))} required placeholder={pendingResetCitizenId || "CTZ-2026-00000001"} style={fieldStyle(C)} />
               </Field>
-              <Field label="Reset OTP" icon={<Shield size={16} color={C.t3} />}>
+              <Field label={t("login.otp")} icon={<Shield size={16} color={C.t3} />}>
                 <input value={resetForm.otp} onChange={(event) => setResetForm((current) => ({ ...current, otp: event.target.value.replace(/\D/g, "").slice(0, 6) }))} required style={fieldStyle(C)} />
               </Field>
-              <Field label="New Password" icon={<Lock size={16} color={C.t3} />}>
+              <Field label={t("login.newPassword")} icon={<Lock size={16} color={C.t3} />}>
                 <input type="password" value={resetForm.password} onChange={(event) => setResetForm((current) => ({ ...current, password: event.target.value }))} required style={fieldStyle(C)} />
               </Field>
-              <Field label="Confirm New Password" icon={<Lock size={16} color={C.t3} />}>
+              <Field label={t("login.confirmPassword")} icon={<Lock size={16} color={C.t3} />}>
                 <input type="password" value={resetForm.confirmPassword} onChange={(event) => setResetForm((current) => ({ ...current, confirmPassword: event.target.value }))} required style={fieldStyle(C)} />
               </Field>
               <button type="submit" disabled={loading} style={primaryButtonStyle(C)}>
-                {loading ? "Resetting..." : "Reset Password"}
+                {loading ? t("login.resetting") : t("login.resetPassword")}
               </button>
               <button type="button" onClick={() => setCitizenMode("login")} style={secondaryButtonStyle(C)}>
-                Back to Login
+                {t("login.backToLogin")}
               </button>
             </form>
           ) : null}
@@ -1454,7 +1459,8 @@ export default function LoginPage({ defaultRole = "citizen" }) {
   }
 }
 
-function CitizenNavbar({ C, theme, toggleTheme, activeSection, mobileNavOpen, isMobile, setMobileNavOpen, onNavigate }) {
+function CitizenNavbar({ C, theme, toggleTheme, activeSection, mobileNavOpen, isMobile, setMobileNavOpen, onNavigate, sections }) {
+  const CITIZEN_SECTIONS = sections || [];
   const [hoveredSection, setHoveredSection] = useState(null);
   const activeNavAccent = CITIZEN_HERO_PURPLE;
   const navActiveBackground = theme === "dark" ? C.purple : activeNavAccent;

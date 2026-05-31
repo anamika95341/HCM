@@ -70,6 +70,7 @@ async function listFiles(req, res, next) {
     const result = await filesService.listFiles({
       actorRole: req.user.role,
       actorId: req.user.sub,
+      adminType: req.user?.adminType || 'regular',
       query: req.query,
     });
     res.json(result);
@@ -84,6 +85,7 @@ async function createDownloadUrl(req, res, next) {
       fileId: req.params.id,
       actorRole: req.user.role,
       actorId: req.user.sub,
+      adminType: req.user?.adminType || 'regular',
       reqMeta: reqMeta(req),
       publicEndpoint: reqMeta(req).publicEndpoint,
     });

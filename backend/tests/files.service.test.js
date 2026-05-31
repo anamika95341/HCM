@@ -12,22 +12,22 @@ jest.mock('../modules/files/files.repository', () => ({
   createFile: jest.fn(),
   findFileRecordById: jest.fn(),
   listFilesVisibleToRole: jest.fn(),
-  getCitizenMeetingById: jest.fn(),
-  getAssignedMeetingForDeo: jest.fn(),
+  getCitizenAppointmentById: jest.fn(),
+  getAssignedAppointmentForDeo: jest.fn(),
   getDeoCalendarEventById: jest.fn(),
-  hasMinisterMeetingAccess: jest.fn(),
+  hasMinisterAppointmentAccess: jest.fn(),
   hasMinisterEventAccess: jest.fn(),
   listFilesForContext: jest.fn(),
 }));
 
-jest.mock('../modules/complaints/complaints.repository', () => ({
-  getCitizenComplaintById: jest.fn(),
-  getComplaintById: jest.fn(),
+jest.mock('../modules/grievances/grievances.repository', () => ({
+  getCitizenGrievanceById: jest.fn(),
+  getGrievanceById: jest.fn(),
 }));
 
-jest.mock('../modules/meetings/meetings.repository', () => ({
-  getCitizenMeetingById: jest.fn(),
-  getMeetingById: jest.fn(),
+jest.mock('../modules/appointments/appointments.repository', () => ({
+  getCitizenAppointmentById: jest.fn(),
+  getAppointmentById: jest.fn(),
 }));
 
 jest.mock('../services/storageService', () => ({
@@ -48,7 +48,7 @@ jest.mock('../utils/logger', () => ({
 
 const redis = require('../config/redis');
 const filesRepository = require('../modules/files/files.repository');
-const complaintsRepository = require('../modules/complaints/complaints.repository');
+const grievancesRepository = require('../modules/grievances/grievances.repository');
 const storageService = require('../services/storageService');
 const filesService = require('../modules/files/files.service');
 
@@ -69,7 +69,7 @@ describe('files service', () => {
   });
 
   test('allows a citizen to request an upload URL for a valid 5MB document', async () => {
-    filesRepository.getCitizenMeetingById.mockResolvedValue({ id: 'meeting-1' });
+    filesRepository.getCitizenAppointmentById.mockResolvedValue({ id: 'appointment-1' });
 
     const result = await filesService.createUploadUrl({
       actorRole: 'citizen',
@@ -78,8 +78,8 @@ describe('files service', () => {
         fileName: 'note.pdf',
         mimeType: 'application/pdf',
         size: 5 * 1024 * 1024,
-        contextType: 'meeting',
-        contextId: 'meeting-1',
+        contextType: 'appointment',
+        contextId: 'appointment-1',
       },
       reqMeta: { ip: '127.0.0.1', userAgent: 'jest' },
     });
@@ -126,7 +126,7 @@ describe('files service', () => {
   });
 
   test('allows DEO 20MB image and 100MB video uploads', async () => {
-    filesRepository.getAssignedMeetingForDeo.mockResolvedValue({ id: 'meeting-1' });
+    filesRepository.getAssignedAppointmentForDeo.mockResolvedValue({ id: 'appointment-1' });
     filesRepository.getDeoCalendarEventById.mockResolvedValue({ id: 'event-1' });
 
     await expect(
@@ -137,8 +137,8 @@ describe('files service', () => {
           fileName: 'photo.png',
           mimeType: 'image/png',
           size: 20 * 1024 * 1024,
-          contextType: 'meeting',
-          contextId: 'meeting-1',
+          contextType: 'appointment',
+          contextId: 'appointment-1',
         },
         reqMeta: { ip: '127.0.0.1', userAgent: 'jest' },
       })
@@ -160,8 +160,8 @@ describe('files service', () => {
     ).resolves.toEqual(expect.objectContaining({ uploadUrl: 'http://upload-url' }));
   });
 
-  test('allows a DEO to upload files for a completed meeting even when it was not assigned to that DEO', async () => {
-    filesRepository.getAssignedMeetingForDeo.mockResolvedValue({ id: 'meeting-1' });
+  test('allows a DEO to upload files for a completed appointment even when it was not assigned to that DEO', async () => {
+    filesRepository.getAssignedAppointmentForDeo.mockResolvedValue({ id: 'appointment-1' });
 
     await expect(
       filesService.createUploadUrl({
@@ -171,8 +171,8 @@ describe('files service', () => {
           fileName: 'completion-photo.png',
           mimeType: 'image/png',
           size: 1024,
-          contextType: 'meeting',
-          contextId: 'meeting-1',
+          contextType: 'appointment',
+          contextId: 'appointment-1',
         },
         reqMeta: { ip: '127.0.0.1', userAgent: 'jest' },
       })
@@ -180,7 +180,7 @@ describe('files service', () => {
   });
 
   test('rejects DEO uploads beyond role limits', async () => {
-    filesRepository.getAssignedMeetingForDeo.mockResolvedValue({ id: 'meeting-1' });
+    filesRepository.getAssignedAppointmentForDeo.mockResolvedValue({ id: 'appointment-1' });
     filesRepository.getDeoCalendarEventById.mockResolvedValue({ id: 'event-1' });
 
     await expect(
@@ -191,8 +191,8 @@ describe('files service', () => {
           fileName: 'photo.png',
           mimeType: 'image/png',
           size: (20 * 1024 * 1024) + 1,
-          contextType: 'meeting',
-          contextId: 'meeting-1',
+          contextType: 'appointment',
+          contextId: 'appointment-1',
         },
         reqMeta: { ip: '127.0.0.1', userAgent: 'jest' },
       })
@@ -250,18 +250,18 @@ describe('files service', () => {
     expect(storageService.generateUploadUrl).not.toHaveBeenCalled();
   });
 
-  test('creates signed legacy access for a citizen-owned complaint document', async () => {
+  test('creates signed legacy access for a citizen-owned grievance document', async () => {
     filesRepository.findUploadedFileById.mockResolvedValue({
       id: '11111111-1111-1111-1111-111111111111',
-      entity_type: 'complaint_document',
-      entity_id: 'complaint-1',
+      entity_type: 'grievance_document',
+      entity_id: 'grievance-1',
       original_name: 'evidence.pdf',
       mime_type: 'application/pdf',
       file_size: 2048,
       storage_path: '/tmp/evidence.pdf',
       created_at: '2026-04-06T10:00:00.000Z',
     });
-    complaintsRepository.getCitizenComplaintById.mockResolvedValue({ id: 'complaint-1' });
+    grievancesRepository.getCitizenGrievanceById.mockResolvedValue({ id: 'grievance-1' });
 
     const result = await filesService.createLegacyDownloadAccess({
       fileId: '11111111-1111-1111-1111-111111111111',
@@ -275,19 +275,19 @@ describe('files service', () => {
     expect(redis.set).toHaveBeenCalled();
   });
 
-  test('rejects legacy complaint download for an unrelated admin', async () => {
+  test('rejects legacy grievance download for an unrelated admin', async () => {
     filesRepository.findUploadedFileById.mockResolvedValue({
       id: '11111111-1111-1111-1111-111111111111',
-      entity_type: 'complaint_document',
-      entity_id: 'complaint-1',
+      entity_type: 'grievance_document',
+      entity_id: 'grievance-1',
       original_name: 'evidence.pdf',
       mime_type: 'application/pdf',
       file_size: 2048,
       storage_path: '/tmp/evidence.pdf',
       created_at: '2026-04-06T10:00:00.000Z',
     });
-    complaintsRepository.getComplaintById.mockResolvedValue({
-      id: 'complaint-1',
+    grievancesRepository.getGrievanceById.mockResolvedValue({
+      id: 'grievance-1',
       assignedAdminUserId: 'admin-2',
       status: 'assigned',
     });
@@ -361,12 +361,12 @@ describe('files service', () => {
       mime_type: 'video/mp4',
       file_category: 'video',
       size: 1024,
-      context_type: 'meeting',
-      context_id: 'meeting-1',
+      context_type: 'appointment',
+      context_id: 'appointment-1',
       status: 'pending',
       created_at: '2026-04-05T00:00:00.000Z',
     });
-    filesRepository.hasMinisterMeetingAccess.mockResolvedValue(false);
+    filesRepository.hasMinisterAppointmentAccess.mockResolvedValue(false);
 
     await expect(
       filesService.createDownloadUrl({

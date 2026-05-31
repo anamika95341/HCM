@@ -82,14 +82,14 @@
 // }
 
 // function getItemKind(item) {
-//   return item.kind === "event" ? "event" : "meeting";
+//   return item.kind === "event" ? "event" : "appointment";
 // }
 
 // function getItemSummary(items) {
-//   const meetings = items.filter((item) => getItemKind(item) === "meeting").length;
+//   const appointments = items.filter((item) => getItemKind(item) === "appointment").length;
 //   const events = items.filter((item) => getItemKind(item) === "event").length;
 //   const parts = [];
-//   if (meetings) parts.push(`${meetings} meeting${meetings !== 1 ? "s" : ""}`);
+//   if (appointments) parts.push(`${appointments} appointment${appointments !== 1 ? "s" : ""}`);
 //   if (events) parts.push(`${events} event${events !== 1 ? "s" : ""}`);
 //   return parts.join(" ");
 // }
@@ -98,7 +98,7 @@
 //   if (getItemKind(item) === "event") {
 //     return item.isVip ? "VIP Event" : "Scheduled Event";
 //   }
-//   return item.isVip ? "VIP Meeting" : "Scheduled Meeting";
+//   return item.isVip ? "VIP Appointment" : "Scheduled Appointment";
 // }
 
 // // ── EventPill ────────────────────────────────────────────────────────────────
@@ -334,9 +334,9 @@
 //   );
 // }
 
-// // ── DayMeetingsPanel (Side Panel that pushes content) ────────────────────────
+// // ── DayAppointmentsPanel (Side Panel that pushes content) ────────────────────────
 
-// function DayMeetingsPanel({ date, items, onClose, onSelectMeeting, isVisible }) {
+// function DayAppointmentsPanel({ date, items, onClose, onSelectAppointment, isVisible }) {
 //   const { C } = usePortalTheme();
 
 //   return (
@@ -449,12 +449,12 @@
 //           <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
 //             {items.map((item) => {
 //               const tone = item.isVip ? C.warn : C.purple;
-//               const kindLabel = getItemKind(item) === "event" ? "Event" : "Meeting";
+//               const kindLabel = getItemKind(item) === "event" ? "Event" : "Appointment";
 //               return (
 //                 <button
 //                   key={item.id}
 //                   type="button"
-//                   onClick={() => onSelectMeeting(item)}
+//                   onClick={() => onSelectAppointment(item)}
 //                   style={{
 //                     width: "100%",
 //                     textAlign: "left",
@@ -572,7 +572,7 @@
 //            type === "videos" ? <Film size={32} style={{ opacity: 0.4 }} /> : 
 //            <FileText size={32} style={{ opacity: 0.4 }} />}
 //         </div>
-//         No {type} attached to this meeting.
+//         No {type} attached to this appointment.
 //       </div>
 //     );
 //   }
@@ -653,14 +653,14 @@
 //   );
 // }
 
-// // ── MeetingDetailModal ────────────────────────────────────────────────────────
+// // ── AppointmentDetailModal ────────────────────────────────────────────────────────
 
-// function MeetingDetailModal({ meeting, onClose }) {
+// function AppointmentDetailModal({ appointment, onClose }) {
 //   const { C } = usePortalTheme();
 //   const [activeTab, setActiveTab] = useState("details");
   
-//   if (!meeting) return null;
-//   const tone = meeting.isVip ? C.warn : C.purple;
+//   if (!appointment) return null;
+//   const tone = appointment.isVip ? C.warn : C.purple;
 
 //   const getTabCount = () => null;
 
@@ -700,7 +700,7 @@
 //                     letterSpacing: ".05em",
 //                   }}
 //                 >
-//                   {getItemTypeLabel(meeting)}
+//                   {getItemTypeLabel(appointment)}
 //                 </div>
 //                 <h3 
 //                   style={{ 
@@ -712,7 +712,7 @@
 //                     wordBreak: "break-word",
 //                   }}
 //                 >
-//                   {meeting.title}
+//                   {appointment.title}
 //                 </h3>
 //                 <div 
 //                   style={{ 
@@ -726,11 +726,11 @@
 //                   }}
 //                 >
 //                   <span style={{ fontWeight: 500 }}>
-//                     {new Date(meeting.startsAt).toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric", year: "numeric" })}
+//                     {new Date(appointment.startsAt).toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric", year: "numeric" })}
 //                   </span>
 //                   <span style={{ color: C.t3 }}>•</span>
 //                   <span style={{ fontWeight: 600, color: tone }}>
-//                     {formatTime(meeting.startsAt)} – {formatTime(meeting.endsAt)}
+//                     {formatTime(appointment.startsAt)} – {formatTime(appointment.endsAt)}
 //                   </span>
 //                   <span 
 //                     style={{ 
@@ -742,7 +742,7 @@
 //                       fontWeight: 500,
 //                     }}
 //                   >
-//                     {formatDuration(meeting)}
+//                     {formatDuration(appointment)}
 //                   </span>
 //                 </div>
 //               </div>
@@ -876,7 +876,7 @@
 //                       </span>
 //                     </div>
 //                     <p style={{ fontSize: 14, color: C.t1, fontWeight: 600, wordBreak: "break-word", margin: 0 }}>
-//                       {meeting.location || "Location pending"}
+//                       {appointment.location || "Location pending"}
 //                     </p>
 //                   </div>
 //                   <div 
@@ -896,13 +896,13 @@
 //                       </span>
 //                     </div>
 //                     <p style={{ fontSize: 14, color: C.t1, fontWeight: 600, margin: 0 }}>
-//                       {meeting.source}
+//                       {appointment.source}
 //                     </p>
 //                   </div>
 //                 </div>
 
 //                 {/* Participants */}
-//                 {Array.isArray(meeting.participants) && meeting.participants.length > 0 && (
+//                 {Array.isArray(appointment.participants) && appointment.participants.length > 0 && (
 //                   <div>
 //                     <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
 //                       <div style={{ padding: 6, borderRadius: 6, background: `${tone}12`, color: tone }}>
@@ -913,7 +913,7 @@
 //                       </span>
 //                     </div>
 //                     <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
-//                       {meeting.participants.map((p) => (
+//                       {appointment.participants.map((p) => (
 //                         <span
 //                           key={p}
 //                           style={{
@@ -940,7 +940,7 @@
 //                   </p>
 //                   <p style={{ color: C.t2, lineHeight: 1.75, fontSize: 14, margin: 0 ,
 //                     wordBreak: "break-word",whiteSpace: "pre-wrap"}}>
-//                     {meeting.details || "No description available."}
+//                     {appointment.details || "No description available."}
 //                   </p>
 //                 </div>
 //               </div>
@@ -948,17 +948,17 @@
 
 //             {/* Photos Tab */}
 //             {activeTab === "photos" && (
-//               <FilesSection item={meeting} C={C} tone={tone} defaultTab="photos" />
+//               <FilesSection item={appointment} C={C} tone={tone} defaultTab="photos" />
 //             )}
 
 //             {/* Videos Tab */}
 //             {activeTab === "videos" && (
-//               <FilesSection item={meeting} C={C} tone={tone} defaultTab="videos" />
+//               <FilesSection item={appointment} C={C} tone={tone} defaultTab="videos" />
 //             )}
 
 //             {/* Documents Tab */}
 //             {activeTab === "documents" && (
-//               <FilesSection item={meeting} C={C} tone={tone} defaultTab="documents" />
+//               <FilesSection item={appointment} C={C} tone={tone} defaultTab="documents" />
 //             )}
 //           </div>
 //         </div>
@@ -983,8 +983,8 @@
 //   const [cursorDate, setCursorDate] = useState(startOfDay(new Date()));
 
 //   // Modal state
-//   const [selectedDate, setSelectedDate] = useState(null);   // controls DayMeetingsDrawer
-//   const [selectedMeeting, setSelectedMeeting] = useState(null); // controls MeetingDetailModal
+//   const [selectedDate, setSelectedDate] = useState(null);   // controls DayAppointmentsDrawer
+//   const [selectedAppointment, setSelectedAppointment] = useState(null); // controls AppointmentDetailModal
 
 //   useEffect(() => {
 //     let mounted = true;
@@ -994,15 +994,15 @@
 //         const { data } = await apiClient.get("/minister/calendar");
 //         const mapped = (data.events || []).map((event) => ({
 //           id: event.id,
-//           sourceId: event.meeting_id || event.id,
+//           sourceId: event.appointment_id || event.id,
 //           title: event.title,
 //           details: event.comments || "",
 //           startsAt: event.starts_at,
 //           endsAt: event.ends_at,
 //           location: event.location,
-//           source: event.meeting_id ? (event.is_vip ? "Minister Priority" : "Minister Calendar") : "DEO Event",
+//           source: event.appointment_id ? (event.is_vip ? "Minister Priority" : "Minister Calendar") : "DEO Event",
 //           participants: event.participants || [],
-//           kind: event.meeting_id ? "meeting" : "event",
+//           kind: event.appointment_id ? "appointment" : "event",
 //           isVip: Boolean(event.is_vip),
 //           whoToMeet: event.who_to_meet || "",
 //         }));
@@ -1077,7 +1077,7 @@
 //     return grid;
 //   }, [cursorDate]);
 
-//   const meetingsForDate = useMemo(() => {
+//   const appointmentsForDate = useMemo(() => {
 //     if (!selectedDate) return [];
 //     return items
 //       .filter((item) => isSameDay(item.startsAt, selectedDate))
@@ -1089,7 +1089,7 @@
 //     [filteredItems]
 //   );
 
-//   const nextTwoMeetings = useMemo(() => {
+//   const nextTwoAppointments = useMemo(() => {
 //     const now = new Date();
 //     return items
 //       .filter((item) => new Date(item.startsAt) >= now)
@@ -1120,25 +1120,25 @@
 
 //   function handleDateSelect(day) {
 //     setSelectedDate(day);
-//     setSelectedMeeting(null);
+//     setSelectedAppointment(null);
 //   }
 
-//   function handleEventPillClick(day, meeting) {
+//   function handleEventPillClick(day, appointment) {
 //     setSelectedDate(day);
-//     setSelectedMeeting(meeting);
+//     setSelectedAppointment(appointment);
 //   }
 
-//   function handleSelectMeeting(meeting) {
-//     setSelectedMeeting(meeting);
+//   function handleSelectAppointment(appointment) {
+//     setSelectedAppointment(appointment);
 //   }
 
-//   function handleCloseMeetingDetail() {
-//     setSelectedMeeting(null);
+//   function handleCloseAppointmentDetail() {
+//     setSelectedAppointment(null);
 //   }
 
 //   function handleCloseDayDrawer() {
 //     setSelectedDate(null);
-//     setSelectedMeeting(null);
+//     setSelectedAppointment(null);
 //   }
 
 //   // Calculate dynamic height based on the exact number of weeks needed (monthGrid.length / 7)
@@ -1167,11 +1167,11 @@
 //                 transition: "width 0.35s cubic-bezier(0.4, 0, 0.2, 1)",
 //               }}
 //             >
-//               <DayMeetingsPanel
+//               <DayAppointmentsPanel
 //                 date={selectedDate}
-//                 items={meetingsForDate}
+//                 items={appointmentsForDate}
 //                 onClose={handleCloseDayDrawer}
-//                 onSelectMeeting={handleSelectMeeting}
+//                 onSelectAppointment={handleSelectAppointment}
 //                 isVisible={selectedDate !== null}
 //               />
 //             </div>
@@ -1375,7 +1375,7 @@
 //                                 textOverflow: "ellipsis",
 //                               }}
 //                             >
-//                               {eventsForDay.length} {eventsForDay.length === 1 ? "meeting" : "meetings"}
+//                               {eventsForDay.length} {eventsForDay.length === 1 ? "appointment" : "appointments"}
 //                             </div>
 //                           )}
 //                         </div>
@@ -1523,10 +1523,10 @@
              
 //             </WorkspaceCard>
 
-//             {/* Right Panel: Upcoming Meetings */}
+//             {/* Right Panel: Upcoming Appointments */}
 //             <div style={{ width: 300, flexShrink: 0, display: "flex", flexDirection: "column" }}>
               
-//               {/* Upcoming Meetings */}
+//               {/* Upcoming Appointments */}
 //               <WorkspaceCard style={{ padding: 24, marginBottom: 0, flex: 1, display: "flex", flexDirection: "column", overflow: "hidden" }}>
 //                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
 //                   <div>
@@ -1538,17 +1538,17 @@
 //                   </div>
 //                 </div>
 
-//                 {nextTwoMeetings.length === 0 ? (
-//                   <div style={{ fontSize: 13, color: C.t3 }}>No upcoming meetings or events scheduled.</div>
+//                 {nextTwoAppointments.length === 0 ? (
+//                   <div style={{ fontSize: 13, color: C.t3 }}>No upcoming appointments or events scheduled.</div>
 //                 ) : (
 //                   <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-//                     {nextTwoMeetings.map((item) => {
+//                     {nextTwoAppointments.map((item) => {
 //                       const tone = item.isVip ? C.warn : C.purple;
 //                       return (
 //                         <button
 //                           key={item.id}
 //                           type="button"
-//                           onClick={() => { setSelectedDate(startOfDay(new Date(item.startsAt))); setSelectedMeeting(item); }}
+//                           onClick={() => { setSelectedDate(startOfDay(new Date(item.startsAt))); setSelectedAppointment(item); }}
 //                           style={{
 //                             display: "flex",
 //                             alignItems: "stretch",
@@ -1597,11 +1597,11 @@
 //         </div>
 //       )}
 
-//       {/* Meeting detail modal — opens on top when a meeting is selected */}
-//       {selectedMeeting && (
-//         <MeetingDetailModal
-//           meeting={selectedMeeting}
-//           onClose={handleCloseMeetingDetail}
+//       {/* Appointment detail modal — opens on top when a appointment is selected */}
+//       {selectedAppointment && (
+//         <AppointmentDetailModal
+//           appointment={selectedAppointment}
+//           onClose={handleCloseAppointmentDetail}
 //         />
 //       )}
 //     </WorkspacePage>
@@ -1694,33 +1694,39 @@ function formatFileSize(size = 0) {
 }
 
 function getItemKind(item) {
-  return item.kind === "event" ? "event" : "meeting";
+  return item.kind === "event" ? "event" : "appointment";
 }
 
 function getItemSummary(items) {
-  const meetings = items.filter((item) => getItemKind(item) === "meeting").length;
+  const appointments = items.filter((item) => getItemKind(item) === "appointment").length;
   const events = items.filter((item) => getItemKind(item) === "event").length;
   const parts = [];
-  if (meetings) parts.push(`${meetings} meeting${meetings !== 1 ? "s" : ""}`);
+  if (appointments) parts.push(`${appointments} appointment${appointments !== 1 ? "s" : ""}`);
   if (events) parts.push(`${events} event${events !== 1 ? "s" : ""}`);
   return parts.join(" ");
+}
+
+function getItemTone(item, C) {
+  if (item.calendarKind === "grievanceCall") return C.mint;
+  if (item.appointmentStatus === "cancelled") return C.danger;
+  return item.isVip ? C.warn : C.purple;
 }
 
 function getItemTypeLabel(item) {
   if (getItemKind(item) === "event") {
     return item.isVip ? "VIP Event" : "Scheduled Event";
   }
-  if (item.meetingStatus === "cancelled") {
-    return "Cancelled Meeting";
+  if (item.appointmentStatus === "cancelled") {
+    return "Cancelled Appointment";
   }
-  return item.isVip ? "VIP Meeting" : "Scheduled Meeting";
+  return item.isVip ? "VIP Appointment" : "Scheduled Appointment";
 }
 
 // ── EventPill ────────────────────────────────────────────────────────────────
 
 function EventPill({ item, compact = false, onClick }) {
   const { C } = usePortalTheme();
-  const tone = item.meetingStatus === "cancelled" ? C.danger : item.isVip ? C.warn : C.purple;
+  const tone = getItemTone(item, C);
   return (
     <button
       type="button"
@@ -1894,9 +1900,9 @@ function FilesSection({ item, C, tone, defaultTab = "photos", hideTabBar = false
   );
 }
 
-// ── DayMeetingsPanel (Side Panel that pushes content) ────────────────────────
+// ── DayAppointmentsPanel (Side Panel that pushes content) ────────────────────────
 
-function DayMeetingsPanel({ date, items, onClose, onSelectMeeting, isVisible }) {
+function DayAppointmentsPanel({ date, items, onClose, onSelectAppointment, isVisible }) {
   const { C } = usePortalTheme();
 
   return (
@@ -1928,22 +1934,22 @@ function DayMeetingsPanel({ date, items, onClose, onSelectMeeting, isVisible }) 
         }}
       >
         <div style={{ minWidth: 0 }}>
-          <div 
-            style={{ 
-              fontSize: 10, 
-              fontWeight: 700, 
-              color: C.t3, 
-              textTransform: "uppercase", 
+          <div
+            style={{
+              fontSize: 10,
+              fontWeight: 700,
+              color: C.t3,
+              textTransform: "uppercase",
               letterSpacing: ".08em",
               marginBottom: 4,
             }}
           >
             Schedule
           </div>
-          <h3 
-            style={{ 
-              fontSize: 16, 
-              fontWeight: 700, 
+          <h3
+            style={{
+              fontSize: 16,
+              fontWeight: 700,
               color: C.t1,
               margin: 0,
               lineHeight: 1.3,
@@ -1951,6 +1957,24 @@ function DayMeetingsPanel({ date, items, onClose, onSelectMeeting, isVisible }) 
           >
             {date?.toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" })}
           </h3>
+          {items.length > 0 && (() => {
+            const appts = items.filter((i) => i.calendarKind !== "grievanceCall");
+            const grieves = items.filter((i) => i.calendarKind === "grievanceCall");
+            return (
+              <div style={{ display: "flex", gap: 6, marginTop: 8, flexWrap: "wrap" }}>
+                {appts.length > 0 && (
+                  <span style={{ fontSize: 10, fontWeight: 600, padding: "2px 8px", borderRadius: 99, background: `${C.purple}12`, color: C.purple, border: `1px solid ${C.purple}25` }}>
+                    {appts.length} appt{appts.length !== 1 ? "s" : ""}
+                  </span>
+                )}
+                {grieves.length > 0 && (
+                  <span style={{ fontSize: 10, fontWeight: 600, padding: "2px 8px", borderRadius: 99, background: `${C.mint}12`, color: C.mint, border: `1px solid ${C.mint}25` }}>
+                    {grieves.length} grievance{grieves.length !== 1 ? "s" : ""}
+                  </span>
+                )}
+              </div>
+            );
+          })()}
         </div>
         <button
           type="button"
@@ -2008,13 +2032,13 @@ function DayMeetingsPanel({ date, items, onClose, onSelectMeeting, isVisible }) 
         ) : (
           <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
             {items.map((item) => {
-              const tone = item.isVip ? C.warn : C.purple;
-              const kindLabel = getItemKind(item) === "event" ? "Event" : "Meeting";
+              const tone = getItemTone(item, C);
+              const kindLabel = item.calendarKind === "grievanceCall" ? "Grievance" : getItemKind(item) === "event" ? "Event" : "Appointment";
               return (
                 <button
                   key={item.id}
                   type="button"
-                  onClick={() => onSelectMeeting(item)}
+                  onClick={() => onSelectAppointment(item)}
                   style={{
                     width: "100%",
                     textAlign: "left",
@@ -2132,7 +2156,7 @@ function FileGridSection({ type, C, tone }) {
            type === "videos" ? <Film size={32} style={{ opacity: 0.4 }} /> : 
            <FileText size={32} style={{ opacity: 0.4 }} />}
         </div>
-        No {type} attached to this meeting.
+        No {type} attached to this appointment.
       </div>
     );
   }
@@ -2213,9 +2237,9 @@ function FileGridSection({ type, C, tone }) {
   );
 }
 
-// ── MeetingDetailModal ────────────────────────────────────────────────────────
+// ── AppointmentDetailModal ────────────────────────────────────────────────────────
 
-function MeetingDetailModal({ meeting, onClose }) {
+function AppointmentDetailModal({ appointment, onClose }) {
   const { C } = usePortalTheme();
   const [activeTab, setActiveTab] = useState("details");
   const [isClosing, setIsClosing] = useState(false);
@@ -2223,13 +2247,13 @@ function MeetingDetailModal({ meeting, onClose }) {
 
   // File counts load karo modal tab bar ke liye
   useEffect(() => {
-    if (!meeting?.sourceId) return;
+    if (!appointment?.sourceId) return;
     let mounted = true;
     async function loadCounts() {
       try {
         const result = await listVisibleFiles({
-          contextType: getItemKind(meeting),
-          contextId: meeting.sourceId,
+          contextType: getItemKind(appointment),
+          contextId: appointment.sourceId,
         });
         if (mounted) {
           setFileCounts({
@@ -2242,15 +2266,16 @@ function MeetingDetailModal({ meeting, onClose }) {
     }
     loadCounts();
     return () => { mounted = false; };
-  }, [meeting]);
+  }, [appointment]);
 
   function handleClose() {
     setIsClosing(true);
     setTimeout(onClose, 240); // animation ke baad close karo
   }
 
-  if (!meeting) return null;
-  const tone = meeting.isVip ? C.warn : C.purple;
+  if (!appointment) return null;
+  const isGrievance = appointment.calendarKind === "grievanceCall";
+  const tone = getItemTone(appointment, C);
 
   // Tab ke liye count — details ka null
   function getTabCount(id) {
@@ -2308,19 +2333,19 @@ function MeetingDetailModal({ meeting, onClose }) {
             <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 16 }}>
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ display: "inline-flex", padding: "4px 10px", borderRadius: 6, fontSize: 10, fontWeight: 700, border: `1px solid ${tone}33`, background: `${tone}12`, color: tone, textTransform: "uppercase", letterSpacing: ".05em" }}>
-                  {getItemTypeLabel(meeting)}
+                  {isGrievance ? "Scheduled Grievance Call" : getItemTypeLabel(appointment)}
                 </div>
                 <h3 style={{ marginTop: 12, fontSize: 22, fontWeight: 700, color: C.t1, lineHeight: 1.3, wordBreak: "break-word" }}>
-                  {meeting.title}
+                  {appointment.title}
                 </h3>
                 <div style={{ marginTop: 10, fontSize: 13, color: C.t2, display: "flex", flexWrap: "wrap", alignItems: "center", gap: 8 }}>
                   <span style={{ fontWeight: 500 }}>
-                    {new Date(meeting.startsAt).toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric", year: "numeric" })}
+                    {new Date(appointment.startsAt).toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric", year: "numeric" })}
                   </span>
                   <span style={{ color: C.t3 }}>•</span>
-                  <span style={{ fontWeight: 600, color: tone }}>{formatTime(meeting.startsAt)} – {formatTime(meeting.endsAt)}</span>
+                  <span style={{ fontWeight: 600, color: tone }}>{formatTime(appointment.startsAt)} – {formatTime(appointment.endsAt)}</span>
                   <span style={{ fontSize: 11, padding: "2px 8px", borderRadius: 4, background: `${C.t3}10`, color: C.t3, fontWeight: 500 }}>
-                    {formatDuration(meeting)}
+                    {formatDuration(appointment)}
                   </span>
                 </div>
               </div>
@@ -2336,9 +2361,9 @@ function MeetingDetailModal({ meeting, onClose }) {
               </button>
             </div>
 
-            {/* ── Tabs — SIRF EK BAR, counts ke saath ── */}
+            {/* ── Tabs — grievance only shows Details; appointments show all tabs ── */}
             <div style={{ display: "flex", gap: 6, marginTop: 20, paddingTop: 16, borderTop: `1px solid ${C.border}` }}>
-              {MODAL_TABS.map(({ id, label, icon: Icon }) => {
+              {(isGrievance ? MODAL_TABS.filter((t) => t.id === "details") : MODAL_TABS).map(({ id, label, icon: Icon }) => {
                 const isActive = activeTab === id;
                 const count = getTabCount(id); // null for details, number for files
                 return (
@@ -2378,59 +2403,94 @@ function MeetingDetailModal({ meeting, onClose }) {
             {/* Details */}
             {activeTab === "details" && (
               <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
-                <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 16 }}>
-                  <div style={{ padding: 16, borderRadius: 10, background: C.bgElevated, border: `1px solid ${C.border}` }}>
-                    <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
-                      <div style={{ padding: 6, borderRadius: 6, background: `${tone}12`, color: tone }}><MapPin size={14} /></div>
-                      <span style={{ fontSize: 11, fontWeight: 700, color: C.t3, textTransform: "uppercase", letterSpacing: ".08em" }}>Location</span>
+                {isGrievance ? (
+                  <>
+                    <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 16 }}>
+                      <div style={{ padding: 16, borderRadius: 10, background: C.bgElevated, border: `1px solid ${C.border}` }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
+                          <div style={{ padding: 6, borderRadius: 6, background: `${tone}12`, color: tone }}><Users size={14} /></div>
+                          <span style={{ fontSize: 11, fontWeight: 700, color: C.t3, textTransform: "uppercase", letterSpacing: ".08em" }}>Citizen</span>
+                        </div>
+                        <p style={{ fontSize: 14, color: C.t1, fontWeight: 600, wordBreak: "break-word", margin: 0 }}>{appointment.location || "Contact pending"}</p>
+                      </div>
+                      <div style={{ padding: 16, borderRadius: 10, background: C.bgElevated, border: `1px solid ${C.border}` }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
+                          <div style={{ padding: 6, borderRadius: 6, background: `${tone}12`, color: tone }}><Calendar size={14} /></div>
+                          <span style={{ fontSize: 11, fontWeight: 700, color: C.t3, textTransform: "uppercase", letterSpacing: ".08em" }}>Source</span>
+                        </div>
+                        <p style={{ fontSize: 14, color: C.t1, fontWeight: 600, margin: 0 }}>{appointment.source}</p>
+                      </div>
                     </div>
-                    <p style={{ fontSize: 14, color: C.t1, fontWeight: 600, wordBreak: "break-word", margin: 0 }}>{meeting.location || "Location pending"}</p>
-                  </div>
-                  <div style={{ padding: 16, borderRadius: 10, background: C.bgElevated, border: `1px solid ${C.border}` }}>
-                    <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
-                      <div style={{ padding: 6, borderRadius: 6, background: `${tone}12`, color: tone }}><Calendar size={14} /></div>
-                      <span style={{ fontSize: 11, fontWeight: 700, color: C.t3, textTransform: "uppercase", letterSpacing: ".08em" }}>Source</span>
+                    {appointment.department && (
+                      <div style={{ padding: 16, borderRadius: 10, background: C.bgElevated, border: `1px solid ${C.border}` }}>
+                        <p style={{ fontSize: 11, fontWeight: 700, color: C.t3, textTransform: "uppercase", letterSpacing: ".08em", marginBottom: 8, margin: 0, marginBottom: 8 }}>Department</p>
+                        <p style={{ fontSize: 14, color: C.t1, fontWeight: 600, margin: 0 }}>{appointment.department}</p>
+                      </div>
+                    )}
+                    <div>
+                      <p style={{ fontSize: 11, fontWeight: 700, color: C.t3, textTransform: "uppercase", letterSpacing: ".08em", marginBottom: 12 }}>Description</p>
+                      <p style={{ color: C.t2, lineHeight: 1.75, fontSize: 14, margin: 0, wordBreak: "break-word", whiteSpace: "pre-wrap" }}>
+                        {appointment.details || "No description available."}
+                      </p>
                     </div>
-                    <p style={{ fontSize: 14, color: C.t1, fontWeight: 600, margin: 0 }}>{meeting.source}</p>
-                  </div>
-                </div>
+                  </>
+                ) : (
+                  <>
+                    <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 16 }}>
+                      <div style={{ padding: 16, borderRadius: 10, background: C.bgElevated, border: `1px solid ${C.border}` }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
+                          <div style={{ padding: 6, borderRadius: 6, background: `${tone}12`, color: tone }}><MapPin size={14} /></div>
+                          <span style={{ fontSize: 11, fontWeight: 700, color: C.t3, textTransform: "uppercase", letterSpacing: ".08em" }}>Location</span>
+                        </div>
+                        <p style={{ fontSize: 14, color: C.t1, fontWeight: 600, wordBreak: "break-word", margin: 0 }}>{appointment.location || "Location pending"}</p>
+                      </div>
+                      <div style={{ padding: 16, borderRadius: 10, background: C.bgElevated, border: `1px solid ${C.border}` }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
+                          <div style={{ padding: 6, borderRadius: 6, background: `${tone}12`, color: tone }}><Calendar size={14} /></div>
+                          <span style={{ fontSize: 11, fontWeight: 700, color: C.t3, textTransform: "uppercase", letterSpacing: ".08em" }}>Source</span>
+                        </div>
+                        <p style={{ fontSize: 14, color: C.t1, fontWeight: 600, margin: 0 }}>{appointment.source}</p>
+                      </div>
+                    </div>
 
-                {Array.isArray(meeting.participants) && meeting.participants.length > 0 && (
-                  <div>
-                    <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
-                      <div style={{ padding: 6, borderRadius: 6, background: `${tone}12`, color: tone }}><Users size={14} /></div>
-                      <span style={{ fontSize: 11, fontWeight: 700, color: C.t3, textTransform: "uppercase", letterSpacing: ".08em" }}>Participants</span>
+                    {Array.isArray(appointment.participants) && appointment.participants.length > 0 && (
+                      <div>
+                        <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
+                          <div style={{ padding: 6, borderRadius: 6, background: `${tone}12`, color: tone }}><Users size={14} /></div>
+                          <span style={{ fontSize: 11, fontWeight: 700, color: C.t3, textTransform: "uppercase", letterSpacing: ".08em" }}>Participants</span>
+                        </div>
+                        <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+                          {appointment.participants.map((p) => (
+                            <span key={p} style={{ fontSize: 12, padding: "6px 14px", borderRadius: 99, background: `${tone}10`, color: tone, border: `1px solid ${tone}25`, fontWeight: 500 }}>{p}</span>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    <div>
+                      <p style={{ fontSize: 11, fontWeight: 700, color: C.t3, textTransform: "uppercase", letterSpacing: ".08em", marginBottom: 12 }}>Description</p>
+                      <p style={{ color: C.t2, lineHeight: 1.75, fontSize: 14, margin: 0, wordBreak: "break-word", whiteSpace: "pre-wrap" }}>
+                        {appointment.details || "No description available."}
+                      </p>
                     </div>
-                    <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
-                      {meeting.participants.map((p) => (
-                        <span key={p} style={{ fontSize: 12, padding: "6px 14px", borderRadius: 99, background: `${tone}10`, color: tone, border: `1px solid ${tone}25`, fontWeight: 500 }}>{p}</span>
-                      ))}
-                    </div>
-                  </div>
+                  </>
                 )}
-
-                <div>
-                  <p style={{ fontSize: 11, fontWeight: 700, color: C.t3, textTransform: "uppercase", letterSpacing: ".08em", marginBottom: 12 }}>Description</p>
-                  <p style={{ color: C.t2, lineHeight: 1.75, fontSize: 14, margin: 0, wordBreak: "break-word", whiteSpace: "pre-wrap" }}>
-                    {meeting.details || "No description available."}
-                  </p>
-                </div>
               </div>
             )}
 
             {/* Photos — hideTabBar=true kyunki upar tab bar already hai */}
             {activeTab === "photos" && (
-              <FilesSection item={meeting} C={C} tone={tone} defaultTab="photos" hideTabBar={true} />
+              <FilesSection item={appointment} C={C} tone={tone} defaultTab="photos" hideTabBar={true} />
             )}
 
             {/* Videos */}
             {activeTab === "videos" && (
-              <FilesSection item={meeting} C={C} tone={tone} defaultTab="videos" hideTabBar={true} />
+              <FilesSection item={appointment} C={C} tone={tone} defaultTab="videos" hideTabBar={true} />
             )}
 
             {/* Documents */}
             {activeTab === "documents" && (
-              <FilesSection item={meeting} C={C} tone={tone} defaultTab="documents" hideTabBar={true} />
+              <FilesSection item={appointment} C={C} tone={tone} defaultTab="documents" hideTabBar={true} />
             )}
           </div>
         </div>
@@ -2455,33 +2515,62 @@ export default function MinisterCalendar() {
   const [cursorDate, setCursorDate] = useState(startOfDay(new Date()));
 
   // Modal state
-  const [selectedDate, setSelectedDate] = useState(null);   // controls DayMeetingsDrawer
-  const [selectedMeeting, setSelectedMeeting] = useState(null); // controls MeetingDetailModal
+  const [selectedDate, setSelectedDate] = useState(null);   // controls DayAppointmentsDrawer
+  const [selectedAppointment, setSelectedAppointment] = useState(null); // controls AppointmentDetailModal
 
   useEffect(() => {
     let mounted = true;
 
     async function loadCalendar() {
       try {
-        const endpoint = session?.role === "admin" ? "/admin/calendar" : "/minister/calendar";
-        const { data } = await apiClient.get(endpoint);
-        const mapped = (data.events || []).map((event) => ({
+        const [calendarRes, grievanceRes] = await Promise.allSettled([
+          apiClient.get("/minister/calendar"),
+          apiClient.get("/minister/scheduled-grievances"),
+        ]);
+
+        const calendarData = calendarRes.status === "fulfilled" ? calendarRes.value.data : { events: [] };
+        const grievanceData = grievanceRes.status === "fulfilled" ? grievanceRes.value.data : { grievances: [] };
+
+        const mappedEvents = (calendarData.events || []).map((event) => ({
           id: event.id,
-          sourceId: event.meeting_id || event.id,
-          title: event.meeting_status === "cancelled" ? `${event.title} (Cancelled)` : event.title,
+          sourceId: event.appointment_id || event.id,
+          title: event.appointment_status === "cancelled" ? `${event.title} (Cancelled)` : event.title,
           details: event.comments || "",
           startsAt: event.starts_at,
           endsAt: event.ends_at,
           location: event.location,
-          source: event.meeting_id ? (event.is_vip ? "Minister Priority" : "Minister Calendar") : "DEO Event",
+          source: event.appointment_id ? (event.is_vip ? "Minister Priority" : "Minister Calendar") : "DEO Event",
           participants: event.participants || [],
-          kind: event.meeting_id ? "meeting" : "event",
+          kind: event.appointment_id ? "appointment" : "event",
           isVip: Boolean(event.is_vip),
-          meetingStatus: event.meeting_status || "",
+          appointmentStatus: event.appointment_status || "",
           whoToMeet: event.who_to_meet || "",
         }));
+
+        const mappedGrievances = (grievanceData.grievances || [])
+          .filter((g) => g.callScheduledAt)
+          .map((g) => {
+            const startAt = g.callScheduledAt;
+            const endAt = new Date(new Date(startAt).getTime() + 30 * 60 * 1000).toISOString();
+            return {
+              id: g.id,
+              sourceId: g.grievanceId || g.id,
+              calendarKind: "grievanceCall",
+              title: g.title || g.subject || "Scheduled Grievance Call",
+              details: g.details || g.description || "Grievance follow-up call",
+              startsAt: startAt,
+              endsAt: endAt,
+              location: g.citizenName || "Citizen call",
+              source: "Grievance Workflow",
+              kind: "grievance",
+              isVip: false,
+              grievanceStatus: g.status,
+              department: g.department || "",
+            };
+          });
+
         if (mounted) {
-          setItems(mapped);
+          setItems([...mappedEvents, ...mappedGrievances]);
           setError("");
         }
       } catch (loadError) {
@@ -2551,7 +2640,7 @@ export default function MinisterCalendar() {
     return grid;
   }, [cursorDate]);
 
-  const meetingsForDate = useMemo(() => {
+  const appointmentsForDate = useMemo(() => {
     if (!selectedDate) return [];
     return items
       .filter((item) => isSameDay(item.startsAt, selectedDate))
@@ -2563,7 +2652,7 @@ export default function MinisterCalendar() {
     [filteredItems]
   );
 
-  const nextTwoMeetings = useMemo(() => {
+  const nextTwoAppointments = useMemo(() => {
     const now = new Date();
     return items
       .filter((item) => new Date(item.startsAt) >= now)
@@ -2594,25 +2683,25 @@ export default function MinisterCalendar() {
 
   function handleDateSelect(day) {
     setSelectedDate(day);
-    setSelectedMeeting(null);
+    setSelectedAppointment(null);
   }
 
-  function handleEventPillClick(day, meeting) {
+  function handleEventPillClick(day, appointment) {
     setSelectedDate(day);
-    setSelectedMeeting(meeting);
+    setSelectedAppointment(appointment);
   }
 
-  function handleSelectMeeting(meeting) {
-    setSelectedMeeting(meeting);
+  function handleSelectAppointment(appointment) {
+    setSelectedAppointment(appointment);
   }
 
-  function handleCloseMeetingDetail() {
-    setSelectedMeeting(null);
+  function handleCloseAppointmentDetail() {
+    setSelectedAppointment(null);
   }
 
   function handleCloseDayDrawer() {
     setSelectedDate(null);
-    setSelectedMeeting(null);
+    setSelectedAppointment(null);
   }
 
   // Calculate dynamic height based on the exact number of weeks needed (monthGrid.length / 7)
@@ -2641,11 +2730,11 @@ export default function MinisterCalendar() {
                 transition: "width 0.35s cubic-bezier(0.4, 0, 0.2, 1)",
               }}
             >
-              <DayMeetingsPanel
+              <DayAppointmentsPanel
                 date={selectedDate}
-                items={meetingsForDate}
+                items={appointmentsForDate}
                 onClose={handleCloseDayDrawer}
-                onSelectMeeting={handleSelectMeeting}
+                onSelectAppointment={handleSelectAppointment}
                 isVisible={selectedDate !== null}
               />
             </div>
@@ -2833,25 +2922,24 @@ export default function MinisterCalendar() {
                           >
                             {day.getDate()}
                           </div>
-                          {eventsForDay.length > 0 && (
-                            <div
-                              style={{
-                                fontSize: 10,
-                                fontWeight: 600,
-                                color: C.purple,
-                                background: `${C.purple}12`,
-                                border: `1px solid ${C.purple}30`,
-                                borderRadius: 6,
-                                padding: "3px 6px",
-                                textAlign: "center",
-                                whiteSpace: "nowrap",
-                                overflow: "hidden",
-                                textOverflow: "ellipsis",
-                              }}
-                            >
-                              {eventsForDay.length} {eventsForDay.length === 1 ? "meeting" : "meetings"}
-                            </div>
-                          )}
+                          {eventsForDay.length > 0 && (() => {
+                            const appts = eventsForDay.filter((i) => i.calendarKind !== "grievanceCall");
+                            const grieves = eventsForDay.filter((i) => i.calendarKind === "grievanceCall");
+                            return (
+                              <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
+                                {appts.length > 0 && (
+                                  <div style={{ fontSize: 10, fontWeight: 600, color: C.purple, background: `${C.purple}12`, border: `1px solid ${C.purple}30`, borderRadius: 6, padding: "3px 6px", textAlign: "center", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                                    {appts.length} appt{appts.length !== 1 ? "s" : ""}
+                                  </div>
+                                )}
+                                {grieves.length > 0 && (
+                                  <div style={{ fontSize: 10, fontWeight: 600, color: C.mint, background: `${C.mint}12`, border: `1px solid ${C.mint}30`, borderRadius: 6, padding: "3px 6px", textAlign: "center", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                                    {grieves.length} grievance{grieves.length !== 1 ? "s" : ""}
+                                  </div>
+                                )}
+                              </div>
+                            );
+                          })()}
                         </div>
                       );
                     })}
@@ -2914,22 +3002,24 @@ export default function MinisterCalendar() {
                           </div>
                         </div>
                         <div style={{ display: "grid", gap: 6 }}>
-                          {eventsForDay.length > 0 ? (
-                            <div
-                              style={{
-                                fontSize: 12,
-                                fontWeight: 600,
-                                color: C.purple,
-                                background: `${C.purple}12`,
-                                border: `1px solid ${C.purple}30`,
-                                borderRadius: 8,
-                                padding: "6px 10px",
-                                textAlign: "center",
-                              }}
-                            >
-                              {daySummary}
-                            </div>
-                          ) : (
+                          {eventsForDay.length > 0 ? (() => {
+                            const appts = eventsForDay.filter((i) => i.calendarKind !== "grievanceCall");
+                            const grieves = eventsForDay.filter((i) => i.calendarKind === "grievanceCall");
+                            return (
+                              <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                                {appts.length > 0 && (
+                                  <div style={{ fontSize: 11, fontWeight: 600, color: C.purple, background: `${C.purple}12`, border: `1px solid ${C.purple}30`, borderRadius: 8, padding: "5px 8px", textAlign: "center" }}>
+                                    {appts.length} appt{appts.length !== 1 ? "s" : ""}
+                                  </div>
+                                )}
+                                {grieves.length > 0 && (
+                                  <div style={{ fontSize: 11, fontWeight: 600, color: C.mint, background: `${C.mint}12`, border: `1px solid ${C.mint}30`, borderRadius: 8, padding: "5px 8px", textAlign: "center" }}>
+                                    {grieves.length} grievance{grieves.length !== 1 ? "s" : ""}
+                                  </div>
+                                )}
+                              </div>
+                            );
+                          })() : (
                             <div style={{ fontSize: 11, color: C.t3 }}>No events</div>
                           )}
                         </div>
@@ -2944,7 +3034,8 @@ export default function MinisterCalendar() {
                 <div style={{ display: "grid", gap: 10 }}>
                   {dayItems.length ? (
                     dayItems.map((item) => {
-                      const tone = item.isVip ? C.warn : C.purple;
+                      const tone = getItemTone(item, C);
+                      const isGrievance = item.calendarKind === "grievanceCall";
                       return (
                         <button
                           key={item.id}
@@ -2977,11 +3068,11 @@ export default function MinisterCalendar() {
                                 {formatTime(item.startsAt)} – {formatTime(item.endsAt)} · {formatDuration(item)}
                               </div>
                               <div style={{ fontSize: 12, color: C.t3 }}>
-                                {item.location || "Location pending"}
+                                {isGrievance ? item.location || "Citizen call" : item.location || "Location pending"}
                               </div>
                             </div>
                             <WorkspaceBadge color={tone}>
-                              {getItemKind(item) === "event" ? "Event" : item.isVip ? "VIP" : "Standard"}
+                              {isGrievance ? "Grievance" : getItemKind(item) === "event" ? "Event" : item.isVip ? "VIP" : "Standard"}
                             </WorkspaceBadge>
                           </div>
                         </button>
@@ -2997,10 +3088,10 @@ export default function MinisterCalendar() {
              
             </WorkspaceCard>
 
-            {/* Right Panel: Upcoming Meetings */}
+            {/* Right Panel: Upcoming Appointments */}
             <div style={{ width: 300, flexShrink: 0, display: "flex", flexDirection: "column" }}>
               
-              {/* Upcoming Meetings */}
+              {/* Upcoming Appointments */}
               <WorkspaceCard style={{ padding: 24, marginBottom: 0, flex: 1, display: "flex", flexDirection: "column", overflow: "hidden" }}>
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
                   <div>
@@ -3012,17 +3103,17 @@ export default function MinisterCalendar() {
                   </div>
                 </div>
 
-                {nextTwoMeetings.length === 0 ? (
-                  <div style={{ fontSize: 13, color: C.t3 }}>No upcoming meetings or events scheduled.</div>
+                {nextTwoAppointments.length === 0 ? (
+                  <div style={{ fontSize: 13, color: C.t3 }}>No upcoming appointments or events scheduled.</div>
                 ) : (
                   <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-                    {nextTwoMeetings.map((item) => {
-                      const tone = item.isVip ? C.warn : C.purple;
+                    {nextTwoAppointments.map((item) => {
+                      const tone = getItemTone(item, C);
                       return (
                         <button
                           key={item.id}
                           type="button"
-                          onClick={() => { setSelectedDate(startOfDay(new Date(item.startsAt))); setSelectedMeeting(item); }}
+                          onClick={() => { setSelectedDate(startOfDay(new Date(item.startsAt))); setSelectedAppointment(item); }}
                           style={{
                             display: "flex",
                             alignItems: "stretch",
@@ -3071,11 +3162,11 @@ export default function MinisterCalendar() {
         </div>
       )}
 
-      {/* Meeting detail modal — opens on top when a meeting is selected */}
-      {selectedMeeting && (
-        <MeetingDetailModal
-          meeting={selectedMeeting}
-          onClose={handleCloseMeetingDetail}
+      {/* Appointment detail modal — opens on top when a appointment is selected */}
+      {selectedAppointment && (
+        <AppointmentDetailModal
+          appointment={selectedAppointment}
+          onClose={handleCloseAppointmentDetail}
         />
       )}
     </WorkspacePage>

@@ -1,9 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
-import {
-  ChevronRight,
-  FileDown,
-} from "lucide-react";
+import { ChevronRight } from "lucide-react";
+import { useTranslation } from "react-i18next";
 import { apiClient } from "../../../shared/api/client.js";
 import { openDownloadUrl } from "../../../shared/api/downloads.js";
 import { useAuth } from "../../../shared/auth/AuthContext.jsx";
@@ -38,14 +36,16 @@ function cleanTimelineNote(note) {
   return String(note).replace(/Sent to DEO\s+[a-f0-9-]+\s+for verification/i, "Sent to DEO for verification");
 }
 
+const MONTH_NAMES = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+
 function formatCitizenDate(value) {
   if (!value) return "";
   const parsed = new Date(value);
   if (Number.isNaN(parsed.getTime())) return "";
   const day = String(parsed.getDate()).padStart(2, "0");
-  const month = String(parsed.getMonth() + 1).padStart(2, "0");
+  const mon = MONTH_NAMES[parsed.getMonth()];
   const year = String(parsed.getFullYear()).slice(-2);
-  return `${day}/${month}/${year}`;
+  return `${day} ${mon},${year}`;
 }
 
 function formatCitizenDateTime(value) {
@@ -61,12 +61,13 @@ function valueTone(status, C) {
   const s = String(status || "").toLowerCase().replace(/[_\s-]/g, "");
   if (/^(verified|resolved|completed|scheduled|active|accepted|approved)$/.test(s)) return C.mint;
   if (/^(rejected|cancelled|notverified|locked|failed)$/.test(s)) return C.danger;
-  if (/^(pending|submitted|inreview|assigned|verificationpending|deptcontactidentified|callscheduled|followup|escalatedtomeeting|escalated)$/.test(s)) return C.warn;
+  if (/^(pending|submitted|inreview|assigned|verificationpending|deptcontactidentified|callscheduled|followup)$/.test(s)) return C.warn;
   return C.purple;
 }
 
 function DetailBlock({ label, value, multiline = false, compact = false, valueColor }) {
   const { C } = usePortalTheme();
+  const { t } = useTranslation();
   return (
     <div
       style={{
@@ -95,7 +96,7 @@ function DetailBlock({ label, value, multiline = false, compact = false, valueCo
           wordBreak: "break-word",
         }}
       >
-        {value || <span style={{ color: C.t3, fontStyle: "italic" }}>Not provided</span>}
+        {value || <span style={{ color: C.t3, fontStyle: "italic" }}>{t("citizen.appointmentDetail.notProvided")}</span>}
       </div>
     </div>
   );
@@ -108,38 +109,37 @@ function getAttachedFiles(item) {
   return item?.document ? [item.document] : [];
 }
 
-export default function MeetingDetail() {
+export default function AppointmentDetail() {
   const { C } = usePortalTheme();
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const { id } = useParams();
   const { state } = useLocation();
   const { session } = useAuth();
   const { eventVersion } = useNotifications();
-  const [meeting, setMeeting] = useState(state?.meetingData || null);
+  const [appointment, setAppointment] = useState(state?.appointmentData || null);
   const [history, setHistory] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [isBackHovered, setIsBackHovered] = useState(false);
-  const [passLoading, setPassLoading] = useState(false);
-  const [passError, setPassError] = useState("");
   const informationCardRef = useRef(null);
   const [timelineCardHeight, setTimelineCardHeight] = useState(null);
   const [isDesktopLayout, setIsDesktopLayout] = useState(false);
   useEffect(() => {
     let mounted = true;
 
-    async function loadMeeting() {
+    async function loadAppointment() {
       try {
         setLoading(true);
         setError("");
-        const { data } = await apiClient.get(`/meetings/my/${id}`);
+        const { data } = await apiClient.get(`/appointments/my/${id}`);
         if (mounted) {
-          setMeeting(data.meeting || null);
+          setAppointment(data.appointment || null);
           setHistory(data.history || []);
         }
       } catch (loadError) {
         if (mounted) {
-          setError(loadError?.response?.data?.error || "Unable to load meeting details");
+          setError(loadError?.response?.data?.error || t("citizen.appointmentDetail.unableToLoad"));
         }
       } finally {
         if (mounted) {
@@ -149,7 +149,7 @@ export default function MeetingDetail() {
     }
 
     if (session?.role && id) {
-      loadMeeting();
+      loadAppointment();
     }
 
     return () => {
@@ -187,12 +187,12 @@ export default function MeetingDetail() {
     observer.observe(cardElement);
 
     return () => observer.disconnect();
-  }, [isDesktopLayout, meeting, history]);
+  }, [isDesktopLayout, appointment, history]);
 
   if (loading) {
     return (
       <WorkspacePage width={1320}>
-        <WorkspaceEmptyState title="Loading meeting..." />
+        <WorkspaceEmptyState title={t("citizen.appointmentDetail.loading")} />
       </WorkspacePage>
     );
   }
@@ -209,58 +209,39 @@ export default function MeetingDetail() {
     return (
       <div className="portal-citizen-page" style={{ minHeight: "100%", padding: "16px 20px 12px" }}>
         <div style={{ width: "100%", maxWidth: 1320, margin: "0 auto" }}>
-          <WorkspaceEmptyState title="Loading meeting details..." />
+          <WorkspaceEmptyState title={t("citizen.appointmentDetail.loadingDetails")} />
         </div>
       </div>
     );
   }
 
-  if (error || !meeting) {
+  if (error || !appointment) {
     return (
       <div className="portal-citizen-page" style={{ minHeight: "100%", padding: "16px 20px 12px" }}>
         <div style={{ width: "100%", maxWidth: 1320, margin: "0 auto" }}>
           <WorkspaceCard style={{ textAlign: "center" }}>
-            <p style={{ color: C.t2, fontWeight: 600, marginBottom: 16 }}>{error || "Meeting not found"}</p>
+            <p style={{ color: C.t2, fontWeight: 600, marginBottom: 16 }}>{error || t("citizen.appointmentDetail.notFound")}</p>
           </WorkspaceCard>
         </div>
       </div>
     );
   }
 
-  const preferredTimeLabel = meeting.preferred_time
-    ? formatCitizenDateTime(meeting.preferred_time)
+  const preferredTimeLabel = appointment.preferred_time
+    ? formatCitizenDateTime(appointment.preferred_time)
     : null;
-  const createdAtLabel = meeting.createdAt || meeting.created_at
-    ? formatCitizenDate(meeting.createdAt || meeting.created_at)
+  const createdAtLabel = appointment.createdAt || appointment.created_at
+    ? formatCitizenDate(appointment.createdAt || appointment.created_at)
     : "Not provided";
-  const scheduledTimeLabel = meeting.scheduled_at
-    ? formatCitizenDateTime(meeting.scheduled_at)
-    : "Pending";
-  const attachedFiles = getAttachedFiles(meeting);
+  const scheduledTimeLabel = appointment.scheduled_at
+    ? formatCitizenDateTime(appointment.scheduled_at)
+    : t("citizen.appointmentDetail.pending");
+  const attachedFiles = getAttachedFiles(appointment);
   const hasUploadedDocument = attachedFiles.length > 0;
-  const statusLabel = formatStatus(meeting.status);
-  const locationLabel = meeting.scheduled_location || "Pending";
-  const scheduledTone = valueTone(meeting.scheduled_at ? "scheduled" : "pending", C);
-  const locationTone = valueTone(meeting.scheduled_location ? "scheduled" : "pending", C);
-  const isScheduled = meeting.status === "scheduled" || meeting.status === "rescheduled";
-
-  async function handleDownloadPass() {
-    setPassLoading(true);
-    setPassError("");
-    try {
-      const { data } = await apiClient.get(`/meetings/my/${id}/pass`);
-      if (data?.downloadUrl) {
-        openDownloadUrl(data.downloadUrl);
-      }
-    } catch (err) {
-      setPassError(
-        err?.response?.data?.error ||
-        "Appointment pass is not available yet. Please try again after the meeting is confirmed."
-      );
-    } finally {
-      setPassLoading(false);
-    }
-  }
+  const statusLabel = formatStatus(appointment.status);
+  const locationLabel = appointment.scheduled_location || t("citizen.appointmentDetail.pending");
+  const scheduledTone = valueTone(appointment.scheduled_at ? "scheduled" : "pending", C);
+  const locationTone = valueTone(appointment.scheduled_location ? "scheduled" : "pending", C);
 
   return (
     <div
@@ -301,51 +282,19 @@ export default function MeetingDetail() {
                 }}
               >
                 <ChevronRight size={16} className="rotate-180" />
-                Back
+                {t("common.back")}
               </button>
             </div>
-            <h2 style={{ fontSize: 20, fontWeight: 600, color: C.t1, margin: 0, textAlign: "center" }}>MEETING DETAILS</h2>
-            <div style={{ justifySelf: "end", display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 4 }}>
-              {isScheduled && (
-                <button
-                  type="button"
-                  onClick={handleDownloadPass}
-                  disabled={passLoading}
-                  style={{
-                    display: "inline-flex",
-                    alignItems: "center",
-                    gap: 6,
-                    border: "1px solid #f9a825",
-                    background: passLoading ? "#f9a82520" : "#f9a82514",
-                    color: "#f9a825",
-                    fontSize: 13,
-                    fontWeight: 600,
-                    padding: "8px 12px",
-                    borderRadius: 10,
-                    cursor: passLoading ? "not-allowed" : "pointer",
-                    whiteSpace: "nowrap",
-                    opacity: passLoading ? 0.7 : 1,
-                    transition: "background 0.15s",
-                  }}
-                >
-                  <FileDown size={15} />
-                  {passLoading ? "Preparing..." : "Download Pass"}
-                </button>
-              )}
-              {passError && (
-                <span style={{ fontSize: 11, color: C.danger, maxWidth: 200, textAlign: "right" }}>
-                  {passError}
-                </span>
-              )}
-            </div>
+            <h2 style={{ fontSize: 20, fontWeight: 600, color: C.t1, margin: 0, textAlign: "center" }}>{t("citizen.appointmentDetail.appointmentDetailsTitle")}</h2>
+            <div />
           </div>
 
           <div className="grid lg:grid-cols-[7fr_3fr] gap-6" style={{ flex: 1, minHeight: 0, alignItems: "start" }}>
             <div ref={informationCardRef} style={{ minHeight: 0 }}>
               <WorkspaceCard style={{ marginBottom: 0 }}>
                 <div className="grid md:grid-cols-3 gap-4">
-                  <DetailBlock label="Meeting ID" value={meeting.requestId || meeting.id} compact />
-                  <DetailBlock label="Created At" value={createdAtLabel} compact />
+                  <DetailBlock label={t("citizen.appointmentDetail.appointmentId")} value={appointment.requestId || appointment.id} compact />
+                  <DetailBlock label={t("citizen.appointmentDetail.createdAt")} value={createdAtLabel} compact />
                   <div style={{ padding: "0 0 14px" }}>
                     <div
                       style={{
@@ -357,23 +306,23 @@ export default function MeetingDetail() {
                       }}
                       className="portal-citizen-label"
                     >
-                      Status
+                      {t("common.status")}
                     </div>
-                    <WorkspaceBadge status={meeting.status}>{statusLabel}</WorkspaceBadge>
+                    <WorkspaceBadge status={appointment.status}>{statusLabel}</WorkspaceBadge>
                   </div>
                 </div>
 
                 <div style={{ marginTop: 16 }}>
                   <DetailBlock
-                    label="Meeting Title"
-                    value={meeting.title || meeting.primaryTitle}
+                    label={t("citizen.appointmentDetail.appointmentTitle")}
+                    value={appointment.title || appointment.primaryTitle}
                     multiline
                     compact
                   />
                 </div>
 
                 <div className="grid md:grid-cols-3 gap-4" style={{ marginTop: 16 }}>
-                  <DetailBlock label="Preferred Date/Time" value={preferredTimeLabel} compact />
+                  <DetailBlock label={t("citizen.appointmentDetail.preferredDateTime")} value={preferredTimeLabel} compact />
                   <div style={{ padding: "0 0 14px" }}>
                     <div
                       style={{
@@ -387,7 +336,7 @@ export default function MeetingDetail() {
                         letterSpacing: ".08em",
                       }}
                     >
-                      Scheduled Time
+                      {t("citizen.appointmentDetail.scheduledTime")}
                     </div>
                     <span style={{
                       display: "inline-flex",
@@ -416,7 +365,7 @@ export default function MeetingDetail() {
                       }}
                       className="portal-citizen-label"
                     >
-                      Location
+                      {t("citizen.appointmentDetail.location")}
                     </div>
                     <span style={{
                       display: "inline-flex",
@@ -438,8 +387,8 @@ export default function MeetingDetail() {
 
                 <div style={{ marginTop: 16 }}>
                   <DetailBlock
-                    label="Meeting Description"
-                    value={meeting.purpose}
+                    label={t("citizen.appointmentDetail.appointmentDescription")}
+                    value={appointment.purpose}
                     multiline
                     compact
                   />
@@ -458,7 +407,7 @@ export default function MeetingDetail() {
                       }}
                       className="portal-citizen-label"
                     >
-                    Documents
+                    {t("citizen.appointmentDetail.documents")}
                   </div>
                   <div
                     style={{
@@ -477,21 +426,21 @@ export default function MeetingDetail() {
                           >
                             <div>
                               <div className="portal-citizen-value" style={{ color: C.t1, fontWeight: 600 }}>{file.name}</div>
-                              <div className="portal-citizen-caption" style={{ marginTop: 4, color: C.t3 }}>{file.mimeType || "Document"}</div>
+                              <div className="portal-citizen-caption" style={{ marginTop: 4, color: C.t3 }}>{file.mimeType || t("citizen.appointmentDetail.document")}</div>
                             </div>
                             <WorkspaceButton
                               type="button"
                               variant="outline"
                               onClick={() => openDownloadUrl(file.downloadUrl)}
                             >
-                              Download
+                              {t("common.download")}
                             </WorkspaceButton>
                           </div>
                         ))}
                       </div>
                     ) : (
                       <div className="portal-citizen-value" style={{ color: C.t1, fontWeight: 500 }}>
-                        No documents uploaded
+                        {t("citizen.appointmentDetail.noDocuments")}
                       </div>
                     )}
                   </div>
@@ -523,12 +472,12 @@ export default function MeetingDetail() {
                     flexShrink: 0,
                   }}
                 >
-                  Timeline
+                  {t("citizen.appointmentDetail.timeline")}
                 </div>
 
                 <div style={{ flex: 1, minHeight: 0, paddingRight: 0, overflowY: isDesktopLayout && timelineCardHeight ? "auto" : "visible" }}>
                   {history.length === 0 ? (
-                    <p className="portal-citizen-caption" style={{ color: C.t3 }}>No timeline entries yet.</p>
+                    <p className="portal-citizen-caption" style={{ color: C.t3 }}>{t("citizen.appointmentDetail.noTimeline")}</p>
                   ) : (
                     <div className="space-y-4">
                       {history.map((entry, index) => (

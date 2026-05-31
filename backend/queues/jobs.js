@@ -220,7 +220,7 @@ function validateSendEmailBatchPayload(data) {
  * Examples:
  *   buildJobId('notif-email', notificationId) → 'notif-email|123'
  *   buildJobId('notif-sms', notificationId) → 'notif-sms|123'
- *   buildJobId('pool-email', eventType, entityId) → 'pool-email|meeting.submitted|abc-123'
+ *   buildJobId('pool-email', eventType, entityId) → 'pool-email|appointment.submitted|abc-123'
  *   buildJobId('otp-email', userId, purpose, windowSlot) → 'otp-email|u1|registration_verification|329847'
  *
  * @param {string} type - Job type identifier

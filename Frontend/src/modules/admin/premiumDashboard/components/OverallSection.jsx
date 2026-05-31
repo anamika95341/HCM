@@ -1,4 +1,5 @@
 import { useMemo } from "react";
+import { useTranslation } from "react-i18next";
 import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, CartesianGrid, Legend } from "recharts";
 import { CardHeader, COLORS, StoryTooltip } from "./SharedUI.jsx";
 
@@ -10,11 +11,12 @@ const INDIAN_STATES = [
   "Uttar Pradesh", "Uttarakhand", "West Bengal"
 ];
 
-export default function OverallSection({ meetings = [], complaints = [], loading }) {
-  const meetingData = useMemo(() => {
+export default function OverallSection({ appointments = [], grievances = [], loading, showGrievances = true }) {
+  const { t } = useTranslation();
+  const appointmentData = useMemo(() => {
     const map = {};
     INDIAN_STATES.forEach(st => map[st] = { state: st, total: 0, completed: 0 });
-    meetings.forEach(m => {
+    appointments.forEach(m => {
       const st = m.citizenSnapshot?.state;
       if (st && map[st]) {
         map[st].total++;
@@ -22,12 +24,12 @@ export default function OverallSection({ meetings = [], complaints = [], loading
       }
     });
     return INDIAN_STATES.map(st => map[st]);
-  }, [meetings]);
+  }, [appointments]);
 
-  const complaintData = useMemo(() => {
+  const grievanceData = useMemo(() => {
     const map = {};
     INDIAN_STATES.forEach(st => map[st] = { state: st, total: 0, resolved: 0 });
-    complaints.forEach(c => {
+    grievances.forEach(c => {
       const st = c.citizenSnapshot?.state;
       if (st && map[st]) {
         map[st].total++;
@@ -35,12 +37,12 @@ export default function OverallSection({ meetings = [], complaints = [], loading
       }
     });
     return INDIAN_STATES.map(st => map[st]);
-  }, [complaints]);
+  }, [grievances]);
 
   return (
     <div className="db-grid-row db-col-1-1">
       <div className="db-card">
-        <CardHeader title="Meeting Requests by State" infoText="Total meeting requests vs. completed meetings across states." />
+        <CardHeader title={t("admin.dashboard.appointmentsByState")} infoText={t("admin.dashboard.appointmentsByStateInfo")} />
         {loading ? (
           <div style={{ height: 190, display: "flex", alignItems: "center", justifyContent: "center" }}>
             <span style={{ fontSize: "0.8rem", color: "var(--db-text-muted)" }}>Loading…</span>
@@ -49,13 +51,13 @@ export default function OverallSection({ meetings = [], complaints = [], loading
           <div style={{ height: 240, overflowY: "auto", overflowX: "hidden", paddingRight: "0.5rem" }}>
             <div style={{ height: INDIAN_STATES.length * 45 + 40 }}>
               <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={meetingData} layout="vertical" barCategoryGap={16}>
+                <BarChart data={appointmentData} layout="vertical" barCategoryGap={16}>
                   <defs>
-                    <linearGradient id="overallMeetingTotalBar" x1="0" y1="0" x2="1" y2="0">
+                    <linearGradient id="overallAppointmentTotalBar" x1="0" y1="0" x2="1" y2="0">
                       <stop offset="0%" stopColor="var(--db-series-lavender-soft)" />
                       <stop offset="100%" stopColor="var(--db-series-lavender-deep)" />
                     </linearGradient>
-                    <linearGradient id="overallMeetingCompletedBar" x1="0" y1="0" x2="1" y2="0">
+                    <linearGradient id="overallAppointmentCompletedBar" x1="0" y1="0" x2="1" y2="0">
                       <stop offset="0%" stopColor="var(--db-series-teal-soft)" />
                       <stop offset="100%" stopColor="var(--db-series-teal-deep)" />
                     </linearGradient>
@@ -72,7 +74,7 @@ export default function OverallSection({ meetings = [], complaints = [], loading
                           const completed = payload.find(p => p.dataKey === "completed")?.value || 0;
                           return (
                             <>
-                              <strong>{label}</strong> generated <strong>{total}</strong> meeting requests, out of which <strong>{completed}</strong> were completed.
+                              <strong>{label}</strong> generated <strong>{total}</strong> appointment requests, out of which <strong>{completed}</strong> were completed.
                             </>
                           );
                         }}
@@ -80,8 +82,8 @@ export default function OverallSection({ meetings = [], complaints = [], loading
                     }
                   />
                   <Legend wrapperStyle={{ fontSize: "0.75rem", paddingTop: 10 }} />
-                  <Bar dataKey="total" name="Total Requests" fill="url(#overallMeetingTotalBar)" radius={[0, 4, 4, 0]} />
-                  <Bar dataKey="completed" name="Completed" fill="url(#overallMeetingCompletedBar)" radius={[0, 4, 4, 0]} />
+                  <Bar dataKey="total" name="Total Requests" fill="url(#overallAppointmentTotalBar)" radius={[0, 4, 4, 0]} />
+                  <Bar dataKey="completed" name="Completed" fill="url(#overallAppointmentCompletedBar)" radius={[0, 4, 4, 0]} />
                 </BarChart>
               </ResponsiveContainer>
             </div>
@@ -89,8 +91,8 @@ export default function OverallSection({ meetings = [], complaints = [], loading
         )}
       </div>
 
-      <div className="db-card">
-        <CardHeader title="Complaints by State" infoText="Total complaints submitted vs. resolved complaints across states." />
+      {showGrievances && <div className="db-card">
+        <CardHeader title={t("admin.dashboard.grievancesByState")} infoText={t("admin.dashboard.grievancesByStateInfo")} />
         {loading ? (
           <div style={{ height: 190, display: "flex", alignItems: "center", justifyContent: "center" }}>
             <span style={{ fontSize: "0.8rem", color: "var(--db-text-muted)" }}>Loading…</span>
@@ -99,13 +101,13 @@ export default function OverallSection({ meetings = [], complaints = [], loading
           <div style={{ height: 240, overflowY: "auto", overflowX: "hidden", paddingRight: "0.5rem" }}>
             <div style={{ height: INDIAN_STATES.length * 45 + 40 }}>
               <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={complaintData} layout="vertical" barCategoryGap={16}>
+                <BarChart data={grievanceData} layout="vertical" barCategoryGap={16}>
                   <defs>
-                    <linearGradient id="overallComplaintTotalBar" x1="0" y1="0" x2="1" y2="0">
+                    <linearGradient id="overallGrievanceTotalBar" x1="0" y1="0" x2="1" y2="0">
                       <stop offset="0%" stopColor="var(--db-series-indigo-soft)" />
                       <stop offset="100%" stopColor="var(--db-series-indigo-deep)" />
                     </linearGradient>
-                    <linearGradient id="overallComplaintResolvedBar" x1="0" y1="0" x2="1" y2="0">
+                    <linearGradient id="overallGrievanceResolvedBar" x1="0" y1="0" x2="1" y2="0">
                       <stop offset="0%" stopColor="var(--db-series-amber-soft)" />
                       <stop offset="100%" stopColor="var(--db-series-amber-deep)" />
                     </linearGradient>
@@ -122,7 +124,7 @@ export default function OverallSection({ meetings = [], complaints = [], loading
                           const resolved = payload.find(p => p.dataKey === "resolved")?.value || 0;
                           return (
                             <>
-                              <strong>{label}</strong> submitted <strong>{total}</strong> complaints, out of which <strong>{resolved}</strong> are resolved.
+                              <strong>{label}</strong> submitted <strong>{total}</strong> grievances, out of which <strong>{resolved}</strong> are resolved.
                             </>
                           );
                         }}
@@ -130,14 +132,14 @@ export default function OverallSection({ meetings = [], complaints = [], loading
                     }
                   />
                   <Legend wrapperStyle={{ fontSize: "0.75rem", paddingTop: 10 }} />
-                  <Bar dataKey="total" name="Total Complaints" fill="url(#overallComplaintTotalBar)" radius={[0, 4, 4, 0]} />
-                  <Bar dataKey="resolved" name="Resolved" fill="url(#overallComplaintResolvedBar)" radius={[0, 4, 4, 0]} />
+                  <Bar dataKey="total" name="Total Grievances" fill="url(#overallGrievanceTotalBar)" radius={[0, 4, 4, 0]} />
+                  <Bar dataKey="resolved" name="Resolved" fill="url(#overallGrievanceResolvedBar)" radius={[0, 4, 4, 0]} />
                 </BarChart>
               </ResponsiveContainer>
             </div>
           </div>
         )}
-      </div>
+      </div>}
     </div>
   );
 }

@@ -1,23 +1,23 @@
 const { z } = require('zod');
 
-const assignMeetingSchema = z.object({});
+const assignAppointmentSchema = z.object({});
 
 const assignVerificationSchema = z.object({
   deoId: z.string().uuid(),
 });
 
-const meetingRejectSchema = z.object({
+const appointmentRejectSchema = z.object({
   reason: z.string().min(5).max(2000),
 });
 
-const meetingVerificationSchema = z.object({
+const appointmentVerificationSchema = z.object({
   verified: z.boolean(),
   reason: z.string().min(5).max(2000),
   notes: z.string().max(2000).optional().or(z.literal('')),
 });
 
-const meetingScheduleSchema = z.object({
-  ministerId: z.string().uuid(),
+const appointmentScheduleSchema = z.object({
+  ministerId: z.string().uuid().optional().or(z.literal('')),
   startsAt: z.string().datetime(),
   endsAt: z.string().datetime(),
   location: z.string().min(3).max(500),
@@ -28,15 +28,20 @@ const meetingScheduleSchema = z.object({
   path: ['endsAt'],
 });
 
-const meetingActionNoteSchema = z.object({
+const appointmentActionNoteSchema = z.object({
   reason: z.string().min(3).max(2000),
 });
 
+const appointmentLogSchema = z.object({
+  notes: z.string().max(2000).optional().or(z.literal('')),
+});
+
 module.exports = {
-  assignMeetingSchema,
+  assignAppointmentSchema,
   assignVerificationSchema,
-  meetingRejectSchema,
-  meetingVerificationSchema,
-  meetingScheduleSchema,
-  meetingActionNoteSchema,
+  appointmentRejectSchema,
+  appointmentVerificationSchema,
+  appointmentScheduleSchema,
+  appointmentActionNoteSchema,
+  appointmentLogSchema,
 };

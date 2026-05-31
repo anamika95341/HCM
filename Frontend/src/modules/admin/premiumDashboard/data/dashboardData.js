@@ -1,14 +1,14 @@
 export const execSummary = {
   visitorsScheduledToday: 148,
   vipDelegationToday: 12,
-  pendingComplaints: 44,
+  pendingGrievances: 44,
   resolvedThisWeek: 67,
   avgTAT: 3.2,
   highPriorityCases: 8,
-  meetingsWithHCM: 5,
+  appointmentsWithHCM: 5,
 };
 
-export const meetingsData = {
+export const appointmentsData = {
   week: [
     { label: "Mon", conducted: 3, scheduled: 4, cancelled: 1 },
     { label: "Tue", conducted: 5, scheduled: 5, cancelled: 0 },
@@ -40,13 +40,13 @@ export const meetingsData = {
   ],
 };
 
-export const meetingStats = {
+export const appointmentStats = {
   week: { total: 21, completionRate: 84, upcoming: 3, cancelled: 3 },
   month: { total: 90, completionRate: 87, upcoming: 11, cancelled: 11 },
   year: { total: 1071, completionRate: 88, upcoming: 42, cancelled: 83 },
 };
 
-export const complaintsData = {
+export const grievancesData = {
   week: [
     { label: "Mon", received: 12, resolved: 8, pending: 4 },
     { label: "Tue", received: 15, resolved: 11, pending: 4 },
@@ -78,7 +78,7 @@ export const complaintsData = {
   ],
 };
 
-export const complaintStatusBuckets = {
+export const grievanceStatusBuckets = {
   week: [
     { name: "Resolved", value: 54 },
     { name: "Open", value: 15 },
@@ -102,7 +102,7 @@ export const complaintStatusBuckets = {
   ],
 };
 
-export const complaintsByCategory = [
+export const grievancesByCategory = [
   { category: "Public Grievance", count: 72, resolved: 54 },
   { category: "Infrastructure", count: 55, resolved: 38 },
   { category: "Heritage", count: 48, resolved: 32 },
@@ -167,12 +167,12 @@ export const escalationLadder = [
   { level: "Level 4 – Minister", count: 2 },
 ];
 
-export const topRecurringComplaints = [
-  { complaint: "Heritage site maintenance delay", count: 23, trend: "up" },
-  { complaint: "Event permit processing time", count: 19, trend: "down" },
-  { complaint: "Staff unresponsiveness", count: 17, trend: "up" },
-  { complaint: "Online portal errors", count: 15, trend: "down" },
-  { complaint: "Public gathering restrictions", count: 12, trend: "neutral" },
+export const topRecurringGrievances = [
+  { grievance: "Heritage site maintenance delay", count: 23, trend: "up" },
+  { grievance: "Event permit processing time", count: 19, trend: "down" },
+  { grievance: "Staff unresponsiveness", count: 17, trend: "up" },
+  { grievance: "Online portal errors", count: 15, trend: "down" },
+  { grievance: "Public gathering restrictions", count: 12, trend: "neutral" },
 ];
 
 export const visitorTrends = {

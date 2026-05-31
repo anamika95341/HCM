@@ -2,8 +2,8 @@ const crypto = require('crypto');
 const createHttpError = require('http-errors');
 const redis = require('../../config/redis');
 const filesRepository = require('./files.repository');
-const complaintsRepository = require('../complaints/complaints.repository');
-const meetingsRepository = require('../meetings/meetings.repository');
+const grievancesRepository = require('../grievances/grievances.repository');
+const appointmentsRepository = require('../appointments/appointments.repository');
 const storageService = require('../../services/storageService');
 const logger = require('../../utils/logger');
 const { writeAuditLog } = require('../../utils/audit');
@@ -22,16 +22,16 @@ const UPLOAD_INTENT_TTL_SECONDS = 900;
 const DUPLICATE_UPLOAD_TTL_SECONDS = 300;
 
 function getUploadAuditTarget({ actorId, contextType, contextId }) {
-  if (contextType === 'meeting' && contextId) {
+  if (contextType === 'appointment' && contextId) {
     return {
-      entityType: 'meeting',
+      entityType: 'appointment',
       entityId: contextId,
     };
   }
 
-  if (contextType === 'complaint' && contextId) {
+  if (contextType === 'grievance' && contextId) {
     return {
-      entityType: 'complaint',
+      entityType: 'grievance',
       entityId: contextId,
     };
   }
@@ -93,19 +93,19 @@ async function resolveSignedFileAccess(fileId, token) {
   return file;
 }
 
-async function assertLegacyFileViewerAccess(file, actorRole, actorId) {
+async function assertLegacyFileViewerAccess(file, actorRole, actorId, adminType = 'regular') {
   if (actorRole === 'citizen') {
-    if (file.entity_type === 'meeting_document') {
-      const meeting = await meetingsRepository.getCitizenMeetingById(file.entity_id, actorId);
-      if (!meeting) {
+    if (file.entity_type === 'appointment_document') {
+      const appointment = await appointmentsRepository.getCitizenAppointmentById(file.entity_id, actorId);
+      if (!appointment) {
         throw createHttpError(404, 'File not found');
       }
       return;
     }
 
-    if (file.entity_type === 'complaint_document') {
-      const complaint = await complaintsRepository.getCitizenComplaintById(file.entity_id, actorId);
-      if (!complaint) {
+    if (file.entity_type === 'grievance_document') {
+      const grievance = await grievancesRepository.getCitizenGrievanceById(file.entity_id, actorId);
+      if (!grievance) {
         throw createHttpError(404, 'File not found');
       }
       return;
@@ -115,27 +115,37 @@ async function assertLegacyFileViewerAccess(file, actorRole, actorId) {
   }
 
   if (actorRole === 'admin') {
-    if (file.entity_type === 'meeting_document' || file.entity_type === 'meeting_photo') {
-      const meeting = await meetingsRepository.getMeetingById(file.entity_id);
-      if (!meeting) {
+    if (file.entity_type === 'appointment_document' || file.entity_type === 'appointment_photo') {
+      const appointment = await appointmentsRepository.getAppointmentById(file.entity_id);
+      if (!appointment) {
         throw createHttpError(404, 'File not found');
       }
-      const canAccessMeeting = meeting.assignedAdminUserId === actorId
-        || (!meeting.assignedAdminUserId && meeting.status === 'pending');
-      if (!canAccessMeeting) {
+      const canAccessAppointment = appointment.assignedAdminUserId === actorId
+        || (!appointment.assignedAdminUserId && appointment.status === 'pending');
+      if (!canAccessAppointment) {
         throw createHttpError(404, 'File not found');
       }
       return;
     }
 
-    if (file.entity_type === 'complaint_document') {
-      const complaint = await complaintsRepository.getComplaintById(file.entity_id);
-      if (!complaint) {
+    if (file.entity_type === 'grievance_document') {
+      if (adminType !== 'chief_minister') {
         throw createHttpError(404, 'File not found');
       }
-      const canAccessComplaint = complaint.assignedAdminUserId === actorId
-        || (!complaint.assignedAdminUserId && complaint.status === 'submitted');
-      if (!canAccessComplaint) {
+      const grievance = await grievancesRepository.getGrievanceById(file.entity_id);
+      if (!grievance) {
+        throw createHttpError(404, 'File not found');
+      }
+      return;
+    }
+
+    // DEO letterhead: Chief Minister admin only.
+    if (file.entity_type === 'grievance_letterhead') {
+      if (adminType !== 'chief_minister') {
+        throw createHttpError(404, 'File not found');
+      }
+      const grievance = await grievancesRepository.getGrievanceById(file.entity_id);
+      if (!grievance) {
         throw createHttpError(404, 'File not found');
       }
       return;
@@ -145,11 +155,11 @@ async function assertLegacyFileViewerAccess(file, actorRole, actorId) {
   }
 
   if (actorRole === 'minister') {
-    if (file.entity_type !== 'meeting_document' && file.entity_type !== 'meeting_photo') {
+    if (file.entity_type !== 'appointment_document' && file.entity_type !== 'appointment_photo') {
       throw createHttpError(404, 'File not found');
     }
     const allowed = await canMinisterAccessFile({
-      context_type: 'meeting',
+      context_type: 'appointment',
       context_id: file.entity_id,
       visible_to_role: 'minister',
       uploader_role: 'deo',
@@ -233,29 +243,29 @@ async function assertContextAccess({ actorRole, actorId, contextType, contextId 
   }
 
   if (actorRole === 'citizen') {
-    if (!['meeting', 'complaint'].includes(contextType)) {
-      throw createHttpError(400, 'Citizens can only upload files in meeting, complaint, or general context');
+    if (!['appointment', 'grievance'].includes(contextType)) {
+      throw createHttpError(400, 'Citizens can only upload files in appointment, grievance, or general context');
     }
 
-    if (contextType === 'meeting') {
-      const meeting = await filesRepository.getCitizenMeetingById(contextId, actorId);
-      if (!meeting) {
-        throw createHttpError(403, 'You cannot upload files for this meeting');
+    if (contextType === 'appointment') {
+      const appointment = await filesRepository.getCitizenAppointmentById(contextId, actorId);
+      if (!appointment) {
+        throw createHttpError(403, 'You cannot upload files for this appointment');
       }
       return;
     }
 
-    const complaint = await filesRepository.getCitizenComplaintById(contextId, actorId);
-    if (!complaint) {
-      throw createHttpError(403, 'You cannot upload files for this complaint');
+    const grievance = await filesRepository.getCitizenGrievanceById(contextId, actorId);
+    if (!grievance) {
+      throw createHttpError(403, 'You cannot upload files for this grievance');
     }
     return;
   }
 
-  if (actorRole === 'deo' && contextType === 'meeting') {
-    const meeting = await filesRepository.getAssignedMeetingForDeo(contextId, actorId);
-    if (!meeting) {
-      throw createHttpError(403, 'You cannot upload files for this meeting');
+  if (actorRole === 'deo' && contextType === 'appointment') {
+    const appointment = await filesRepository.getAssignedAppointmentForDeo(contextId, actorId);
+    if (!appointment) {
+      throw createHttpError(403, 'You cannot upload files for this appointment');
     }
     return;
   }
@@ -271,6 +281,8 @@ async function assertContextAccess({ actorRole, actorId, contextType, contextId 
   throw createHttpError(400, 'Unsupported upload context');
 }
 
+const CITIZEN_MAX_FILES_PER_CONTEXT = 5;
+
 async function createUploadUrl({ actorRole, actorId, body, reqMeta, publicEndpoint }) {
   assertUploaderRole(actorRole);
   const fileCategory = validateUploadPolicy(actorRole, body.mimeType, body.size);
@@ -280,6 +292,17 @@ async function createUploadUrl({ actorRole, actorId, body, reqMeta, publicEndpoi
     contextType: body.contextType,
     contextId: body.contextId || null,
   });
+
+  if (actorRole === 'citizen' && body.contextId) {
+    const existing = await filesRepository.listFilesUploadedByActor('citizen', actorId, {
+      contextType: body.contextType,
+      contextId: body.contextId,
+    });
+    if (existing.length >= CITIZEN_MAX_FILES_PER_CONTEXT) {
+      throw createHttpError(400, `You can upload a maximum of ${CITIZEN_MAX_FILES_PER_CONTEXT} files`);
+    }
+  }
+
   await trackUploadAttempt(actorRole, actorId);
 
   const duplicateFingerprint = buildDuplicateFingerprint({
@@ -342,6 +365,11 @@ async function createUploadUrl({ actorRole, actorId, body, reqMeta, publicEndpoi
     key: s3Key,
     contentType: body.mimeType,
     publicEndpoint,
+    metadata: {
+      uploaderrole: actorRole,
+      uploaderid: actorId,
+      contexttype: body.contextType,
+    },
   });
 
   const auditTarget = getUploadAuditTarget({
@@ -471,8 +499,8 @@ async function confirmUpload({ actorRole, actorId, body, reqMeta }) {
 }
 
 async function canMinisterAccessFile(file, ministerId) {
-  if (file.context_type === 'meeting' && file.context_id) {
-    return filesRepository.hasMinisterMeetingAccess(file.context_id, ministerId);
+  if (file.context_type === 'appointment' && file.context_id) {
+    return filesRepository.hasMinisterAppointmentAccess(file.context_id, ministerId);
   }
   if (file.context_type === 'event' && file.context_id) {
     return filesRepository.hasMinisterEventAccess(file.context_id, ministerId);
@@ -480,35 +508,44 @@ async function canMinisterAccessFile(file, ministerId) {
   return true;
 }
 
-function isCitizenVisibleFile(file) {
-  return file.visible_to_role === 'admin' && file.uploader_role === 'citizen';
-}
-
-function isDeoVisibleCalendarFile(file) {
-  return file.visible_to_role === 'minister'
-    && file.uploader_role === 'deo'
-    && ['meeting', 'event'].includes(file.context_type);
-}
-
-async function assertFileViewerAccess(file, actorRole, actorId) {
+async function assertFileViewerAccess(file, actorRole, actorId, options = {}) {
   assertViewerRole(actorRole);
 
   if (actorRole === 'admin') {
-    if (isCitizenVisibleFile(file) || isDeoVisibleCalendarFile(file)) {
+    if (file.uploader_role !== 'citizen') {
+      throw createHttpError(404, 'File not found');
+    }
+    // Citizen appointment files: visible to all admins while pooled, then the assigned admin only.
+    if (file.context_type === 'appointment') {
+      const appointment = await appointmentsRepository.getAppointmentById(file.context_id);
+      if (!appointment) {
+        throw createHttpError(404, 'File not found');
+      }
+      const isPool = !appointment.assignedAdminUserId && appointment.status === 'pending';
+      const isAssigned = appointment.assignedAdminUserId === actorId;
+      if (!isPool && !isAssigned) {
+        throw createHttpError(404, 'File not found');
+      }
+      return;
+    }
+    // Citizen grievance files: Chief Minister admin only.
+    if (file.context_type === 'grievance') {
+      if (options.adminType !== 'chief_minister') {
+        throw createHttpError(404, 'File not found');
+      }
       return;
     }
     throw createHttpError(404, 'File not found');
   }
 
   if (actorRole === 'minister') {
-    if (isCitizenVisibleFile(file)) {
-      return;
-    }
-    if (!isDeoVisibleCalendarFile(file)) {
+    if (file.visible_to_role !== 'minister' || file.uploader_role !== 'deo') {
       throw createHttpError(404, 'File not found');
     }
     const allowed = await canMinisterAccessFile(file, actorId);
-    if (!allowed) throw createHttpError(404, 'File not found');
+    if (!allowed) {
+      throw createHttpError(404, 'File not found');
+    }
     return;
   }
 
@@ -539,18 +576,15 @@ function assertOwnedFileAccess(file, actorRole, actorId) {
   }
 }
 
-async function listFiles({ actorRole, actorId, query = {} }) {
+async function listFiles({ actorRole, actorId, adminType, query = {} }) {
   assertViewerRole(actorRole);
 
-  const visibleToRoles = actorRole === 'admin' || actorRole === 'minister'
-    ? ['admin', 'minister']
-    : [actorRole];
-  const files = await filesRepository.listFilesVisibleToRole(visibleToRoles, query);
+  const files = await filesRepository.listFilesVisibleToRole(actorRole, query);
   const visibleFiles = [];
 
   for (const file of files) {
     try {
-      await assertFileViewerAccess(file, actorRole, actorId);
+      await assertFileViewerAccess(file, actorRole, actorId, { adminType });
       visibleFiles.push(mapFileResponse(file));
     } catch (error) {
       if (error.statusCode === 404 || error.status === 404) {
@@ -563,14 +597,14 @@ async function listFiles({ actorRole, actorId, query = {} }) {
   return { files: visibleFiles };
 }
 
-async function createDownloadUrl({ fileId, actorRole, actorId, reqMeta, publicEndpoint }) {
+async function createDownloadUrl({ fileId, actorRole, actorId, adminType, reqMeta, publicEndpoint }) {
   assertViewerRole(actorRole);
   const file = await filesRepository.findFileRecordById(fileId);
   if (!file) {
     throw createHttpError(404, 'File not found');
   }
 
-  await assertFileViewerAccess(file, actorRole, actorId);
+  await assertFileViewerAccess(file, actorRole, actorId, { adminType });
 
   const signed = await storageService.generateDownloadUrl({
     key: file.s3_key,
@@ -644,28 +678,76 @@ async function listOwnedFiles({ actorRole, actorId, contextType, contextId, reqM
     contextId,
   });
 
-  return Promise.all(files.map(async (file) => {
-    const owned = await createOwnerDownloadUrl({
-      fileId: file.id,
-      actorRole,
-      actorId,
-      reqMeta,
-      publicEndpoint: reqMeta?.publicEndpoint || undefined,
-    });
-    return {
-      ...owned.file,
-      downloadUrl: owned.downloadUrl,
-    };
+  const results = await Promise.all(files.map(async (file) => {
+    try {
+      const owned = await createOwnerDownloadUrl({
+        fileId: file.id,
+        actorRole,
+        actorId,
+        reqMeta,
+        publicEndpoint: reqMeta?.publicEndpoint || undefined,
+      });
+      return {
+        ...owned.file,
+        downloadUrl: owned.downloadUrl,
+      };
+    } catch (error) {
+      // A single file's signed-URL failure must not break the whole detail page.
+      logger.warn('Failed to generate owner download URL', {
+        fileId: file.id,
+        actorRole,
+        contextType,
+        contextId,
+        error: error.message,
+      });
+      return null;
+    }
   }));
+
+  return results.filter(Boolean);
 }
 
-async function createLegacyDownloadAccess({ fileId, actorRole, actorId, reqMeta, scope = {} }) {
+// Citizen-uploaded files for a context, with signed download URLs.
+// Used to surface citizen files to DEO (who may view all citizen files).
+async function listCitizenFilesForContext({ contextType, contextId, reqMeta }) {
+  if (!contextId) {
+    return [];
+  }
+  const files = await filesRepository.listFilesForContext('citizen', { contextType, contextId });
+
+  const results = await Promise.all(files.map(async (file) => {
+    try {
+      const signed = await storageService.generateDownloadUrl({
+        key: file.s3_key,
+        filename: file.original_name,
+        contentType: file.mime_type,
+        publicEndpoint: reqMeta?.publicEndpoint || undefined,
+      });
+      return {
+        ...mapFileResponse(file),
+        downloadUrl: signed.downloadUrl,
+      };
+    } catch (error) {
+      logger.warn('Failed to generate citizen file download URL', {
+        fileId: file.id,
+        contextType,
+        contextId,
+        error: error.message,
+      });
+      return null;
+    }
+  }));
+
+  return results.filter(Boolean);
+}
+
+async function createLegacyDownloadAccess({ fileId, actorRole, actorId, adminType, reqMeta, scope = {} }) {
   const file = await filesRepository.findUploadedFileById(fileId);
   if (!file) {
     throw createHttpError(404, 'File not found');
   }
 
-  await assertLegacyFileViewerAccess(file, actorRole, actorId);
+  await assertLegacyFileViewerAccess(file, actorRole, actorId, adminType);
   const signed = await createSignedFileAccess({
     fileId,
     actorRole,
@@ -730,6 +812,7 @@ module.exports = {
   createDownloadUrl,
   createOwnerDownloadUrl,
   listOwnedFiles,
+  listCitizenFilesForContext,
   createLegacyDownloadAccess,
   createStorageUploadUrl,
   createStorageDownloadUrl,

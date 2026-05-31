@@ -15,37 +15,40 @@ import {
 } from "react-icons/fi";
 import { apiClient } from "../../../shared/api/client.js";
 import { DEO_ACCEPT, getFileUiType, uploadPrivateFile } from "../../../shared/api/privateFiles.js";
+import { openDownloadUrl } from "../../../shared/api/downloads.js";
 import { useAuth } from "../../../shared/auth/AuthContext.jsx";
 
 const PAGE_SIZE = 8;
 
-function formatMeetingDate(value) {
+function formatAppointmentDate(value) {
   if (!value) return "Pending";
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return value;
   return date.toISOString().slice(0, 10);
 }
 
-function mapMeetingToRow(meeting) {
+function mapAppointmentToRow(appointment) {
   return {
-    id: meeting.id,
-    citizen: [meeting.first_name, meeting.last_name].filter(Boolean).join(" ") || "Unknown",
-    subject: meeting.title || meeting.purpose || "Untitled meeting",
-    date: formatMeetingDate(meeting.created_at),
-    status: meeting.status === "completed" ? "Completed" : meeting.status,
-    requestId: meeting.request_id || meeting.id,
-    contact: meeting.mobile_number || meeting.email || "",
-    files: Array.isArray(meeting.files)
-      ? meeting.files.map((file) => ({
+    id: appointment.id,
+    citizen: [appointment.first_name, appointment.last_name].filter(Boolean).join(" ") || "Unknown",
+    subject: appointment.title || appointment.purpose || "Untitled appointment",
+    date: formatAppointmentDate(appointment.created_at),
+    status: appointment.status === "completed" ? "Completed" : appointment.status,
+    requestId: appointment.request_id || appointment.id,
+    contact: appointment.mobile_number || appointment.email || "",
+    files: Array.isArray(appointment.files)
+      ? appointment.files.map((file) => ({
           id: file.id,
           name: file.name,
           type: file.type || getFileUiType(file.mimeType),
           size: file.size || "",
           mimeType: file.mimeType,
           createdAt: file.createdAt,
+          uploadedBy: file.uploadedBy || "",
+          downloadUrl: file.downloadUrl || "",
         }))
       : [],
-    raw: meeting,
+    raw: appointment,
   };
 }
 
@@ -55,13 +58,13 @@ function FileIcon({ type }) {
   return <FiFile size={15} className="text-amber-500" />;
 }
 
-function UploadModal({ meeting, onClose, onEdit, onUploaded }) {
+function UploadModal({ appointment, onClose, onEdit, onUploaded }) {
   const [selectedFile, setSelectedFile] = useState(null);
   const [error, setError] = useState("");
   const [uploading, setUploading] = useState(false);
   const inputRef = useRef(null);
 
-  if (!meeting) return null;
+  if (!appointment) return null;
 
   async function handleUpload() {
     if (!selectedFile || uploading) return;
@@ -70,8 +73,8 @@ function UploadModal({ meeting, onClose, onEdit, onUploaded }) {
       setError("");
       await uploadPrivateFile({
         file: selectedFile,
-        contextType: "meeting",
-        contextId: meeting.id,
+        contextType: "appointment",
+        contextId: appointment.id,
       });
       await onUploaded?.();
       onClose();
@@ -108,16 +111,16 @@ function UploadModal({ meeting, onClose, onEdit, onUploaded }) {
               <label className="block text-[12px] font-medium text-[var(--portal-text)] mb-1.5">Citizen Name</label>
               <input
                 className="w-full p-2.5 text-sm bg-[var(--portal-bg-elevated)] border border-[var(--portal-border)] rounded-lg outline-none text-[var(--portal-text-strong)]"
-                value={meeting.citizen}
+                value={appointment.citizen}
                 readOnly
               />
             </div>
 
             <div>
-              <label className="block text-[12px] font-medium text-[var(--portal-text)] mb-1.5">Meeting Subject</label>
+              <label className="block text-[12px] font-medium text-[var(--portal-text)] mb-1.5">Appointment Subject</label>
               <input
                 className="w-full p-2.5 text-sm bg-[var(--portal-bg-elevated)] border border-[var(--portal-border)] rounded-lg outline-none text-[var(--portal-text-strong)]"
-                value={meeting.subject}
+                value={appointment.subject}
                 readOnly
               />
             </div>
@@ -166,16 +169,16 @@ function UploadModal({ meeting, onClose, onEdit, onUploaded }) {
   );
 }
 
-function ManageMediaModal({ meeting, selectedIds, onToggleItem, onToggleAll, onDeleteSelected, onClose, onBack }) {
+function ManageMediaModal({ appointment, selectedIds, onToggleItem, onToggleAll, onDeleteSelected, onClose, onBack }) {
   const [activeType, setActiveType] = useState("photo");
-  if (!meeting) return null;
+  if (!appointment) return null;
 
   const mediaTabs = [
     { key: "photo", label: "Photos", icon: FiImage },
     { key: "video", label: "Videos", icon: FiVideo },
     { key: "document", label: "Documents", icon: FiFile },
   ];
-  const visibleFiles = meeting.files.filter((file) => file.type === activeType);
+  const visibleFiles = appointment.files.filter((file) => file.type === activeType);
   const allSelected = visibleFiles.length > 0 && visibleFiles.every((file) => selectedIds.includes(file.id));
 
   return (
@@ -201,11 +204,11 @@ function ManageMediaModal({ meeting, selectedIds, onToggleItem, onToggleAll, onD
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <label className="block text-[12px] font-medium text-[var(--portal-text)] mb-1.5">Citizen Name</label>
-                <input className="w-full p-2.5 text-sm bg-[var(--portal-bg-elevated)] border border-[var(--portal-border)] rounded-lg outline-none text-[var(--portal-text-strong)]" value={meeting.citizen} readOnly />
+                <input className="w-full p-2.5 text-sm bg-[var(--portal-bg-elevated)] border border-[var(--portal-border)] rounded-lg outline-none text-[var(--portal-text-strong)]" value={appointment.citizen} readOnly />
               </div>
               <div>
-                <label className="block text-[12px] font-medium text-[var(--portal-text)] mb-1.5">Meeting Subject</label>
-                <input className="w-full p-2.5 text-sm bg-[var(--portal-bg-elevated)] border border-[var(--portal-border)] rounded-lg outline-none text-[var(--portal-text-strong)]" value={meeting.subject} readOnly />
+                <label className="block text-[12px] font-medium text-[var(--portal-text)] mb-1.5">Appointment Subject</label>
+                <input className="w-full p-2.5 text-sm bg-[var(--portal-bg-elevated)] border border-[var(--portal-border)] rounded-lg outline-none text-[var(--portal-text-strong)]" value={appointment.subject} readOnly />
               </div>
             </div>
 
@@ -266,9 +269,24 @@ function ManageMediaModal({ meeting, selectedIds, onToggleItem, onToggleAll, onD
                       className="w-4 h-4"
                     />
                     <FileIcon type={file.type} />
-                    <span className="flex-1 text-sm font-medium text-[var(--portal-text)] truncate">{file.name}</span>
+                    <span className="flex-1 text-sm font-medium text-[var(--portal-text)] truncate">
+                      {file.name}
+                      {file.uploadedBy === "citizen" && (
+                        <span className="ml-2 text-[10px] font-semibold uppercase tracking-wide text-[var(--portal-purple)]">Citizen</span>
+                      )}
+                    </span>
                     <span className="text-xs text-[var(--portal-text-muted)] mr-1">{file.size}</span>
                     <span className="text-xs font-medium text-[var(--portal-text-muted)] capitalize">{file.type}</span>
+                    {file.downloadUrl && (
+                      <button
+                        type="button"
+                        onClick={() => openDownloadUrl(file.downloadUrl)}
+                        className="flex items-center justify-center w-8 h-8 rounded-lg border border-[var(--portal-purple-dim)] bg-[var(--portal-purple-dim)] text-[var(--portal-purple)] hover:opacity-80 transition-opacity"
+                        title="Download"
+                      >
+                        <FiDownload size={13} />
+                      </button>
+                    )}
                   </div>
                 ))
               )}
@@ -284,9 +302,9 @@ function ManageMediaModal({ meeting, selectedIds, onToggleItem, onToggleAll, onD
   );
 }
 
-export default function CitizenMeetingFiles() {
+export default function CitizenAppointmentFiles() {
   const { session } = useAuth();
-  const [meetings, setMeetings] = useState([]);
+  const [appointments, setAppointments] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [search, setSearch] = useState("");
@@ -296,8 +314,8 @@ export default function CitizenMeetingFiles() {
   const [dateTo, setDateTo] = useState("");
   const [page, setPage] = useState(1);
   const [showExportMenu, setShowExportMenu] = useState(false);
-  const [uploadMeeting, setUploadMeeting] = useState(null);
-  const [editMeeting, setEditMeeting] = useState(null);
+  const [uploadAppointment, setUploadAppointment] = useState(null);
+  const [editAppointment, setEditAppointment] = useState(null);
   const [selectedFileIds, setSelectedFileIds] = useState([]);
   const exportMenuRef = useRef(null);
 
@@ -315,16 +333,16 @@ export default function CitizenMeetingFiles() {
   useEffect(() => {
     let mounted = true;
 
-    async function loadAssignedMeetings() {
+    async function loadAssignedAppointments() {
       try {
         setLoading(true);
         setError("");
-        const { data } = await apiClient.get("/deo/completed-meetings");
+        const { data } = await apiClient.get("/deo/completed-appointments");
         if (!mounted) return;
-        setMeetings((data.meetings || []).map(mapMeetingToRow));
+        setAppointments((data.appointments || []).map(mapAppointmentToRow));
       } catch (loadError) {
         if (mounted) {
-          setError(loadError?.response?.data?.error || "Unable to load completed citizen meetings");
+          setError(loadError?.response?.data?.error || "Unable to load completed citizen appointments");
         }
       } finally {
         if (mounted) {
@@ -334,7 +352,7 @@ export default function CitizenMeetingFiles() {
     }
 
     if (session?.role) {
-      loadAssignedMeetings();
+      loadAssignedAppointments();
     } else {
       setLoading(false);
     }
@@ -344,32 +362,32 @@ export default function CitizenMeetingFiles() {
     };
   }, [session?.role]);
 
-  async function reloadCompletedMeetings() {
-    const { data } = await apiClient.get("/deo/completed-meetings");
-    setMeetings((data.meetings || []).map(mapMeetingToRow));
+  async function reloadCompletedAppointments() {
+    const { data } = await apiClient.get("/deo/completed-appointments");
+    setAppointments((data.appointments || []).map(mapAppointmentToRow));
   }
 
   const counts = {
-    All: meetings.length,
-    Upcoming: meetings.length,
-    Completed: meetings.filter((meeting) => meeting.status === "Completed").length,
-    Cancelled: meetings.filter((meeting) => meeting.status === "Cancelled").length,
+    All: appointments.length,
+    Upcoming: appointments.length,
+    Completed: appointments.filter((appointment) => appointment.status === "Completed").length,
+    Cancelled: appointments.filter((appointment) => appointment.status === "Cancelled").length,
   };
 
   const filtered = useMemo(() => {
     const query = search.toLowerCase();
 
-    return meetings.filter((meeting) => {
-      const totalFiles = meeting.files.length;
+    return appointments.filter((appointment) => {
+      const totalFiles = appointment.files.length;
       return (
-        (!search || [meeting.citizen, meeting.subject, meeting.date, String(totalFiles)].join(" ").toLowerCase().includes(query))
-        && (activeTab === "All" || meeting.status === activeTab)
-        && (!statusFilter || meeting.status === statusFilter)
-        && (!dateFrom || meeting.date >= dateFrom)
-        && (!dateTo || meeting.date <= dateTo)
+        (!search || [appointment.citizen, appointment.subject, appointment.date, String(totalFiles)].join(" ").toLowerCase().includes(query))
+        && (activeTab === "All" || appointment.status === activeTab)
+        && (!statusFilter || appointment.status === statusFilter)
+        && (!dateFrom || appointment.date >= dateFrom)
+        && (!dateTo || appointment.date <= dateTo)
       );
     });
-  }, [activeTab, dateFrom, dateTo, meetings, search, statusFilter]);
+  }, [activeTab, dateFrom, dateTo, appointments, search, statusFilter]);
 
   const totalPages = Math.ceil(filtered.length / PAGE_SIZE);
   const paginated = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
@@ -380,15 +398,15 @@ export default function CitizenMeetingFiles() {
     console.log(`Export ${type}`, filtered);
   };
 
-  const handleOpenEdit = (meeting) => {
-    setUploadMeeting(null);
+  const handleOpenEdit = (appointment) => {
+    setUploadAppointment(null);
     setSelectedFileIds([]);
-    setEditMeeting(meeting);
+    setEditAppointment(appointment);
   };
 
   const handleCloseModals = () => {
-    setUploadMeeting(null);
-    setEditMeeting(null);
+    setUploadAppointment(null);
+    setEditAppointment(null);
     setSelectedFileIds([]);
   };
 
@@ -401,21 +419,21 @@ export default function CitizenMeetingFiles() {
   };
 
   const handleToggleAllFiles = () => {
-    if (!editMeeting) return;
-    const ids = editMeeting.files.map((file) => file.id);
+    if (!editAppointment) return;
+    const ids = editAppointment.files.map((file) => file.id);
     setSelectedFileIds((current) => (current.length === ids.length ? [] : ids));
   };
 
   const handleDeleteSelected = () => {
-    if (!editMeeting || !selectedFileIds.length) return;
+    if (!editAppointment || !selectedFileIds.length) return;
 
-    setMeetings((current) => current.map((meeting) => (
-      meeting.id === editMeeting.id
-        ? { ...meeting, files: meeting.files.filter((file) => !selectedFileIds.includes(file.id)) }
-        : meeting
+    setAppointments((current) => current.map((appointment) => (
+      appointment.id === editAppointment.id
+        ? { ...appointment, files: appointment.files.filter((file) => !selectedFileIds.includes(file.id)) }
+        : appointment
     )));
 
-    setEditMeeting((current) => (
+    setEditAppointment((current) => (
       current
         ? { ...current, files: current.files.filter((file) => !selectedFileIds.includes(file.id)) }
         : current
@@ -426,7 +444,7 @@ export default function CitizenMeetingFiles() {
   return (
     <div className="min-h-screen bg-[var(--portal-bg)] w-full box-border" style={{ fontFamily: "var(--portal-font, 'Lora', Georgia, 'Times New Roman', serif)" }}>
       <div className="bg-[var(--portal-card)] border-b border-[var(--portal-border)] px-7 py-3.5 flex items-center justify-between">
-        <h1 className="text-xl font-semibold text-[var(--portal-text-strong)] m-0">Citizen Meeting Files</h1>
+        <h1 className="text-xl font-semibold text-[var(--portal-text-strong)] m-0">Citizen Appointment Files</h1>
         <div className="flex items-center gap-2.5">
           <div className="relative" ref={exportMenuRef}>
             <button
@@ -497,7 +515,7 @@ export default function CitizenMeetingFiles() {
           )}
 
           <div className="flex-1" />
-          <span className="text-xs font-medium text-[var(--portal-text-muted)] whitespace-nowrap px-2">{filtered.length} meeting{filtered.length !== 1 ? "s" : ""}</span>
+          <span className="text-xs font-medium text-[var(--portal-text-muted)] whitespace-nowrap px-2">{filtered.length} appointment{filtered.length !== 1 ? "s" : ""}</span>
         </div>
       </div>
 
@@ -507,7 +525,7 @@ export default function CitizenMeetingFiles() {
             <table className="w-full border-collapse text-sm text-left">
               <thead>
                 <tr className="bg-[var(--portal-bg-elevated)]">
-                  {["#", "Citizen Name", "Meeting Subject", "Meeting Date", "Files", "Status", "Actions"].map((header, index) => (
+                  {["#", "Citizen Name", "Appointment Subject", "Appointment Date", "Files", "Status", "Actions"].map((header, index) => (
                     <th key={header} className={`px-4 py-3 text-xs font-bold tracking-wider uppercase text-[var(--portal-text-muted)] border-b border-[var(--portal-border)] whitespace-nowrap ${index === 6 ? "text-center" : ""}`}>{header}</th>
                   ))}
                 </tr>
@@ -518,33 +536,36 @@ export default function CitizenMeetingFiles() {
                     <td colSpan={7}>
                       <div className="py-12 px-6 text-center">
                         <FiPaperclip size={36} className="text-[var(--portal-border)] mx-auto mb-3" />
-                        <div className="text-sm font-semibold text-[var(--portal-text)] mb-1">{loading ? "Loading meetings..." : error ? "Unable to load meetings" : "No meetings found"}</div>
+                        <div className="text-sm font-semibold text-[var(--portal-text)] mb-1">{loading ? "Loading appointments..." : error ? "Unable to load appointments" : "No appointments found"}</div>
                         <div className="text-xs text-[var(--portal-text-muted)]">{error || "Try adjusting your filters"}</div>
                       </div>
                     </td>
                   </tr>
-                ) : paginated.map((meeting, index) => (
-                  <tr key={meeting.id} className={`border-b border-[var(--portal-border-light)] hover:bg-[var(--portal-bg-elevated)] transition-colors ${index % 2 === 0 ? "bg-[var(--portal-card)]" : "bg-[var(--portal-bg-elevated)]"}`}>
+                ) : paginated.map((appointment, index) => (
+                  <tr key={appointment.id} className={`border-b border-[var(--portal-border-light)] hover:bg-[var(--portal-bg-elevated)] transition-colors ${index % 2 === 0 ? "bg-[var(--portal-card)]" : "bg-[var(--portal-bg-elevated)]"}`}>
                     <td className="px-4 py-3.5 text-xs text-[var(--portal-text-muted)] align-middle">{(page - 1) * PAGE_SIZE + index + 1}</td>
-                    <td className="px-4 py-3.5 align-middle"><span className="font-semibold text-[var(--portal-text-strong)]">{meeting.citizen}</span></td>
-                    <td className="px-4 py-3.5 text-[var(--portal-text)] align-middle">{meeting.subject}</td>
+                    <td className="px-4 py-3.5 align-middle"><span className="font-semibold text-[var(--portal-text-strong)]">{appointment.citizen}</span></td>
+                    <td className="px-4 py-3.5 text-[var(--portal-text)] align-middle">{appointment.subject}</td>
                     <td className="px-4 py-3.5 align-middle">
-                      <div className="font-semibold text-sm text-[var(--portal-text-strong)]">{meeting.date}</div>
+                      <div className="font-semibold text-sm text-[var(--portal-text-strong)]">{appointment.date}</div>
                     </td>
                     <td className="px-4 py-3.5 align-middle">
                       <div className="flex items-center gap-1.5">
-                        <FiPaperclip size={13} color={meeting.files.length ? "var(--portal-purple)" : "var(--portal-border)"} />
-                        <span className="text-xs font-semibold" style={{ color: meeting.files.length ? "var(--portal-purple)" : "var(--portal-border)" }}>{meeting.files.length}</span>
+                        <FiPaperclip size={13} color={appointment.files.length ? "var(--portal-purple)" : "var(--portal-border)"} />
+                        <span className="text-xs font-semibold" style={{ color: appointment.files.length ? "var(--portal-purple)" : "var(--portal-border)" }}>{appointment.files.length}</span>
                       </div>
                     </td>
                     <td className="px-4 py-3.5 align-middle">
                       <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-bold bg-[var(--portal-purple-dim)] text-[var(--portal-purple)]">
-                        {meeting.status}
+                        {appointment.status}
                       </span>
                     </td>
                     <td className="px-4 py-3.5 align-middle text-center">
                       <div className="flex gap-1.5 justify-center">
-                        <button className="flex items-center justify-center w-8 h-8 rounded-lg border border-[var(--portal-purple-dim)] bg-[var(--portal-purple-dim)] text-[var(--portal-purple)] hover:opacity-80 transition-opacity" onClick={() => { setSelectedFileIds([]); setUploadMeeting(meeting); }} title="Upload">
+                        <button className="flex items-center justify-center w-8 h-8 rounded-lg border border-[var(--portal-border)] bg-[var(--portal-card)] text-[var(--portal-text)] hover:bg-[var(--portal-bg-elevated)] transition-colors" onClick={() => handleOpenEdit(appointment)} title="View files">
+                          <FiPaperclip size={13} />
+                        </button>
+                        <button className="flex items-center justify-center w-8 h-8 rounded-lg border border-[var(--portal-purple-dim)] bg-[var(--portal-purple-dim)] text-[var(--portal-purple)] hover:opacity-80 transition-opacity" onClick={() => { setSelectedFileIds([]); setUploadAppointment(appointment); }} title="Upload">
                           <FiUploadCloud size={13} />
                         </button>
                       </div>
@@ -557,7 +578,7 @@ export default function CitizenMeetingFiles() {
 
           {totalPages > 1 && (
             <div className="flex items-center justify-between px-5 py-3.5 border-t border-[var(--portal-border-light)] flex-wrap gap-3 bg-[var(--portal-card)]">
-              <div className="text-xs text-[var(--portal-text-muted)] font-medium">Showing {Math.min((page - 1) * PAGE_SIZE + 1, filtered.length)}–{Math.min(page * PAGE_SIZE, filtered.length)} of {filtered.length} meetings</div>
+              <div className="text-xs text-[var(--portal-text-muted)] font-medium">Showing {Math.min((page - 1) * PAGE_SIZE + 1, filtered.length)}–{Math.min(page * PAGE_SIZE, filtered.length)} of {filtered.length} appointments</div>
               <div className="flex gap-1">
                 <button className="w-8 h-8 rounded-md border border-[var(--portal-border)] bg-[var(--portal-card)] text-[var(--portal-text)] text-sm hover:bg-[var(--portal-bg-elevated)] disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center transition-colors" onClick={() => setPage((current) => Math.max(1, current - 1))} disabled={page === 1}>‹</button>
                 {Array.from({ length: totalPages }, (_, index) => index + 1)
@@ -578,27 +599,27 @@ export default function CitizenMeetingFiles() {
         </div>
       </div>
 
-      {uploadMeeting && (
+      {uploadAppointment && (
         <UploadModal
-          meeting={uploadMeeting}
-          onUploaded={reloadCompletedMeetings}
+          appointment={uploadAppointment}
+          onUploaded={reloadCompletedAppointments}
           onClose={handleCloseModals}
-          onEdit={() => handleOpenEdit(uploadMeeting)}
+          onEdit={() => handleOpenEdit(uploadAppointment)}
         />
       )}
 
-      {editMeeting && (
+      {editAppointment && (
         <ManageMediaModal
-          meeting={editMeeting}
+          appointment={editAppointment}
           selectedIds={selectedFileIds}
           onToggleItem={handleToggleFile}
           onToggleAll={handleToggleAllFiles}
           onDeleteSelected={handleDeleteSelected}
           onClose={handleCloseModals}
           onBack={() => {
-            setEditMeeting(null);
+            setEditAppointment(null);
             setSelectedFileIds([]);
-            setUploadMeeting(editMeeting);
+            setUploadAppointment(editAppointment);
           }}
         />
       )}

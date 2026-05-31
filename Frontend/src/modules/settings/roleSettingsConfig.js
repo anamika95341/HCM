@@ -1,4 +1,5 @@
 // roleSettingsConfig.js
+// label/badge/identifierLabel/createdByLabel values are i18n translation keys
 
 export const ROLE_SETTINGS = {
   citizen: {
@@ -7,7 +8,7 @@ export const ROLE_SETTINGS = {
       emailReadOnly: false,
       phoneReadOnly: false,
       showIdentifier: true,
-      identifierLabel: 'Citizen ID',
+      identifierLabel: 'settings.identifiers.citizenId',
       showDesignation: false,
       designationReadOnly: true,
       showCreatedBy: false,
@@ -22,8 +23,8 @@ export const ROLE_SETTINGS = {
     notifications: {
       showSmsChannel: true,
       triggers: [
-        { k: 'meetingStatus', label: 'Meeting status updates (accepted, scheduled, cancelled)' },
-        { k: 'complaintStatus', label: 'Complaint status updates (assigned, resolved, escalated)' },
+        { k: 'appointmentStatus', label: 'settings.triggers.citizenAppointmentStatus' },
+        { k: 'grievanceStatus', label: 'settings.triggers.citizenGrievanceStatus' },
       ],
       digestOptions: ['realtime', 'daily', 'weekly'],
     },
@@ -34,11 +35,11 @@ export const ROLE_SETTINGS = {
       emailReadOnly: true,
       phoneReadOnly: false,
       showIdentifier: true,
-      identifierLabel: 'Username',
+      identifierLabel: 'settings.identifiers.username',
       showDesignation: false,
       designationReadOnly: true,
       showCreatedBy: true,
-      createdByLabel: 'Created By (MasterAdmin)',
+      createdByLabel: 'settings.identifiers.createdByMasterAdmin',
       showVerificationStatus: false,
       showDigitalSignature: false,
       showDelegation: false,
@@ -49,11 +50,11 @@ export const ROLE_SETTINGS = {
     notifications: {
       showSmsChannel: true,
       triggers: [
-        { k: 'newTask', label: 'New case assigned or received in the work queue' },
-        { k: 'moved', label: 'Case progressed to next stage in the workflow' },
-        { k: 'deadline', label: 'Case approaching its due date', deadline: true },
-        { k: 'escalation', label: 'Automatic escalation triggered for overdue case', badge: 'Critical', badgeType: 'danger' },
-        { k: 'approval', label: 'Case is awaiting your action', badge: 'Action Required', badgeType: 'warn' },
+        { k: 'newTask', label: 'settings.triggers.adminNewTask' },
+        { k: 'moved', label: 'settings.triggers.adminMoved' },
+        { k: 'deadline', label: 'settings.triggers.adminDeadline', deadline: true },
+        { k: 'escalation', label: 'settings.triggers.adminEscalation', badge: 'settings.triggers.badgeCritical', badgeType: 'danger' },
+        { k: 'approval', label: 'settings.triggers.adminApproval', badge: 'settings.triggers.badgeActionRequired', badgeType: 'warn' },
       ],
       digestOptions: ['realtime', 'daily', 'weekly'],
     },
@@ -64,7 +65,7 @@ export const ROLE_SETTINGS = {
       emailReadOnly: true,
       phoneReadOnly: false,
       showIdentifier: true,
-      identifierLabel: 'Username',
+      identifierLabel: 'settings.identifiers.username',
       showDesignation: true,
       designationReadOnly: true,
       showCreatedBy: false,
@@ -79,10 +80,10 @@ export const ROLE_SETTINGS = {
     notifications: {
       showSmsChannel: false,
       triggers: [
-        { k: 'adminCreated', label: 'New Admin account created under the portal' },
-        { k: 'deoCreated', label: 'New DEO account created under the portal' },
-        { k: 'accountVerified', label: 'Admin or DEO account verified for the first time' },
-        { k: 'escalation', label: 'System-level escalation or anomaly alert', badge: 'Critical', badgeType: 'danger' },
+        { k: 'adminCreated', label: 'settings.triggers.masteradminAdminCreated' },
+        { k: 'deoCreated', label: 'settings.triggers.masteradminDeoCreated' },
+        { k: 'accountVerified', label: 'settings.triggers.masteradminAccountVerified' },
+        { k: 'escalation', label: 'settings.triggers.masteradminEscalation', badge: 'settings.triggers.badgeCritical', badgeType: 'danger' },
       ],
       digestOptions: ['realtime', 'daily', 'weekly'],
     },
@@ -108,11 +109,11 @@ export const ROLE_SETTINGS = {
     notifications: {
       showSmsChannel: true,
       triggers: [
-        { k: 'newMeeting', label: 'New meeting scheduled on my calendar' },
-        { k: 'meetingChange', label: 'Meeting cancelled or rescheduled' },
-        { k: 'deadline', label: 'Upcoming meeting reminder (N days before)', deadline: true },
-        { k: 'escalation', label: 'Escalation alert triggered for a pending task', badge: 'Critical', badgeType: 'danger' },
-        { k: 'approval', label: 'Task is awaiting my approval or action', badge: 'Action Required', badgeType: 'warn' },
+        { k: 'newAppointment', label: 'settings.triggers.ministerNewAppointment' },
+        { k: 'appointmentChange', label: 'settings.triggers.ministerAppointmentChange' },
+        { k: 'deadline', label: 'settings.triggers.ministerDeadline', deadline: true },
+        { k: 'escalation', label: 'settings.triggers.ministerEscalation', badge: 'settings.triggers.badgeCritical', badgeType: 'danger' },
+        { k: 'approval', label: 'settings.triggers.ministerApproval', badge: 'settings.triggers.badgeActionRequired', badgeType: 'warn' },
       ],
       digestOptions: ['realtime', 'daily', 'weekly'],
     },
@@ -123,11 +124,11 @@ export const ROLE_SETTINGS = {
       emailReadOnly: true,
       phoneReadOnly: false,
       showIdentifier: true,
-      identifierLabel: 'Username',
+      identifierLabel: 'settings.identifiers.username',
       showDesignation: false,
       designationReadOnly: true,
       showCreatedBy: true,
-      createdByLabel: 'Created By',
+      createdByLabel: 'settings.identifiers.createdBy',
       showVerificationStatus: true,
       showDigitalSignature: false,
       showDelegation: false,
@@ -138,8 +139,8 @@ export const ROLE_SETTINGS = {
     notifications: {
       showSmsChannel: false,
       triggers: [
-        { k: 'newTask', label: 'New citizen verification task assigned to me' },
-        { k: 'deadline', label: 'Verification task deadline approaching', deadline: true },
+        { k: 'newTask', label: 'settings.triggers.deoNewTask' },
+        { k: 'deadline', label: 'settings.triggers.deoDeadline', deadline: true },
       ],
       digestOptions: ['daily', 'weekly'],
     },

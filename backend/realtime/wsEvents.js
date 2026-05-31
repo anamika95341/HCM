@@ -1,5 +1,5 @@
 module.exports = {
-  MEETING_STATUS_UPDATED: 'meeting.status.updated',
-  COMPLAINT_STATUS_UPDATED: 'complaint.status.updated',
+  APPOINTMENT_STATUS_UPDATED: 'appointment.status.updated',
+  GRIEVANCE_STATUS_UPDATED: 'grievance.status.updated',
   NOTIFICATION_CREATED: 'notification.created',
 };

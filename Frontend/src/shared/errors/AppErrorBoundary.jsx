@@ -3,17 +3,15 @@ import React from "react";
 export default class AppErrorBoundary extends React.Component {
   constructor(props) {
     super(props);
-    this.state = { hasError: false };
+    this.state = { hasError: false, errorMessage: "" };
   }
 
-  static getDerivedStateFromError() {
-    return { hasError: true };
+  static getDerivedStateFromError(error) {
+    return { hasError: true, errorMessage: error?.message || String(error) };
   }
 
   componentDidCatch(error) {
-    if (import.meta.env.DEV) {
-      console.error("Unhandled frontend error", error);
-    }
+    console.error("Unhandled frontend error", error);
   }
 
   render() {
@@ -49,6 +47,11 @@ export default class AppErrorBoundary extends React.Component {
             <div style={{ fontSize: 12, lineHeight: 1.55, color: "var(--portal-text, #525252)" }}>
               The application hit an unexpected error and stopped rendering this screen. Refresh the page and sign in again if needed.
             </div>
+            {this.state.errorMessage && (
+              <div style={{ marginTop: 12, padding: "8px 10px", background: "#FEF2F2", border: "1px solid #FCA5A5", borderRadius: 6, fontSize: 11, color: "#7F1D1D", fontFamily: "monospace", wordBreak: "break-all" }}>
+                {this.state.errorMessage}
+              </div>
+            )}
           </div>
         </div>
       );

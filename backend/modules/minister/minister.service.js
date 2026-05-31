@@ -1,42 +1,38 @@
 const redis = require('../../config/redis');
 const ministerRepository = require('./minister.repository');
-const complaintsRepository = require('../complaints/complaints.repository');
-const meetingsRepository = require('../meetings/meetings.repository');
+const appointmentsRepository = require('../appointments/appointments.repository');
 const filesService = require('../files/files.service');
 
 async function getCalendar(ministerId) {
-  const [ministerCalendarEvents, complaintCalendarEvents] = await Promise.all([
-    ministerRepository.getCalendar(ministerId),
-    complaintsRepository.listScheduledComplaintCalendarEvents(),
-  ]);
-
-  return [...ministerCalendarEvents, ...complaintCalendarEvents].sort(
-    (left, right) => new Date(left.starts_at).getTime() - new Date(right.starts_at).getTime()
-  );
+  return ministerRepository.getCalendar(ministerId);
 }
 
-function cacheKey(meetingId) {
-  return `meeting:files:${meetingId}`;
+async function getScheduledGrievances() {
+  return ministerRepository.getScheduledGrievances();
 }
 
-async function getMeetingFiles(ministerId, meetingId) {
-  const allowed = await ministerRepository.hasCalendarAccessToMeeting(ministerId, meetingId);
+function cacheKey(appointmentId) {
+  return `appointment:files:${appointmentId}`;
+}
+
+async function getAppointmentFiles(ministerId, appointmentId) {
+  const allowed = await ministerRepository.hasCalendarAccessToAppointment(ministerId, appointmentId);
   if (!allowed) {
-    const error = new Error('Meeting not found');
+    const error = new Error('Appointment not found');
     error.status = 404;
     throw error;
   }
 
-  const cached = await redis.get(cacheKey(meetingId));
+  const cached = await redis.get(cacheKey(appointmentId));
   const files = cached
     ? JSON.parse(cached)
-    : await meetingsRepository.listMeetingFilesForMinister(meetingId, ministerId);
+    : await appointmentsRepository.listAppointmentFilesForMinister(appointmentId, ministerId);
 
   if (!cached) {
     const toCache = files.map(({ id, entity_type, original_name, mime_type, file_size, created_at }) => ({
       id, entity_type, original_name, mime_type, file_size, created_at,
     }));
-    await redis.set(cacheKey(meetingId), JSON.stringify(toCache), 'EX', 300);
+    await redis.set(cacheKey(appointmentId), JSON.stringify(toCache), 'EX', 300);
   }
 
   const hydrated = await Promise.all(
@@ -45,7 +41,7 @@ async function getMeetingFiles(ministerId, meetingId) {
         fileId: file.id,
         actorRole: 'minister',
         actorId: ministerId,
-        scope: { meetingId },
+        scope: { appointmentId },
       });
 
       return {
@@ -64,4 +60,9 @@ async function getMeetingFiles(ministerId, meetingId) {
   return { files: hydrated };
 }
 
-module.exports = { getCalendar, getMeetingFiles };
+async function getAppointmentPool() {
+  const appointments = await appointmentsRepository.getAppointmentQueue();
+  return { appointments };
+}
+
+module.exports = { getCalendar, getAppointmentFiles, getScheduledGrievances, getAppointmentPool };
