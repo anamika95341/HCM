@@ -1,7 +1,13 @@
 -- 018_add_pass_s3_key_to_meetings.sql
--- Adds a column to store the S3 key of the generated meeting appointment pass PDF.
--- When a meeting is (re)scheduled, a new pass is generated and this key is updated.
--- The old S3 object is deleted before the new one is uploaded.
+-- Adds pass_s3_key column to the appointments table (formerly meetings).
+-- Guard handles both: DBs where rename hasn't run yet (meetings) and
+-- DBs where 018_rename already ran (appointments).
 
-ALTER TABLE meetings
-  ADD COLUMN IF NOT EXISTS pass_s3_key TEXT;
+DO $$
+BEGIN
+  IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'meetings' AND table_schema = 'public') THEN
+    ALTER TABLE meetings ADD COLUMN IF NOT EXISTS pass_s3_key TEXT;
+  ELSIF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'appointments' AND table_schema = 'public') THEN
+    ALTER TABLE appointments ADD COLUMN IF NOT EXISTS pass_s3_key TEXT;
+  END IF;
+END $$;
