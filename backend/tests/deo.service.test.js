@@ -24,6 +24,10 @@ jest.mock('../modules/notifications/notifications.service', () => ({
   notifyMinisterAppointmentScheduled: jest.fn(),
 }));
 
+jest.mock('../modules/files/files.service', () => ({
+  listCitizenFilesForContext: jest.fn(),
+}));
+
 const deoRepository = require('../modules/deo/deo.repository');
 const filesRepository = require('../modules/files/files.repository');
 const deoService = require('../modules/deo/deo.service');

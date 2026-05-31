@@ -14,7 +14,11 @@
       "Bash(npm test *)",
       "Bash(npm ci *)",
       "Bash(npx jest *)",
-      "Bash(./node_modules/.bin/jest --runInBand --testPathPattern=\"files.service|submission.service|authenticate.resilience|auth.api|rate.limiter.resilience\")"
+      "Bash(./node_modules/.bin/jest --runInBand --testPathPattern=\"files.service|submission.service|authenticate.resilience|auth.api|rate.limiter.resilience\")",
+      "Bash(git -C /mnt/c/users/anami/Documents/HCMProject/HCM status --short)",
+      "Bash(git -C /mnt/c/users/anami/Documents/HCMProject/HCM log --oneline -3)",
+      "Bash(git -C /mnt/c/users/anami/Documents/HCMProject/HCM show HEAD --name-only)",
+      "Bash(git *)"
     ]
   }
 }
