@@ -990,8 +990,6 @@ export default function HCMNewCasePage() {
   const isAppointmentFormInvalid =
     !appointmentForm.title ||
     !appointmentForm.purpose ||
-    !appointmentForm.preferredDate ||
-    !appointmentForm.preferredTime ||
     appointmentForm.companions.some(c => c.phone.length > 0 && (!/^[6-9]/.test(c.phone) || c.phone.length < 10));
   return (
     <WorkspacePage
@@ -1637,7 +1635,7 @@ export default function HCMNewCasePage() {
               {/* SUBMIT */}
               <WorkspaceButton
                 type="submit"
-                disabled={loading || !grievanceForm.title || !grievanceForm.details || !grievanceForm.state || !grievanceForm.district || !grievanceForm.incidentDate}
+                disabled={loading || !grievanceForm.title || !grievanceForm.details || !grievanceForm.state || !grievanceForm.district}
                 style={{ width: "30%", minWidth: 220, padding: "16px 24px", margin: "0 auto", display: "flex", justifyContent: "center" }}
               >
                 {loading ? t("citizen.newCase.submitting") : t("citizen.newCase.submitGrievanceBtn")}
