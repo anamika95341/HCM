@@ -605,6 +605,7 @@ export default function LoginPage({ defaultRole = "citizen" }) {
           isMobile={isMobile}
           setMobileNavOpen={setMobileNavOpen}
           onNavigate={handleCitizenNav}
+          sections={CITIZEN_SECTIONS}
         />
 
         <main>
@@ -1458,7 +1459,8 @@ export default function LoginPage({ defaultRole = "citizen" }) {
   }
 }
 
-function CitizenNavbar({ C, theme, toggleTheme, activeSection, mobileNavOpen, isMobile, setMobileNavOpen, onNavigate }) {
+function CitizenNavbar({ C, theme, toggleTheme, activeSection, mobileNavOpen, isMobile, setMobileNavOpen, onNavigate, sections }) {
+  const CITIZEN_SECTIONS = sections || [];
   const [hoveredSection, setHoveredSection] = useState(null);
   const activeNavAccent = CITIZEN_HERO_PURPLE;
   const navActiveBackground = theme === "dark" ? C.purple : activeNavAccent;
