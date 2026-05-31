@@ -2,7 +2,13 @@
   "permissions": {
     "allow": [
       "Bash(node -e \"require\\('dotenv'\\).config\\(\\); const pool = require\\('./config/database'\\); pool.query\\('SELECT 1'\\).then\\(\\(\\) => { console.log\\('DB connected'\\); pool.end\\(\\); }\\).catch\\(e => { console.error\\('DB error:', e.message\\); pool.end\\(\\); }\\);\")",
-      "Bash(docker exec hcm-postgres-1 *)"
+      "Bash(docker exec hcm-postgres-1 *)",
+      "Bash(docker compose *)",
+      "Bash(docker restart hcm-frontend-1 *)",
+      "Bash(chmod +x /mnt/c/users/anami/Documents/HCMProject/HCM/scripts/deploy-dev.sh)",
+      "Bash(cp /mnt/c/gg/hcm-demo-key.pem /tmp/hcm-demo-key.pem)",
+      "Bash(chmod 600 /tmp/hcm-demo-key.pem)",
+      "Bash(ssh *)"
     ]
   }
 }

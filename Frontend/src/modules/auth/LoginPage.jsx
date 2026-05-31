@@ -605,6 +605,7 @@ export default function LoginPage({ defaultRole = "citizen" }) {
           isMobile={isMobile}
           setMobileNavOpen={setMobileNavOpen}
           onNavigate={handleCitizenNav}
+          sections={CITIZEN_SECTIONS}
         />
 
         <main>
@@ -1458,7 +1459,7 @@ export default function LoginPage({ defaultRole = "citizen" }) {
   }
 }
 
-function CitizenNavbar({ C, theme, toggleTheme, activeSection, mobileNavOpen, isMobile, setMobileNavOpen, onNavigate }) {
+function CitizenNavbar({ C, theme, toggleTheme, activeSection, mobileNavOpen, isMobile, setMobileNavOpen, onNavigate, sections }) {
   const [hoveredSection, setHoveredSection] = useState(null);
   const activeNavAccent = CITIZEN_HERO_PURPLE;
   const navActiveBackground = theme === "dark" ? C.purple : activeNavAccent;
@@ -1536,7 +1537,7 @@ function CitizenNavbar({ C, theme, toggleTheme, activeSection, mobileNavOpen, is
               justifyContent: "center",
             }}
           >
-            {CITIZEN_SECTIONS.map((section) => {
+            {sections.map((section) => {
               const active = activeSection === section.id;
               const isHovered = hoveredSection === section.id;
               return (
@@ -1622,7 +1623,7 @@ function CitizenNavbar({ C, theme, toggleTheme, activeSection, mobileNavOpen, is
           margin: "0 auto",
         }}
       >
-        {CITIZEN_SECTIONS.map((section) => (
+        {sections.map((section) => (
           <button
             key={section.id}
             type="button"

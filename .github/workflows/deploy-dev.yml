@@ -1,4 +1,4 @@
-name: Deploy Prod
+name: Deploy Dev
 
 on:
   workflow_dispatch:
@@ -7,7 +7,7 @@ on:
       - CI
       - Security
     branches:
-      - main
+      - dev
     types:
       - completed
 
@@ -67,9 +67,9 @@ jobs:
     runs-on: ubuntu-latest
     environment: production
     env:
-      FRONTEND_IMAGE: ghcr.io/${{ github.repository_owner }}/hcm-frontend:${{ needs.gate.outputs.ref }}
-      BACKEND_IMAGE: ghcr.io/${{ github.repository_owner }}/hcm-backend:${{ needs.gate.outputs.ref }}
-      AUTH_STREAM_WORKER_IMAGE: ghcr.io/${{ github.repository_owner }}/hcm-auth-stream-worker:${{ needs.gate.outputs.ref }}
+      FRONTEND_IMAGE: ghcr.io/${{ github.repository_owner }}/hcm-frontend:dev-${{ needs.gate.outputs.ref }}
+      BACKEND_IMAGE: ghcr.io/${{ github.repository_owner }}/hcm-backend:dev-${{ needs.gate.outputs.ref }}
+      AUTH_STREAM_WORKER_IMAGE: ghcr.io/${{ github.repository_owner }}/hcm-auth-stream-worker:dev-${{ needs.gate.outputs.ref }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -138,7 +138,7 @@ jobs:
           ssh "${{ secrets.PROD_SSH_USER }}@${{ secrets.PROD_SSH_HOST }}" \
             "echo '${{ secrets.GITHUB_TOKEN }}' | docker login ghcr.io -u '${{ github.actor }}' --password-stdin"
 
-      - name: Deploy production stack
+      - name: Deploy dev stack
         run: |
           ssh "${{ secrets.PROD_SSH_USER }}@${{ secrets.PROD_SSH_HOST }}" \
-            "cd '${{ secrets.PROD_DEPLOY_PATH }}' && chmod +x scripts/deploy-prod.sh && FRONTEND_IMAGE='${{ env.FRONTEND_IMAGE }}' BACKEND_IMAGE='${{ env.BACKEND_IMAGE }}' AUTH_STREAM_WORKER_IMAGE='${{ env.AUTH_STREAM_WORKER_IMAGE }}' ./scripts/deploy-prod.sh '${{ secrets.PROD_DEPLOY_PATH }}'"
+            "cd '${{ secrets.PROD_DEPLOY_PATH }}' && chmod +x scripts/deploy-dev.sh && FRONTEND_IMAGE='${{ env.FRONTEND_IMAGE }}' BACKEND_IMAGE='${{ env.BACKEND_IMAGE }}' AUTH_STREAM_WORKER_IMAGE='${{ env.AUTH_STREAM_WORKER_IMAGE }}' ./scripts/deploy-dev.sh '${{ secrets.PROD_DEPLOY_PATH }}'"
