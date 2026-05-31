@@ -12,6 +12,7 @@ jest.mock('../modules/files/files.repository', () => ({
   createFile: jest.fn(),
   findFileRecordById: jest.fn(),
   listFilesVisibleToRole: jest.fn(),
+  listFilesUploadedByActor: jest.fn(),
   getCitizenAppointmentById: jest.fn(),
   getAssignedAppointmentForDeo: jest.fn(),
   getDeoCalendarEventById: jest.fn(),
@@ -49,6 +50,7 @@ jest.mock('../utils/logger', () => ({
 const redis = require('../config/redis');
 const filesRepository = require('../modules/files/files.repository');
 const grievancesRepository = require('../modules/grievances/grievances.repository');
+const appointmentsRepository = require('../modules/appointments/appointments.repository');
 const storageService = require('../services/storageService');
 const filesService = require('../modules/files/files.service');
 
@@ -58,6 +60,7 @@ describe('files service', () => {
     redis.incr.mockResolvedValue(1);
     redis.expire.mockResolvedValue(1);
     redis.set.mockResolvedValue('OK');
+    filesRepository.listFilesUploadedByActor.mockResolvedValue([]);
     storageService.generateUploadUrl.mockResolvedValue({
       uploadUrl: 'http://upload-url',
       expiresIn: 90,
@@ -93,7 +96,7 @@ describe('files service', () => {
     }));
   });
 
-  test('rejects citizen uploads above 5MB', async () => {
+  test('rejects citizen uploads above 10MB', async () => {
     await expect(
       filesService.createUploadUrl({
         actorRole: 'citizen',
@@ -101,7 +104,7 @@ describe('files service', () => {
         body: {
           fileName: 'big.pdf',
           mimeType: 'application/pdf',
-          size: (5 * 1024 * 1024) + 1,
+          size: (10 * 1024 * 1024) + 1,
           contextType: 'general',
         },
         reqMeta: { ip: '127.0.0.1', userAgent: 'jest' },
@@ -378,21 +381,26 @@ describe('files service', () => {
     ).rejects.toMatchObject({ statusCode: 404 });
   });
 
-  test('allows admin calendar viewers to download DEO files attached to meetings', async () => {
+  test('allows admin to download a citizen appointment file in the pool', async () => {
     filesRepository.findFileRecordById.mockResolvedValue({
       id: 'file-1',
-      s3_key: 'deo/deo-1/video.mp4',
-      uploaded_by: 'deo-1',
-      uploader_role: 'deo',
-      visible_to_role: 'minister',
-      original_name: 'video.mp4',
-      mime_type: 'video/mp4',
-      file_category: 'video',
+      s3_key: 'citizen/citizen-1/document.pdf',
+      uploaded_by: 'citizen-1',
+      uploader_role: 'citizen',
+      visible_to_role: 'admin',
+      original_name: 'document.pdf',
+      mime_type: 'application/pdf',
+      file_category: 'document',
       size: 1024,
-      context_type: 'meeting',
-      context_id: 'meeting-1',
+      context_type: 'appointment',
+      context_id: 'appointment-1',
       status: 'pending',
       created_at: '2026-04-05T00:00:00.000Z',
+    });
+    appointmentsRepository.getAppointmentById.mockResolvedValue({
+      id: 'appointment-1',
+      assignedAdminUserId: null,
+      status: 'pending',
     });
 
     await expect(
@@ -405,10 +413,15 @@ describe('files service', () => {
     ).resolves.toEqual(expect.objectContaining({ downloadUrl: 'http://download-url' }));
   });
 
-  test('lists admin and minister visible files for shared calendar viewers', async () => {
+  test('lists citizen appointment files visible to admin', async () => {
+    appointmentsRepository.getAppointmentById.mockResolvedValue({
+      id: 'appointment-1',
+      assignedAdminUserId: 'admin-1',
+      status: 'scheduled',
+    });
     filesRepository.listFilesVisibleToRole.mockResolvedValue([
       {
-        id: 'file-admin',
+        id: 'file-1',
         s3_key: 'citizen/citizen-1/document.pdf',
         uploaded_by: 'citizen-1',
         uploader_role: 'citizen',
@@ -417,23 +430,8 @@ describe('files service', () => {
         mime_type: 'application/pdf',
         file_category: 'document',
         size: 1024,
-        context_type: 'meeting',
-        context_id: 'meeting-1',
-        status: 'pending',
-        created_at: '2026-04-05T00:00:00.000Z',
-      },
-      {
-        id: 'file-minister',
-        s3_key: 'deo/deo-1/photo.png',
-        uploaded_by: 'deo-1',
-        uploader_role: 'deo',
-        visible_to_role: 'minister',
-        original_name: 'photo.png',
-        mime_type: 'image/png',
-        file_category: 'image',
-        size: 2048,
-        context_type: 'meeting',
-        context_id: 'meeting-1',
+        context_type: 'appointment',
+        context_id: 'appointment-1',
         status: 'pending',
         created_at: '2026-04-05T00:00:00.000Z',
       },
@@ -442,13 +440,13 @@ describe('files service', () => {
     const result = await filesService.listFiles({
       actorRole: 'admin',
       actorId: 'admin-1',
-      query: { contextType: 'meeting', contextId: 'meeting-1' },
+      query: { contextType: 'appointment', contextId: 'appointment-1' },
     });
 
     expect(filesRepository.listFilesVisibleToRole).toHaveBeenCalledWith(
-      ['admin', 'minister'],
-      { contextType: 'meeting', contextId: 'meeting-1' }
+      'admin',
+      { contextType: 'appointment', contextId: 'appointment-1' }
     );
-    expect(result.files.map((file) => file.id)).toEqual(['file-admin', 'file-minister']);
+    expect(result.files.map((file) => file.id)).toEqual(['file-1']);
   });
 });
