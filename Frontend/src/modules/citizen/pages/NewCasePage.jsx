@@ -615,6 +615,16 @@ const calendarNavButtonStyle = (C) => ({
   cursor: "pointer",
 });
 
+const generateUUID = () => {
+  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
+    return crypto.randomUUID();
+  }
+  return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, (c) => {
+    const r = (Math.random() * 16) | 0;
+    return (c === "x" ? r : (r & 0x3) | 0x8).toString(16);
+  });
+};
+
 const toIsoFromDateAndSlot = (dateString, timeSlot) => {
   if (!dateString || !timeSlot) {
     return "";
@@ -774,8 +784,7 @@ export default function HCMNewCasePage() {
       );
       const { data } = await apiClient.post("/appointments/request", payload, {
         headers: {
-          "Content-Type": "multipart/form-data",
-          "Idempotency-Key": crypto.randomUUID(),
+          "Idempotency-Key": generateUUID(),
         },
       });
 
@@ -843,8 +852,7 @@ export default function HCMNewCasePage() {
 
       const { data } = await apiClient.post("/grievances", payload, {
         headers: {
-          "Content-Type": "multipart/form-data",
-          "Idempotency-Key": crypto.randomUUID(),
+          "Idempotency-Key": generateUUID(),
         },
       });
 
