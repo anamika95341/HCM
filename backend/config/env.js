@@ -41,7 +41,7 @@ module.exports = {
   redisUrl: process.env.REDIS_URL,
   frontendOrigins: (process.env.FRONTEND_ORIGINS || '').split(',').map((value) => value.trim()).filter(Boolean),
   jwtIssuer: process.env.JWT_ISSUER || 'citizen-portal',
-  accessTokenTtl: process.env.ACCESS_TOKEN_TTL || '15m',
+  accessTokenTtl: process.env.ACCESS_TOKEN_TTL || '4h',
   refreshTokenTtlDays: Number(process.env.REFRESH_TOKEN_TTL_DAYS || 30),
   aadhaarEncryptionKey: getDevSecretOrEnv(process.env.AADHAAR_ENC_KEY, 'aadhaarEncryptionKey'),
   recaptchaSecret: process.env.RECAPTCHA_SECRET,

@@ -65,7 +65,7 @@ const grievanceSchema = z.object({
   description: z.string().min(10).max(5000),
   state: z.string().min(2).max(120),
   district: z.string().min(2).max(120),
-  incidentDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+  incidentDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional().or(z.literal('')),
 });
 
 const appointmentRequestSchema = z.object({
