@@ -25,7 +25,7 @@ jest.mock('../modules/notifications/notifications.service', () => ({
 }));
 
 jest.mock('../modules/files/files.service', () => ({
-  listCitizenFilesForContext: jest.fn(),
+  listCitizenFilesForContext: jest.fn().mockResolvedValue([]),
 }));
 
 const deoRepository = require('../modules/deo/deo.repository');
