@@ -14,7 +14,7 @@
     "auth-stream:requeue-dlq": "node scripts/authStreamAdmin.js requeue-dlq",
     "migrate": "node db/postgres/seeds/seed.js migrate",
     "seed": "node db/postgres/seeds/seed.js seed",
-    "test": "jest --runInBand",
+    "test": "jest --runInBand --forceExit",
     "lint:security": "npm audit --audit-level=high"
   },
   "dependencies": {
