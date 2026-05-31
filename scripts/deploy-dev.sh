@@ -7,14 +7,15 @@ cd "${DEPLOY_ROOT}"
 
 test -f backend/.env || { echo "Missing ${DEPLOY_ROOT}/backend/.env"; exit 1; }
 
-docker compose --env-file backend/.env -f compose.yml down --remove-orphans || true
-docker builder prune -af || true
-docker image prune -af || true
-
 if [[ -n "${FRONTEND_IMAGE:-}" && -n "${BACKEND_IMAGE:-}" && -n "${AUTH_STREAM_WORKER_IMAGE:-}" ]]; then
   docker compose --env-file backend/.env -f compose.yml pull frontend backend auth-stream-worker
+  docker compose --env-file backend/.env -f compose.yml down --remove-orphans || true
+  docker builder prune -af || true
+  docker image prune -af || true
   docker compose --env-file backend/.env -f compose.yml up -d --remove-orphans
 else
+  docker compose --env-file backend/.env -f compose.yml down --remove-orphans || true
+  docker builder prune -af || true
   docker compose --env-file backend/.env -f compose.yml up -d --build --remove-orphans
 fi
 
