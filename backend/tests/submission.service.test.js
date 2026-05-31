@@ -24,6 +24,7 @@ jest.mock('../modules/admin/admin.repository', () => ({
   findActiveAdminById: jest.fn(),
   findActiveDeoById: jest.fn(),
   findActiveMinisterById: jest.fn(),
+  findChiefMinisterAdmin: jest.fn(),
 }));
 
 jest.mock('../middleware/uploadHandler', () => ({
@@ -134,6 +135,7 @@ describe('submission workflow services', () => {
     pool.query
       .mockResolvedValueOnce({ rows: [{ id: 'idempo-2' }] })
       .mockResolvedValueOnce({ rows: [] });
+    adminRepository.findChiefMinisterAdmin.mockResolvedValue(null);
     grievancesRepository.createGrievance.mockResolvedValue({ id: 'grievance-db-1' });
     grievancesRepository.getGrievanceById.mockResolvedValue({ id: 'grievance-db-1', grievanceId: 'COMP-2026-000001', status: 'submitted' });
 

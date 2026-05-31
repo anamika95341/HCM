@@ -35,7 +35,7 @@ describe('rateLimiter Redis resilience', () => {
     await rateLimiter.auth(req, res, next);
 
     expect(logger.warn).toHaveBeenCalledWith(
-      'Rate limiter Redis unavailable, bypassing',
+      'Rate limiter Redis unavailable, using in-memory fallback',
       expect.objectContaining({ error: 'redis down' }),
     );
   });

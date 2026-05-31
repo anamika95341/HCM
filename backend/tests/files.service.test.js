@@ -12,6 +12,7 @@ jest.mock('../modules/files/files.repository', () => ({
   createFile: jest.fn(),
   findFileRecordById: jest.fn(),
   listFilesVisibleToRole: jest.fn(),
+  listFilesUploadedByActor: jest.fn(),
   getCitizenAppointmentById: jest.fn(),
   getAssignedAppointmentForDeo: jest.fn(),
   getDeoCalendarEventById: jest.fn(),
@@ -70,6 +71,7 @@ describe('files service', () => {
 
   test('allows a citizen to request an upload URL for a valid 5MB document', async () => {
     filesRepository.getCitizenAppointmentById.mockResolvedValue({ id: 'appointment-1' });
+    filesRepository.listFilesUploadedByActor.mockResolvedValue([]);
 
     const result = await filesService.createUploadUrl({
       actorRole: 'citizen',
@@ -93,7 +95,7 @@ describe('files service', () => {
     }));
   });
 
-  test('rejects citizen uploads above 5MB', async () => {
+  test('rejects citizen uploads above 10MB', async () => {
     await expect(
       filesService.createUploadUrl({
         actorRole: 'citizen',
@@ -101,7 +103,7 @@ describe('files service', () => {
         body: {
           fileName: 'big.pdf',
           mimeType: 'application/pdf',
-          size: (5 * 1024 * 1024) + 1,
+          size: (10 * 1024 * 1024) + 1,
           contextType: 'general',
         },
         reqMeta: { ip: '127.0.0.1', userAgent: 'jest' },

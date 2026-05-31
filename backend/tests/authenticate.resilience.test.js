@@ -19,9 +19,10 @@ const authRepository = require('../modules/auth/auth.repository');
 const { publishAuthEvent } = require('../utils/authStream');
 const authenticate = require('../middleware/authenticate');
 
-function makeReq(token = 'Bearer mock.token') {
+function makeReq(token = 'mock.token') {
   return {
-    headers: { authorization: token },
+    cookies: { access_token: token },
+    headers: {},
     originalUrl: '/api/test',
     method: 'GET',
     ip: '127.0.0.1',

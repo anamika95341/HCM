@@ -31,12 +31,14 @@ jest.mock('../modules/auth/auth.service', () => ({
 
 const request = require('supertest');
 const express = require('express');
+const cookieParser = require('cookie-parser');
 const authService = require('../modules/auth/auth.service');
 const authRoutes = require('../modules/auth/auth.routes');
 
 function makeApp() {
   const app = express();
   app.use(express.json());
+  app.use(cookieParser());
   app.use('/api/v1/auth', authRoutes);
   app.use((error, req, res, next) => {
     res.status(error.statusCode || error.status || 500).json({ error: error.message });
@@ -62,10 +64,7 @@ describe('auth API routes', () => {
       .send({ citizenId: 'CTZ12345678', password: 'StrongPass123!' });
 
     expect(response.status).toBe(200);
-    expect(response.body).toEqual(expect.objectContaining({
-      accessToken: 'access-token',
-      refreshToken: 'refresh-token-refresh-token',
-    }));
+    expect(response.body).toEqual({ user: { id: 'user-1' } });
     expect(authService.loginCitizen).toHaveBeenCalled();
   });
 
@@ -90,7 +89,7 @@ describe('auth API routes', () => {
     const app = makeApp();
     const response = await request(app)
       .post('/api/v1/auth/citizen/logout')
-      .send({ refreshToken: 'refresh-token-refresh-token' });
+      .set('Cookie', 'refresh_token=refresh-token-refresh-token');
 
     expect(response.status).toBe(200);
     expect(response.body).toEqual({ message: 'Logged out successfully' });
